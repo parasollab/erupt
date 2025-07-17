@@ -89,6 +89,19 @@ public class WristUI : MonoBehaviour
         sphere.AddComponent<Rigidbody>().useGravity = true; // Add a Rigidbody for physics
         sphere.AddComponent<XRGrabInteractable>(); // Assuming you have a Grabbable script for interaction
         sphere.transform.localScale = Vector3.one; // Set default scale
+
+        // Add tag for selection
+        sphere.tag = "Selectable"; // Ensure the sphere is tagged as selectable for the SelectionManager
+
+        // Give the shape a collider if it doesn't have one
+        if (sphere.GetComponent<Collider>() == null)
+        {
+            sphere.AddComponent<SphereCollider>();
+        }
+        else
+        {
+            sphere.GetComponent<Collider>().enabled = true; // Ensure the collider is enabled
+        }
     }
 
     public void AddCube()
@@ -99,6 +112,19 @@ public class WristUI : MonoBehaviour
         cube.AddComponent<Rigidbody>().useGravity = true; // Add a Rigidbody for physics
         cube.AddComponent<XRGrabInteractable>(); // Assuming you have a Grabbable script for interaction
         cube.transform.localScale = Vector3.one; // Set default scale
+
+        // Add tag for selection
+        cube.tag = "Selectable"; // Ensure the cube is tagged as selectable for the SelectionManager
+
+        // Give the shape a collider if it doesn't have one
+        if (cube.GetComponent<Collider>() == null)
+        {
+            cube.AddComponent<BoxCollider>();
+        }
+        else
+        {
+            cube.GetComponent<Collider>().enabled = true; // Ensure the collider is enabled
+        }
     }
 
     public void AddCylinder()
@@ -109,6 +135,19 @@ public class WristUI : MonoBehaviour
         cylinder.AddComponent<Rigidbody>().useGravity = true; // Add a Rigidbody for physics
         cylinder.AddComponent<XRGrabInteractable>(); // Assuming you have a Grabbable script for interaction
         cylinder.transform.localScale = Vector3.one; // Set default scale
+
+        // Add tag for selection
+        cylinder.tag = "Selectable"; // Ensure the cylinder is tagged as selectable for the SelectionManager
+
+        // Give the shape a collider if it doesn't have one
+        if (cylinder.GetComponent<Collider>() == null)
+        {
+            cylinder.AddComponent<CapsuleCollider>();
+        }
+        else
+        {
+            cylinder.GetComponent<Collider>().enabled = true; // Ensure the collider is enabled
+        }
     }
 
     private void ToggleMenu(InputAction.CallbackContext context)
