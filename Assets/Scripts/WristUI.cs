@@ -16,6 +16,8 @@ public class WristUI : MonoBehaviour
     public GameObject cubePrefab;
     public GameObject cylinderPrefab;
 
+    public SelectionManager selectionManager;
+
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
@@ -148,6 +150,11 @@ public class WristUI : MonoBehaviour
         {
             cylinder.GetComponent<Collider>().enabled = true; // Ensure the collider is enabled
         }
+    }
+
+    public void DeleteSelectedObject()
+    {
+        selectionManager.DeleteSelectedObject();
     }
 
     private void ToggleMenu(InputAction.CallbackContext context)

@@ -40,9 +40,6 @@ public class SelectionManager : MonoBehaviour
 
     void TrySelect()
     {
-        // Do something to visually indicate that this function was called
-        Debug.Log("SelectionManager: TrySelect called");
-
         if (rayInteractor == null || !rayInteractor.TryGetCurrent3DRaycastHit(out RaycastHit hit))
         {
             ClearSelection();
@@ -80,11 +77,31 @@ public class SelectionManager : MonoBehaviour
 
     public void ClearSelection()
     {
-        if (selectedRenderer != null)
+        if (selectedRenderer != null && selectedRenderer.gameObject != null)
         {
             selectedRenderer.material = originalMaterial;
-            selectedRenderer = null;
         }
+
+        selectedRenderer = null;
         SelectedObject = null;
+    }
+
+    public void DeleteSelectedObject()
+    {
+        if (SelectedObject != null)
+        {
+            // Clear highlight *before* destroying
+            if (selectedRenderer != null)
+            {
+                selectedRenderer.material = originalMaterial;
+            }
+
+            GameObject toDestroy = SelectedObject;
+
+            selectedRenderer = null;
+            SelectedObject = null;
+
+            Destroy(toDestroy);
+        }
     }
 }
