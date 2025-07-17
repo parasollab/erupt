@@ -12,6 +12,10 @@ public class WristUI : MonoBehaviour
     private GameObject addShapePanel;
     private GameObject resizePanel;
 
+    public GameObject spherePrefab;
+    public GameObject cubePrefab;
+    public GameObject cylinderPrefab;
+
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
@@ -80,28 +84,31 @@ public class WristUI : MonoBehaviour
     public void AddSphere()
     {
         // Spawn a grabbable sphere in front of the user
-        GameObject sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        GameObject sphere = Instantiate(spherePrefab);
         sphere.transform.position = Camera.main.transform.position + Camera.main.transform.forward * 2f;
         sphere.AddComponent<Rigidbody>().useGravity = true; // Add a Rigidbody for physics
         sphere.AddComponent<XRGrabInteractable>(); // Assuming you have a Grabbable script for interaction
+        sphere.transform.localScale = Vector3.one; // Set default scale
     }
 
     public void AddCube()
     {
         // Spawn a grabbable cube in front of the user
-        GameObject cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        GameObject cube = Instantiate(cubePrefab);
         cube.transform.position = Camera.main.transform.position + Camera.main.transform.forward * 2f;
         cube.AddComponent<Rigidbody>().useGravity = true; // Add a Rigidbody for physics
         cube.AddComponent<XRGrabInteractable>(); // Assuming you have a Grabbable script for interaction
+        cube.transform.localScale = Vector3.one; // Set default scale
     }
 
     public void AddCylinder()
     {
         // Spawn a grabbable cylinder in front of the user
-        GameObject cylinder = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        GameObject cylinder = Instantiate(cylinderPrefab);
         cylinder.transform.position = Camera.main.transform.position + Camera.main.transform.forward * 2f;
         cylinder.AddComponent<Rigidbody>().useGravity = true; // Add a Rigidbody for physics
         cylinder.AddComponent<XRGrabInteractable>(); // Assuming you have a Grabbable script for interaction
+        cylinder.transform.localScale = Vector3.one; // Set default scale
     }
 
     private void ToggleMenu(InputAction.CallbackContext context)
