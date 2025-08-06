@@ -12,9 +12,12 @@ public class WristUI : MonoBehaviour
     private GameObject addShapePanel;
     private GameObject resizePanel;
 
-    public GameObject spherePrefab;
-    public GameObject cubePrefab;
-    public GameObject cylinderPrefab;
+    public Material litMaterial;
+
+    // Remove individual prefab references since we'll use Unity primitives
+    // public GameObject spherePrefab;
+    // public GameObject cubePrefab;
+    // public GameObject cylinderPrefab;
 
     public SelectionManager selectionManager;
 
@@ -83,73 +86,80 @@ public class WristUI : MonoBehaviour
         }
     }
 
+    // Generalized method to create any primitive shape
+    public void AddPrimitiveShape(PrimitiveType primitiveType)
+    {
+        // Create the primitive using Unity's built-in method
+        GameObject shape = GameObject.CreatePrimitive(primitiveType);
+        
+        // Position the shape in front of the user
+        shape.transform.position = Camera.main.transform.position + Camera.main.transform.forward * 2f;
+        
+        // Add physics components
+        Rigidbody rb = shape.AddComponent<Rigidbody>();
+        rb.useGravity = false;
+        rb.isKinematic = true;
+        
+        // Add XR interaction (will be controlled by SelectableGrabController)
+        shape.AddComponent<XRGrabInteractable>();
+        
+        // Add component to control grabbing based on selection state
+        shape.AddComponent<SelectableGrabController>();
+        
+        // Set default scale
+        shape.transform.localScale = Vector3.one;
+        
+        // Add tag for selection
+        shape.tag = "Selectable";
+
+        var meshRenderer = shape.GetComponent<MeshRenderer>();
+        if (meshRenderer != null && litMaterial != null)
+            meshRenderer.material = litMaterial;
+        
+        // Ensure collider is enabled (should already be there from CreatePrimitive)
+        Collider collider = shape.GetComponent<Collider>();
+        if (collider != null)
+        {
+            collider.enabled = true;
+        }
+
+        // Add CollisionObjectPublisher to automatically publish to ROS
+        CollisionObjectPublisher publisher = shape.AddComponent<CollisionObjectPublisher>();
+        // Generate unique ID for each object
+        publisher.objectId = $"unity_{primitiveType.ToString().ToLower()}_{System.DateTime.Now.Ticks}";
+        
+        // Automatically select the newly created object so user can immediately grab it
+        if (selectionManager != null)
+        {
+            selectionManager.SetSelectedObject(shape);
+        }
+    }
+
+    // Convenience methods for specific shapes
     public void AddSphere()
     {
-        // Spawn a grabbable sphere in front of the user
-        GameObject sphere = Instantiate(spherePrefab);
-        sphere.transform.position = Camera.main.transform.position + Camera.main.transform.forward * 2f;
-        sphere.AddComponent<Rigidbody>().useGravity = true; // Add a Rigidbody for physics
-        sphere.AddComponent<XRGrabInteractable>(); // Assuming you have a Grabbable script for interaction
-        sphere.transform.localScale = Vector3.one; // Set default scale
-
-        // Add tag for selection
-        sphere.tag = "Selectable"; // Ensure the sphere is tagged as selectable for the SelectionManager
-
-        // Give the shape a collider if it doesn't have one
-        if (sphere.GetComponent<Collider>() == null)
-        {
-            sphere.AddComponent<SphereCollider>();
-        }
-        else
-        {
-            sphere.GetComponent<Collider>().enabled = true; // Ensure the collider is enabled
-        }
+        AddPrimitiveShape(PrimitiveType.Sphere);
     }
 
     public void AddCube()
     {
-        // Spawn a grabbable cube in front of the user
-        GameObject cube = Instantiate(cubePrefab);
-        cube.transform.position = Camera.main.transform.position + Camera.main.transform.forward * 2f;
-        cube.AddComponent<Rigidbody>().useGravity = true; // Add a Rigidbody for physics
-        cube.AddComponent<XRGrabInteractable>(); // Assuming you have a Grabbable script for interaction
-        cube.transform.localScale = Vector3.one; // Set default scale
-
-        // Add tag for selection
-        cube.tag = "Selectable"; // Ensure the cube is tagged as selectable for the SelectionManager
-
-        // Give the shape a collider if it doesn't have one
-        if (cube.GetComponent<Collider>() == null)
-        {
-            cube.AddComponent<BoxCollider>();
-        }
-        else
-        {
-            cube.GetComponent<Collider>().enabled = true; // Ensure the collider is enabled
-        }
+        AddPrimitiveShape(PrimitiveType.Cube);
     }
 
     public void AddCylinder()
     {
-        // Spawn a grabbable cylinder in front of the user
-        GameObject cylinder = Instantiate(cylinderPrefab);
-        cylinder.transform.position = Camera.main.transform.position + Camera.main.transform.forward * 2f;
-        cylinder.AddComponent<Rigidbody>().useGravity = true; // Add a Rigidbody for physics
-        cylinder.AddComponent<XRGrabInteractable>(); // Assuming you have a Grabbable script for interaction
-        cylinder.transform.localScale = Vector3.one; // Set default scale
+        AddPrimitiveShape(PrimitiveType.Cylinder);
+    }
 
-        // Add tag for selection
-        cylinder.tag = "Selectable"; // Ensure the cylinder is tagged as selectable for the SelectionManager
+    // Additional primitive types you might want
+    public void AddCapsule()
+    {
+        AddPrimitiveShape(PrimitiveType.Capsule);
+    }
 
-        // Give the shape a collider if it doesn't have one
-        if (cylinder.GetComponent<Collider>() == null)
-        {
-            cylinder.AddComponent<CapsuleCollider>();
-        }
-        else
-        {
-            cylinder.GetComponent<Collider>().enabled = true; // Ensure the collider is enabled
-        }
+    public void AddPlane()
+    {
+        AddPrimitiveShape(PrimitiveType.Plane);
     }
 
     public void DeleteSelectedObject()

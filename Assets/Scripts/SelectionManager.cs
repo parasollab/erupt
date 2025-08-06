@@ -17,6 +17,10 @@ public class SelectionManager : MonoBehaviour
     private Renderer selectedRenderer;
 
     public GameObject SelectedObject { get; private set; }
+    
+    // Events for selection changes
+    public System.Action<GameObject> OnObjectSelected;
+    public System.Action OnSelectionCleared;
 
     private void Awake()
     {
@@ -42,17 +46,29 @@ public class SelectionManager : MonoBehaviour
     {
         if (rayInteractor == null || !rayInteractor.TryGetCurrent3DRaycastHit(out RaycastHit hit))
         {
+            // Clicked on empty space - deselect all
             ClearSelection();
             return;
         }
 
-        if (rayInteractor.TryGetCurrent3DRaycastHit(out _))
+        GameObject hitObj = hit.collider.gameObject;
+        
+        if (hitObj.CompareTag("Selectable"))
         {
-            GameObject hitObj = hit.collider.gameObject;
-            if (hitObj.CompareTag("Selectable"))
+            // Check if clicking on already selected object - toggle selection
+            if (SelectedObject == hitObj)
             {
-                SetSelectedObject(hitObj);
+                ClearSelection(); // Deselect if clicking on selected object
             }
+            else
+            {
+                SetSelectedObject(hitObj); // Select new object
+            }
+        }
+        else
+        {
+            // Clicked on non-selectable object - deselect all
+            ClearSelection();
         }
     }
 
@@ -73,6 +89,9 @@ public class SelectionManager : MonoBehaviour
             originalMaterial = selectedRenderer.material;
             selectedRenderer.material = highlightMaterial;
         }
+        
+        // Notify listeners that an object was selected
+        OnObjectSelected?.Invoke(SelectedObject);
     }
 
     public void ClearSelection()
@@ -84,6 +103,9 @@ public class SelectionManager : MonoBehaviour
 
         selectedRenderer = null;
         SelectedObject = null;
+        
+        // Notify listeners that selection was cleared
+        OnSelectionCleared?.Invoke();
     }
 
     public void DeleteSelectedObject()

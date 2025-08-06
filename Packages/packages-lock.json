@@ -1,16 +1,5 @@
 {
   "dependencies": {
-    "com.parasol.rader": {
-      "version": "file:RADER",
-      "depth": 0,
-      "source": "embedded",
-      "dependencies": {
-        "com.unity.xr.interaction.toolkit": "2.5.4",
-        "com.unity.xr.core-utils": "2.3.0",
-        "com.unity.textmeshpro": "3.0.9",
-        "com.unity.xr.hands": "1.5.0"
-      }
-    },
     "com.unity.2d.sprite": {
       "version": "1.0.0",
       "depth": 0,
@@ -162,20 +151,24 @@
       }
     },
     "com.unity.robotics.ros-tcp-connector": {
-      "version": "https://github.com/parasollab/ROS-TCP-Connector.git?path=/com.unity.robotics.ros-tcp-connector",
+      "version": "file:/Users/imngui/Documents/Projects/Unity/ROS-TCP-Connector/com.unity.robotics.ros-tcp-connector",
       "depth": 0,
-      "source": "git",
-      "dependencies": {},
-      "hash": "55a0aae2f39751998df8f95d043504418d3c2931"
+      "source": "local",
+      "dependencies": {}
     },
     "com.unity.robotics.urdf-importer": {
-      "version": "https://github.com/parasollab/URDF-Importer.git?path=/com.unity.robotics.urdf-importer",
+      "version": "file:/Users/imngui/Documents/Projects/Unity/URDF-Importer/com.unity.robotics.urdf-importer",
       "depth": 0,
-      "source": "git",
+      "source": "local",
       "dependencies": {
         "com.unity.editorcoroutines": "1.0.0"
-      },
-      "hash": "0319b0221c1af4c89503bc966856f0afcba15e16"
+      }
+    },
+    "com.unity.robotics.visualizations": {
+      "version": "file:/Users/imngui/Documents/Projects/Unity/ROS-TCP-Connector/com.unity.robotics.visualizations",
+      "depth": 0,
+      "source": "local",
+      "dependencies": {}
     },
     "com.unity.searcher": {
       "version": "4.9.2",
@@ -213,14 +206,6 @@
         "com.unity.modules.jsonserialize": "1.0.0"
       },
       "url": "https://packages.unity.com"
-    },
-    "com.unity.textmeshpro": {
-      "version": "3.0.9",
-      "depth": 1,
-      "source": "builtin",
-      "dependencies": {
-        "com.unity.ugui": "2.0.0"
-      }
     },
     "com.unity.timeline": {
       "version": "1.8.7",
@@ -277,19 +262,6 @@
       "source": "registry",
       "dependencies": {
         "com.unity.modules.xr": "1.0.0"
-      },
-      "url": "https://packages.unity.com"
-    },
-    "com.unity.xr.hands": {
-      "version": "1.5.0",
-      "depth": 1,
-      "source": "registry",
-      "dependencies": {
-        "com.unity.modules.xr": "1.0.0",
-        "com.unity.inputsystem": "1.3.0",
-        "com.unity.mathematics": "1.2.6",
-        "com.unity.xr.core-utils": "2.2.0",
-        "com.unity.xr.management": "4.0.1"
       },
       "url": "https://packages.unity.com"
     },
