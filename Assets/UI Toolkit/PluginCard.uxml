@@ -1,0 +1,12 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <Style src="project://database/Assets/UI%20Toolkit/Cards.uss?fileID=7433441132597879392&amp;guid=6b897a800b7ab4ac6bb783b6585707e9&amp;type=3#Cards" />
+    <ui:VisualElement name="card" style="padding: 10px; margin: 6px 8px; border-width: 1px; border-radius: 10px; border-color: rgb(70, 70, 70); background-color: rgb(35, 35, 35); flex-shrink: 0;">
+        <ui:VisualElement name="row" style="flex-direction: row; align-items: center;">
+            <ui:Toggle name="enable" style="width: 24px; height: 24px;" />
+            <ui:VisualElement name="center" style="flex-grow: 1; align-items: center;">
+                <ui:Label name="title" text="Item" style="-unity-text-align: middle-center; font-size: 14px; -unity-font-style: bold;" />
+            </ui:VisualElement>
+            <ui:VisualElement name="spacer" style="width: 24px; height: 1px;" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

@@ -1,0 +1,11 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <Style src="project://database/Assets/UI%20Toolkit/PluginCards.uss?fileID=7433441132597879392&amp;guid=6b897a800b7ab4ac6bb783b6585707e9&amp;type=3#PluginCards" />
+    <ui:VisualElement name="card" style="padding: 10px; margin: 6px 8px; border-width: 1px; border-radius: 10px; border-color: rgb(70, 70, 70); background-color: rgb(35, 35, 35); flex-shrink: 0;">
+        <ui:VisualElement name="row" style="flex-direction: row; align-items: center; justify-content: space-between;">
+            <ui:VisualElement name="left" style="flex-grow: 1; align-items: flex-start;">
+                <ui:Label name="pluginName" text="Plugin Name" style="-unity-text-align: upper-left; font-size: 14px; -unity-font-style: bold; color: white;" />
+            </ui:VisualElement>
+            <ui:Button name="addPluginButton" style="min-width: auto; height: 40px; border-top-left-radius: 50px; border-top-right-radius: 50px; border-bottom-right-radius: 50px; border-bottom-left-radius: 50px; width: 40px; overflow: visible; background-color: rgb(255, 0, 143); border-top-width: 0; border-right-width: 0; border-bottom-width: 0; border-left-width: 0; border-left-color: rgba(149, 149, 149, 0); border-right-color: rgba(149, 149, 149, 0); border-top-color: rgba(149, 149, 149, 0); border-bottom-color: rgba(149, 149, 149, 0); background-image: url(&quot;project://database/Assets/_Heathen%20Engineering/Assets/UX/Icons/Flat%20Icons%20[Free]/Free%20Flat%20Plus%20Icon.png?fileID=21300000&amp;guid=dbd47afd428ae6e46acf14df8476e8db&amp;type=3#Free Flat Plus Icon&quot;); -unity-background-image-tint-color: rgb(0, 15, 255); background-size: 60% 60%;" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>
