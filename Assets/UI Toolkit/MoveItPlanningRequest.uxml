@@ -1,0 +1,10 @@
+<ui:UXML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" noNamespaceSchemaLocation="../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
+    <ui:VisualElement style="flex-grow: 1; background-color: rgb(99, 99, 99);">
+        <ui:Label text="Planning Request Menu" name="planningRequestMenuLabel" style="-unity-text-align: upper-center; -unity-font-style: bold; font-size: 20px; border-bottom-width: 3px; border-bottom-color: rgb(0, 0, 0);" />
+        <ui:Button text="Set Start State" name="planningRequestSetStartButton" style="-unity-font-style: bold;" />
+        <ui:Button text="Set Goal State" name="planningRequestSetGoalStateButton" style="-unity-font-style: bold;" />
+        <ui:DropdownField label="Planner" name="planningRequestPlannerIDDropDown" style="-unity-font-style: bold;" />
+        <ui:IntegerField label="Num Planning Attempts" value="42" name="planningRequestNumPlanningAttemptsInput" style="-unity-font-style: bold;" />
+        <ui:FloatField label="Allowed Planning Time" value="42.2" name="planningRequestAllowedPlanningTimeInput" style="-unity-font-style: bold;" />
+    </ui:VisualElement>
+</ui:UXML>

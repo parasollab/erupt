@@ -1185,6 +1185,7 @@ GameObject:
   - component: {fileID: 314651392}
   - component: {fileID: 314651393}
   - component: {fileID: 314651396}
+  - component: {fileID: 314651397}
   m_Layer: 0
   m_Name: XRDashboard
   m_TagString: Untagged
@@ -1277,6 +1278,33 @@ UIRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+--- !u!114 &314651397
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 314651391}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e860ba9b154b49838bd17994a417852, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::XRDashboardUI
+  uiDocument: {fileID: 314651393}
+  applyBackgroundStyling: 1
+  startHidden: 0
+  cardsStyles: {fileID: 7433441132597879392, guid: 6b897a800b7ab4ac6bb783b6585707e9, type: 3}
+  activeCardTemplate: {fileID: 9197481963319205126, guid: 57dda3de328b3410c8d5bce806114d86, type: 3}
+  addPluginCardTemplate: {fileID: 9197481963319205126, guid: 200b208699fac433a8199acb2945065c, type: 3}
+  activeCardRowHeight: 80
+  addPluginCardRowHeight: 72
+  inputActions: {fileID: 0}
+  actionMapName: XRI Left Interaction
+  toggleActionName: Menu
+  defaultVisualizationSuite: {fileID: 1422744418}
+  autoFindVisualizationSuite: 1
+  allActiveCards: []
+  availablePlugins: []
 --- !u!1 &410087039
 GameObject:
   m_ObjectHideFlags: 0
@@ -4032,6 +4060,11 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1406818641}
   m_CullTransparentMesh: 1
+--- !u!1 &1422744418 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 3885009520023495737, guid: 7e8ecfd17cd58c247916864b74797f3f, type: 3}
+  m_PrefabInstance: {fileID: 1494195009}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1444191561
 GameObject:
   m_ObjectHideFlags: 0
@@ -4324,7 +4357,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3885009520023495737, guid: 7e8ecfd17cd58c247916864b74797f3f, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 3885009520023495739, guid: 7e8ecfd17cd58c247916864b74797f3f, type: 3}
       propertyPath: m_LocalPosition.x
