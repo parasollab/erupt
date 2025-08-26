@@ -2032,6 +2032,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: DebugPanel
       objectReference: {fileID: 0}
+    - target: {fileID: 1000011928778752, guid: bac85bcbcdc58924f840d203376147c2, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 224000010550048884, guid: bac85bcbcdc58924f840d203376147c2, type: 3}
       propertyPath: m_Pivot.x
       value: 0.5
@@ -2419,6 +2423,7 @@ GameObject:
   m_Component:
   - component: {fileID: 873622719}
   - component: {fileID: 873622721}
+  - component: {fileID: 873622722}
   m_Layer: 5
   m_Name: PlanningRequestMenu
   m_TagString: Untagged
@@ -2464,6 +2469,28 @@ MonoBehaviour:
   m_PivotReferenceSize: 0
   m_Pivot: 0
   m_WorldSpaceCollider: {fileID: 0}
+--- !u!114 &873622722
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 873622718}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 05c065f740c1f4c94b68815678f02569, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MoveItPlanningRequestMenuUI
+  uiDocument: {fileID: 873622721}
+  planningGroupName: ur_manipulator
+  planningPipelineId: ompl
+  defaultPlannerId: ur_manipulator
+  defaultNumPlanningAttempts: 10
+  defaultAllowedPlanningTime: 5
+  motionPlanRequestTopic: /move_group/plan
+  motionPlanResponseTopic: /move_group/result
+  plannerQueryServiceName: /query_planner_interface
+  PlannerResults: []
 --- !u!1 &928193516
 GameObject:
   m_ObjectHideFlags: 0

@@ -9,27 +9,32 @@ using RosMessageTypes.Trajectory;
 using RosMessageTypes.Sensor;
 using System.Collections.Generic;
 using System.Linq;
+using System;
 
 public class MoveItPlanningRequestMenuUI : MonoBehaviour
 {
     [Header("UI Toolkit")]
     [SerializeField] private UIDocument uiDocument;
     
-    [Header("MoveIt Configuration")]
-    [SerializeField] private string planningGroupName = "manipulator";
+    [Header("MoveIt2 Configuration")]
+    [SerializeField] private string planningGroupName = "ur_manipulator";
     [SerializeField] private string planningPipelineId = "ompl";
-    [SerializeField] private string defaultPlannerId = "RRTConnect";
+    [SerializeField] private string defaultPlannerId = "ur_manipulator";
     [SerializeField] private int defaultNumPlanningAttempts = 10;
     [SerializeField] private float defaultAllowedPlanningTime = 5.0f;
     
-    [Header("ROS Topics")]
+    [Header("ROS 2 Topics")]
     [SerializeField] private string motionPlanRequestTopic = "/move_group/plan";
     [SerializeField] private string motionPlanResponseTopic = "/move_group/result";
+    
+    [Header("Planner Query Service")]
+    [SerializeField] private string plannerQueryServiceName = "/query_planner_interface";
     
     // UI Elements
     private VisualElement root;
     private Button setStartStateButton;
     private Button setGoalStateButton;
+    private DropdownField plannerPipelineDropdown;
     private DropdownField plannerDropdown;
     private IntegerField numPlanningAttemptsField;
     private FloatField allowedPlanningTimeField;
@@ -45,22 +50,19 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     private bool hasStartState = false;
     private bool hasGoalState = false;
     
-    // Available planners
-    private readonly List<string> availablePlanners = new List<string>
+    // Planner querying
+    private bool isQueryingPlanners = false;
+    private Dictionary<string, string[]> pipelineToPlanners = new Dictionary<string, string[]>();
+    
+    // Parsed results for planner dropdowns
+    [Serializable]
+    public class PlannerListing
     {
-        "RRTConnect",
-        "RRT",
-        "RRTStar",
-        "PRM",
-        "PRMStar",
-        "BKPIECE",
-        "KPIECE",
-        "BiTRRT",
-        "FMT",
-        "STRIDE",
-        "SPARS",
-        "SPARStwo"
-    };
+        public string pipelineId;
+        public string[] plannerIds;
+    }
+    
+    public List<PlannerListing> PlannerResults = new List<PlannerListing>();
 
     private void OnEnable()
     {
@@ -77,6 +79,20 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         InitializeUIElements();
         SetupEventHandlers();
         InitializeROSConnection();
+        
+        // Start planner querying immediately
+        StartPlannerQuerying();
+    }
+
+    private void StartPlannerQuerying()
+    {
+        Debug.Log("MoveItPlanningRequestMenuUI: Starting planner query...");
+        // Register the service and start querying
+        if (ros != null)
+        {
+            ros.RegisterRosService<QueryPlannerInterfacesRequest, QueryPlannerInterfacesResponse>(plannerQueryServiceName);
+            InvokeRepeating(nameof(TryQueryPlanners), 0.5f, 1.0f); // retry until it succeeds
+        }
     }
 
     private void InitializeUIElements()
@@ -85,22 +101,25 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         planningRequestMenuLabel = root.Q<Label>("planningRequestMenuLabel");
         setStartStateButton = root.Q<Button>("planningRequestSetStartButton");
         setGoalStateButton = root.Q<Button>("planningRequestSetGoalStateButton");
+        plannerPipelineDropdown = root.Q<DropdownField>("planningRequestPlannerPipelineIDDropDown");
         plannerDropdown = root.Q<DropdownField>("planningRequestPlannerIDDropDown");
         numPlanningAttemptsField = root.Q<IntegerField>("planningRequestNumPlanningAttemptsInput");
         allowedPlanningTimeField = root.Q<FloatField>("planningRequestAllowedPlanningTimeInput");
         
         // Validate UI elements
         if (setStartStateButton == null || setGoalStateButton == null || 
-            plannerDropdown == null || numPlanningAttemptsField == null || 
-            allowedPlanningTimeField == null)
+            plannerPipelineDropdown == null || plannerDropdown == null || 
+            numPlanningAttemptsField == null || allowedPlanningTimeField == null)
         {
             Debug.LogError("MoveItPlanningRequestMenuUI: One or more UI elements not found in UXML.");
             return;
         }
         
-        // Initialize dropdown with available planners
-        plannerDropdown.choices = availablePlanners;
-        plannerDropdown.value = defaultPlannerId;
+        // Initialize dropdowns with empty lists - will be populated by ROS
+        plannerPipelineDropdown.choices = new List<string>();
+        plannerPipelineDropdown.value = "";
+        plannerDropdown.choices = new List<string>();
+        plannerDropdown.value = "";
         
         // Set default values
         numPlanningAttemptsField.value = defaultNumPlanningAttempts;
@@ -115,8 +134,137 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         setStartStateButton.clicked += OnSetStartStateClicked;
         setGoalStateButton.clicked += OnSetGoalStateClicked;
         
+        // Setup dropdown event handlers
+        plannerPipelineDropdown.RegisterValueChangedCallback(OnPipelineSelectionChanged);
+        
         // Add planning request button (if you want to add one)
         // planningRequestButton.clicked += OnPlanningRequestClicked;
+    }
+
+    private void OnPipelineSelectionChanged(ChangeEvent<string> evt)
+    {
+        string selectedPipeline = evt.newValue;
+        planningPipelineId = selectedPipeline;
+
+        if (pipelineToPlanners.TryGetValue(selectedPipeline, out var planners))
+        {
+            plannerDropdown.choices = planners.ToList();
+            var pick = planners.Contains(defaultPlannerId) ? defaultPlannerId :
+                       planners.Length > 0 ? planners[0] : "";
+            plannerDropdown.SetValueWithoutNotify(pick);
+        }
+        else
+        {
+            plannerDropdown.choices = new List<string>();
+            plannerDropdown.SetValueWithoutNotify("");
+        }
+
+        Debug.Log($"MoveItPlanningRequestMenuUI: Pipeline changed to: {selectedPipeline}");
+    }
+
+    private void TryQueryPlanners()
+    {
+        if (isQueryingPlanners) return;
+        if (ros == null || !ros.HasConnectionThread)
+        {
+            Debug.LogWarning("[MoveIt] Waiting for ROS-TCP connection...");
+            return;
+        }
+
+        isQueryingPlanners = true;
+        var req = new QueryPlannerInterfacesRequest();
+        try
+        {
+            ros.SendServiceMessage<QueryPlannerInterfacesResponse>(
+                plannerQueryServiceName, req,
+                OnPlannerQueryResponse
+            );
+            Debug.Log($"[MoveIt] Query planner interfaces request sent to {plannerQueryServiceName}");
+        }
+        catch (Exception e)
+        {
+            isQueryingPlanners = false;
+            Debug.LogError($"[MoveIt] Service call failed: {e.GetType().Name}: {e.Message}");
+        }
+    }
+
+    // Call this whenever you update UI from a callback/thread.
+    void UI(Action a)
+    {
+        // Ensure we run on the UI panel's schedule (main thread, next frame)
+        if (root != null)
+            root.schedule.Execute(() => a()).ExecuteLater(0);
+        else
+            a();
+    }
+
+    private void OnPlannerQueryResponse(QueryPlannerInterfacesResponse resp)
+    {
+        isQueryingPlanners = false;
+        CancelInvoke(nameof(TryQueryPlanners));
+
+        if (resp == null || resp.planner_interfaces == null)
+        {
+            Debug.LogWarning("[MoveIt] Empty response from /query_planner_interface");
+            return;
+        }
+
+        PlannerResults.Clear();
+        pipelineToPlanners.Clear();
+
+        foreach (var desc in resp.planner_interfaces)
+        {
+            var pipeline = desc.pipeline_id ?? string.Empty;
+            var planners = desc.planner_ids ?? Array.Empty<string>();
+
+            PlannerResults.Add(new PlannerListing
+            {
+                pipelineId = pipeline,
+                plannerIds = planners
+            });
+
+            pipelineToPlanners[pipeline] = planners;
+            Debug.Log($"[MoveIt] Pipeline: {pipeline} | Planners: {string.Join(", ", planners)}");
+        }
+
+        Debug.Log($"MoveItPlanningRequestMenuUI: Successfully loaded {PlannerResults.Count} planner interfaces.");
+
+        UI(() =>
+        {
+            // 1) Update pipeline dropdown
+            var discoveredPipelines = pipelineToPlanners.Keys.ToList();
+
+            plannerPipelineDropdown.choices = discoveredPipelines;
+
+            // Pick a valid pipeline
+            string chosenPipeline = planningPipelineId;
+            if (!discoveredPipelines.Contains(chosenPipeline))
+                chosenPipeline = discoveredPipelines.Count > 0 ? discoveredPipelines[0] : "";
+
+            // IMPORTANT: Set without notify, then manually update planners
+            plannerPipelineDropdown.SetValueWithoutNotify(chosenPipeline);
+            planningPipelineId = chosenPipeline;
+
+            // 2) Update planner dropdown for the selected pipeline
+            if (!string.IsNullOrEmpty(chosenPipeline) && pipelineToPlanners.TryGetValue(chosenPipeline, out var planners))
+            {
+                plannerDropdown.choices = planners.ToList();
+                // If your default isn't in the list, pick the first one
+                var chosenPlanner = planners.Contains(defaultPlannerId) ? defaultPlannerId :
+                                    planners.Length > 0 ? planners[0] : "";
+                plannerDropdown.SetValueWithoutNotify(chosenPlanner);
+            }
+            else
+            {
+                plannerDropdown.choices = new List<string>();
+                plannerDropdown.SetValueWithoutNotify("");
+            }
+
+            Debug.Log($"[MoveIt] UI updated: {discoveredPipelines.Count} pipelines, " +
+                      $"{(string.IsNullOrEmpty(planningPipelineId) ? 0 : plannerDropdown.choices.Count)} planners.");
+        });
+
+        Debug.Log($"MoveItPlanningRequestMenuUI: Successfully loaded {PlannerResults.Count} planner interfaces.");
     }
 
     private void InitializeROSConnection()
@@ -174,7 +322,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     {
         if (!isConnected)
         {
-            Debug.LogWarning("MoveItPlanningRequestMenuUI: ROS connection not available.");
+            Debug.LogWarning("MoveItPlanningRequestMenuUI: ROS 2 connection not available.");
             return;
         }
         
@@ -184,7 +332,23 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
             return;
         }
         
-        var planningRequest = new MotionPlanRequestMsg
+        // Get the selected planner from the dropdown
+        string selectedPlanner = plannerDropdown.value;
+        if (string.IsNullOrEmpty(selectedPlanner))
+        {
+            Debug.LogWarning("MoveItPlanningRequestMenuUI: No planner selected.");
+            return;
+        }
+        
+        var planningRequest = CreateMotionPlanRequest();
+        ros.Publish(motionPlanRequestTopic, planningRequest);
+        
+        Debug.Log($"MoveItPlanningRequestMenuUI: ROS 2 planning request sent with planner: {selectedPlanner}");
+    }
+
+    private MotionPlanRequestMsg CreateMotionPlanRequest()
+    {
+        var request = new MotionPlanRequestMsg
         {
             workspace_parameters = new WorkspaceParametersMsg(),
             start_state = currentStartState,
@@ -193,7 +357,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
             trajectory_constraints = new TrajectoryConstraintsMsg(),
             reference_trajectories = new GenericTrajectoryMsg[0],
             pipeline_id = planningPipelineId,
-            planner_id = plannerDropdown.value,
+            planner_id = plannerDropdown.value, // Use the selected planner from dropdown
             group_name = planningGroupName,
             num_planning_attempts = numPlanningAttemptsField.value,
             allowed_planning_time = allowedPlanningTimeField.value,
@@ -202,9 +366,8 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
             cartesian_speed_limited_link = "",
             max_cartesian_speed = 0.0
         };
-        ros.Publish(motionPlanRequestTopic, planningRequest);
         
-        Debug.Log($"MoveItPlanningRequestMenuUI: Planning request sent with planner: {plannerDropdown.value}");
+        return request;
     }
 
     private ConstraintsMsg[] CreateGoalConstraints()
@@ -379,5 +542,12 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         {
             ros.Unsubscribe(motionPlanResponseTopic);
         }
+        
+        // Cancel any pending invokes
+        CancelInvoke(nameof(TryQueryPlanners));
+        
+        // // Unregister service if needed
+        // if (ros != null)
+        //     ros.UnregisterRosService(plannerQueryServiceName);
     }
 }
