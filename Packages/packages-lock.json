@@ -1,5 +1,16 @@
 {
   "dependencies": {
+    "com.parasol.rader": {
+      "version": "file:RADER",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.unity.xr.interaction.toolkit": "2.5.4",
+        "com.unity.xr.core-utils": "2.3.0",
+        "com.unity.textmeshpro": "3.0.9",
+        "com.unity.xr.hands": "1.5.0"
+      }
+    },
     "com.unity.2d.sprite": {
       "version": "1.0.0",
       "depth": 0,
@@ -151,13 +162,13 @@
       }
     },
     "com.unity.robotics.ros-tcp-connector": {
-      "version": "file:/Users/imngui/Documents/Projects/Unity/ROS-TCP-Connector/com.unity.robotics.ros-tcp-connector",
+      "version": "file:./ROS-TCP-Connector/com.unity.robotics.ros-tcp-connector",
       "depth": 0,
       "source": "local",
       "dependencies": {}
     },
     "com.unity.robotics.urdf-importer": {
-      "version": "file:/Users/imngui/Documents/Projects/Unity/URDF-Importer/com.unity.robotics.urdf-importer",
+      "version": "file:./URDF-Importer/com.unity.robotics.urdf-importer",
       "depth": 0,
       "source": "local",
       "dependencies": {
@@ -165,7 +176,7 @@
       }
     },
     "com.unity.robotics.visualizations": {
-      "version": "file:/Users/imngui/Documents/Projects/Unity/ROS-TCP-Connector/com.unity.robotics.visualizations",
+      "version": "file:./ROS-TCP-Connector/com.unity.robotics.visualizations",
       "depth": 0,
       "source": "local",
       "dependencies": {}
@@ -206,14 +217,22 @@
       },
       "url": "https://packages.unity.com"
     },
+    "com.unity.textmeshpro": {
+      "version": "5.0.0",
+      "depth": 1,
+      "source": "builtin",
+      "dependencies": {
+        "com.unity.ugui": "2.0.0"
+      }
+    },
     "com.unity.timeline": {
       "version": "1.8.9",
       "depth": 0,
       "source": "registry",
       "dependencies": {
-        "com.unity.modules.audio": "1.0.0",
         "com.unity.modules.director": "1.0.0",
         "com.unity.modules.animation": "1.0.0",
+        "com.unity.modules.audio": "1.0.0",
         "com.unity.modules.particlesystem": "1.0.0"
       },
       "url": "https://packages.unity.com"
@@ -261,8 +280,8 @@
       "source": "registry",
       "dependencies": {
         "com.unity.inputsystem": "1.6.3",
-        "com.unity.xr.core-utils": "2.2.2",
-        "com.unity.xr.management": "4.0.1"
+        "com.unity.xr.management": "4.0.1",
+        "com.unity.xr.core-utils": "2.2.2"
       },
       "url": "https://packages.unity.com"
     },
@@ -272,6 +291,19 @@
       "source": "registry",
       "dependencies": {
         "com.unity.modules.xr": "1.0.0"
+      },
+      "url": "https://packages.unity.com"
+    },
+    "com.unity.xr.hands": {
+      "version": "1.5.0",
+      "depth": 1,
+      "source": "registry",
+      "dependencies": {
+        "com.unity.modules.xr": "1.0.0",
+        "com.unity.inputsystem": "1.3.0",
+        "com.unity.mathematics": "1.2.6",
+        "com.unity.xr.core-utils": "2.2.0",
+        "com.unity.xr.management": "4.0.1"
       },
       "url": "https://packages.unity.com"
     },

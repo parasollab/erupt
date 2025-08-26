@@ -1,0 +1,151 @@
+using System.Linq;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class TranslucentOverride : MonoBehaviour
+{
+    [Header("Overlay Color/Alpha")]
+    public Color overlayColor = new Color(0f, 0.6f, 1f, 0.35f); // solid color with translucency
+
+    [Header("Provide your own material OR leave empty to auto-create")]
+    public Material overlayMaterial;
+
+    // Cache of original materials for each renderer
+    private readonly Dictionary<Renderer, Material[]> _originals = new Dictionary<Renderer, Material[]>();
+    private bool _isApplied;
+    private Material _runtimeMat;
+
+    public void SetTranslucent(bool on)
+    {
+        if (on == _isApplied) return;
+        if (on) Apply();
+        else Restore();
+    }
+
+    private void Apply()
+    {
+        var renderers = GetComponentsInChildren<Renderer>(includeInactive: true);
+        if (renderers.Length == 0) return;
+
+        // Create a runtime instance of the overlay material if needed.
+        // If user didn’t assign one, try to choose a suitable shader and build it.
+        if (_runtimeMat == null)
+        {
+            if (overlayMaterial != null)
+            {
+                _runtimeMat = Instantiate(overlayMaterial);
+            }
+            else
+            {
+                // Try URP/HDRP/Standard in that order.
+                Shader shader =
+                    Shader.Find("Universal Render Pipeline/Lit") ??
+                    Shader.Find("HDRP/Lit") ??
+                    Shader.Find("Standard");
+                _runtimeMat = new Material(shader);
+            }
+
+            ConfigureAsTransparent(_runtimeMat, overlayColor);
+        }
+
+        _originals.Clear();
+
+        foreach (var r in renderers)
+        {
+            // Cache originals
+            var mats = r.sharedMaterials;
+            _originals[r] = mats;
+
+            // Prepare an array of the same overlay mat repeated for each submesh
+            var newArray = Enumerable.Repeat(_runtimeMat, Mathf.Max(1, mats.Length)).ToArray();
+            r.sharedMaterials = newArray;
+        }
+
+        _isApplied = true;
+    }
+
+    private void Restore()
+    {
+        if (!_isApplied) return;
+
+        foreach (var kvp in _originals)
+        {
+            var r = kvp.Key;
+            if (r) r.sharedMaterials = kvp.Value;
+        }
+        _originals.Clear();
+
+        _isApplied = false;
+    }
+
+    private void OnDestroy()
+    {
+        // Safety: restore if still applied
+        if (_isApplied) Restore();
+        if (_runtimeMat) Destroy(_runtimeMat);
+    }
+
+    /// <summary>
+    /// Sets up a material to be transparent and uniformly colored across pipelines.
+    /// </summary>
+    private static void ConfigureAsTransparent(Material mat, Color color)
+    {
+    var name = mat.shader ? mat.shader.name : "";
+    mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+
+    // Use a reasonable default alpha if someone passes 0 or 1
+    if (color.a <= 0f) color.a = 0.35f;
+    if (color.a >= 1f) color.a = 0.5f;
+
+    if (name.Contains("Universal Render Pipeline"))
+    {
+        // URP Lit/Unlit
+        mat.SetFloat("_Surface", 1f);                 // Transparent
+        mat.SetFloat("_AlphaClip", 0f);               // NO cutout
+        mat.DisableKeyword("_ALPHATEST_ON");
+
+        // Ensure standard alpha blending (not premultiplied)
+        mat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+        if (mat.HasProperty("_SrcBlend")) mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+        if (mat.HasProperty("_DstBlend")) mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+        if (mat.HasProperty("_ZWrite"))   mat.SetInt("_ZWrite", 0);
+
+        if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", color);
+        if (mat.HasProperty("_BaseColorFactor")) mat.SetColor("_BaseColorFactor", color);
+    }
+    else if (name.Contains("HDRP"))
+    {
+        // HDRP Lit
+        mat.SetFloat("_SurfaceType", 1f);             // Transparent
+        if (mat.HasProperty("_BlendMode")) mat.SetFloat("_BlendMode", 0f); // 0 = Alpha
+        if (mat.HasProperty("_AlphaCutoffEnable")) mat.SetFloat("_AlphaCutoffEnable", 0f);
+        if (mat.HasProperty("_ZWrite")) mat.SetInt("_ZWrite", 0);
+
+        if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", color);
+
+        // Optional “flatter” look:
+        // if (mat.HasProperty("_EnableFogOnTransparent")) mat.SetFloat("_EnableFogOnTransparent", 0f);
+    }
+    else
+    {
+        // Built-in Standard — use FADE mode for smooth translucency
+        // (Transparent/premultiplied often causes “too invisible” look)
+        mat.SetFloat("_Mode", 2f); // 2 = Fade
+        mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+        mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+        mat.SetInt("_ZWrite", 0);
+        mat.DisableKeyword("_ALPHATEST_ON");
+        mat.EnableKeyword("_ALPHABLEND_ON");
+        mat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+        if (mat.HasProperty("_Color")) mat.SetColor("_Color", color);
+    }
+
+    mat.enableInstancing = true;
+    }
+
+
+  public void Start()
+  {
+    SetTranslucent(true);
+  }
+}
