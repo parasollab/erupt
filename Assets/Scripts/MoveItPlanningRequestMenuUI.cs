@@ -85,7 +85,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     }
 
     private void StartPlannerQuerying()
-    {
+    { 
         Debug.Log("MoveItPlanningRequestMenuUI: Starting planner query...");
         // Register the service and start querying
         if (ros != null)
