@@ -1,0 +1,31 @@
+{
+    "name": "xrviz",
+    "rootNamespace": "",
+    "references": [
+        "GUID:3f8053c1a58fb7f47b2af9d34d2e4b1e",
+        "GUID:98a54df5fd4214e20bd19abe9b8d96e8",
+        "GUID:625bfc588fb96c74696858f2c467e978",
+        "GUID:5db6cbfd5d0e86a46862a70f4b4067f2",
+        "GUID:ba58c43074cf72549aa2ac5937dae44b",
+        "GUID:fe685ec1767f73d42b749ea8045bfe43",
+        "GUID:75469ad4d38634e559750d17036d5f7c",
+        "GUID:6055be8ebefd69e48b49212b09b47b2f"
+    ],
+    "includePlatforms": [
+        "Android",
+        "Editor",
+        "EmbeddedLinux",
+        "LinuxStandalone64",
+        "macOSStandalone",
+        "WindowsStandalone32",
+        "WindowsStandalone64"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
