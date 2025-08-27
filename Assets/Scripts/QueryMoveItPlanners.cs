@@ -40,21 +40,21 @@ public class QueryMoveItPlanners : MonoBehaviour
     void Start()
     {
         // Wait for SystemPrewarmer to complete before starting
-        if (SystemPrewarmer.IsPrewarmingComplete)
-        {
-            StartQuerying();
-        }
-        else
-        {
-            // Subscribe to the prewarming complete event
-            SystemPrewarmer.OnPrewarmingComplete += OnPrewarmingComplete;
-        }
+        // if (SystemPrewarmer.IsPrewarmingComplete)
+        // {
+        //     StartQuerying();
+        // }
+        // else
+        // {
+        //     // Subscribe to the prewarming complete event
+        //     SystemPrewarmer.OnPrewarmingComplete += OnPrewarmingComplete;
+        // }
     }
 
     private void OnPrewarmingComplete()
     {
         // Unsubscribe from the event
-        SystemPrewarmer.OnPrewarmingComplete -= OnPrewarmingComplete;
+        // SystemPrewarmer.OnPrewarmingComplete -= OnPrewarmingComplete;
         
         // Start the querying process
         StartQuerying();
