@@ -29,6 +29,9 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     
     [Header("Planner Query Service")]
     [SerializeField] private string plannerQueryServiceName = "/query_planner_interface";
+
+    [Header("Ghost Robots")]
+    [SerializeField] private SpawnGhosts ghostSpawner;
     
     // UI Elements
     private VisualElement root;
@@ -43,8 +46,10 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     // ROS Connection
     private ROSConnection ros;
     private bool isConnected = false;
-    
+
     // Planning state
+    private bool startSet = false;
+    private bool goalSet = false;
     private RobotStateMsg currentStartState;
     private RobotStateMsg currentGoalState;
     private bool hasStartState = false;
@@ -288,6 +293,16 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
     private void OnSetStartStateClicked()
     {
+        if (!startSet)
+        {
+            ghostSpawner.SpawnStartGhost();
+            startSet = true;
+        }
+        else
+        {
+            ghostSpawner.UpdateStartGhost();
+        }
+
         if (!isConnected)
         {
             Debug.LogWarning("MoveItPlanningRequestMenuUI: ROS connection not available.");
@@ -304,6 +319,16 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
     private void OnSetGoalStateClicked()
     {
+        if (!goalSet)
+        {
+            ghostSpawner.SpawnGoalGhost();
+            goalSet = true;
+        }
+        else
+        {
+            ghostSpawner.UpdateGoalGhost();
+        }
+
         if (!isConnected)
         {
             Debug.LogWarning("MoveItPlanningRequestMenuUI: ROS connection not available.");

@@ -36,6 +36,17 @@ public class SpawnGhosts : MonoBehaviour
         }
     }
 
+    public void SpawnStartGhost()
+    {
+        // Get the joint angles from the real robot
+        RobotManager robotManager = realRobot.GetComponent<RobotManager>();
+        if (robotManager != null)
+        {
+            float[] jointAngles = robotManager.GetJointAngles();
+            SpawnStartGhost(jointAngles);
+        }
+    }
+
     public void SpawnGoalGhost(float[] jointAngles)
     {
         goalGhost = Instantiate(robotPrefab);
@@ -53,6 +64,63 @@ public class SpawnGhosts : MonoBehaviour
         if (robotManager != null)
         {
             robotManager.SetJointAngles(jointAngles);
+        }
+    }
+
+    public void SpawnGoalGhost()
+    {
+        // Get the joint angles from the real robot
+        RobotManager robotManager = realRobot.GetComponent<RobotManager>();
+        if (robotManager != null)
+        {
+            float[] jointAngles = robotManager.GetJointAngles();
+            SpawnGoalGhost(jointAngles);
+        }
+    }
+
+    public void UpdateStartGhost(float[] jointAngles)
+    {
+        if (startGhost != null)
+        {
+            RobotManager robotManager = startGhost.GetComponent<RobotManager>();
+            if (robotManager != null)
+            {
+                robotManager.SetJointAngles(jointAngles);
+            }
+        }
+    }
+
+    public void UpdateStartGhost()
+    {
+        // Get the joint angles from the real robot
+        RobotManager robotManager = realRobot.GetComponent<RobotManager>();
+        if (robotManager != null)
+        {
+            float[] jointAngles = robotManager.GetJointAngles();
+            UpdateStartGhost(jointAngles);
+        }
+    }
+
+    public void UpdateGoalGhost(float[] jointAngles)
+    {
+        if (goalGhost != null)
+        {
+            RobotManager robotManager = goalGhost.GetComponent<RobotManager>();
+            if (robotManager != null)
+            {
+                robotManager.SetJointAngles(jointAngles);
+            }
+        }
+    }
+
+    public void UpdateGoalGhost()
+    {
+        // Get the joint angles from the real robot
+        RobotManager robotManager = realRobot.GetComponent<RobotManager>();
+        if (robotManager != null)
+        {
+            float[] jointAngles = robotManager.GetJointAngles();
+            UpdateGoalGhost(jointAngles);
         }
     }
 
