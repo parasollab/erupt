@@ -32,6 +32,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
     [Header("Ghost Robots")]
     [SerializeField] private SpawnGhosts ghostSpawner;
+    [SerializeField] private TrajectoryReplay trajectoryReplayer;
     
     // UI Elements
     private VisualElement root;
@@ -42,6 +43,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     private IntegerField numPlanningAttemptsField;
     private FloatField allowedPlanningTimeField;
     private Label planningRequestMenuLabel;
+    private Button planningRequestButton;
     
     // ROS Connection
     private ROSConnection ros;
@@ -110,11 +112,12 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         plannerDropdown = root.Q<DropdownField>("planningRequestPlannerIDDropDown");
         numPlanningAttemptsField = root.Q<IntegerField>("planningRequestNumPlanningAttemptsInput");
         allowedPlanningTimeField = root.Q<FloatField>("planningRequestAllowedPlanningTimeInput");
+        planningRequestButton = root.Q<Button>("planningRequestSendButton");
         
         // Validate UI elements
-        if (setStartStateButton == null || setGoalStateButton == null || 
-            plannerPipelineDropdown == null || plannerDropdown == null || 
-            numPlanningAttemptsField == null || allowedPlanningTimeField == null)
+        if (setStartStateButton == null || setGoalStateButton == null ||
+            plannerPipelineDropdown == null || plannerDropdown == null ||
+            numPlanningAttemptsField == null || allowedPlanningTimeField == null || planningRequestButton == null)
         {
             Debug.LogError("MoveItPlanningRequestMenuUI: One or more UI elements not found in UXML.");
             return;
@@ -143,7 +146,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         plannerPipelineDropdown.RegisterValueChangedCallback(OnPipelineSelectionChanged);
         
         // Add planning request button (if you want to add one)
-        // planningRequestButton.clicked += OnPlanningRequestClicked;
+        planningRequestButton.clicked += SendPlanningRequest;
     }
 
     private void OnPipelineSelectionChanged(ChangeEvent<string> evt)
@@ -515,9 +518,18 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
     private void ExecuteTrajectory(JointTrajectoryMsg trajectory)
     {
-        // This method should execute the planned trajectory on your robot
-        // Implementation depends on your robot control system
-        Debug.Log("MoveItPlanningRequestMenuUI: Trajectory execution not implemented yet.");
+        // This method should send the trajectory to your robot or simulation for execution
+        Debug.Log("MoveItPlanningRequestMenuUI: Executing trajectory...");
+        
+        // Example: Use the TrajectoryReplay component to visualize the trajectory
+        if (trajectoryReplayer != null)
+        {
+            StartCoroutine(trajectoryReplayer.StartReplay(trajectory));
+        }
+        else
+        {
+            Debug.Log("MoveItPlanningRequestMenuUI: No TrajectoryReplay component assigned.");
+        }
     }
 
     private void UpdateButtonStates()

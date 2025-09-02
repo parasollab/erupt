@@ -6,10 +6,10 @@ public class SpawnGhosts : MonoBehaviour
     public GameObject robotPrefab;
 
     // Default start color is transluscent green
-    private Color startGhostColor = new Color(0, 1, 0, 0.5f); // RGBA
+    public Color startGhostColor = new Color(0, 1, 0, 0.5f); // RGBA
 
     // Default goal color is transluscent orange
-    private Color goalGhostColor = new Color(1, 0.5f, 0, 0.5f); // RGBA
+    public Color goalGhostColor = new Color(1, 0.5f, 0, 0.5f); // RGBA
 
     public GameObject realRobot;
 

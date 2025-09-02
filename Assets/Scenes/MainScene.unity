@@ -1300,6 +1300,7 @@ MonoBehaviour:
   motionPlanResponseTopic: /move_group/result
   plannerQueryServiceName: /query_planner_interface
   ghostSpawner: {fileID: 2049209135}
+  trajectoryReplayer: {fileID: 2049209137}
   PlannerResults: []
 --- !u!1 &277324831
 GameObject:
@@ -7540,6 +7541,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2049209136}
   - component: {fileID: 2049209135}
+  - component: {fileID: 2049209137}
   m_Layer: 0
   m_Name: SpawnGhosts
   m_TagString: Untagged
@@ -7560,6 +7562,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: xrviz::SpawnGhosts
   robotPrefab: {fileID: 6218579206858659184, guid: 75a7667bb6680412091ea4ee29978066, type: 3}
+  startGhostColor: {r: 0, g: 1, b: 0, a: 0.5}
+  goalGhostColor: {r: 1, g: 0.5, b: 0, a: 0.5}
   realRobot: {fileID: 1981893040}
 --- !u!4 &2049209136
 Transform:
@@ -7576,6 +7580,21 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2049209137
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2049209134}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: def60ca2db7f14a38a20ba986fcb8496, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: xrviz::TrajectoryReplay
+  real_robot: {fileID: 1981893040}
+  robot_prefab: {fileID: 6218579206858659184, guid: 75a7667bb6680412091ea4ee29978066, type: 3}
+  ghostColor: {r: 0, g: 1, b: 1, a: 0.5}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
