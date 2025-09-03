@@ -1290,6 +1290,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 05c065f740c1f4c94b68815678f02569, type: 3}
   m_Name: 
   m_EditorClassIdentifier: xrviz::MoveItPlanningRequestMenuUI
+  robot: {fileID: 1981893040}
   uiDocument: {fileID: 277060372}
   planningGroupName: ur_manipulator
   planningPipelineId: ompl
