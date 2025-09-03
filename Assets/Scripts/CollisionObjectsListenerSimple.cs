@@ -10,6 +10,7 @@ using PlaneMsg = RosMessageTypes.Shape.PlaneMsg;
 using SolidPrimitiveMsg = RosMessageTypes.Shape.SolidPrimitiveMsg;
 using PointMsg = RosMessageTypes.Geometry.PointMsg;
 using QuaternionMsg = RosMessageTypes.Geometry.QuaternionMsg;
+using Unity.Robotics.ROSTCPConnector.ROSGeometry;
 
 public class CollisionObjectsListenerSimple : MonoBehaviour
 {
@@ -125,17 +126,19 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
     void ApplyWorldPose(Transform t, PoseMsg rosPose)
     {
         // ROS (x,y,z) → Unity (x,z,y)
-        Vector3 pos = new Vector3(
-            (float)rosPose.position.x,
-            (float)rosPose.position.z,
-            (float)rosPose.position.y
-        );
-        Quaternion rot = new Quaternion(
-            (float)rosPose.orientation.x,
-            (float)rosPose.orientation.z,
-            (float)rosPose.orientation.y,
-            (float)rosPose.orientation.w
-        );
+        Vector3 pos = rosPose.position.From<FLU>();
+        // Vector3 pos = new Vector3(
+        //     (float)rosPose.position.x,
+        //     (float)rosPose.position.z,
+        //     (float)rosPose.position.y
+        // );
+        Quaternion rot = rosPose.orientation.From<FLU>();
+        // Quaternion rot = new Quaternion(
+        //     (float)rosPose.orientation.x,
+        //     (float)rosPose.orientation.z,
+        //     (float)rosPose.orientation.y,
+        //     (float)rosPose.orientation.w
+        // );
         t.position = worldOrigin.TransformPoint(pos);
         t.rotation = worldOrigin.rotation * rot;
     }
@@ -143,17 +146,19 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
     void ApplyLocalPose(Transform t, PoseMsg rosPose)
     {
         // Local pose relative to parent (object frame). Same axis remap.
-        t.localPosition = new Vector3(
-            (float)rosPose.position.x,
-            (float)rosPose.position.z,
-            (float)rosPose.position.y
-        );
-        t.localRotation = new Quaternion(
-            (float)rosPose.orientation.x,
-            (float)rosPose.orientation.z,
-            (float)rosPose.orientation.y,
-            (float)rosPose.orientation.w
-        );
+        t.localPosition = rosPose.position.From<FLU>();
+        t.localRotation = rosPose.orientation.From<FLU>();
+        // t.localPosition = new Vector3(
+        //     (float)rosPose.position.x,
+        //     (float)rosPose.position.z,
+        //     (float)rosPose.position.y
+        // );
+        // t.localRotation = new Quaternion(
+        //     (float)rosPose.orientation.x,
+        //     (float)rosPose.orientation.z,
+        //     (float)rosPose.orientation.y,
+        //     (float)rosPose.orientation.w
+        // );
     }
 
     // ---------- Builders ----------

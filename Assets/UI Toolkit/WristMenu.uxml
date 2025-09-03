@@ -1,0 +1,17 @@
+<ui:UXML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" noNamespaceSchemaLocation="../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
+    <ui:VisualElement name="wristMenuMainPanel" style="flex-grow: 1;">
+        <ui:VisualElement enabled="true" name="wristMenuOptionsPanel" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0.53); padding-bottom: 0; flex-direction: column; flex-shrink: 0; visibility: visible; display: flex; opacity: 1;">
+            <ui:Label text="Options" name="wristMenuOptionsLabel" style="-unity-text-align: upper-center; color: rgb(255, 250, 250); -unity-font-style: bold; border-bottom-width: 3px; border-bottom-color: rgb(255, 250, 250); margin-bottom: 10px; font-size: 24px;" />
+            <ui:Button text="Add Shape" name="wristMenuAddShapeButton" style="-unity-font-style: bold; margin-top: 0; margin-bottom: 10px;" />
+            <ui:Button text="Resize Shape" name="wristMenuResizeShapeButton" style="-unity-font-style: bold; margin-top: 0; margin-bottom: 10px;" />
+            <ui:Button text="Delete Shape" name="wristMenuDeleteShapeButton" style="-unity-font-style: bold; margin-top: 0; margin-bottom: 10px;" />
+        </ui:VisualElement>
+        <ui:VisualElement name="wristMenuAddShapePanel" enabled="false" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0.53); color: rgb(255, 250, 250); border-bottom-width: 0; border-bottom-color: rgb(0, 0, 0); display: none;">
+            <ui:Label text="Add Shape" name="wristMenuAddShapeLabel" style="-unity-text-align: upper-center; -unity-font-style: bold; border-bottom-width: 3px; border-bottom-color: rgb(255, 250, 250); margin-bottom: 10px; font-size: 24px;" />
+            <ui:Button name="wristMenuAddShapeBackButton" style="width: 48px; height: 36px; position: absolute; top: 0; left: 0; background-image: url(&quot;project://database/Assets/_Heathen%20Engineering/Assets/UX/Icons/Flat%20Icons%20[Free]/Free%20Flat%20Arrow%201%20W%20Icon.png?fileID=21300000&amp;guid=f1737b486a23f634bb246de79b8d4f4b&amp;type=3#Free Flat Arrow 1 W Icon&quot;); background-color: rgba(188, 188, 188, 0); border-left-color: rgba(149, 149, 149, 0); border-right-color: rgba(149, 149, 149, 0); border-top-color: rgba(149, 149, 149, 0); border-bottom-color: rgba(149, 149, 149, 0);" />
+            <ui:Button text="Add Cube" name="wristMenuAddCubeButton" style="margin-top: 0; margin-bottom: 10px; color: rgb(26, 26, 26); -unity-font-style: bold;" />
+            <ui:Button text="Add Sphere" name="wristMenuAddSphereButton" style="margin-top: 0; margin-bottom: 10px; color: rgb(26, 26, 26); -unity-font-style: bold;" />
+            <ui:Button text="Add Cylinder" name="wristMenuAddCylinderButton" style="margin-top: 0; margin-bottom: 10px; color: rgb(26, 26, 26); -unity-font-style: bold;" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>
