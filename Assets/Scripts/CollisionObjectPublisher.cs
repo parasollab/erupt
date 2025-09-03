@@ -13,8 +13,8 @@ public class CollisionObjectPublisher : MonoBehaviour
     public string objectId = "unity_object";
     public string frameId = "world";
     public bool isMesh = false;
-    public bool autoDetectMeshType = true; // New field for automatic detection
-    public bool createReadableMeshCopy = true; // Create readable copy of non-readable meshes
+    public bool autoDetectMeshType = false; // New field for automatic detection
+    public bool createReadableMeshCopy = false; // Create readable copy of non-readable meshes
     public float publishRateHz = 1f;
 
     private ROSConnection ros;
@@ -55,7 +55,7 @@ public class CollisionObjectPublisher : MonoBehaviour
         lastScale = transform.localScale;
 
         // Log object analysis for debugging
-        AnalyzeObject();
+        // AnalyzeObject();
     }
 
     void Update()
@@ -93,30 +93,6 @@ public class CollisionObjectPublisher : MonoBehaviour
         catch
         {
             return false;
-        }
-    }
-
-    // Method to re-register publisher if needed
-    void EnsurePublisherRegistered()
-    {
-        if (ros == null)
-        {
-            Debug.LogError($"ROS connection is null for object '{gameObject.name}' - cannot register publisher");
-            return;
-        }
-
-        if (!IsPublisherRegistered())
-        {
-            Debug.LogWarning($"Publisher not registered for object '{gameObject.name}' - attempting to re-register");
-            try
-            {
-                ros.RegisterPublisher<CollisionObjectMsg>("/collision_object");
-                Debug.Log($"Successfully re-registered publisher for object '{gameObject.name}'");
-            }
-            catch (System.Exception e)
-            {
-                Debug.LogError($"Failed to re-register publisher for object '{gameObject.name}': {e.Message}");
-            }
         }
     }
 
@@ -158,36 +134,6 @@ public class CollisionObjectPublisher : MonoBehaviour
         Debug.Log("=== End Status ===");
     }
 
-    // Public method to manually trigger a test publish
-    [ContextMenu("Test Publish")]
-    public void TestPublish()
-    {
-        Debug.Log($"=== Testing Publish for '{gameObject.name}' ===");
-        
-        // Check ROS connection first
-        if (ros == null)
-        {
-            Debug.LogError("Cannot test publish - ROS connection is null");
-            return;
-        }
-
-        // Ensure publisher is registered
-        EnsurePublisherRegistered();
-
-        // Try to publish
-        try
-        {
-            PublishCollisionObject();
-            Debug.Log("Test publish completed successfully");
-        }
-        catch (System.Exception e)
-        {
-            Debug.LogError($"Test publish failed: {e.Message}");
-        }
-        
-        Debug.Log("=== End Test ===");
-    }
-
     void PublishCollisionObject()
     {
         bool isMesh = false;
@@ -198,9 +144,6 @@ public class CollisionObjectPublisher : MonoBehaviour
             Debug.LogError($"ROS connection is null for object '{gameObject.name}' - cannot publish");
             return;
         }
-
-        // Ensure publisher is registered
-        EnsurePublisherRegistered();
 
         // Validate topic name
         string topicName = "/collision_object";
@@ -226,7 +169,7 @@ public class CollisionObjectPublisher : MonoBehaviour
             }
         };
 
-        if (ShouldTreatAsMesh())
+        if (!isMesh && ShouldTreatAsMesh())
         {
             Mesh mesh = GetReadableMesh();
             if (mesh != null)

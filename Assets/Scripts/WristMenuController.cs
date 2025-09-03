@@ -322,6 +322,7 @@ public class WristMenuController : MonoBehaviour
         
         // Add CollisionObjectPublisher to automatically publish to ROS
         CollisionObjectPublisher publisher = shape.AddComponent<CollisionObjectPublisher>();
+        publisher.isMesh = false;
         // Generate unique ID for each object
         publisher.objectId = $"unity_{primitiveType.ToString().ToLower()}_{System.DateTime.Now.Ticks}";
         
