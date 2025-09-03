@@ -24,9 +24,8 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     [SerializeField] private float defaultAllowedPlanningTime = 5.0f;
     
     [Header("ROS 2 Topics")]
-    [SerializeField] private string motionPlanRequestTopic = "/move_group/plan";
-    [SerializeField] private string motionPlanResponseTopic = "/move_group/result";
-    
+    [SerializeField] private string motionPlanServiceName = "/plan_kinematic_path";
+
     [Header("Planner Query Service")]
     [SerializeField] private string plannerQueryServiceName = "/query_planner_interface";
 
@@ -282,8 +281,8 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
             ros = ROSConnection.GetOrCreateInstance();
             isConnected = true;
             
-            // Register for motion plan response
-            ros.Subscribe<MotionPlanResponseMsg>(motionPlanResponseTopic, OnMotionPlanResponse);
+            // Register for motion plan service
+            ros.RegisterRosService<MotionPlanRequestMsg, MotionPlanResponseMsg>(motionPlanServiceName);
             
             Debug.Log("MoveItPlanningRequestMenuUI: ROS connection established successfully.");
         }
@@ -369,8 +368,11 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         }
         
         var planningRequest = CreateMotionPlanRequest();
-        ros.Publish(motionPlanRequestTopic, planningRequest);
-        
+        ros.SendServiceMessage<MotionPlanResponseMsg>(
+            motionPlanServiceName, planningRequest,
+            OnMotionPlanResponse
+        );
+
         Debug.Log($"MoveItPlanningRequestMenuUI: ROS 2 planning request sent with planner: {selectedPlanner}");
     }
 
@@ -567,19 +569,10 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
     private void OnDisable()
     {
-        if (ros != null && isConnected)
-        {
-            ros.Unsubscribe(motionPlanResponseTopic);
-        }
     }
 
     private void OnDestroy()
-    {
-        if (ros != null && isConnected)
-        {
-            ros.Unsubscribe(motionPlanResponseTopic);
-        }
-        
+    {    
         // Cancel any pending invokes
         CancelInvoke(nameof(TryQueryPlanners));
         
