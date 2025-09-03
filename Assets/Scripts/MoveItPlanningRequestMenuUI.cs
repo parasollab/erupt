@@ -13,6 +13,9 @@ using System;
 
 public class MoveItPlanningRequestMenuUI : MonoBehaviour
 {
+    [Header("Robot")]
+    [SerializeField] private GameObject robot;
+
     [Header("UI Toolkit")]
     [SerializeField] private UIDocument uiDocument;
     
@@ -32,6 +35,9 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     [Header("Ghost Robots")]
     [SerializeField] private SpawnGhosts ghostSpawner;
     [SerializeField] private TrajectoryReplay trajectoryReplayer;
+
+    // Robot
+    private RobotManager robotManager;
     
     // UI Elements
     private VisualElement root;
@@ -81,7 +87,10 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
             Debug.LogError("MoveItPlanningRequestMenuUI: No UIDocument/rootVisualElement found.");
             return;
         }
-        
+
+        // Get the robot manager
+        robotManager = robot.GetComponent<RobotManager>();
+
         InitializeUIElements();
         SetupEventHandlers();
         InitializeROSConnection();
@@ -451,22 +460,26 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     {
         // This method should get the current robot state from your robot or simulation
         // For now, we'll create a placeholder state
+        // Convert joint angles from degrees to radians
+        var jointAnglesDegrees = robotManager.GetJointAngles();
+        var jointAnglesRadians = jointAnglesDegrees.Select(x => (double)x * Mathf.Deg2Rad).ToArray();
+
         var robotState = new RobotStateMsg
         {
             joint_state = new JointStateMsg
             {
-                header = new HeaderMsg
-                {
-                    frame_id = "base_link",
-                    stamp = new TimeMsg { 
-                        sec = (int)Time.time,
-                        nanosec = (uint)((Time.time - (int)Time.time) * 1e9)
-                    }
-                },
-                name = new string[] { "joint1", "joint2", "joint3", "joint4", "joint5", "joint6" },
-                position = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 },
-                velocity = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 },
-                effort = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 }
+            header = new HeaderMsg
+            {
+                frame_id = "base_link",
+                stamp = new TimeMsg { 
+                sec = (int)Time.time,
+                nanosec = (uint)((Time.time - (int)Time.time) * 1e9)
+                }
+            },
+            name = new string[] { "shoulder_pan_joint", "shoulder_lift_joint", "elbow_joint", "wrist_1_joint", "wrist_2_joint", "wrist_3_joint" },
+            position = jointAnglesRadians,
+            velocity = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 },
+            effort = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 }
             },
             multi_dof_joint_state = new MultiDOFJointStateMsg()
         };
@@ -478,22 +491,25 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     {
         // This method should get the goal robot state from user interaction or predefined poses
         // For now, we'll create a placeholder state with different joint values
+        var jointAnglesDegrees = robotManager.GetJointAngles();
+        var jointAnglesRadians = jointAnglesDegrees.Select(x => (double)x * Mathf.Deg2Rad).ToArray();
+        
         var robotState = new RobotStateMsg
         {
             joint_state = new JointStateMsg
             {
-                header = new HeaderMsg
-                {
-                    frame_id = "base_link",
-                    stamp = new TimeMsg { 
-                        sec = (int)Time.time,
-                        nanosec = (uint)((Time.time - (int)Time.time) * 1e9)
-                    }
-                },
-                name = new string[] { "joint1", "joint2", "joint3", "joint4", "joint5", "joint6" },
-                position = new double[] { 1.57, 0.0, 0.0, 0.0, 0.0, 0.0 },
-                velocity = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 },
-                effort = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 }
+            header = new HeaderMsg
+            {
+                frame_id = "base_link",
+                stamp = new TimeMsg { 
+                sec = (int)Time.time,
+                nanosec = (uint)((Time.time - (int)Time.time) * 1e9)
+                }
+            },
+            name = new string[] { "shoulder_pan_joint", "shoulder_lift_joint", "elbow_joint", "wrist_1_joint", "wrist_2_joint", "wrist_3_joint" },
+            position = jointAnglesRadians,
+            velocity = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 },
+            effort = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 }
             },
             multi_dof_joint_state = new MultiDOFJointStateMsg()
         };
