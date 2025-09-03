@@ -97,6 +97,9 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         if (ros != null)
         {
             ros.RegisterRosService<QueryPlannerInterfacesRequest, QueryPlannerInterfacesResponse>(plannerQueryServiceName);
+
+            ros.RegisterRosService<GetMotionPlanRequest, GetMotionPlanResponse>(motionPlanServiceName);
+
             InvokeRepeating(nameof(TryQueryPlanners), 0.5f, 1.0f); // retry until it succeeds
         }
     }
@@ -276,21 +279,22 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
     private void InitializeROSConnection()
     {
-        try
+        isConnected = false;
+
+        ros = ROSConnection.GetOrCreateInstance();
+
+        if (ros == null)
         {
-            ros = ROSConnection.GetOrCreateInstance();
-            isConnected = true;
-            
-            // Register for motion plan service
-            ros.RegisterRosService<MotionPlanRequestMsg, MotionPlanResponseMsg>(motionPlanServiceName);
-            
-            Debug.Log("MoveItPlanningRequestMenuUI: ROS connection established successfully.");
+            Debug.LogError("MoveItPlanningRequestMenuUI: Failed to create ROS connection.");
+            return;
         }
-        catch (System.Exception e)
-        {
-            Debug.LogError($"MoveItPlanningRequestMenuUI: Failed to establish ROS connection: {e.Message}");
-            isConnected = false;
-        }
+
+        isConnected = true;
+
+        // // Register for motion plan service
+        // ros.RegisterRosService<GetMotionPlanRequest, GetMotionPlanResponse>(motionPlanServiceName);
+
+        Debug.Log("MoveItPlanningRequestMenuUI: ROS connection established successfully.");
     }
 
     private void OnSetStartStateClicked()
@@ -368,8 +372,9 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         }
         
         var planningRequest = CreateMotionPlanRequest();
-        ros.SendServiceMessage<MotionPlanResponseMsg>(
-            motionPlanServiceName, planningRequest,
+        GetMotionPlanRequest motionPlanRequest = new GetMotionPlanRequest(planningRequest);
+        ros.SendServiceMessage<GetMotionPlanResponse>(
+            motionPlanServiceName, motionPlanRequest,
             OnMotionPlanResponse
         );
 
@@ -496,25 +501,26 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         return robotState;
     }
 
-    private void OnMotionPlanResponse(MotionPlanResponseMsg response)
+    private void OnMotionPlanResponse(GetMotionPlanResponse response)
     {
-        if (response.error_code.val == 1) // SUCCESS
+        var motionPlanResponse = response.motion_plan_response;
+        if (motionPlanResponse.error_code.val == 1) // SUCCESS
         {
-            Debug.Log($"MoveItPlanningRequestMenuUI: Planning successful! Planning time: {response.planning_time}s");
-            
+            Debug.Log($"MoveItPlanningRequestMenuUI: Planning successful! Planning time: {motionPlanResponse.planning_time}s");
+
             // Handle the planned trajectory
-            if (response.trajectory?.joint_trajectory != null)
+            if (motionPlanResponse.trajectory?.joint_trajectory != null)
             {
-                var trajectory = response.trajectory.joint_trajectory;
+                var trajectory = motionPlanResponse.trajectory.joint_trajectory;
                 Debug.Log($"MoveItPlanningRequestMenuUI: Trajectory has {trajectory.points.Length} waypoints");
-                
+
                 // You can execute the trajectory here or store it for later execution
                 ExecuteTrajectory(trajectory);
             }
         }
         else
         {
-            Debug.LogError($"MoveItPlanningRequestMenuUI: Planning failed with error code: {response.error_code.val} - {response.error_code.message}");
+            Debug.LogError($"MoveItPlanningRequestMenuUI: Planning failed with error code: {motionPlanResponse.error_code.val} - {motionPlanResponse.error_code.message}");
         }
     }
 
