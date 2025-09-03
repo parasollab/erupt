@@ -19,24 +19,27 @@ public class SystemPrewarmer : MonoBehaviour
     {
         StartCoroutine(PrewarmSystemsDelayed());
     }
-    
+
     private IEnumerator PrewarmSystemsDelayed()
     {
         // Wait for scene to fully load
         yield return new WaitForSeconds(prewarmDelay);
-        
-        Debug.Log("SystemPrewarmer: Starting system pre-warming...");
-        
+
+        // Debug.Log("SystemPrewarmer: Starting system pre-warming...");
+
         // Pre-warm ROS connection and publisher registration
         PrewarmROSConnection();
-        
+
         // Pre-warm primitive creation (this is usually the biggest cause of lag)
         yield return StartCoroutine(PrewarmPrimitiveCreation());
-        
+
         // Pre-warm XR interaction system
         PrewarmXRInteractionSystem();
-        
-        Debug.Log("SystemPrewarmer: System pre-warming completed!");
+
+        // Debug.Log("SystemPrewarmer: System pre-warming completed!");
+
+        // Spawn the MainScene
+        UnityEngine.SceneManagement.SceneManager.LoadScene("MainScene");
     }
     
     private void PrewarmROSConnection()
@@ -49,7 +52,7 @@ public class SystemPrewarmer : MonoBehaviour
             // Pre-register the publisher that will be used by collision objects
             ros.RegisterPublisher<CollisionObjectMsg>("/collision_object");
             
-            Debug.Log("SystemPrewarmer: ROS connection pre-warmed");
+            // Debug.Log("SystemPrewarmer: ROS connection pre-warmed");
         }
         catch (System.Exception e)
         {
@@ -75,7 +78,7 @@ public class SystemPrewarmer : MonoBehaviour
             DestroyImmediate(tempPrimitive);
         }
         
-        Debug.Log("SystemPrewarmer: Primitive creation systems pre-warmed");
+        // Debug.Log("SystemPrewarmer: Primitive creation systems pre-warmed");
     }
     
     private void PrewarmXRInteractionSystem()
