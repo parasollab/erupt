@@ -169,7 +169,7 @@ public class CollisionObjectPublisher : MonoBehaviour
             }
         };
 
-        if (!hasBeenPublished)
+        if (!hasBeenPublished || HasScaleChanged())
         {
             if (!isMesh && ShouldTreatAsMesh())
             {
