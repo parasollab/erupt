@@ -169,30 +169,10 @@ public class CollisionObjectPublisher : MonoBehaviour
             }
         };
 
-        if (!isMesh && ShouldTreatAsMesh())
+        if (!hasBeenPublished)
         {
-            Mesh mesh = GetReadableMesh();
-            if (mesh != null)
+            if (!isMesh && ShouldTreatAsMesh())
             {
-                isMesh = true;
-                msg.meshes = new[] { UnityMeshToRosMesh(mesh, transform) };
-            }
-            else
-            {
-                Debug.LogError($"Failed to get readable mesh for object '{gameObject.name}' - cannot publish collision object");
-                return;
-            }
-        }
-        else
-        {
-            SolidPrimitiveMsg primitive = CreatePrimitiveFromUnityShape();
-            if (primitive != null)
-            {
-                msg.primitives = new[] { primitive };
-            }
-            else
-            {
-                // Fallback to mesh if primitive type not supported
                 Mesh mesh = GetReadableMesh();
                 if (mesh != null)
                 {
@@ -201,9 +181,39 @@ public class CollisionObjectPublisher : MonoBehaviour
                 }
                 else
                 {
-                    Debug.LogError($"Failed to get readable mesh for fallback on object '{gameObject.name}' - cannot publish collision object");
+                    Debug.LogError($"Failed to get readable mesh for object '{gameObject.name}' - cannot publish collision object");
                     return;
                 }
+            }
+            else
+            {
+                SolidPrimitiveMsg primitive = CreatePrimitiveFromUnityShape();
+                if (primitive != null)
+                {
+                    msg.primitives = new[] { primitive };
+                }
+                else
+                {
+                    // Fallback to mesh if primitive type not supported
+                    Mesh mesh = GetReadableMesh();
+                    if (mesh != null)
+                    {
+                        isMesh = true;
+                        msg.meshes = new[] { UnityMeshToRosMesh(mesh, transform) };
+                    }
+                    else
+                    {
+                        Debug.LogError($"Failed to get readable mesh for fallback on object '{gameObject.name}' - cannot publish collision object");
+                        return;
+                    }
+                }
+            }
+        }
+        else
+        {
+            if (!HasScaleChanged())
+            {
+                msg.operation = CollisionObjectMsg.MOVE;
             }
         }
 
@@ -299,10 +309,18 @@ public class CollisionObjectPublisher : MonoBehaviour
     {
         // Use small epsilon for floating point comparison to avoid precision issues
         const float epsilon = 0.001f;
+
+        // Debug.Log("Scale: " + transform.scale);
+        Debug.Log("Local Scale: " + transform.localScale);
         
         return Vector3.Distance(transform.position, lastPosition) > epsilon ||
-               Quaternion.Angle(transform.rotation, lastRotation) > epsilon ||
-               Vector3.Distance(transform.localScale, lastScale) > epsilon;
+               Quaternion.Angle(transform.rotation, lastRotation) > epsilon;
+    }
+
+    bool HasScaleChanged()
+    {
+        const float epsilon = 0.001f;
+        return Vector3.Distance(transform.localScale, lastScale) > epsilon;
     }
 
     void UpdateLastTransform()
@@ -314,6 +332,22 @@ public class CollisionObjectPublisher : MonoBehaviour
 
     void OnDestroy()
     {
+        // Delete the collision object from the planning scene
+        if (ros != null)
+        {
+            CollisionObjectMsg msg = new CollisionObjectMsg
+            {
+                id = objectId,
+                header = new HeaderMsg
+                {
+                    frame_id = frameId,
+                    stamp = new TimeMsg() // Stamp left blank by default
+                },
+                operation = CollisionObjectMsg.REMOVE
+            };
+
+            ros.Publish("/collision_object", msg);
+        }
         // Clean up the readable mesh copy to prevent memory leaks
         if (readableMeshCopy != null)
         {

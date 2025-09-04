@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UIElements;
 using UnityEngine.InputSystem;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
+using UnityEngine.XR.Interaction.Toolkit.Transformers;
 
 public class WristMenuController : MonoBehaviour
 {
@@ -296,6 +297,7 @@ public class WristMenuController : MonoBehaviour
         
         // Add XR interaction (will be controlled by SelectableGrabController)
         shape.AddComponent<XRGrabInteractable>();
+        shape.GetComponent<XRGrabInteractable>().selectMode = InteractableSelectMode.Multiple;
         
         // Add component to control grabbing based on selection state
         shape.AddComponent<SelectableGrabController>();
@@ -305,6 +307,10 @@ public class WristMenuController : MonoBehaviour
         
         // Add tag for selection
         shape.tag = "Selectable";
+
+        // Add an XR General Grab Transformer
+        shape.AddComponent<XRGeneralGrabTransformer>();
+        shape.GetComponent<XRGeneralGrabTransformer>().allowTwoHandedScaling = true;
         
         // Apply material
         var meshRenderer = shape.GetComponent<MeshRenderer>();

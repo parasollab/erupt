@@ -63,7 +63,7 @@ public class SystemPrewarmer : MonoBehaviour
     private IEnumerator PrewarmPrimitiveCreation()
     {
         // Create a temporary primitive to force Unity to initialize its primitive generation systems
-        GameObject tempPrimitive = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        GameObject tempPrimitive = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         
         // Add components that will be used on actual objects to pre-warm their initialization
         Rigidbody tempRb = tempPrimitive.AddComponent<Rigidbody>();
