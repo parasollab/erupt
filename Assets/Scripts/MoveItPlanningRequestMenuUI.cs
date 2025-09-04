@@ -49,6 +49,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     private FloatField allowedPlanningTimeField;
     private Label planningRequestMenuLabel;
     private Button planningRequestButton;
+    private Button stopReplayButton;
     
     // ROS Connection
     private ROSConnection ros;
@@ -124,11 +125,13 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         numPlanningAttemptsField = root.Q<IntegerField>("planningRequestNumPlanningAttemptsInput");
         allowedPlanningTimeField = root.Q<FloatField>("planningRequestAllowedPlanningTimeInput");
         planningRequestButton = root.Q<Button>("planningRequestSendButton");
+        stopReplayButton = root.Q<Button>("planningRequestStopReplayButton");
         
         // Validate UI elements
         if (setStartStateButton == null || setGoalStateButton == null ||
             plannerPipelineDropdown == null || plannerDropdown == null ||
-            numPlanningAttemptsField == null || allowedPlanningTimeField == null || planningRequestButton == null)
+            numPlanningAttemptsField == null || allowedPlanningTimeField == null ||
+            planningRequestButton == null || stopReplayButton == null)
         {
             Debug.LogError("MoveItPlanningRequestMenuUI: One or more UI elements not found in UXML.");
             return;
@@ -143,7 +146,9 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         // Set default values
         numPlanningAttemptsField.value = defaultNumPlanningAttempts;
         allowedPlanningTimeField.value = defaultAllowedPlanningTime;
-        
+
+        stopReplayButton.SetEnabled(false);
+
         // Update button states
         UpdateButtonStates();
     }
@@ -152,12 +157,21 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     {
         setStartStateButton.clicked += OnSetStartStateClicked;
         setGoalStateButton.clicked += OnSetGoalStateClicked;
-        
+
         // Setup dropdown event handlers
         plannerPipelineDropdown.RegisterValueChangedCallback(OnPipelineSelectionChanged);
-        
+
         // Add planning request button (if you want to add one)
         planningRequestButton.clicked += SendPlanningRequest;
+        
+        stopReplayButton.clicked += () =>
+        {
+            if (trajectoryReplayer != null)
+            {
+                trajectoryReplayer.StopReplay();
+                stopReplayButton.SetEnabled(false);
+            }
+        };
     }
 
     private void OnPipelineSelectionChanged(ChangeEvent<string> evt)
@@ -531,6 +545,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
                 Debug.Log($"MoveItPlanningRequestMenuUI: Trajectory has {trajectory.points.Length} waypoints");
 
                 // You can execute the trajectory here or store it for later execution
+                stopReplayButton.SetEnabled(true);
                 ExecuteTrajectory(trajectory);
             }
         }

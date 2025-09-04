@@ -8,7 +8,7 @@ using RosMessageTypes.Sensor;
 
 public class TrajectoryReplay : MonoBehaviour
 {
-
+    private bool isReplaying = false;
     public GameObject real_robot;
     public GameObject robot_prefab;
     private GameObject robot;
@@ -28,10 +28,20 @@ public class TrajectoryReplay : MonoBehaviour
         // Get the robot manager from the robot
         robotManager = robot.GetComponent<RobotManager>();
 
-        yield return StartCoroutine(playTrajectory(trajectory));
-
+        isReplaying = true;
+        while (isReplaying)
+        {
+            yield return StartCoroutine(playTrajectory(trajectory));
+        }
         // Cleanup
         Destroy(robot);
+        robot = null;
+    }
+
+    // Call this to stop replay and destroy the ghost robot
+    public void StopReplay()
+    {
+        isReplaying = false;
     }
 
     IEnumerator playTrajectory(JointTrajectoryMsg trajectory)
