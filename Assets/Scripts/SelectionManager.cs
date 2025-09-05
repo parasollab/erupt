@@ -119,7 +119,7 @@ public class SelectionManager : MonoBehaviour
         Transform current = obj.transform;
         while (current != null)
         {
-            if (current.GetComponent<WristUI>() != null)
+            if (current.GetComponent<WristMenuController>() != null)
             {
                 return true;
             }
@@ -139,9 +139,9 @@ public class SelectionManager : MonoBehaviour
         while (current != null)
         {
             Debug.Log($"SelectionManager: Checking object '{current.name}' in hierarchy");
-            
-            // Check if this object has a WristUI component
-            WristUI wristUI = current.GetComponent<WristUI>();
+
+            // Check if this object has a WristMenuController component
+            WristMenuController wristUI = current.GetComponent<WristMenuController>();
             if (wristUI != null)
             {
                 Debug.Log($"SelectionManager: Found WristUI component on '{current.name}' - preventing deselection");
@@ -169,7 +169,7 @@ public class SelectionManager : MonoBehaviour
                 Transform canvasParent = canvas.transform.parent;
                 while (canvasParent != null)
                 {
-                    if (canvasParent.GetComponent<WristUI>() != null)
+                    if (canvasParent.GetComponent<WristMenuController>() != null)
                     {
                         Debug.Log($"SelectionManager: Canvas belongs to WristUI - preventing deselection");
                         return true;
