@@ -9,5 +9,6 @@
         <ui:FloatField label="Allowed Planning Time" value="42.2" name="planningRequestAllowedPlanningTimeInput" style="-unity-font-style: bold;" />
         <ui:Button text="Send Request" name="planningRequestSendButton" style="-unity-font-style: bold;" />
         <ui:Button text="Stop Replay" name="planningRequestStopReplayButton" style="-unity-font-style: bold;" />
+        <ui:Button text="Mirror Joint State" name="mirrorJointStateButton" style="-unity-font-style: bold;" />
     </ui:VisualElement>
 </ui:UXML>

@@ -308,9 +308,15 @@ public class WristMenuController : MonoBehaviour
         // Add tag for selection
         shape.tag = "Selectable";
 
+        shape.AddComponent<XRGrabTransformerScaleAxisLock>();
+
         // Add an XR General Grab Transformer
         shape.AddComponent<XRGeneralGrabTransformer>();
         shape.GetComponent<XRGeneralGrabTransformer>().allowTwoHandedScaling = true;
+
+        shape.GetComponent<XRGrabInteractable>().AddMultipleGrabTransformer(shape.GetComponent<XRGeneralGrabTransformer>());
+
+        shape.GetComponent<XRGrabInteractable>().AddMultipleGrabTransformer(shape.GetComponent<XRGrabTransformerScaleAxisLock>());
         
         // Apply material
         var meshRenderer = shape.GetComponent<MeshRenderer>();

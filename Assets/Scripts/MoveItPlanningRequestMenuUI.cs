@@ -15,6 +15,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 {
     [Header("Robot")]
     [SerializeField] private GameObject robot;
+    [SerializeField] private string jointStateTopic = "/joint_states";
 
     [Header("UI Toolkit")]
     [SerializeField] private UIDocument uiDocument;
@@ -50,7 +51,9 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     private Label planningRequestMenuLabel;
     private Button planningRequestButton;
     private Button stopReplayButton;
-    
+    private Button mirrorButton;
+    private bool isMirroring = false;
+
     // ROS Connection
     private ROSConnection ros;
     private bool isConnected = false;
@@ -126,12 +129,14 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         allowedPlanningTimeField = root.Q<FloatField>("planningRequestAllowedPlanningTimeInput");
         planningRequestButton = root.Q<Button>("planningRequestSendButton");
         stopReplayButton = root.Q<Button>("planningRequestStopReplayButton");
+        mirrorButton = root.Q<Button>("mirrorJointStateButton");
         
         // Validate UI elements
         if (setStartStateButton == null || setGoalStateButton == null ||
             plannerPipelineDropdown == null || plannerDropdown == null ||
             numPlanningAttemptsField == null || allowedPlanningTimeField == null ||
-            planningRequestButton == null || stopReplayButton == null)
+            planningRequestButton == null || stopReplayButton == null ||
+            mirrorButton == null)
         {
             Debug.LogError("MoveItPlanningRequestMenuUI: One or more UI elements not found in UXML.");
             return;
@@ -163,7 +168,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
         // Add planning request button (if you want to add one)
         planningRequestButton.clicked += SendPlanningRequest;
-        
+
         stopReplayButton.clicked += () =>
         {
             if (trajectoryReplayer != null)
@@ -172,6 +177,8 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
                 stopReplayButton.SetEnabled(false);
             }
         };
+        
+        mirrorButton.clicked += ToggleMirroring;
     }
 
     private void OnPipelineSelectionChanged(ChangeEvent<string> evt)
@@ -314,10 +321,32 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
         isConnected = true;
 
-        // // Register for motion plan service
-        // ros.RegisterRosService<GetMotionPlanRequest, GetMotionPlanResponse>(motionPlanServiceName);
+        ros.Subscribe<JointStateMsg>(jointStateTopic, MirrorJointStates);
 
         Debug.Log("MoveItPlanningRequestMenuUI: ROS connection established successfully.");
+    }
+
+    private void MirrorJointStates(JointStateMsg jointState)
+    {
+        if (!isMirroring) return;
+
+        if (robotManager == null)
+        {
+            Debug.LogWarning("MoveItPlanningRequestMenuUI: RobotManager not assigned.");
+            return;
+        }
+
+        // Apply mirrored joint angles back to the robot
+        robotManager.SetJointAngles(jointState.position.Select(x => (float)(x * Mathf.Rad2Deg)).ToArray());
+
+        Debug.Log("MoveItPlanningRequestMenuUI: Joint states mirrored.");
+    }
+
+    private void ToggleMirroring()
+    {
+        isMirroring = !isMirroring;
+        mirrorButton.text = isMirroring ? "Stop Mirroring" : "Mirror Joint States";
+        Debug.Log($"MoveItPlanningRequestMenuUI: Mirroring {(isMirroring ? "enabled" : "disabled")}.");
     }
 
     private void OnSetStartStateClicked()
@@ -337,11 +366,11 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
             Debug.LogWarning("MoveItPlanningRequestMenuUI: ROS connection not available.");
             return;
         }
-        
+
         // Get current robot state (this would typically come from the robot or simulation)
         currentStartState = GetCurrentRobotState();
         hasStartState = true;
-        
+
         Debug.Log("MoveItPlanningRequestMenuUI: Start state set successfully.");
         UpdateButtonStates();
     }

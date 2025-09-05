@@ -1291,6 +1291,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: xrviz::MoveItPlanningRequestMenuUI
   robot: {fileID: 1981893040}
+  jointStateTopic: /joint_states
   uiDocument: {fileID: 277060372}
   planningGroupName: ur_manipulator
   planningPipelineId: ompl
