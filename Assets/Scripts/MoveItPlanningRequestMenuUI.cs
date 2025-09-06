@@ -26,6 +26,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     [SerializeField] private string defaultPlannerId = "ur_manipulator";
     [SerializeField] private int defaultNumPlanningAttempts = 10;
     [SerializeField] private float defaultAllowedPlanningTime = 5.0f;
+    [SerializeField] private double goalTolerance = 0.01;
     
     [Header("ROS 2 Topics")]
     [SerializeField] private string motionPlanServiceName = "/plan_kinematic_path";
@@ -119,7 +120,6 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
     private void StartPlannerQuerying()
     { 
-        Debug.Log("MoveItPlanningRequestMenuUI: Starting planner query...");
         // Register the service and start querying
         if (ros != null)
         {
@@ -212,8 +212,6 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
             plannerDropdown.choices = new List<string>();
             plannerDropdown.SetValueWithoutNotify("");
         }
-
-        Debug.Log($"MoveItPlanningRequestMenuUI: Pipeline changed to: {selectedPipeline}");
     }
 
     private void TryQueryPlanners()
@@ -233,7 +231,6 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
                 plannerQueryServiceName, req,
                 OnPlannerQueryResponse
             );
-            Debug.Log($"[MoveIt] Query planner interfaces request sent to {plannerQueryServiceName}");
         }
         catch (Exception e)
         {
@@ -278,10 +275,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
             });
 
             pipelineToPlanners[pipeline] = planners;
-            Debug.Log($"[MoveIt] Pipeline: {pipeline} | Planners: {string.Join(", ", planners)}");
         }
-
-        Debug.Log($"MoveItPlanningRequestMenuUI: Successfully loaded {PlannerResults.Count} planner interfaces.");
 
         UI(() =>
         {
@@ -313,12 +307,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
                 plannerDropdown.choices = new List<string>();
                 plannerDropdown.SetValueWithoutNotify("");
             }
-
-            Debug.Log($"[MoveIt] UI updated: {discoveredPipelines.Count} pipelines, " +
-                      $"{(string.IsNullOrEmpty(planningPipelineId) ? 0 : plannerDropdown.choices.Count)} planners.");
         });
-
-        Debug.Log($"MoveItPlanningRequestMenuUI: Successfully loaded {PlannerResults.Count} planner interfaces.");
     }
 
     private void InitializeROSConnection()
@@ -336,8 +325,6 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         isConnected = true;
 
         ros.Subscribe<JointStateMsg>(jointStateTopic, MirrorJointStates);
-
-        Debug.Log("MoveItPlanningRequestMenuUI: ROS connection established successfully.");
     }
 
     private void MirrorJointStates(JointStateMsg jointState)
@@ -385,7 +372,6 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         currentStartState = GetCurrentRobotState();
         hasStartState = true;
 
-        Debug.Log("MoveItPlanningRequestMenuUI: Start state set successfully.");
         UpdateButtonStates();
     }
 
@@ -411,7 +397,6 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         currentGoalState = GetGoalRobotState();
         hasGoalState = true;
         
-        Debug.Log("MoveItPlanningRequestMenuUI: Goal state set successfully.");
         UpdateButtonStates();
     }
 
@@ -502,8 +487,8 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
                 {
                     joint_name = robotState.joint_state.name[i],
                     position = robotState.joint_state.position[i],
-                    tolerance_above = 0.1,
-                    tolerance_below = 0.1,
+                    tolerance_above = goalTolerance,
+                    tolerance_below = goalTolerance,
                     weight = 1.0
                 };
                 constraints.Add(constraint);
@@ -637,10 +622,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
     private void ExecuteTrajectory(JointTrajectoryMsg trajectory)
     {
-        // This method should send the trajectory to your robot or simulation for execution
-        Debug.Log("MoveItPlanningRequestMenuUI: Executing trajectory...");
-        
-        // Example: Use the TrajectoryReplay component to visualize the trajectory
+        // Use the TrajectoryReplay component to visualize the trajectory
         if (trajectoryReplayer != null)
         {
             StartCoroutine(trajectoryReplayer.StartReplay(trajectory));
@@ -669,19 +651,16 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         currentStartState = null;
         currentGoalState = null;
         UpdateButtonStates();
-        Debug.Log("MoveItPlanningRequestMenuUI: Planning state reset.");
     }
 
     public void SetPlanningGroup(string groupName)
     {
         planningGroupName = groupName;
-        Debug.Log($"MoveItPlanningRequestMenuUI: Planning group set to: {planningGroupName}");
     }
 
     public void SetPlanningPipeline(string pipelineId)
     {
         planningPipelineId = pipelineId;
-        Debug.Log($"MoveItPlanningRequestMenuUI: Planning pipeline set to: {planningPipelineId}");
     }
 
     private void OnDisable()
@@ -692,9 +671,5 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     {    
         // Cancel any pending invokes
         CancelInvoke(nameof(TryQueryPlanners));
-        
-        // // Unregister service if needed
-        // if (ros != null)
-        //     ros.UnregisterRosService(plannerQueryServiceName);
     }
 }
