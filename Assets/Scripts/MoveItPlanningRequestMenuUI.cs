@@ -338,7 +338,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         }
 
         // Apply mirrored joint angles back to the robot
-        robotManager.SetJointAngles(jointState.position.Select(x => (float)(x * Mathf.Rad2Deg)).ToArray());
+        robotManager.SetJointAngles(jointState.position.Select(x => (float)(x * -1 * Mathf.Rad2Deg)).ToArray());
 
         Debug.Log("MoveItPlanningRequestMenuUI: Joint states mirrored.");
     }
