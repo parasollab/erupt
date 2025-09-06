@@ -56,11 +56,23 @@ namespace UnityEngine.XR.Interaction.Toolkit.Transformers
         }
 
         /// <inheritdoc />
-        public override void Process(UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable grabInteractable, XRInteractionUpdateOrder.UpdatePhase updatePhase, ref Pose targetPose, ref Vector3 localScale)
+        // public override void Process(UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable grabInteractable, XRInteractionUpdateOrder.UpdatePhase updatePhase, ref Pose targetPose, ref Vector3 localScale)
+        // {
+        //         localScale.x = m_FreezeXScale ? m_InitialScale.x : localScale.x;
+        //         localScale.y = m_FreezeYScale ? m_InitialScale.y : localScale.y;
+        //         localScale.z = m_FreezeZScale ? m_InitialScale.z : localScale.z;
+        // }
+
+        public override void Process(UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable grabInteractable,
+                             XRInteractionUpdateOrder.UpdatePhase updatePhase,
+                             ref Pose targetPose, ref Vector3 localScale)
         {
-                localScale.x = m_FreezeXScale ? m_InitialScale.x : localScale.x;
-                localScale.y = m_FreezeYScale ? m_InitialScale.y : localScale.y;
-                localScale.z = m_FreezeZScale ? m_InitialScale.z : localScale.z;
+            // Keep locked axes equal to the object's current transform scale,
+            // not the scale captured at Awake.
+            var current = transform.localScale;
+            if (m_FreezeXScale) localScale.x = current.x;
+            if (m_FreezeYScale) localScale.y = current.y;
+            if (m_FreezeZScale) localScale.z = current.z;
         }
     }
 }
