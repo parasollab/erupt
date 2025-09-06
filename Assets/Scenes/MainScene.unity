@@ -1185,6 +1185,18 @@ PrefabInstance:
       propertyPath: m_Name
       value: MoveItPlanningRequestMenu
       objectReference: {fileID: 0}
+    - target: {fileID: 5897628828326932340, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 5
+      objectReference: {fileID: 0}
+    - target: {fileID: 6242857085696009294, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
+      propertyPath: m_Size.y
+      value: 4.8
+      objectReference: {fileID: 0}
+    - target: {fileID: 6242857085696009294, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
+      propertyPath: m_Center.y
+      value: -2.2
+      objectReference: {fileID: 0}
     - target: {fileID: 6758849327301269162, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
       propertyPath: m_LocalScale.x
       value: 0.19999999
@@ -1295,6 +1307,7 @@ MonoBehaviour:
   defaultPlannerId: ur_manipulator
   defaultNumPlanningAttempts: 10
   defaultAllowedPlanningTime: 5
+  goalTolerance: 0.01
   motionPlanServiceName: /plan_kinematic_path
   plannerQueryServiceName: /query_planner_interface
   ghostSpawner: {fileID: 2049209135}
@@ -5149,7 +5162,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 7623396544050726892, guid: 649d18ad58e93d547b0350eb4be7233a, type: 3}
       propertyPath: m_Name
-      value: UGUI Grab UI
+      value: DebugPanelGrab
       objectReference: {fileID: 0}
     - target: {fileID: 7827370518970566511, guid: 649d18ad58e93d547b0350eb4be7233a, type: 3}
       propertyPath: m_AnchorMax.x

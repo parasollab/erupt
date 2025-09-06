@@ -52,8 +52,10 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     private Label planningRequestMenuLabel;
     private Button planningRequestButton;
     private Button stopReplayButton;
+    private Button executeTrajectoryButton;
     private Button mirrorButton;
     private bool isMirroring = false;
+    private bool isReplaying = false;
 
     // ROS Connection
     private ROSConnection ros;
@@ -66,6 +68,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     private RobotStateMsg currentGoalState;
     private bool hasStartState = false;
     private bool hasGoalState = false;
+    private JointTrajectoryMsg lastPlannedTrajectory;
     
     // Planner querying
     private bool isQueryingPlanners = false;
@@ -143,6 +146,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         allowedPlanningTimeField = root.Q<FloatField>("planningRequestAllowedPlanningTimeInput");
         planningRequestButton = root.Q<Button>("planningRequestSendButton");
         stopReplayButton = root.Q<Button>("planningRequestStopReplayButton");
+        executeTrajectoryButton = root.Q<Button>("planningRequestExecuteTrajectoryButton");
         mirrorButton = root.Q<Button>("mirrorJointStateButton");
         
         // Validate UI elements
@@ -150,7 +154,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
             plannerPipelineDropdown == null || plannerDropdown == null ||
             numPlanningAttemptsField == null || allowedPlanningTimeField == null ||
             planningRequestButton == null || stopReplayButton == null ||
-            mirrorButton == null)
+            mirrorButton == null || executeTrajectoryButton == null)
         {
             Debug.LogError("MoveItPlanningRequestMenuUI: One or more UI elements not found in UXML.");
             return;
@@ -185,10 +189,14 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
         stopReplayButton.clicked += () =>
         {
-            if (trajectoryReplayer != null)
+            if (isReplaying)
             {
-                trajectoryReplayer.StopReplay();
-                stopReplayButton.SetEnabled(false);
+                StopPreview();
+            }
+            else if (!isReplaying)
+            {
+                PreviewTrajectory(lastPlannedTrajectory);
+
             }
         };
         
@@ -421,6 +429,10 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
             Debug.LogWarning("MoveItPlanningRequestMenuUI: No planner selected.");
             return;
         }
+
+        // Disable replay button until we have a new trajectory
+        StopPreview();
+        stopReplayButton.SetEnabled(false);
         
         var planningRequest = CreateMotionPlanRequest();
         GetMotionPlanRequest motionPlanRequest = new GetMotionPlanRequest(planningRequest);
@@ -606,12 +618,11 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
             // Handle the planned trajectory
             if (motionPlanResponse.trajectory?.joint_trajectory != null)
             {
-                var trajectory = motionPlanResponse.trajectory.joint_trajectory;
-                Debug.Log($"MoveItPlanningRequestMenuUI: Trajectory has {trajectory.points.Length} waypoints");
+                lastPlannedTrajectory = motionPlanResponse.trajectory.joint_trajectory;
+                Debug.Log($"MoveItPlanningRequestMenuUI: Trajectory has {lastPlannedTrajectory.points.Length} waypoints");
 
                 // You can execute the trajectory here or store it for later execution
-                stopReplayButton.SetEnabled(true);
-                ExecuteTrajectory(trajectory);
+                PreviewTrajectory(lastPlannedTrajectory);
             }
         }
         else
@@ -620,16 +631,29 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         }
     }
 
-    private void ExecuteTrajectory(JointTrajectoryMsg trajectory)
+    private void PreviewTrajectory(JointTrajectoryMsg trajectory)
     {
         // Use the TrajectoryReplay component to visualize the trajectory
         if (trajectoryReplayer != null)
         {
+            stopReplayButton.SetEnabled(true);
+            isReplaying = true;
+            stopReplayButton.text = "Stop Replay";
             StartCoroutine(trajectoryReplayer.StartReplay(trajectory));
         }
         else
         {
             Debug.Log("MoveItPlanningRequestMenuUI: No TrajectoryReplay component assigned.");
+        }
+    }
+    
+    private void StopPreview()
+    {
+        if (trajectoryReplayer != null && isReplaying)
+        {
+            trajectoryReplayer.StopReplay();
+            isReplaying = false;
+            stopReplayButton.text = "Start Replay";
         }
     }
 
@@ -638,7 +662,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         // Update button visual states based on current planning state
         setStartStateButton.text = hasStartState ? "Start State ✓" : "Set Start State";
         setGoalStateButton.text = hasGoalState ? "Goal State ✓" : "Set Goal State";
-        
+
         // You could also change button colors or enable/disable them
         setStartStateButton.SetEnabled(true);
         setGoalStateButton.SetEnabled(true);
