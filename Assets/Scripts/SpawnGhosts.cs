@@ -86,6 +86,7 @@ public class SpawnGhosts : MonoBehaviour
             if (robotManager != null)
             {
                 robotManager.SetJointAngles(jointAngles);
+                Debug.Log("Start ghost updated to: " + string.Join(", ", jointAngles));
             }
         }
     }
@@ -121,6 +122,7 @@ public class SpawnGhosts : MonoBehaviour
         {
             float[] jointAngles = robotManager.GetJointAngles();
             UpdateGoalGhost(jointAngles);
+            Debug.Log("Goal ghost updated to: " + string.Join(", ", jointAngles));
         }
     }
 
