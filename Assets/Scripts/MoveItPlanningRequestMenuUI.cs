@@ -79,12 +79,26 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     }
     
     public List<PlannerListing> PlannerResults = new List<PlannerListing>();
+    
+    // Hardcoded joint names for the UR5e - ideally this would be dynamic
+    private readonly string[] jointNames = new string[]
+    { "shoulder_pan_joint", "shoulder_lift_joint", "elbow_joint", "wrist_1_joint", "wrist_2_joint", "wrist_3_joint" };
+
+    private readonly Tuple<float, float>[] jointLimits = new Tuple<float, float>[]
+    {
+        new Tuple<float, float>(-351f, 351f),  // shoulder_pan_joint
+        new Tuple<float, float>(-351f, 351f),  // shoulder_lift_joint
+        new Tuple<float, float>(-171f, 171f),  // elbow_joint
+        new Tuple<float, float>(-351f, 351f),  // wrist_1_joint
+        new Tuple<float, float>(-351f, 351f),  // wrist_2_joint
+        new Tuple<float, float>(-351f, 351f)   // wrist_3_joint
+    };
 
     private void OnEnable()
     {
         if (uiDocument == null)
             uiDocument = GetComponent<UIDocument>();
-            
+
         root = uiDocument?.rootVisualElement;
         if (root == null)
         {
@@ -98,7 +112,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         InitializeUIElements();
         SetupEventHandlers();
         InitializeROSConnection();
-        
+
         // Start planner querying immediately
         StartPlannerQuerying();
     }
@@ -499,34 +513,71 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         return constraints.ToArray();
     }
 
+    private double[] ConvertJointAnglesWithinRange(double[] angles)
+    {
+        // Assumes angles are in degrees, convert to radians and adjust within joint limits
+        double[] adjustedAngles = new double[angles.Length];
+        
+        for (int i = 0; i < angles.Length; i++)
+        {
+            float minLimit = jointLimits[i].Item1 * Mathf.Deg2Rad;
+            float maxLimit = jointLimits[i].Item2 * Mathf.Deg2Rad;
+            double angle = angles[i] * Mathf.Deg2Rad;
+
+            // Normalize angle to be within -π to π
+            angle = (angle + Math.PI) % (2 * Math.PI);
+            if (angle < 0)
+                angle += 2 * Math.PI;
+            angle -= Math.PI;
+
+            // Adjust angle to be within joint limits
+            if (angle < minLimit)
+                angle += 2 * Math.PI;
+            else if (angle > maxLimit)
+                angle -= 2 * Math.PI;
+
+            // Final check to ensure it's within limits
+            if (angle < minLimit || angle > maxLimit)
+            {
+                Debug.LogWarning($"MoveItPlanningRequestMenuUI: Joint {i} angle {angle * Mathf.Rad2Deg}° is out of limits ({minLimit * Mathf.Rad2Deg}°, {maxLimit * Mathf.Rad2Deg}°). Clamping.");
+                angle = Math.Max(minLimit, Math.Min(maxLimit, angle));
+            }
+
+            adjustedAngles[i] = angle;
+        }
+        
+        return adjustedAngles;
+    }
+
     private RobotStateMsg GetCurrentRobotState()
     {
         // This method should get the current robot state from your robot or simulation
         // For now, we'll create a placeholder state
         // Convert joint angles from degrees to radians
         var jointAnglesDegrees = robotManager.GetJointAngles();
-        var jointAnglesRadians = jointAnglesDegrees.Select(x => (double)x * Mathf.Deg2Rad).ToArray();
+        var jointAnglesRadians = ConvertJointAnglesWithinRange(jointAnglesDegrees.Select(x => (double)x * -1).ToArray());
 
         var robotState = new RobotStateMsg
         {
             joint_state = new JointStateMsg
             {
-            header = new HeaderMsg
-            {
-                frame_id = "base_link",
-                stamp = new TimeMsg { 
-                sec = (int)Time.time,
-                nanosec = (uint)((Time.time - (int)Time.time) * 1e9)
-                }
-            },
-            name = new string[] { "shoulder_pan_joint", "shoulder_lift_joint", "elbow_joint", "wrist_1_joint", "wrist_2_joint", "wrist_3_joint" },
-            position = jointAnglesRadians,
-            velocity = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 },
-            effort = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 }
+                header = new HeaderMsg
+                {
+                    frame_id = "base_link",
+                    stamp = new TimeMsg
+                    {
+                        sec = (int)Time.time,
+                        nanosec = (uint)((Time.time - (int)Time.time) * 1e9)
+                    }
+                },
+                name = jointNames,
+                position = jointAnglesRadians,
+                velocity = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 },
+                effort = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 }
             },
             multi_dof_joint_state = new MultiDOFJointStateMsg()
         };
-        
+
         return robotState;
     }
 
@@ -535,8 +586,8 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         // This method should get the goal robot state from user interaction or predefined poses
         // For now, we'll create a placeholder state with different joint values
         var jointAnglesDegrees = robotManager.GetJointAngles();
-        var jointAnglesRadians = jointAnglesDegrees.Select(x => (double)x * Mathf.Deg2Rad).ToArray();
-        
+        var jointAnglesRadians = ConvertJointAnglesWithinRange(jointAnglesDegrees.Select(x => (double)x * -1).ToArray());
+
         var robotState = new RobotStateMsg
         {
             joint_state = new JointStateMsg
@@ -549,7 +600,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
                 nanosec = (uint)((Time.time - (int)Time.time) * 1e9)
                 }
             },
-            name = new string[] { "shoulder_pan_joint", "shoulder_lift_joint", "elbow_joint", "wrist_1_joint", "wrist_2_joint", "wrist_3_joint" },
+            name = jointNames,
             position = jointAnglesRadians,
             velocity = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 },
             effort = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 }
