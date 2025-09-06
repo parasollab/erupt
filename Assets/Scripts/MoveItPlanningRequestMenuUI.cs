@@ -16,6 +16,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     [Header("Robot")]
     [SerializeField] private GameObject robot;
     [SerializeField] private string jointStateTopic = "/joint_states";
+    [SerializeField] private string executeTrajectoryTopic = "/joint_trajectory_controller/joint_trajectory";
 
     [Header("UI Toolkit")]
     [SerializeField] private UIDocument uiDocument;
@@ -184,7 +185,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         // Setup dropdown event handlers
         plannerPipelineDropdown.RegisterValueChangedCallback(OnPipelineSelectionChanged);
 
-        // Add planning request button (if you want to add one)
+        // Add planning request button
         planningRequestButton.clicked += SendPlanningRequest;
 
         stopReplayButton.clicked += () =>
@@ -199,8 +200,9 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
             }
         };
-        
+
         mirrorButton.clicked += ToggleMirroring;
+        executeTrajectoryButton.clicked += ExectuteTrajectory;
     }
 
     private void OnPipelineSelectionChanged(ChangeEvent<string> evt)
@@ -332,6 +334,8 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
         isConnected = true;
 
+        ros.RegisterPublisher<JointTrajectoryMsg>(executeTrajectoryTopic);
+
         ros.Subscribe<JointStateMsg>(jointStateTopic, MirrorJointStates);
     }
 
@@ -347,8 +351,6 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
         // Apply mirrored joint angles back to the robot
         robotManager.SetJointAngles(jointState.position.Select(x => (float)(x * -1 * Mathf.Rad2Deg)).ToArray());
-
-        Debug.Log("MoveItPlanningRequestMenuUI: Joint states mirrored.");
     }
 
     private void ToggleMirroring()
@@ -433,6 +435,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         // Disable replay button until we have a new trajectory
         StopPreview();
         stopReplayButton.SetEnabled(false);
+        executeTrajectoryButton.SetEnabled(false);
         
         var planningRequest = CreateMotionPlanRequest();
         GetMotionPlanRequest motionPlanRequest = new GetMotionPlanRequest(planningRequest);
@@ -623,6 +626,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
                 // You can execute the trajectory here or store it for later execution
                 PreviewTrajectory(lastPlannedTrajectory);
+                executeTrajectoryButton.SetEnabled(true);
             }
         }
         else
@@ -655,6 +659,29 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
             isReplaying = false;
             stopReplayButton.text = "Start Replay";
         }
+    }
+
+    private void ExectuteTrajectory()
+    {
+        if (!isConnected)
+        {
+            Debug.LogWarning("MoveItPlanningRequestMenuUI: ROS 2 connection not available.");
+            return;
+        }
+
+        if (lastPlannedTrajectory == null)
+        {
+            Debug.LogWarning("MoveItPlanningRequestMenuUI: No planned trajectory to execute.");
+            return;
+        }
+
+        // Stop any ongoing preview and start mirroring if not already
+        StopPreview();
+        if (!isMirroring)
+            ToggleMirroring();
+
+        ros.Publish(executeTrajectoryTopic, lastPlannedTrajectory);
+        Debug.Log("MoveItPlanningRequestMenuUI: Published trajectory for execution.");
     }
 
     private void UpdateButtonStates()
