@@ -62,7 +62,7 @@ public class WristMenuController : MonoBehaviour
         SetMenuVisibility(false);
     }
     
-    public VisualElement CreateToggleStack(string label)
+    public VisualElement CreateToggleStack(string shape, string label)
     {
         // <ui:VisualElement name="toggle-stack" style="flex-direction: column; align-items: stretch;">
         var container = new VisualElement { name = "wristMenuEditScale" + label + "Stack" };
@@ -81,6 +81,53 @@ public class WristMenuController : MonoBehaviour
         toggle.value = true; // Default to enabled
         toggle.RegisterCallback<ChangeEvent<bool>>((evt) =>
         {
+            var selected = selectionManager.SelectedObject;
+            if (selected != null)
+            {
+                var axisLock = selected.GetComponent<XRGrabTransformerScaleAxisLock>();
+                if (axisLock != null)
+                {
+                    Debug.Log($"WristMenuController: Found XRGrabTransformerScaleAxisLock on selected object");
+                    if (shape.Contains("Cube"))
+                    {
+                        Debug.Log($"WristMenuController: Toggling axis lock for Cube");
+                        if (label == "X")
+                        {
+                            axisLock.freezeXScale = !evt.newValue;
+                        }
+                        else if (label == "Y")
+                        {
+                            axisLock.freezeYScale = !evt.newValue;
+                        }
+                        else if (label == "Z")
+                        {
+                            axisLock.freezeZScale = !evt.newValue;
+                        }
+                    }
+                    else if (shape.Contains("Sphere"))
+                    {
+                        Debug.Log($"WristMenuController: Toggling axis lock for Sphere");
+                        axisLock.freezeXScale = !evt.newValue;
+                        axisLock.freezeYScale = !evt.newValue;
+                        axisLock.freezeZScale = !evt.newValue;
+                    }
+                    else if (shape.Contains("Cylinder"))
+                    {
+                        Debug.Log($"WristMenuController: Toggling axis lock for Cylinder");
+                        axisLock.freezeXScale = !evt.newValue;
+                        axisLock.freezeYScale = !evt.newValue;
+                        axisLock.freezeZScale = !evt.newValue;
+                    }
+                    else if (shape.Contains("Mesh"))
+                    {
+                        Debug.Log($"WristMenuController: Toggling axis lock for Mesh");
+                        axisLock.freezeXScale = !evt.newValue;
+                        axisLock.freezeYScale = !evt.newValue;
+                        axisLock.freezeZScale = !evt.newValue;
+                    }
+                }
+            }
+            
             Debug.Log($"WristMenuController: Toggle '{label}' changed to {evt.newValue}");
         });
 
@@ -92,15 +139,234 @@ public class WristMenuController : MonoBehaviour
         slider.style.flexGrow = 1;
         slider.style.paddingLeft = 10;
         slider.style.paddingRight = 10;
-        slider.RegisterCallback<ChangeEvent<float>>((evt) =>
+
+        float prevValue = 100f;
+        int activePointerId = -1;
+        const float minScale = 0.01f;
+
+        void ResetToCenterDeferred()
         {
-            Debug.Log($"WristMenuController: Slider '{label}' changed to {evt.newValue}");
+            slider.schedule.Execute(() =>
+            {
+                slider.SetValueWithoutNotify(100f);
+                prevValue = 100f;
+            }).ExecuteLater(0);
+        }
+
+        Vector3 MakeDelta(string shapeName, string axisLabel, float delta)
+        {
+            if (shapeName.Contains("Cube"))
+            {
+                if (axisLabel == "X") return new Vector3(delta, 0f, 0f);
+                if (axisLabel == "Y") return new Vector3(0f, delta, 0f);
+                if (axisLabel == "Z") return new Vector3(0f, 0f, delta);
+                return Vector3.zero;
+            }
+            else if (shapeName.Contains("Cylinder"))
+            {
+                // Support your "Height" and "Radius" UI
+                if (axisLabel == "Height") return new Vector3(0f, delta, 0f);
+                if (axisLabel == "Radius") return new Vector3(delta, 0f, delta);
+                // fallback uniform
+                return new Vector3(delta, delta, delta);
+            }
+            else
+            {
+                // Sphere / Mesh => uniform
+                return new Vector3(delta, delta, delta);
+            }
+        }
+
+        slider.RegisterCallback<PointerDownEvent>(evt =>
+        {
+            activePointerId = evt.pointerId;
+            prevValue = slider.value;
+            slider.CapturePointer(activePointerId);
+        });
+
+        slider.RegisterValueChangedCallback(evt =>
+        {
+            var selected = selectionManager.SelectedObject;
+            if (selected == null) { prevValue = evt.newValue; return; }
+
+            float delta = (evt.newValue - prevValue) / 100f;
+            prevValue = evt.newValue;
+            if (Mathf.Approximately(delta, 0f)) return;
+
+            var d = MakeDelta(shape, label, delta);
+
+            // Respect axis locks
+            var axisLock = selected.GetComponent<XRGrabTransformerScaleAxisLock>();
+            bool allowX = axisLock == null || !axisLock.freezeXScale;
+            bool allowY = axisLock == null || !axisLock.freezeYScale;
+            bool allowZ = axisLock == null || !axisLock.freezeZScale;
+            if (!allowX) d.x = 0f;
+            if (!allowY) d.y = 0f;
+            if (!allowZ) d.z = 0f;
+
+            var gi  = selected.GetComponent<XRGrabInteractable>();
+            var uiT = selected.GetComponent<XRUIScaleTransformer>();
+
+            if (gi != null && gi.isSelected && uiT != null)
+            {
+                // Object is grabbed → let the XRI pipeline apply it this frame
+                uiT.queuedDelta += d;
+            }
+            else
+            {
+                // Not grabbed → apply directly
+                var s = selected.transform.localScale + d;
+                s.x = Mathf.Max(minScale, s.x);
+                s.y = Mathf.Max(minScale, s.y);
+                s.z = Mathf.Max(minScale, s.z);
+                selected.transform.localScale = s;
+            }
+        });
+
+        slider.RegisterCallback<PointerUpEvent>(evt =>
+        {
+            if (evt.pointerId == activePointerId)
+            {
+                ResetToCenterDeferred();
+                slider.ReleasePointer(activePointerId);
+                activePointerId = -1;
+            }
         });
         slider.RegisterCallback<PointerCancelEvent>(_ =>
         {
-            slider.SetValueWithoutNotify(100f);
-            Debug.Log($"WristMenuController: Slider '{label}' interaction ended at {slider.value}");
+            ResetToCenterDeferred();
+            activePointerId = -1;
         });
+        slider.RegisterCallback<PointerCaptureOutEvent>(_ =>
+        {
+            // Safety: if capture is lost, still recenter
+            ResetToCenterDeferred();
+            activePointerId = -1;
+        });
+
+
+
+        // Keep the "center" at 100; treat changes as deltas from the last value
+        // float prevValue = 100f;
+        // const float minScale = 0.01f; // avoid zero/negative scales
+
+        // slider.RegisterValueChangedCallback(evt =>
+        // {
+        //     var selected = selectionManager.SelectedObject;
+        //     // Compute signed delta since last event, normalized so 100 "points" == +1.0 scale units
+        //     float delta = (evt.newValue - prevValue) / 100f;
+        //     prevValue = evt.newValue;
+
+        //     if (selected == null || Mathf.Approximately(delta, 0f))
+        //         return;
+
+        //     Vector3 s = selected.transform.localScale;
+
+        //     // Respect axis locks if present (so programmatic changes won't override user locks)
+        //     var axisLock = selected.GetComponent<XRGrabTransformerScaleAxisLock>();
+        //     bool allowX = axisLock == null || !axisLock.freezeXScale;
+        //     bool allowY = axisLock == null || !axisLock.freezeYScale;
+        //     bool allowZ = axisLock == null || !axisLock.freezeZScale;
+
+        //     if (shape.Contains("Cube"))
+        //     {
+        //         if (label == "X" && allowX) s.x = Mathf.Max(minScale, s.x + delta);
+        //         else if (label == "Y" && allowY) s.y = Mathf.Max(minScale, s.y + delta);
+        //         else if (label == "Z" && allowZ) s.z = Mathf.Max(minScale, s.z + delta);
+        //     }
+        //     else if (shape.Contains("Sphere"))
+        //     {
+        //         // Uniform scale for sphere
+        //         if (allowX) s.x = Mathf.Max(minScale, s.x + delta);
+        //         if (allowY) s.y = Mathf.Max(minScale, s.y + delta);
+        //         if (allowZ) s.z = Mathf.Max(minScale, s.z + delta);
+        //     }
+        //     else if (shape.Contains("Cylinder"))
+        //     {
+        //         // Keep your original behavior (uniform). If you prefer Height/Radius split:
+        //         // Height -> Y only, Radius -> X & Z.
+        //         if (allowX) s.x = Mathf.Max(minScale, s.x + delta);
+        //         if (allowY) s.y = Mathf.Max(minScale, s.y + delta);
+        //         if (allowZ) s.z = Mathf.Max(minScale, s.z + delta);
+        //     }
+        //     else if (shape.Contains("Mesh"))
+        //     {
+        //         // Uniform scale for generic meshes
+        //         if (allowX) s.x = Mathf.Max(minScale, s.x + delta);
+        //         if (allowY) s.y = Mathf.Max(minScale, s.y + delta);
+        //         if (allowZ) s.z = Mathf.Max(minScale, s.z + delta);
+        //     }
+
+        //     selected.transform.localScale = s;
+
+        //     Debug.Log($"WristMenuController: Slider '{label}' delta {delta:+0.###;-0.###} → new scale {s}");
+        // });
+
+        // // Reset to center and baseline the prevValue when interaction ends
+        // slider.RegisterCallback<PointerCancelEvent>(_ =>
+        // {
+        //     slider.SetValueWithoutNotify(100f);
+        //     prevValue = 100f;
+        //     Debug.Log($"WristMenuController: Slider '{label}' interaction canceled");
+        // });
+        // slider.RegisterCallback<PointerUpEvent>(_ =>
+        // {
+        //     slider.SetValueWithoutNotify(100f);
+        //     prevValue = 100f;
+        //     Debug.Log($"WristMenuController: Slider '{label}' interaction ended");
+        // });
+
+        // slider.RegisterCallback<ChangeEvent<float>>((evt) =>
+        // {
+        //     Debug.Log($"WristMenuController: Slider '{label}' changed to {evt.newValue}");
+        //     var selected = selectionManager.SelectedObject;
+        //     if (selected != null)
+        //     {
+        //         float scaleValue = evt.newValue / 100f;
+        //         Vector3 newScale = selected.transform.localScale;
+        //         Debug.Log($"WristMenuController: Current scale of selected object is {selected.transform.localScale}");
+        //         if (shape.Contains("Cube"))
+        //         {
+        //             if (label == "X")
+        //             {
+        //                 newScale.x = scaleValue;
+        //             }
+        //             else if (label == "Y")
+        //             {
+        //                 newScale.y = scaleValue;
+        //             }
+        //             else if (label == "Z")
+        //             {
+        //                 newScale.z = scaleValue;
+        //             }
+        //             selected.transform.localScale += newScale;
+        //         }
+        //         else if (shape.Contains("Sphere"))
+        //         {
+        //             selected.transform.localScale += new Vector3(scaleValue, scaleValue, scaleValue);
+        //         }
+        //         else if (shape.Contains("Cylinder"))
+        //         {
+        //             selected.transform.localScale += new Vector3(scaleValue, scaleValue, scaleValue);
+        //         }
+        //         else if (shape.Contains("Mesh"))
+        //         {
+        //             selected.transform.localScale += new Vector3(scaleValue, scaleValue, scaleValue);
+        //         }
+        //     }
+        // });
+        // slider.RegisterCallback<PointerCancelEvent>(_ =>
+        // {
+        //     slider.SetValueWithoutNotify(100f);
+        //     // slider.SetValueWithoutNotify(50f);
+        //     Debug.Log($"WristMenuController: Slider '{label}' interaction ended at {slider.value}");
+        // });
+        // slider.RegisterCallback<PointerUpEvent>(_ =>
+        // {
+        //     slider.SetValueWithoutNotify(100f);
+        //     // slider.SetValueWithoutNotify(50f);
+        //     Debug.Log($"WristMenuController: Slider '{label}' interaction ended at {slider.value}");
+        // });
 
         container.Add(toggle);
         container.Add(slider);
@@ -218,7 +484,7 @@ public class WristMenuController : MonoBehaviour
         
         Debug.Log($"WristMenuController: Menu visibility set to {visible}");
     }
-    
+
     private void ShowOptionsPanel()
     {
         if (wristMenuOptionsPanel != null)
@@ -231,6 +497,12 @@ public class WristMenuController : MonoBehaviour
         {
             wristMenuAddShapePanel.style.display = DisplayStyle.None;
             wristMenuAddShapePanel.SetEnabled(false);
+        }
+        
+        if (wristMenuEditShapePanel != null)
+        {
+            wristMenuEditShapePanel.style.display = DisplayStyle.None;
+            wristMenuEditShapePanel.SetEnabled(false);
         }
     }
     
@@ -299,25 +571,25 @@ public class WristMenuController : MonoBehaviour
         if (meshName.Contains("Cube"))
         {
             Debug.Log("WristMenuController: Populating edit panel for Cube");
-            wristMenuEditSliderPanel.Add(CreateToggleStack("X"));
-            wristMenuEditSliderPanel.Add(CreateToggleStack("Y"));
-            wristMenuEditSliderPanel.Add(CreateToggleStack("Z"));
+            wristMenuEditSliderPanel.Add(CreateToggleStack("Cube", "X"));
+            wristMenuEditSliderPanel.Add(CreateToggleStack("Cube", "Y"));
+            wristMenuEditSliderPanel.Add(CreateToggleStack("Cube", "Z"));
         }
         else if (meshName.Contains("Sphere"))
         {
             Debug.Log("WristMenuController: Populating edit panel for Sphere");
-            wristMenuEditSliderPanel.Add(CreateToggleStack("Radius"));
+            wristMenuEditSliderPanel.Add(CreateToggleStack("Sphere", "Radius"));
         }
         else if (meshName.Contains("Cylinder"))
         {
             Debug.Log("WristMenuController: Populating edit panel for Cylinder");
-            wristMenuEditSliderPanel.Add(CreateToggleStack("Height"));
-            wristMenuEditSliderPanel.Add(CreateToggleStack("Radius"));
+            wristMenuEditSliderPanel.Add(CreateToggleStack("Cylinder", "Height"));
+            wristMenuEditSliderPanel.Add(CreateToggleStack("Cylinder", "Radius"));
         }
         else if (meshName.Contains("Mesh"))
         {
             Debug.Log("WristMenuController: Populating edit panel for Mesh");
-            wristMenuEditSliderPanel.Add(CreateToggleStack("Scale"));
+            wristMenuEditSliderPanel.Add(CreateToggleStack("Mesh", "Scale"));
         }
         else
         {
@@ -401,7 +673,7 @@ public class WristMenuController : MonoBehaviour
         Rigidbody rb = shape.AddComponent<Rigidbody>();
         rb.useGravity = false;
         rb.isKinematic = true;
-        
+
         // Add XR interaction (will be controlled by SelectableGrabController)
         shape.AddComponent<XRGrabInteractable>();
         shape.GetComponent<XRGrabInteractable>().selectMode = InteractableSelectMode.Multiple;
@@ -422,11 +694,15 @@ public class WristMenuController : MonoBehaviour
         shape.AddComponent<XRGeneralGrabTransformer>();
         shape.GetComponent<XRGeneralGrabTransformer>().allowTwoHandedScaling = true;
 
+        shape.AddComponent<XRUIScaleTransformer>();
+
         shape.GetComponent<XRGrabInteractable>().AddMultipleGrabTransformer(shape.GetComponent<XRGeneralGrabTransformer>());
 
         shape.GetComponent<XRGrabInteractable>().AddMultipleGrabTransformer(shape.GetComponent<XRGrabTransformerScaleAxisLock>());
 
         shape.GetComponent<XRGrabInteractable>().AddMultipleGrabTransformer(shape.GetComponent<XRGrabTransformerLockPose>());
+
+        shape.GetComponent<XRGrabInteractable>().AddMultipleGrabTransformer(shape.GetComponent<XRUIScaleTransformer>());
 
         // Apply material
         var meshRenderer = shape.GetComponent<MeshRenderer>();

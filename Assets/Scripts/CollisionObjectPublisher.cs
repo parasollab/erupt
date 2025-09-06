@@ -311,7 +311,7 @@ public class CollisionObjectPublisher : MonoBehaviour
         const float epsilon = 0.001f;
 
         // Debug.Log("Scale: " + transform.scale);
-        Debug.Log("Local Scale: " + transform.localScale);
+        // Debug.Log("Local Scale: " + transform.localScale);
         
         return Vector3.Distance(transform.position, lastPosition) > epsilon ||
                Quaternion.Angle(transform.rotation, lastRotation) > epsilon;
