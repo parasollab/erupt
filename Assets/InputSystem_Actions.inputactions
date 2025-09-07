@@ -95,6 +95,15 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": true
+                },
+                {
+                    "name": "XRToggleTurn",
+                    "type": "Button",
+                    "id": "3ad24ccf-d96b-4018-9fcc-60875fa34141",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -491,6 +500,17 @@
                     "processors": "",
                     "groups": ";XR",
                     "action": "XRRightTurn",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "94840f45-1eeb-4b53-a4aa-34ceee3b6ddd",
+                    "path": "<XRController>{RightHand}/{PrimaryButton}",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";XR",
+                    "action": "XRToggleTurn",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }
