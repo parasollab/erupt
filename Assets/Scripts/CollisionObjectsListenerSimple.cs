@@ -100,9 +100,6 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
 
             // Add component to control grabbing based on selection state
             child.AddComponent<SelectableGrabController>();
-
-            // Set default scale
-            child.transform.localScale = Vector3.one;
             
             // Add tag for selection
             child.tag = "Selectable";
@@ -151,6 +148,38 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
                 child.transform.SetParent(parent.transform, false);
                 ApplyLocalPose(child.transform, meshPosesLocal[i]);
                 built++;
+
+                // Add physics components
+                Rigidbody rb = child.AddComponent<Rigidbody>();
+                rb.useGravity = false;
+                rb.isKinematic = true;
+
+                // Add tag for selection
+                child.tag = "Selectable";
+
+                // Ensure collider is enabled (should already be there from CreatePrimitive)
+                Collider collider = child.GetComponent<Collider>();
+                if (collider != null)
+                {
+                    collider.enabled = true;
+                }
+                else // if no collider, add a BoxCollider
+                {
+                    var c = child.AddComponent<BoxCollider>();
+                }
+
+                // Add XR interaction (will be controlled by SelectableGrabController)
+                child.AddComponent<XRGrabInteractable>();
+                child.AddComponent<XRGeneralGrabTransformer>();
+
+                // Add component to control grabbing based on selection state
+                child.AddComponent<SelectableGrabController>();
+
+                // Add CollisionObjectPublisher to automatically publish to ROS
+                // CollisionObjectPublisher publisher = child.AddComponent<CollisionObjectPublisher>();
+                // publisher.isMesh = true;
+                // // Generate unique ID for each object
+                // publisher.objectId = name;
             }
         }
 
@@ -160,7 +189,7 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
         int nPlaneUse = Mathf.Min(planes.Length, planePosesLocal.Length);
         for (int i = 0; i < nPlaneUse; i++)
         {
-            var child = BuildPlane($"{co.id}_plane_{i}", planes[i]);
+            var child = BuildPlane($"{co.id}", planes[i]);
             child.transform.SetParent(parent.transform, false);
             ApplyLocalPose(child.transform, planePosesLocal[i]);
             built++;
@@ -269,7 +298,7 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
             default:
                 Debug.LogWarning($"[CO Listener] Unsupported primitive {prim.type}; using cube.");
                 go = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                go.name = name + "_unknown";
+                go.name = name;
                 return go;
         }
     }

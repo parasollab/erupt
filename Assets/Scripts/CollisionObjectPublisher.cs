@@ -69,6 +69,7 @@ public class CollisionObjectPublisher : MonoBehaviour
             
             if (shouldPublish)
             {
+                Debug.Log($"Publishing collision object for '{gameObject.name}'");
                 PublishCollisionObject();
                 UpdateLastTransform();
                 hasBeenPublished = true;
