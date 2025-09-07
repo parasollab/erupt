@@ -89,6 +89,8 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     private readonly string[] jointNames = new string[]
     { "shoulder_pan_joint", "shoulder_lift_joint", "elbow_joint", "wrist_1_joint", "wrist_2_joint", "wrist_3_joint" };
 
+    private Dictionary<string, int> jointNameToIndex;
+
     private readonly Tuple<float, float>[] jointLimits = new Tuple<float, float>[]
     {
         new Tuple<float, float>(-351f, 351f),  // shoulder_pan_joint
@@ -98,6 +100,21 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         new Tuple<float, float>(-351f, 351f),  // wrist_2_joint
         new Tuple<float, float>(-351f, 351f)   // wrist_3_joint
     };
+
+    private void Awake()
+    {
+        if (robot == null)
+        {
+            Debug.LogError("MoveItPlanningRequestMenuUI: Robot GameObject not assigned.");
+            return;
+        }
+
+        jointNameToIndex = new Dictionary<string, int>();
+        for (int i = 0; i < jointNames.Length; i++)
+        {
+            jointNameToIndex[jointNames[i]] = i;
+        }
+    }
 
     private void OnEnable()
     {
@@ -349,8 +366,17 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
             return;
         }
 
+        // Read joint states and map to robot joints
+        float[] jointAngles = new float[robotManager.GetJointNames().Count];
+        for (int i = 0; i < jointState.name.Length; i++)
+        {
+            string jointName = jointState.name[i];
+            int jointIndex = jointNameToIndex[jointName];
+            jointAngles[jointIndex] = -((float)jointState.position[i] * Mathf.Rad2Deg);
+        }
+
         // Apply mirrored joint angles back to the robot
-        robotManager.SetJointAngles(jointState.position.Select(x => (float)(x * -1 * Mathf.Rad2Deg)).ToArray());
+        robotManager.SetJointAngles(jointAngles);
     }
 
     private void ToggleMirroring()
