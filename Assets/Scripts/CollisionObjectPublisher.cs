@@ -370,7 +370,7 @@ public class CollisionObjectPublisher : MonoBehaviour
 
     static QuaternionMsg UnityToRosQuaternion(Quaternion q)
     {
-        return new QuaternionMsg(q.x, q.z, q.y, q.w);
+        return new QuaternionMsg(q.z, -q.x, q.y, -q.w);
     }
 
     static MeshMsg UnityMeshToRosMesh(Mesh unityMesh, Transform transform = null)
