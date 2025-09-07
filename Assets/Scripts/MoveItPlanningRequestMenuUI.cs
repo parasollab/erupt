@@ -16,6 +16,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     [Header("Robot")]
     [SerializeField] private GameObject robot;
     [SerializeField] private string jointStateTopic = "/joint_states";
+    [SerializeField] private string executeTrajectoryTopic = "/joint_trajectory_controller/joint_trajectory";
 
     [Header("UI Toolkit")]
     [SerializeField] private UIDocument uiDocument;
@@ -26,6 +27,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     [SerializeField] private string defaultPlannerId = "ur_manipulator";
     [SerializeField] private int defaultNumPlanningAttempts = 10;
     [SerializeField] private float defaultAllowedPlanningTime = 5.0f;
+    [SerializeField] private double goalTolerance = 0.01;
     
     [Header("ROS 2 Topics")]
     [SerializeField] private string motionPlanServiceName = "/plan_kinematic_path";
@@ -51,8 +53,10 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     private Label planningRequestMenuLabel;
     private Button planningRequestButton;
     private Button stopReplayButton;
+    private Button executeTrajectoryButton;
     private Button mirrorButton;
     private bool isMirroring = false;
+    private bool isReplaying = false;
 
     // ROS Connection
     private ROSConnection ros;
@@ -65,6 +69,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     private RobotStateMsg currentGoalState;
     private bool hasStartState = false;
     private bool hasGoalState = false;
+    private JointTrajectoryMsg lastPlannedTrajectory;
     
     // Planner querying
     private bool isQueryingPlanners = false;
@@ -81,10 +86,12 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     public List<PlannerListing> PlannerResults = new List<PlannerListing>();
     
     // Hardcoded joint names for the UR5e - ideally this would be dynamic
-    private readonly string[] jointNames = new string[]
+    public readonly string[] jointNames = new string[]
     { "shoulder_pan_joint", "shoulder_lift_joint", "elbow_joint", "wrist_1_joint", "wrist_2_joint", "wrist_3_joint" };
 
-    private readonly Tuple<float, float>[] jointLimits = new Tuple<float, float>[]
+    private Dictionary<string, int> jointNameToIndex;
+
+    public readonly Tuple<float, float>[] jointLimits = new Tuple<float, float>[]
     {
         new Tuple<float, float>(-351f, 351f),  // shoulder_pan_joint
         new Tuple<float, float>(-351f, 351f),  // shoulder_lift_joint
@@ -93,6 +100,21 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         new Tuple<float, float>(-351f, 351f),  // wrist_2_joint
         new Tuple<float, float>(-351f, 351f)   // wrist_3_joint
     };
+
+    private void Awake()
+    {
+        if (robot == null)
+        {
+            Debug.LogError("MoveItPlanningRequestMenuUI: Robot GameObject not assigned.");
+            return;
+        }
+
+        jointNameToIndex = new Dictionary<string, int>();
+        for (int i = 0; i < jointNames.Length; i++)
+        {
+            jointNameToIndex[jointNames[i]] = i;
+        }
+    }
 
     private void OnEnable()
     {
@@ -119,7 +141,6 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
     private void StartPlannerQuerying()
     { 
-        Debug.Log("MoveItPlanningRequestMenuUI: Starting planner query...");
         // Register the service and start querying
         if (ros != null)
         {
@@ -143,6 +164,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         allowedPlanningTimeField = root.Q<FloatField>("planningRequestAllowedPlanningTimeInput");
         planningRequestButton = root.Q<Button>("planningRequestSendButton");
         stopReplayButton = root.Q<Button>("planningRequestStopReplayButton");
+        executeTrajectoryButton = root.Q<Button>("planningRequestExecuteTrajectoryButton");
         mirrorButton = root.Q<Button>("mirrorJointStateButton");
         
         // Validate UI elements
@@ -150,7 +172,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
             plannerPipelineDropdown == null || plannerDropdown == null ||
             numPlanningAttemptsField == null || allowedPlanningTimeField == null ||
             planningRequestButton == null || stopReplayButton == null ||
-            mirrorButton == null)
+            mirrorButton == null || executeTrajectoryButton == null)
         {
             Debug.LogError("MoveItPlanningRequestMenuUI: One or more UI elements not found in UXML.");
             return;
@@ -167,6 +189,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         allowedPlanningTimeField.value = defaultAllowedPlanningTime;
 
         stopReplayButton.SetEnabled(false);
+        executeTrajectoryButton.SetEnabled(false);
 
         // Update button states
         UpdateButtonStates();
@@ -180,19 +203,24 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         // Setup dropdown event handlers
         plannerPipelineDropdown.RegisterValueChangedCallback(OnPipelineSelectionChanged);
 
-        // Add planning request button (if you want to add one)
+        // Add planning request button
         planningRequestButton.clicked += SendPlanningRequest;
 
         stopReplayButton.clicked += () =>
         {
-            if (trajectoryReplayer != null)
+            if (isReplaying)
             {
-                trajectoryReplayer.StopReplay();
-                stopReplayButton.SetEnabled(false);
+                StopPreview();
+            }
+            else if (!isReplaying)
+            {
+                PreviewTrajectory(lastPlannedTrajectory);
+
             }
         };
-        
+
         mirrorButton.clicked += ToggleMirroring;
+        executeTrajectoryButton.clicked += ExectuteTrajectory;
     }
 
     private void OnPipelineSelectionChanged(ChangeEvent<string> evt)
@@ -212,8 +240,6 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
             plannerDropdown.choices = new List<string>();
             plannerDropdown.SetValueWithoutNotify("");
         }
-
-        Debug.Log($"MoveItPlanningRequestMenuUI: Pipeline changed to: {selectedPipeline}");
     }
 
     private void TryQueryPlanners()
@@ -233,7 +259,6 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
                 plannerQueryServiceName, req,
                 OnPlannerQueryResponse
             );
-            Debug.Log($"[MoveIt] Query planner interfaces request sent to {plannerQueryServiceName}");
         }
         catch (Exception e)
         {
@@ -278,10 +303,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
             });
 
             pipelineToPlanners[pipeline] = planners;
-            Debug.Log($"[MoveIt] Pipeline: {pipeline} | Planners: {string.Join(", ", planners)}");
         }
-
-        Debug.Log($"MoveItPlanningRequestMenuUI: Successfully loaded {PlannerResults.Count} planner interfaces.");
 
         UI(() =>
         {
@@ -313,12 +335,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
                 plannerDropdown.choices = new List<string>();
                 plannerDropdown.SetValueWithoutNotify("");
             }
-
-            Debug.Log($"[MoveIt] UI updated: {discoveredPipelines.Count} pipelines, " +
-                      $"{(string.IsNullOrEmpty(planningPipelineId) ? 0 : plannerDropdown.choices.Count)} planners.");
         });
-
-        Debug.Log($"MoveItPlanningRequestMenuUI: Successfully loaded {PlannerResults.Count} planner interfaces.");
     }
 
     private void InitializeROSConnection()
@@ -335,9 +352,9 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
         isConnected = true;
 
-        ros.Subscribe<JointStateMsg>(jointStateTopic, MirrorJointStates);
+        ros.RegisterPublisher<JointTrajectoryMsg>(executeTrajectoryTopic);
 
-        Debug.Log("MoveItPlanningRequestMenuUI: ROS connection established successfully.");
+        ros.Subscribe<JointStateMsg>(jointStateTopic, MirrorJointStates);
     }
 
     private void MirrorJointStates(JointStateMsg jointState)
@@ -350,10 +367,17 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
             return;
         }
 
-        // Apply mirrored joint angles back to the robot
-        robotManager.SetJointAngles(jointState.position.Select(x => (float)(x * Mathf.Rad2Deg)).ToArray());
+        // Read joint states and map to robot joints
+        float[] jointAngles = new float[robotManager.GetJointNames().Count];
+        for (int i = 0; i < jointState.name.Length; i++)
+        {
+            string jointName = jointState.name[i];
+            int jointIndex = jointNameToIndex[jointName];
+            jointAngles[jointIndex] = -((float)jointState.position[i] * Mathf.Rad2Deg);
+        }
 
-        Debug.Log("MoveItPlanningRequestMenuUI: Joint states mirrored.");
+        // Apply mirrored joint angles back to the robot
+        robotManager.SetJointAngles(jointAngles);
     }
 
     private void ToggleMirroring()
@@ -385,7 +409,6 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         currentStartState = GetCurrentRobotState();
         hasStartState = true;
 
-        Debug.Log("MoveItPlanningRequestMenuUI: Start state set successfully.");
         UpdateButtonStates();
     }
 
@@ -411,7 +434,6 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         currentGoalState = GetGoalRobotState();
         hasGoalState = true;
         
-        Debug.Log("MoveItPlanningRequestMenuUI: Goal state set successfully.");
         UpdateButtonStates();
     }
 
@@ -436,6 +458,11 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
             Debug.LogWarning("MoveItPlanningRequestMenuUI: No planner selected.");
             return;
         }
+
+        // Disable replay button until we have a new trajectory
+        StopPreview();
+        stopReplayButton.SetEnabled(false);
+        executeTrajectoryButton.SetEnabled(false);
         
         var planningRequest = CreateMotionPlanRequest();
         GetMotionPlanRequest motionPlanRequest = new GetMotionPlanRequest(planningRequest);
@@ -502,8 +529,8 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
                 {
                     joint_name = robotState.joint_state.name[i],
                     position = robotState.joint_state.position[i],
-                    tolerance_above = 0.1,
-                    tolerance_below = 0.1,
+                    tolerance_above = goalTolerance,
+                    tolerance_below = goalTolerance,
                     weight = 1.0
                 };
                 constraints.Add(constraint);
@@ -621,12 +648,12 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
             // Handle the planned trajectory
             if (motionPlanResponse.trajectory?.joint_trajectory != null)
             {
-                var trajectory = motionPlanResponse.trajectory.joint_trajectory;
-                Debug.Log($"MoveItPlanningRequestMenuUI: Trajectory has {trajectory.points.Length} waypoints");
+                lastPlannedTrajectory = motionPlanResponse.trajectory.joint_trajectory;
+                Debug.Log($"MoveItPlanningRequestMenuUI: Trajectory has {lastPlannedTrajectory.points.Length} waypoints");
 
                 // You can execute the trajectory here or store it for later execution
-                stopReplayButton.SetEnabled(true);
-                ExecuteTrajectory(trajectory);
+                PreviewTrajectory(lastPlannedTrajectory);
+                executeTrajectoryButton.SetEnabled(true);
             }
         }
         else
@@ -635,14 +662,14 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         }
     }
 
-    private void ExecuteTrajectory(JointTrajectoryMsg trajectory)
+    private void PreviewTrajectory(JointTrajectoryMsg trajectory)
     {
-        // This method should send the trajectory to your robot or simulation for execution
-        Debug.Log("MoveItPlanningRequestMenuUI: Executing trajectory...");
-        
-        // Example: Use the TrajectoryReplay component to visualize the trajectory
+        // Use the TrajectoryReplay component to visualize the trajectory
         if (trajectoryReplayer != null)
         {
+            stopReplayButton.SetEnabled(true);
+            isReplaying = true;
+            stopReplayButton.text = "Stop Replay";
             StartCoroutine(trajectoryReplayer.StartReplay(trajectory));
         }
         else
@@ -650,13 +677,46 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
             Debug.Log("MoveItPlanningRequestMenuUI: No TrajectoryReplay component assigned.");
         }
     }
+    
+    private void StopPreview()
+    {
+        if (trajectoryReplayer != null && isReplaying)
+        {
+            trajectoryReplayer.StopReplay();
+            isReplaying = false;
+            stopReplayButton.text = "Start Replay";
+        }
+    }
+
+    private void ExectuteTrajectory()
+    {
+        if (!isConnected)
+        {
+            Debug.LogWarning("MoveItPlanningRequestMenuUI: ROS 2 connection not available.");
+            return;
+        }
+
+        if (lastPlannedTrajectory == null)
+        {
+            Debug.LogWarning("MoveItPlanningRequestMenuUI: No planned trajectory to execute.");
+            return;
+        }
+
+        // Stop any ongoing preview and start mirroring if not already
+        StopPreview();
+        if (!isMirroring)
+            ToggleMirroring();
+
+        ros.Publish(executeTrajectoryTopic, lastPlannedTrajectory);
+        Debug.Log("MoveItPlanningRequestMenuUI: Published trajectory for execution.");
+    }
 
     private void UpdateButtonStates()
     {
         // Update button visual states based on current planning state
         setStartStateButton.text = hasStartState ? "Start State ✓" : "Set Start State";
         setGoalStateButton.text = hasGoalState ? "Goal State ✓" : "Set Goal State";
-        
+
         // You could also change button colors or enable/disable them
         setStartStateButton.SetEnabled(true);
         setGoalStateButton.SetEnabled(true);
@@ -669,19 +729,16 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         currentStartState = null;
         currentGoalState = null;
         UpdateButtonStates();
-        Debug.Log("MoveItPlanningRequestMenuUI: Planning state reset.");
     }
 
     public void SetPlanningGroup(string groupName)
     {
         planningGroupName = groupName;
-        Debug.Log($"MoveItPlanningRequestMenuUI: Planning group set to: {planningGroupName}");
     }
 
     public void SetPlanningPipeline(string pipelineId)
     {
         planningPipelineId = pipelineId;
-        Debug.Log($"MoveItPlanningRequestMenuUI: Planning pipeline set to: {planningPipelineId}");
     }
 
     private void OnDisable()
@@ -692,9 +749,5 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     {    
         // Cancel any pending invokes
         CancelInvoke(nameof(TryQueryPlanners));
-        
-        // // Unregister service if needed
-        // if (ros != null)
-        //     ros.UnregisterRosService(plannerQueryServiceName);
     }
 }

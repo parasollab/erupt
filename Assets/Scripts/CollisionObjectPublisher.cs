@@ -7,6 +7,7 @@ using RosMessageTypes.Std;
 using System;
 using System.Linq;
 using RosMessageTypes.BuiltinInterfaces;
+using Unity.Robotics.ROSTCPConnector.ROSGeometry;
 
 public class CollisionObjectPublisher : MonoBehaviour
 {
@@ -370,7 +371,63 @@ public class CollisionObjectPublisher : MonoBehaviour
 
     static QuaternionMsg UnityToRosQuaternion(Quaternion q)
     {
-        return new QuaternionMsg(q.x, q.z, q.y, q.w);
+        // Get the Euler angles in degrees
+        Vector3 euler = q.eulerAngles;
+        var ax = euler.x;
+        var ay = euler.z;
+        var az = euler.y;
+
+        // Make a rotation matrix from each axis
+        Matrix4x4 Rx = RotX(ax);
+        Matrix4x4 Ry = RotY(ay);
+        Matrix4x4 Rz = RotZ(az);
+
+        // Combine the rotation matrices (note the order of multiplication)
+        Matrix4x4 R = Rz * Rx * Ry;
+
+        Quaternion converted = R.rotation;
+        return new QuaternionMsg(converted.x, converted.y, converted.z, converted.w);
+
+        // return new QuaternionMsg(q.z, -q.x, q.y, -q.w);
+    }
+    
+    static Matrix4x4 RotX(float angle)
+    {
+        float rad = angle * Mathf.Deg2Rad;
+        float c = Mathf.Cos(rad);
+        float s = Mathf.Sin(rad);
+        return new Matrix4x4(
+            new Vector4(1, 0, 0, 0),
+            new Vector4(0, c, -s, 0),
+            new Vector4(0, s, c, 0),
+            new Vector4(0, 0, 0, 1)
+        );
+    }
+
+    static Matrix4x4 RotY(float angle)
+    {
+        float rad = angle * Mathf.Deg2Rad;
+        float c = Mathf.Cos(rad);
+        float s = Mathf.Sin(rad);
+        return new Matrix4x4(
+            new Vector4(c, 0, s, 0),
+            new Vector4(0, 1, 0, 0),
+            new Vector4(-s, 0, c, 0),
+            new Vector4(0, 0, 0, 1)
+        );
+    }
+
+    static Matrix4x4 RotZ(float angle)
+    {
+        float rad = angle * Mathf.Deg2Rad;
+        float c = Mathf.Cos(rad);
+        float s = Mathf.Sin(rad);
+        return new Matrix4x4(
+            new Vector4(c, -s, 0, 0),
+            new Vector4(s, c, 0, 0),
+            new Vector4(0, 0, 1, 0),
+            new Vector4(0, 0, 0, 1)
+        );
     }
 
     static MeshMsg UnityMeshToRosMesh(Mesh unityMesh, Transform transform = null)
@@ -394,13 +451,13 @@ public class CollisionObjectPublisher : MonoBehaviour
         for (int i = 0; i < unityMesh.vertexCount; i++)
         {
             Vector3 vertex = unityMesh.vertices[i];
-            
+
             // Apply scale if transform is provided
             if (transform != null)
             {
                 vertex = Vector3.Scale(vertex, transform.localScale);
             }
-            
+
             rosVertices[i] = new PointMsg(vertex.x, vertex.z, vertex.y);
         }
 

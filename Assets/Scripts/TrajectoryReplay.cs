@@ -52,22 +52,22 @@ public class TrajectoryReplay : MonoBehaviour
         for (int i = 0; i < prevPos.Length; i++)
             prevPos[i] = -1 * (points[0].positions[i] * Mathf.Rad2Deg);
         for (int i = 1; i < points.Length; i++)
+        {
+            double[] positions = points[i].positions;
+            double[] modifiedPositions = new double[positions.Length];
+            for (int j = 0; j < positions.Length; j++)
+                modifiedPositions[j] = -1 * (positions[j] * Mathf.Rad2Deg);
+            double currTime = durationToDouble(points[i].time_from_start);
+            double movingTime = currTime - prevTime;
+            if (positions.Length != robotManager.GetJointNames().Count)
             {
-                double[] positions = points[i].positions;
-                double[] modifiedPositions = new double[positions.Length];
-                for (int j = 0; j < positions.Length; j++)
-                    modifiedPositions[j] = -1 * (positions[j] * Mathf.Rad2Deg);
-                double currTime = durationToDouble(points[i].time_from_start);
-                double movingTime = currTime - prevTime;
-                if (positions.Length != robotManager.GetJointNames().Count)
-                {
-                    Debug.LogError("Positions array length does not match knobs count.");
-                    yield break;
-                }
-                yield return StartCoroutine(MoveKnobsOverTime(prevPos, modifiedPositions, movingTime));
-                prevPos = modifiedPositions;
-                prevTime = currTime;
+                Debug.LogError("Positions array length does not match knobs count.");
+                yield break;
             }
+            yield return StartCoroutine(MoveKnobsOverTime(prevPos, modifiedPositions, movingTime));
+            prevPos = modifiedPositions;
+            prevTime = currTime;
+        }
     }
 
     IEnumerator MoveKnobsOverTime(double[] startPositions, double[] endPositions, double duration)
