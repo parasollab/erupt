@@ -11,6 +11,8 @@ using SolidPrimitiveMsg = RosMessageTypes.Shape.SolidPrimitiveMsg;
 using PointMsg = RosMessageTypes.Geometry.PointMsg;
 using QuaternionMsg = RosMessageTypes.Geometry.QuaternionMsg;
 using Unity.Robotics.ROSTCPConnector.ROSGeometry;
+using UnityEngine.XR.Interaction.Toolkit.Interactables;
+using UnityEngine.XR.Interaction.Toolkit.Transformers;
 
 public class CollisionObjectsListenerSimple : MonoBehaviour
 {
@@ -19,6 +21,9 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
 
     [Header("Frame Root (ROS world frame)")]
     public Transform worldOrigin; // If null, uses this.transform
+
+    [Header("Materials")]
+    public Material litMaterial;
 
     private ROSConnection ros;
     private readonly Dictionary<string, GameObject> objectsById = new();
@@ -46,10 +51,13 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
 
         if (co.operation == OP_REMOVE)
         {
+            Debug.Log($"[CO Listener] Removing object id={co.id}");
             if (objectsById.TryGetValue(co.id, out var old) && old) Destroy(old);
             objectsById.Remove(co.id);
             return;
         }
+
+        Debug.Log($"[CO Listener] Adding/Appending/Moving object id={co.id}");
 
         // ADD / APPEND / MOVE → upsert parent
         if (!objectsById.TryGetValue(co.id, out var parent) || !parent)
@@ -75,10 +83,60 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
         int nPrimUse = Mathf.Min(prims.Length, primPosesLocal.Length);
         for (int i = 0; i < nPrimUse; i++)
         {
-            var child = BuildPrimitive($"{co.id}_prim_{i}", prims[i]);
+            var name = $"{co.id}";
+            var child = BuildPrimitive(name, prims[i]);
             child.transform.SetParent(parent.transform, false);      // keep local space
             ApplyLocalPose(child.transform, primPosesLocal[i]);      // local to parent
             built++;
+
+            // Add physics components
+            Rigidbody rb = child.AddComponent<Rigidbody>();
+            rb.useGravity = false;
+            rb.isKinematic = true;
+
+            // Add XR interaction (will be controlled by SelectableGrabController)
+            child.AddComponent<XRGrabInteractable>();
+            child.GetComponent<XRGrabInteractable>().selectMode = InteractableSelectMode.Multiple;
+
+            // Add component to control grabbing based on selection state
+            child.AddComponent<SelectableGrabController>();
+
+            // Set default scale
+            child.transform.localScale = Vector3.one;
+            
+            // Add tag for selection
+            child.tag = "Selectable";
+
+            child.AddComponent<XRGrabTransformerScaleAxisLock>();
+            child.AddComponent<XRGrabTransformerLockPose>();
+
+            // Add an XR General Grab Transformer
+            child.AddComponent<XRGeneralGrabTransformer>();
+            child.GetComponent<XRGeneralGrabTransformer>().allowTwoHandedScaling = true;
+            child.GetComponent<XRGeneralGrabTransformer>().clampScaling = false;
+
+            child.AddComponent<XRUIScaleTransformer>();
+
+            child.GetComponent<XRGrabInteractable>().AddMultipleGrabTransformer(child.GetComponent<XRGeneralGrabTransformer>());
+
+            child.GetComponent<XRGrabInteractable>().AddMultipleGrabTransformer(child.GetComponent<XRGrabTransformerScaleAxisLock>());
+
+            child.GetComponent<XRGrabInteractable>().AddMultipleGrabTransformer(child.GetComponent<XRGrabTransformerLockPose>());
+
+            child.GetComponent<XRGrabInteractable>().AddMultipleGrabTransformer(child.GetComponent<XRUIScaleTransformer>());
+
+            // Ensure collider is enabled (should already be there from CreatePrimitive)
+            Collider collider = child.GetComponent<Collider>();
+            if (collider != null)
+            {
+                collider.enabled = true;
+            }
+
+            // Add CollisionObjectPublisher to automatically publish to ROS
+            CollisionObjectPublisher publisher = child.AddComponent<CollisionObjectPublisher>();
+            publisher.isMesh = false;
+            // Generate unique ID for each object
+            publisher.objectId = name;
         }
 
         // ---- MESHES (local to parent) ----
@@ -87,7 +145,7 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
         int nMeshUse = Mathf.Min(meshes.Length, meshPosesLocal.Length);
         for (int i = 0; i < nMeshUse; i++)
         {
-            var child = BuildMesh($"{co.id}_mesh_{i}", meshes[i]);
+            var child = BuildMesh($"{co.id}", meshes[i]);
             if (child)
             {
                 child.transform.SetParent(parent.transform, false);
@@ -125,9 +183,8 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
 
     void ApplyWorldPose(Transform t, PoseMsg rosPose)
     {
-        // ROS (x,y,z) → Unity (x,z,y)
-        Vector3 pos = rosPose.position.From<FLU>();
-        Quaternion rot = rosPose.orientation.From<FLU>();
+        Vector3 pos = RosUnityConversion.RosToUnityPosition(rosPose.position);
+        Quaternion rot = RosUnityConversion.RosToUnityQuaternion(rosPose.orientation);
 
         t.position = worldOrigin.TransformPoint(pos);
         t.rotation = worldOrigin.rotation * rot;
@@ -136,8 +193,8 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
     void ApplyLocalPose(Transform t, PoseMsg rosPose)
     {
         // Local pose relative to parent (object frame). Same axis remap.
-        t.localPosition = rosPose.position.From<FLU>();
-        t.localRotation = rosPose.orientation.From<FLU>();
+        t.localPosition = RosUnityConversion.RosToUnityPosition(rosPose.position);
+        t.localRotation = RosUnityConversion.RosToUnityQuaternion(rosPose.orientation);
     }
 
     // ---------- Builders ----------
@@ -145,6 +202,7 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
     GameObject BuildPrimitive(string name, SolidPrimitiveMsg prim)
     {
         GameObject go;
+        MeshRenderer meshRenderer;
         switch (prim.type)
         {
             case SolidPrimitiveMsg.BOX:
@@ -152,9 +210,16 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
                 go.name = name;
                 go.transform.localScale = new Vector3(
                     (float)prim.dimensions[SolidPrimitiveMsg.BOX_X],
-                    (float)prim.dimensions[SolidPrimitiveMsg.BOX_Y],
-                    (float)prim.dimensions[SolidPrimitiveMsg.BOX_Z]
+                    (float)prim.dimensions[SolidPrimitiveMsg.BOX_Z],
+                    (float)prim.dimensions[SolidPrimitiveMsg.BOX_Y]
                 );
+
+                // Apply material
+                meshRenderer = go.GetComponent<MeshRenderer>();
+                if (meshRenderer != null && litMaterial != null)
+                {
+                    meshRenderer.material = litMaterial;
+                }
                 return go;
 
             case SolidPrimitiveMsg.SPHERE:
@@ -162,6 +227,12 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
                 go.name = name;
                 float r = (float)prim.dimensions[SolidPrimitiveMsg.SPHERE_RADIUS];
                 go.transform.localScale = Vector3.one * (2f * r);
+
+                meshRenderer = go.GetComponent<MeshRenderer>();
+                if (meshRenderer != null && litMaterial != null)
+                {
+                    meshRenderer.material = litMaterial;
+                }
                 return go;
 
             case SolidPrimitiveMsg.CYLINDER:
@@ -172,15 +243,27 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
                 float rr = (float)prim.dimensions[SolidPrimitiveMsg.CYLINDER_RADIUS];
                 go.transform.localScale = new Vector3(2f * rr, h * 0.5f, 2f * rr); // Unity height=2 at scale.y=1
                 go.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+
+                meshRenderer = go.GetComponent<MeshRenderer>();
+                if (meshRenderer != null && litMaterial != null)
+                {
+                    meshRenderer.material = litMaterial;
+                }
                 return go;
 
             case SolidPrimitiveMsg.CONE:
                 go = GameObject.CreatePrimitive(PrimitiveType.Cylinder); // approximate cone; swap for real cone mesh if needed
-                go.name = name + "_approxCone";
+                go.name = name;
                 float ch = (float)prim.dimensions[SolidPrimitiveMsg.CONE_HEIGHT];
                 float cr = (float)prim.dimensions[SolidPrimitiveMsg.CONE_RADIUS];
                 go.transform.localScale = new Vector3(2f * cr, ch * 0.5f, 2f * cr);
                 go.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+
+                meshRenderer = go.GetComponent<MeshRenderer>();
+                if (meshRenderer != null && litMaterial != null)
+                {
+                    meshRenderer.material = litMaterial;
+                }
                 return go;
 
             default:
@@ -202,7 +285,7 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
         var go = new GameObject(name);
         var mf = go.AddComponent<MeshFilter>();
         var mr = go.AddComponent<MeshRenderer>();
-        mr.sharedMaterial = new Material(Shader.Find("Standard"));
+        mr.material = litMaterial;
 
         var uMesh = new Mesh();
         var verts = new Vector3[meshMsg.vertices.Length];
@@ -220,7 +303,8 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
         for (int t = 0; t < meshMsg.triangles.Length; t++)
         {
             var ids = meshMsg.triangles[t].vertex_indices;
-            tris.Add((int)ids[0]); tris.Add((int)ids[1]); tris.Add((int)ids[2]);
+            // Reverse winding order to flip normals (faces out)
+            tris.Add((int)ids[0]); tris.Add((int)ids[2]); tris.Add((int)ids[1]);
         }
 
         uMesh.SetVertices(verts);

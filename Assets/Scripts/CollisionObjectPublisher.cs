@@ -165,8 +165,8 @@ public class CollisionObjectPublisher : MonoBehaviour
             operation = CollisionObjectMsg.ADD, // Use REMOVE or MOVE if needed
             pose = new PoseMsg
             {
-                position = UnityToRosPosition(transform.position),
-                orientation = UnityToRosQuaternion(transform.rotation)
+                position = RosUnityConversion.UnityToRosPosition(transform.position),
+                orientation = RosUnityConversion.UnityToRosQuaternion(transform.rotation)
             }
         };
 
@@ -362,72 +362,6 @@ public class CollisionObjectPublisher : MonoBehaviour
             }
             readableMeshCopy = null;
         }
-    }
-
-    static PointMsg UnityToRosPosition(Vector3 pos)
-    {
-        return new PointMsg(pos.x, pos.z, pos.y); // Unity Y → ROS Z
-    }
-
-    static QuaternionMsg UnityToRosQuaternion(Quaternion q)
-    {
-        // Get the Euler angles in degrees
-        Vector3 euler = q.eulerAngles;
-        var ax = euler.x;
-        var ay = euler.z;
-        var az = euler.y;
-
-        // Make a rotation matrix from each axis
-        Matrix4x4 Rx = RotX(ax);
-        Matrix4x4 Ry = RotY(ay);
-        Matrix4x4 Rz = RotZ(az);
-
-        // Combine the rotation matrices (note the order of multiplication)
-        Matrix4x4 R = Rz * Rx * Ry;
-
-        Quaternion converted = R.rotation;
-        return new QuaternionMsg(converted.x, converted.y, converted.z, converted.w);
-
-        // return new QuaternionMsg(q.z, -q.x, q.y, -q.w);
-    }
-    
-    static Matrix4x4 RotX(float angle)
-    {
-        float rad = angle * Mathf.Deg2Rad;
-        float c = Mathf.Cos(rad);
-        float s = Mathf.Sin(rad);
-        return new Matrix4x4(
-            new Vector4(1, 0, 0, 0),
-            new Vector4(0, c, -s, 0),
-            new Vector4(0, s, c, 0),
-            new Vector4(0, 0, 0, 1)
-        );
-    }
-
-    static Matrix4x4 RotY(float angle)
-    {
-        float rad = angle * Mathf.Deg2Rad;
-        float c = Mathf.Cos(rad);
-        float s = Mathf.Sin(rad);
-        return new Matrix4x4(
-            new Vector4(c, 0, s, 0),
-            new Vector4(0, 1, 0, 0),
-            new Vector4(-s, 0, c, 0),
-            new Vector4(0, 0, 0, 1)
-        );
-    }
-
-    static Matrix4x4 RotZ(float angle)
-    {
-        float rad = angle * Mathf.Deg2Rad;
-        float c = Mathf.Cos(rad);
-        float s = Mathf.Sin(rad);
-        return new Matrix4x4(
-            new Vector4(c, -s, 0, 0),
-            new Vector4(s, c, 0, 0),
-            new Vector4(0, 0, 1, 0),
-            new Vector4(0, 0, 0, 1)
-        );
     }
 
     static MeshMsg UnityMeshToRosMesh(Mesh unityMesh, Transform transform = null)
