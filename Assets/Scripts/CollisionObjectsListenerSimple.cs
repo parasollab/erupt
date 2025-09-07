@@ -143,7 +143,8 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
         int nMeshUse = Mathf.Min(meshes.Length, meshPosesLocal.Length);
         for (int i = 0; i < nMeshUse; i++)
         {
-            var child = BuildMesh($"{co.id}", meshes[i]);
+            var name = $"{co.id}";
+            var child = BuildMesh(name, meshes[i]);
             if (child)
             {
                 child.transform.SetParent(parent.transform, false);
