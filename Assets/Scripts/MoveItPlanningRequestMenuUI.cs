@@ -86,12 +86,12 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     public List<PlannerListing> PlannerResults = new List<PlannerListing>();
     
     // Hardcoded joint names for the UR5e - ideally this would be dynamic
-    private readonly string[] jointNames = new string[]
+    public readonly string[] jointNames = new string[]
     { "shoulder_pan_joint", "shoulder_lift_joint", "elbow_joint", "wrist_1_joint", "wrist_2_joint", "wrist_3_joint" };
 
     private Dictionary<string, int> jointNameToIndex;
 
-    private readonly Tuple<float, float>[] jointLimits = new Tuple<float, float>[]
+    public readonly Tuple<float, float>[] jointLimits = new Tuple<float, float>[]
     {
         new Tuple<float, float>(-351f, 351f),  // shoulder_pan_joint
         new Tuple<float, float>(-351f, 351f),  // shoulder_lift_joint
@@ -189,6 +189,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         allowedPlanningTimeField.value = defaultAllowedPlanningTime;
 
         stopReplayButton.SetEnabled(false);
+        executeTrajectoryButton.SetEnabled(false);
 
         // Update button states
         UpdateButtonStates();
