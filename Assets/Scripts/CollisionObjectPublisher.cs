@@ -23,7 +23,7 @@ public class CollisionObjectPublisher : MonoBehaviour
     private Vector3 lastPosition;
     private Quaternion lastRotation;
     private Vector3 lastScale;
-    private bool hasBeenPublished = false;
+    public bool hasBeenPublished = false;
     private Mesh readableMeshCopy = null; // Cache for the readable mesh copy
 
     void Start()

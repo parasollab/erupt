@@ -100,7 +100,7 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
 
             // Add component to control grabbing based on selection state
             child.AddComponent<SelectableGrabController>();
-            
+
             // Add tag for selection
             child.tag = "Selectable";
 
@@ -134,6 +134,7 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
             publisher.isMesh = false;
             // Generate unique ID for each object
             publisher.objectId = name;
+            publisher.hasBeenPublished = true;
         }
 
         // ---- MESHES (local to parent) ----
@@ -176,10 +177,11 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
                 child.AddComponent<SelectableGrabController>();
 
                 // Add CollisionObjectPublisher to automatically publish to ROS
-                // CollisionObjectPublisher publisher = child.AddComponent<CollisionObjectPublisher>();
-                // publisher.isMesh = true;
-                // // Generate unique ID for each object
-                // publisher.objectId = name;
+                CollisionObjectPublisher publisher = child.AddComponent<CollisionObjectPublisher>();
+                publisher.isMesh = true;
+                // Generate unique ID for each object
+                publisher.objectId = name;
+                publisher.hasBeenPublished = true;
             }
         }
 
