@@ -17,9 +17,9 @@ public static class RosUnityConversion
         var az = euler.y;
 
         // Make a rotation matrix from each axis
-        Matrix4x4 Rx = RotX(ax);
-        Matrix4x4 Ry = RotY(ay);
-        Matrix4x4 Rz = RotZ(az);
+        Matrix4x4 Rx = RotX(-ax);
+        Matrix4x4 Ry = RotY(-ay);
+        Matrix4x4 Rz = RotZ(-az);
 
         // Combine the rotation matrices (note the order of multiplication)
         Matrix4x4 R = Rz * Rx * Ry;
