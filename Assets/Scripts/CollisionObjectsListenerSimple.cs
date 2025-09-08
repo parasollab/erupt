@@ -26,7 +26,7 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
     public Material litMaterial;
 
     private ROSConnection ros;
-    private readonly Dictionary<string, GameObject> objectsById = new();
+    public Dictionary<string, GameObject> objectsById = new();
 
     // MoveIt op codes (per message spec)
     const byte OP_ADD = 0;
@@ -54,6 +54,12 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
             Debug.Log($"[CO Listener] Removing object id={co.id}");
             if (objectsById.TryGetValue(co.id, out var old) && old) Destroy(old);
             objectsById.Remove(co.id);
+            return;
+        }
+
+        if (co.operation == OP_ADD && objectsById.ContainsKey(co.id))
+        {
+            Debug.LogWarning($"[CO Listener] Ignoring ADD for existing id={co.id}; use APPEND or MOVE.");
             return;
         }
 
@@ -135,6 +141,9 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
             // Generate unique ID for each object
             publisher.objectId = name;
             publisher.hasBeenPublished = true;
+
+            // Register the new object
+            objectsById.Add(publisher.objectId, child);
         }
 
         // ---- MESHES (local to parent) ----
@@ -183,6 +192,9 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
                 // Generate unique ID for each object
                 publisher.objectId = name;
                 publisher.hasBeenPublished = true;
+
+                // Register the new object
+                objectsById.Add(publisher.objectId, child);
             }
         }
 

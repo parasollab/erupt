@@ -17,6 +17,9 @@ public class WristMenuController : MonoBehaviour
     
     [Header("Selection Manager")]
     public SelectionManager selectionManager;
+
+    [Header("CollisionObjectsListener")]
+    public CollisionObjectsListenerSimple collisionObjectsListener;
     
     // UI Elements
     private VisualElement root;
@@ -606,6 +609,9 @@ public class WristMenuController : MonoBehaviour
         {
             selectionManager.SetSelectedObject(shape);
         }
+
+        // Register the new object with the CollisionObjectsListener
+        collisionObjectsListener?.objectsById.Add(publisher.objectId, shape);
         
         Debug.Log($"WristMenuController: Created {primitiveType} with ID {publisher.objectId}");
     }
