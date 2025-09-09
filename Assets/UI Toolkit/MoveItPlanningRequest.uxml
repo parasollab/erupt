@@ -11,5 +11,6 @@
         <ui:Button text="Stop Replay" name="planningRequestStopReplayButton" style="-unity-font-style: bold;" />
         <ui:Button text="Execute Trajectory" name="planningRequestExecuteTrajectoryButton" style="-unity-font-style: bold;" />
         <ui:Button text="Mirror Joint State" name="mirrorJointStateButton" style="-unity-font-style: bold;" />
+        <ui:Label text="Planning Result: &lt;No Request Yet&gt;" name="planningResultLabel" emoji-fallback-support="true" parse-escape-sequences="true" style="height: 122px; white-space: normal;" />
     </ui:VisualElement>
 </ui:UXML>

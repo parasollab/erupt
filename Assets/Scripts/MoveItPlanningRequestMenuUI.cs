@@ -50,7 +50,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     private DropdownField plannerDropdown;
     private IntegerField numPlanningAttemptsField;
     private FloatField allowedPlanningTimeField;
-    private Label planningRequestMenuLabel;
+    private Label planningResultLabel;
     private Button planningRequestButton;
     private Button stopReplayButton;
     private Button executeTrajectoryButton;
@@ -155,7 +155,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     private void InitializeUIElements()
     {
         // Get UI elements by name
-        planningRequestMenuLabel = root.Q<Label>("planningRequestMenuLabel");
+        planningResultLabel = root.Q<Label>("planningResultLabel");
         setStartStateButton = root.Q<Button>("planningRequestSetStartButton");
         setGoalStateButton = root.Q<Button>("planningRequestSetGoalStateButton");
         plannerPipelineDropdown = root.Q<DropdownField>("planningRequestPlannerPipelineIDDropDown");
@@ -166,13 +166,14 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         stopReplayButton = root.Q<Button>("planningRequestStopReplayButton");
         executeTrajectoryButton = root.Q<Button>("planningRequestExecuteTrajectoryButton");
         mirrorButton = root.Q<Button>("mirrorJointStateButton");
-        
+
         // Validate UI elements
         if (setStartStateButton == null || setGoalStateButton == null ||
             plannerPipelineDropdown == null || plannerDropdown == null ||
             numPlanningAttemptsField == null || allowedPlanningTimeField == null ||
             planningRequestButton == null || stopReplayButton == null ||
-            mirrorButton == null || executeTrajectoryButton == null)
+            mirrorButton == null || executeTrajectoryButton == null ||
+            planningResultLabel == null)
         {
             Debug.LogError("MoveItPlanningRequestMenuUI: One or more UI elements not found in UXML.");
             return;
@@ -651,6 +652,8 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
                 lastPlannedTrajectory = motionPlanResponse.trajectory.joint_trajectory;
                 Debug.Log($"MoveItPlanningRequestMenuUI: Trajectory has {lastPlannedTrajectory.points.Length} waypoints");
 
+                planningResultLabel.text = $"Planning successful! Time: {motionPlanResponse.planning_time}s, Waypoints: {lastPlannedTrajectory.points.Length}";
+
                 // You can execute the trajectory here or store it for later execution
                 PreviewTrajectory(lastPlannedTrajectory);
                 executeTrajectoryButton.SetEnabled(true);
@@ -658,6 +661,11 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         }
         else
         {
+            planningResultLabel.text = $"Planning failed with error: {motionPlanResponse.error_code.val} {motionPlanResponse.error_code.message}";
+            lastPlannedTrajectory = null;
+            stopReplayButton.SetEnabled(false);
+            executeTrajectoryButton.SetEnabled(false);
+
             Debug.LogError($"MoveItPlanningRequestMenuUI: Planning failed with error code: {motionPlanResponse.error_code.val} - {motionPlanResponse.error_code.message}");
         }
     }

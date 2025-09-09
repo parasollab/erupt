@@ -1200,21 +1200,25 @@ PrefabInstance:
       propertyPath: sourceAsset
       value: 
       objectReference: {fileID: 9197481963319205126, guid: 7d064d19ffaca4f3e82ad948ff71e92c, type: 3}
+    - target: {fileID: 1961351108226525195, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
+      propertyPath: m_WorldSpaceHeight
+      value: 600
+      objectReference: {fileID: 0}
     - target: {fileID: 5481525149749646259, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
       propertyPath: m_Name
       value: MoveItPlanningRequestMenu
       objectReference: {fileID: 0}
     - target: {fileID: 5897628828326932340, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 5
+      value: 6.2
       objectReference: {fileID: 0}
     - target: {fileID: 6242857085696009294, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
       propertyPath: m_Size.y
-      value: 4.8
+      value: 6
       objectReference: {fileID: 0}
     - target: {fileID: 6242857085696009294, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
       propertyPath: m_Center.y
-      value: -2.2
+      value: -3
       objectReference: {fileID: 0}
     - target: {fileID: 6758849327301269162, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
       propertyPath: m_LocalScale.x
