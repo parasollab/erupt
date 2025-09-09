@@ -20,7 +20,8 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
     public string topic = "/collision_objects_ros";
 
     [Header("Frame Root (ROS world frame)")]
-    public Transform worldOrigin; // If null, uses this.transform
+    public GameObject worldOrigin; // If null, uses this.transform
+    private Transform worldOriginTransform => worldOrigin ? worldOrigin.transform : this.transform;
 
     [Header("Materials")]
     public Material litMaterial;
@@ -38,7 +39,6 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
     {
         ros = ROSConnection.GetOrCreateInstance();
         ros.Subscribe<CollisionObjectMsg>(topic, OnCollisionObject);
-        if (worldOrigin == null) worldOrigin = transform;
     }
 
     void OnCollisionObject(CollisionObjectMsg co)
@@ -69,7 +69,7 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
         if (!objectsById.TryGetValue(co.id, out var parent) || !parent)
         {
             parent = new GameObject(co.id);
-            parent.transform.SetParent(worldOrigin, true);
+            parent.transform.SetParent(worldOriginTransform, true);
             objectsById[co.id] = parent;
         }
 
@@ -141,6 +141,7 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
             // Generate unique ID for each object
             publisher.objectId = name;
             publisher.hasBeenPublished = true;
+            publisher.worldOrigin = worldOrigin;
 
             // Register the new object
             objectsById.Add(publisher.objectId, child);
@@ -192,6 +193,7 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
                 // Generate unique ID for each object
                 publisher.objectId = name;
                 publisher.hasBeenPublished = true;
+                publisher.worldOrigin = worldOrigin;
 
                 // Register the new object
                 objectsById.Add(publisher.objectId, child);
@@ -230,8 +232,8 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
         Vector3 pos = RosUnityConversion.RosToUnityPosition(rosPose.position);
         Quaternion rot = RosUnityConversion.RosToUnityQuaternion(rosPose.orientation);
 
-        t.position = worldOrigin.TransformPoint(pos);
-        t.rotation = worldOrigin.rotation * rot;
+        t.position = worldOriginTransform.TransformPoint(pos);
+        t.rotation = worldOriginTransform.rotation * rot;
     }
 
     void ApplyLocalPose(Transform t, PoseMsg rosPose)

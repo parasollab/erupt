@@ -14,6 +14,7 @@ public class SystemPrewarmer : MonoBehaviour
     [Header("Pre-warming Settings")]
     [Tooltip("Delay before starting pre-warming to avoid interfering with scene startup")]
     public float prewarmDelay = 2f;
+    public string mainSceneName = "MainScene";
     
     private void Start()
     {
@@ -39,7 +40,7 @@ public class SystemPrewarmer : MonoBehaviour
         // Debug.Log("SystemPrewarmer: System pre-warming completed!");
 
         // Spawn the MainScene
-        UnityEngine.SceneManagement.SceneManager.LoadScene("MainScene");
+        UnityEngine.SceneManagement.SceneManager.LoadScene(mainSceneName);
     }
     
     private void PrewarmROSConnection()

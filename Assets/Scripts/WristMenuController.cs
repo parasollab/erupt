@@ -20,6 +20,7 @@ public class WristMenuController : MonoBehaviour
 
     [Header("CollisionObjectsListener")]
     public CollisionObjectsListenerSimple collisionObjectsListener;
+    public GameObject worldOrigin;
     
     // UI Elements
     private VisualElement root;
@@ -603,6 +604,7 @@ public class WristMenuController : MonoBehaviour
         publisher.isMesh = false;
         // Generate unique ID for each object
         publisher.objectId = $"unity_{primitiveType.ToString().ToLower()}_{System.DateTime.Now.Ticks}";
+        publisher.worldOrigin = worldOrigin;
         
         // Automatically select the newly created object so user can immediately grab it
         if (selectionManager != null)

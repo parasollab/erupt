@@ -17,6 +17,7 @@ public class CollisionObjectPublisher : MonoBehaviour
     public bool autoDetectMeshType = false; // New field for automatic detection
     public bool createReadableMeshCopy = false; // Create readable copy of non-readable meshes
     public float publishRateHz = 1f;
+    public GameObject worldOrigin; // Optional world origin for relative positioning
 
     private ROSConnection ros;
     private float lastPublishTime = 0f;
@@ -136,6 +137,15 @@ public class CollisionObjectPublisher : MonoBehaviour
         Debug.Log("=== End Status ===");
     }
 
+    Vector3 GetRelativePosition(Vector3 position)
+    {
+        if (worldOrigin != null)
+        {
+            return worldOrigin.transform.InverseTransformPoint(position);
+        }
+        return position;
+    }
+
     void PublishCollisionObject()
     {
         bool isMesh = false;
@@ -155,6 +165,9 @@ public class CollisionObjectPublisher : MonoBehaviour
             return;
         }
 
+        // Get the position relative to world origin if specified
+        Vector3 relativePosition = GetRelativePosition(transform.position);
+
         CollisionObjectMsg msg = new CollisionObjectMsg
         {
             id = objectId,
@@ -166,7 +179,7 @@ public class CollisionObjectPublisher : MonoBehaviour
             operation = CollisionObjectMsg.ADD, // Use REMOVE or MOVE if needed
             pose = new PoseMsg
             {
-                position = RosUnityConversion.UnityToRosPosition(transform.position),
+                position = RosUnityConversion.UnityToRosPosition(relativePosition),
                 orientation = RosUnityConversion.UnityToRosQuaternion(transform.rotation)
             }
         };
