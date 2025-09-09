@@ -1327,6 +1327,17 @@
                 },
                 {
                     "name": "",
+                    "id": "ee5e3b80-82bb-4b04-87e7-3cf8309ab3a9",
+                    "path": "<QuestTouchPlusController>{LeftHand}/primaryButton",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "TogglePlanes",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "1f9a3e71-b15d-4ed9-aa32-7df97113d6d5",
                     "path": "<OculusTouchController>{LeftHand}/secondaryButton",
                     "interactions": "",
@@ -1338,8 +1349,30 @@
                 },
                 {
                     "name": "",
+                    "id": "9ef0d86e-2857-402a-934b-12818c274fc3",
+                    "path": "<QuestTouchPlusController>{LeftHand}/secondaryButton",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "SetRobot",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "c82d5618-e52c-4ed6-a667-1062aa56ac86",
                     "path": "<OculusTouchController>{LeftHand}/menu",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Menu",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "621a2430-f3c3-4335-b9ce-013f6482f69b",
+                    "path": "<QuestTouchPlusController>{LeftHand}/menu",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
@@ -2453,6 +2486,17 @@
                     "name": "",
                     "id": "dbc5014c-62a4-4706-b8b9-eaa225dafcb7",
                     "path": "<OculusTouchController>{RightHand}/triggerPressed",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "SelectObject",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "eb1dfbdf-a1b3-4962-9962-291ba41739a9",
+                    "path": "<QuestTouchPlusController>{RightHand}/triggerPressed",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
