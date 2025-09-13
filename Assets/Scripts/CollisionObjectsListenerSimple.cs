@@ -175,9 +175,9 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
                 {
                     collider.enabled = true;
                 }
-                else // if no collider, add a BoxCollider
+                else
                 {
-                    var c = child.AddComponent<BoxCollider>();
+                    var c = child.AddComponent<MeshCollider>();
                 }
 
                 // Add XR interaction (will be controlled by SelectableGrabController)

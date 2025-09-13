@@ -1185,21 +1185,25 @@ PrefabInstance:
       propertyPath: m_WorldSpaceSizeMode
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 2376129274388650917, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
+      propertyPath: m_Center.y
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 5481525149749646259, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
       propertyPath: m_Name
       value: MoveItPlanningRequestMenu
       objectReference: {fileID: 0}
     - target: {fileID: 5897628828326932340, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 5
+      value: 6.2
       objectReference: {fileID: 0}
     - target: {fileID: 6242857085696009294, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
       propertyPath: m_Size.y
-      value: 4.8
+      value: 6
       objectReference: {fileID: 0}
     - target: {fileID: 6242857085696009294, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
       propertyPath: m_Center.y
-      value: -2.2
+      value: -3
       objectReference: {fileID: 0}
     - target: {fileID: 6758849327301269162, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
       propertyPath: m_LocalScale.x
@@ -1251,6 +1255,10 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6758849327301269162, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7651373568034742396, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
+      propertyPath: m_AABB.m_Center.y
       value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
@@ -1314,6 +1322,7 @@ MonoBehaviour:
   defaultAllowedPlanningTime: 5
   goalTolerance: 0.01
   motionPlanServiceName: /plan_kinematic_path
+  autoQueryPlanners: 1
   plannerQueryServiceName: /query_planner_interface
   ghostSpawner: {fileID: 2049209135}
   trajectoryReplayer: {fileID: 2049209137}

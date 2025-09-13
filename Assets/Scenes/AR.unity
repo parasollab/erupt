@@ -1324,7 +1324,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: xrviz::MoveItPlanningRequestMenuUI
   robot: {fileID: 1981893040}
   jointStateTopic: /joint_states
-  executeTrajectoryTopic: /joint_trajectory_controller/joint_trajectory
+  executeTrajectoryTopic: /scaled_joint_trajectory_controller/joint_trajectory
   uiDocument: {fileID: 277060372}
   planningGroupName: ur_manipulator
   planningPipelineId: ompl

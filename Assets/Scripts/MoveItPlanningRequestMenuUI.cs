@@ -33,6 +33,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     [SerializeField] private string motionPlanServiceName = "/plan_kinematic_path";
 
     [Header("Planner Query Service")]
+    [SerializeField] private bool autoQueryPlanners = true;
     [SerializeField] private string plannerQueryServiceName = "/query_planner_interface";
 
     [Header("Ghost Robots")]
@@ -144,9 +145,10 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         // Register the service and start querying
         if (ros != null)
         {
-            ros.RegisterRosService<QueryPlannerInterfacesRequest, QueryPlannerInterfacesResponse>(plannerQueryServiceName);
-
             ros.RegisterRosService<GetMotionPlanRequest, GetMotionPlanResponse>(motionPlanServiceName);
+
+            if (!autoQueryPlanners) return;
+            ros.RegisterRosService<QueryPlannerInterfacesRequest, QueryPlannerInterfacesResponse>(plannerQueryServiceName);
 
             InvokeRepeating(nameof(TryQueryPlanners), 0.5f, 1.0f); // retry until it succeeds
         }
@@ -454,7 +456,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         
         // Get the selected planner from the dropdown
         string selectedPlanner = plannerDropdown.value;
-        if (string.IsNullOrEmpty(selectedPlanner))
+        if (autoQueryPlanners && string.IsNullOrEmpty(selectedPlanner))
         {
             Debug.LogWarning("MoveItPlanningRequestMenuUI: No planner selected.");
             return;
