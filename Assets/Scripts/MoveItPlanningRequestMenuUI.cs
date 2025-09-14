@@ -31,6 +31,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     
     [Header("ROS 2 Topics")]
     [SerializeField] private string motionPlanServiceName = "/plan_kinematic_path";
+    [SerializeField] private string displayTrajectoryTopic = "";
 
     [Header("Planner Query Service")]
     [SerializeField] private bool autoQueryPlanners = true;
@@ -358,6 +359,25 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         ros.RegisterPublisher<JointTrajectoryMsg>(executeTrajectoryTopic);
 
         ros.Subscribe<JointStateMsg>(jointStateTopic, MirrorJointStates);
+
+        if (!string.IsNullOrEmpty(displayTrajectoryTopic))
+        {
+            ros.Subscribe<DisplayTrajectoryMsg>(displayTrajectoryTopic, DisplayTrajectory);
+        }
+    }
+
+    private void DisplayTrajectory(DisplayTrajectoryMsg trajectory)
+    {
+        if (isReplaying && trajectoryReplayer.HasFinishedOneLoop())
+            StopPreview();
+        else if (isReplaying)
+            return;
+        
+        lastPlannedTrajectory = trajectory.trajectory.Length > 0 ? trajectory.trajectory[0].joint_trajectory : null;
+        if (lastPlannedTrajectory != null)
+        {
+            PreviewTrajectory(lastPlannedTrajectory);
+        }
     }
 
     private void MirrorJointStates(JointStateMsg jointState)
@@ -680,7 +700,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
             stopReplayButton.SetEnabled(true);
             isReplaying = true;
             stopReplayButton.text = "Stop Replay";
-            StartCoroutine(trajectoryReplayer.StartReplay(trajectory));
+            trajectoryReplayer.StartReplay(trajectory);
         }
         else
         {
