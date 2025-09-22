@@ -1323,7 +1323,6 @@ MonoBehaviour:
   goalTolerance: 0.01
   motionPlanServiceName: /erupt_plan_request
   displayTrajectoryTopic: /display_planned_path
-  displayTrajectoryIgnoreFactor: 10
   autoQueryPlanners: 0
   plannerQueryServiceName: /query_planner_interface
   ghostSpawner: {fileID: 2049209135}

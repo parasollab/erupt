@@ -1288,7 +1288,7 @@ MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 4878875058340044388, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
   m_PrefabInstance: {fileID: 277060369}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
+  m_GameObject: {fileID: 477905405}
   m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 1a2d7d89889b4d94fa1f8d6fe49788e8, type: 3}
@@ -1333,6 +1333,8 @@ MonoBehaviour:
   defaultAllowedPlanningTime: 5
   goalTolerance: 0.01
   motionPlanServiceName: /plan_kinematic_path
+  displayTrajectoryTopic: 
+  autoQueryPlanners: 1
   plannerQueryServiceName: /query_planner_interface
   ghostSpawner: {fileID: 2049209135}
   trajectoryReplayer: {fileID: 2049209137}
@@ -1946,6 +1948,11 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 460963484}
   m_CullTransparentMesh: 1
+--- !u!1 &477905405 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 5481525149749646259, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
+  m_PrefabInstance: {fileID: 277060369}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &503502860
 GameObject:
   m_ObjectHideFlags: 0
@@ -5124,6 +5131,11 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1444191561}
   m_CullTransparentMesh: 1
+--- !u!1 &1472619623 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 7623396544050726892, guid: 649d18ad58e93d547b0350eb4be7233a, type: 3}
+  m_PrefabInstance: {fileID: 1557150459}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &1472956070 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 202364688, guid: f6336ac4ac8b4d34bc5072418cdc62a0, type: 3}
@@ -8336,6 +8348,9 @@ MonoBehaviour:
   _setRobotPositionAction: {fileID: 7324189205652438432, guid: c348712bda248c246b8c49b3db54643f, type: 3}
   _leftRobot: {fileID: 1981893040}
   _rightRobot: {fileID: 0}
+  _additionalGameObjects:
+  - {fileID: 477905405}
+  - {fileID: 1472619623}
 --- !u!4 &2047317872
 Transform:
   m_ObjectHideFlags: 0
