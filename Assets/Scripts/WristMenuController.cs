@@ -8,20 +8,20 @@ public class WristMenuController : MonoBehaviour
 {
     [Header("UI Toolkit")]
     [SerializeField] private UIDocument uiDocument;
-    
+
     [Header("Input Actions")]
     public InputActionAsset inputActions;
-    
+
     [Header("Materials")]
     public Material litMaterial;
-    
+
     [Header("Selection Manager")]
     public SelectionManager selectionManager;
 
     [Header("CollisionObjectsListener")]
     public CollisionObjectsListenerSimple collisionObjectsListener;
     public GameObject worldOrigin;
-    
+
     // UI Elements
     private VisualElement root;
     private VisualElement wristMenuMainPanel;
@@ -39,33 +39,37 @@ public class WristMenuController : MonoBehaviour
     private Button addSphereButton;
     private Button addCylinderButton;
     private Button editShapeBackButton;
-    
+
+    private Button duplicateShapeButton; //raizel
+
     // Input Actions
     private InputAction menuAction;
-    
+
+    private Toggle gravityToggle; //raizel
+    private Toggle kinematicToggle;
     // State
     private bool isMenuVisible = false;
-    
+
     private void OnEnable()
     {
         if (uiDocument == null)
             uiDocument = GetComponent<UIDocument>();
-            
+
         root = uiDocument?.rootVisualElement;
         if (root == null)
         {
             Debug.LogError("WristMenuController: No UIDocument/rootVisualElement found.");
             return;
         }
-        
+
         InitializeUIElements();
         SetupEventHandlers();
         SetupInputActions();
-        
+
         // Initially hide the menu
         SetMenuVisibility(false);
     }
-    
+
     public VisualElement CreateToggleStack(string shape, string label)
     {
         // <ui:VisualElement name="toggle-stack" style="flex-direction: column; align-items: stretch;">
@@ -75,7 +79,7 @@ public class WristMenuController : MonoBehaviour
 
         // <ui:Toggle name="my-toggle" label="Enable Feature"
         //    style="flex-direction: row-reverse; overflow: hidden; right: auto; justify-content: flex-start; padding-left: 10px; padding-right: 10px;" />
-        var toggle = new Toggle("Scale " + label + ": ") { name = "wristMenuEditScale" + label + "Toggle"};
+        var toggle = new Toggle("Scale " + label + ": ") { name = "wristMenuEditScale" + label + "Toggle" };
         toggle.style.flexDirection = FlexDirection.RowReverse;
         toggle.style.overflow = Overflow.Hidden;
         toggle.style.right = new StyleLength(StyleKeyword.Auto);
@@ -131,7 +135,7 @@ public class WristMenuController : MonoBehaviour
                     }
                 }
             }
-            
+
             Debug.Log($"WristMenuController: Toggle '{label}' changed to {evt.newValue}");
         });
 
@@ -208,7 +212,7 @@ public class WristMenuController : MonoBehaviour
             if (!allowY) d.y = 0f;
             if (!allowZ) d.z = 0f;
 
-            var gi  = selected.GetComponent<XRGrabInteractable>();
+            var gi = selected.GetComponent<XRGrabInteractable>();
             var uiT = selected.GetComponent<XRUIScaleTransformer>();
 
             if (gi != null && gi.isSelected && uiT != null)
@@ -253,7 +257,7 @@ public class WristMenuController : MonoBehaviour
 
         return container;
     }
-    
+
     private void InitializeUIElements()
     {
         // Get main panels
@@ -273,7 +277,9 @@ public class WristMenuController : MonoBehaviour
         addCubeButton = root.Q<Button>("wristMenuAddCubeButton");
         addSphereButton = root.Q<Button>("wristMenuAddSphereButton");
         addCylinderButton = root.Q<Button>("wristMenuAddCylinderButton");
-
+        duplicateShapeButton = root.Q<Button>("wristMenuDuplicateShapeButton"); //raizel
+        gravityToggle = root.Q<Toggle>("wristMenuGravityShapeToggleButton");//raizel
+        kinematicToggle = root.Q<Toggle>("wristMenuKinematicShapeToggleButton");
         // Get buttons from edit shape panel
         editShapeBackButton = root.Q<Button>("wristMenuEditShapeBackButton");
 
@@ -296,6 +302,8 @@ public class WristMenuController : MonoBehaviour
             return;
         }
 
+
+
         // Initially hide the add shape panel
         ShowOptionsPanel();
     }
@@ -306,6 +314,7 @@ public class WristMenuController : MonoBehaviour
         addShapeButton.clicked += OnAddShapeClicked;
         editShapeButton.clicked += OnEditShapeClicked;
         deleteShapeButton.clicked += OnDeleteShapeClicked;
+        duplicateShapeButton.clicked += OnDuplicateShapeClicked;
 
         // Add shape panel buttons
         addShapeBackButton.clicked += OnAddShapeBackClicked;
@@ -315,6 +324,10 @@ public class WristMenuController : MonoBehaviour
 
         // Edit shape panel buttons
         editShapeBackButton.clicked += OnEditShapeBackClicked;
+        if (gravityToggle != null)//raizel
+            gravityToggle.RegisterValueChangedCallback(evt => OnGravityToggleChanged(evt.newValue));
+        if (kinematicToggle != null)
+            kinematicToggle.RegisterValueChangedCallback(evt => OnKinematicToggleChanged(evt.newValue));
     }
 
     private void SetupInputActions()
@@ -336,17 +349,17 @@ public class WristMenuController : MonoBehaviour
         menuAction.performed += OnMenuToggle;
         menuAction.Enable();
     }
-    
+
     private void OnMenuToggle(InputAction.CallbackContext context)
     {
         ToggleMenu();
     }
-    
+
     public void ToggleMenu()
     {
         SetMenuVisibility(!isMenuVisible);
     }
-    
+
     public void SetMenuVisibility(bool visible)
     {
         isMenuVisible = visible;
@@ -354,14 +367,14 @@ public class WristMenuController : MonoBehaviour
         if (root != null)
         {
             wristMenuMainPanel.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
- 
+
             Collider collider = GetComponent<Collider>();
             if (collider != null)
             {
                 collider.enabled = visible;
             }
         }
-        
+
         Debug.Log($"WristMenuController: Menu visibility set to {visible}");
     }
 
@@ -378,14 +391,14 @@ public class WristMenuController : MonoBehaviour
             wristMenuAddShapePanel.style.display = DisplayStyle.None;
             wristMenuAddShapePanel.SetEnabled(false);
         }
-        
+
         if (wristMenuEditShapePanel != null)
         {
             wristMenuEditShapePanel.style.display = DisplayStyle.None;
             wristMenuEditShapePanel.SetEnabled(false);
         }
     }
-    
+
     private void ShowAddShapePanel()
     {
         if (wristMenuOptionsPanel != null)
@@ -476,7 +489,59 @@ public class WristMenuController : MonoBehaviour
             Debug.LogWarning($"WristMenuController: Unsupported shape '{meshName}' for editing.");
         }
     }
-    
+
+    private void DuplicateSelectedObject(GameObject selected)
+    {//raizel
+        if (selected == null)
+        {
+            Debug.LogWarning("WristMenuController: No object selected to duplicate.");
+            return;
+        }
+        GameObject duplicate = Instantiate(selected);
+
+        duplicate.name = selected.name + "_dup"; //duplicate name confusion
+
+        duplicate.transform.position = selected.transform.position + (Vector3.right * 0.25f);//moving the dulicate a little to the right so you can diffrentiate when just created
+
+
+        duplicate.tag = selected.tag;
+
+
+        var rb = duplicate.GetComponent<Rigidbody>();//similar to in the function of add primitive object
+        if (rb == null)
+        {
+            rb = duplicate.AddComponent<Rigidbody>();
+        }
+        rb.useGravity = false;
+        rb.isKinematic = true;
+
+
+        var oldPublisher = duplicate.GetComponent<CollisionObjectPublisher>();
+        if (oldPublisher != null)
+        {
+            oldPublisher.objectId = $"unity_dup_{System.DateTime.Now.Ticks}";//exactly as addprimitive line 673, get it checked
+            oldPublisher.worldOrigin = worldOrigin;
+        }
+        else
+        {
+            // Adding a new publisher here if not already there
+            var publisher = duplicate.AddComponent<CollisionObjectPublisher>();
+            publisher.isMesh = false; // or set based on original not sure
+            publisher.objectId = $"unity_dup_{System.DateTime.Now.Ticks}";
+            publisher.worldOrigin = worldOrigin;
+        }
+
+
+        var pub = duplicate.GetComponent<CollisionObjectPublisher>();
+        collisionObjectsListener.objectsById[pub.objectId] = duplicate;
+
+        selectionManager?.ClearSelection(); //deselect it
+        selectionManager?.SetSelectedObject(duplicate);//so this object is the one that is now selected
+        Debug.Log($"WristMenuController: Created {selected} with ID {pub.objectId}");
+
+    }
+
+
     private void OnEditShapeClicked()
     {
         // TODO: Implement edit functionality
@@ -486,7 +551,7 @@ public class WristMenuController : MonoBehaviour
         ShowEditShapePanel();
         Debug.Log("WristMenuController: Edit Shape functionality not yet implemented");
     }
-    
+
     private void OnDeleteShapeClicked()
     {
         if (selectionManager != null)
@@ -499,7 +564,60 @@ public class WristMenuController : MonoBehaviour
             Debug.LogWarning("WristMenuController: SelectionManager not assigned - cannot delete object");
         }
     }
-    
+
+
+    private void OnDuplicateShapeClicked()//raizel
+    {
+        DuplicateSelectedObject(selectionManager.SelectedObject);
+        Debug.Log("WristMenuController: Duplicate shape requested");
+    }
+
+
+    private void OnGravityToggleChanged(bool enableGravity) //raizel
+    {
+        Debug.Log("Calling OnGravityToggleChanged" + enableGravity);
+        var selected = selectionManager?.SelectedObject;
+        Debug.Log("Selected OnGravityToggleChanged" + selected);
+        if (selected == null)
+        {
+            return;
+        }
+        Debug.Log("First if statementOnGravityToggleChanged");
+
+
+        var rb = selected.GetComponent<Rigidbody>();
+        if (rb == null)
+        {
+            return;
+        }
+        Debug.Log("Second if statement OnGravityToggleChanged");
+        rb.useGravity = enableGravity;
+        Debug.Log("Assigning rb.gravity to given bool OnGravityToggleChanged");
+
+    }
+
+
+
+    private void OnKinematicToggleChanged(bool enableKinematic) //raizel
+    {
+        var selected = selectionManager?.SelectedObject;
+        if (selected == null)
+        {
+            return;
+        }
+
+        var rb = selected.GetComponent<Rigidbody>();
+        if (rb == null)
+        {
+            return;
+        }
+
+        rb.isKinematic = enableKinematic;
+
+    }
+
+
+
     private void OnAddShapeBackClicked()
     {
         ShowOptionsPanel();
@@ -513,31 +631,31 @@ public class WristMenuController : MonoBehaviour
         ShowOptionsPanel();
         Debug.Log("WristMenuController: Back to options panel");
     }
-    
+
     private void OnAddCubeClicked()
     {
         AddPrimitiveShape(PrimitiveType.Cube);
         ShowOptionsPanel(); // Return to main menu after adding shape
     }
-    
+
     private void OnAddSphereClicked()
     {
         AddPrimitiveShape(PrimitiveType.Sphere);
         ShowOptionsPanel(); // Return to main menu after adding shape
     }
-    
+
     private void OnAddCylinderClicked()
     {
         AddPrimitiveShape(PrimitiveType.Cylinder);
         ShowOptionsPanel(); // Return to main menu after adding shape
     }
-    
+
     // Shape Creation Methods
     private void AddPrimitiveShape(PrimitiveType primitiveType)
     {
         // Create the primitive using Unity's built-in method
         GameObject shape = GameObject.CreatePrimitive(primitiveType);
-        
+
         // Position the shape in front of the user
         if (Camera.main != null)
         {
@@ -548,7 +666,7 @@ public class WristMenuController : MonoBehaviour
             // Fallback position if no main camera
             shape.transform.position = Vector3.forward * 2f;
         }
-        
+
         // Add physics components
         Rigidbody rb = shape.AddComponent<Rigidbody>();
         rb.useGravity = false;
@@ -557,13 +675,13 @@ public class WristMenuController : MonoBehaviour
         // Add XR interaction (will be controlled by SelectableGrabController)
         shape.AddComponent<XRGrabInteractable>();
         shape.GetComponent<XRGrabInteractable>().selectMode = InteractableSelectMode.Multiple;
-        
+
         // Add component to control grabbing based on selection state
         shape.AddComponent<SelectableGrabController>();
-        
+
         // Set default scale
         shape.transform.localScale = Vector3.one;
-        
+
         // Add tag for selection
         shape.tag = "Selectable";
 
@@ -591,21 +709,19 @@ public class WristMenuController : MonoBehaviour
         {
             meshRenderer.material = litMaterial;
         }
-        
+
         // Ensure collider is enabled (should already be there from CreatePrimitive)
         Collider collider = shape.GetComponent<Collider>();
         if (collider != null)
         {
             collider.enabled = true;
         }
-        
-        // Add CollisionObjectPublisher to automatically publish to ROS
+
+
         CollisionObjectPublisher publisher = shape.AddComponent<CollisionObjectPublisher>();
         publisher.isMesh = false;
-        // Generate unique ID for each object
         publisher.objectId = $"unity_{primitiveType.ToString().ToLower()}_{System.DateTime.Now.Ticks}";
-        publisher.worldOrigin = worldOrigin;
-        
+
         // Automatically select the newly created object so user can immediately grab it
         if (selectionManager != null)
         {
@@ -614,36 +730,36 @@ public class WristMenuController : MonoBehaviour
 
         // Register the new object with the CollisionObjectsListener
         collisionObjectsListener?.objectsById.Add(publisher.objectId, shape);
-        
+
         Debug.Log($"WristMenuController: Created {primitiveType} with ID {publisher.objectId}");
     }
-    
+
     // Public convenience methods for external access
     public void AddCube()
     {
         AddPrimitiveShape(PrimitiveType.Cube);
     }
-    
+
     public void AddSphere()
     {
         AddPrimitiveShape(PrimitiveType.Sphere);
     }
-    
+
     public void AddCylinder()
     {
         AddPrimitiveShape(PrimitiveType.Cylinder);
     }
-    
+
     public void AddCapsule()
     {
         AddPrimitiveShape(PrimitiveType.Capsule);
     }
-    
+
     public void AddPlane()
     {
         AddPrimitiveShape(PrimitiveType.Plane);
     }
-    
+
     public void DeleteSelectedObject()
     {
         if (selectionManager != null)
@@ -651,7 +767,7 @@ public class WristMenuController : MonoBehaviour
             selectionManager.DeleteSelectedObject();
         }
     }
-    
+
     // Cleanup
     private void OnDisable()
     {
@@ -661,7 +777,7 @@ public class WristMenuController : MonoBehaviour
             menuAction.Disable();
         }
     }
-    
+
     private void OnDestroy()
     {
         if (menuAction != null)
