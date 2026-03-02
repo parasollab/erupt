@@ -609,6 +609,8 @@ MonoBehaviour:
   autoDetectMeshType: 1
   createReadableMeshCopy: 1
   publishRateHz: 1
+  worldOrigin: {fileID: 0}
+  hasBeenPublished: 0
 --- !u!114 &204194709
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1144,16 +1146,22 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 05c065f740c1f4c94b68815678f02569, type: 3}
   m_Name: 
   m_EditorClassIdentifier: xrviz::MoveItPlanningRequestMenuUI
+  robot: {fileID: 0}
+  jointStateTopic: /joint_states
+  executeTrajectoryTopic: /joint_trajectory_controller/joint_trajectory
   uiDocument: {fileID: 318824015}
   planningGroupName: ur_manipulator
   planningPipelineId: ompl
   defaultPlannerId: ur_manipulator
   defaultNumPlanningAttempts: 10
   defaultAllowedPlanningTime: 5
-  motionPlanRequestTopic: /move_group/plan
-  motionPlanResponseTopic: /move_group/result
+  goalTolerance: 0.01
+  motionPlanServiceName: /plan_kinematic_path
+  displayTrajectoryTopic: 
+  autoQueryPlanners: 1
   plannerQueryServiceName: /query_planner_interface
   ghostSpawner: {fileID: 0}
+  trajectoryReplayer: {fileID: 0}
   PlannerResults: []
 --- !u!1 &388757122
 GameObject:
@@ -1451,9 +1459,6 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 3927579247218649798, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
       insertIndex: -1
       addedObject: {fileID: 318824016}
-    - targetCorrespondingSourceObject: {fileID: 3927579247218649798, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 0}
   m_SourcePrefab: {fileID: 100100000, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
 --- !u!114 &564350326 stripped
 MonoBehaviour:
@@ -1655,6 +1660,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: xrviz::CollisionObjectsListenerSimple
   topic: /collision_objects_ros
   worldOrigin: {fileID: 1533264656}
+  litMaterial: {fileID: 0}
 --- !u!1 &667833892
 GameObject:
   m_ObjectHideFlags: 0
@@ -2187,6 +2193,8 @@ MonoBehaviour:
   inputActions: {fileID: -944628639613478452, guid: c348712bda248c246b8c49b3db54643f, type: 3}
   litMaterial: {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
   selectionManager: {fileID: 667833893}
+  collisionObjectsListener: {fileID: 0}
+  worldOrigin: {fileID: 0}
 --- !u!1 &817925663
 GameObject:
   m_ObjectHideFlags: 0
@@ -3681,6 +3689,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   prewarmDelay: 2
+  mainSceneName: MainScene
 --- !u!4 &1262151335
 Transform:
   m_ObjectHideFlags: 0
@@ -5140,9 +5149,6 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 3927579247218649798, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
       insertIndex: -1
       addedObject: {fileID: 731391345}
-    - targetCorrespondingSourceObject: {fileID: 3927579247218649798, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 0}
   m_SourcePrefab: {fileID: 100100000, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
 --- !u!114 &1529573286 stripped
 MonoBehaviour:
