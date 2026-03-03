@@ -33,6 +33,7 @@ public class WristMenuController : MonoBehaviour
     // Buttons
     private Button addShapeButton;
     private Button editShapeButton;
+    private Button snapSurfaceButton;
     private Button deleteShapeButton;
     private Button addShapeBackButton;
     private Button addCubeButton;
@@ -266,6 +267,7 @@ public class WristMenuController : MonoBehaviour
         // Get buttons from options panel
         addShapeButton = root.Q<Button>("wristMenuAddShapeButton");
         editShapeButton = root.Q<Button>("wristMenuEditShapeButton");
+        snapSurfaceButton = root.Q<Button>("wristMenuSnapSurfaceButton");
         deleteShapeButton = root.Q<Button>("wristMenuDeleteShapeButton");
 
         // Get buttons from add shape panel
@@ -305,6 +307,7 @@ public class WristMenuController : MonoBehaviour
         // Main options panel buttons
         addShapeButton.clicked += OnAddShapeClicked;
         editShapeButton.clicked += OnEditShapeClicked;
+        snapSurfaceButton.clicked += OnSnapSurfaceClicked;
         deleteShapeButton.clicked += OnDeleteShapeClicked;
 
         // Add shape panel buttons
@@ -652,6 +655,63 @@ public class WristMenuController : MonoBehaviour
         }
     }
     
+    private void OnSnapSurfaceClicked()
+    {
+        SnapSelectedToSurface();
+    }
+
+    private void SnapSelectedToSurface()
+    {
+        GameObject selected = selectionManager?.SelectedObject;
+        if (selected == null)
+        {
+            Debug.LogWarning("WristMenuController: No object selected to snap.");
+            return;
+        }
+
+        Collider col = selected.GetComponent<Collider>();
+        Vector3 rayOrigin = col != null ? col.bounds.center : selected.transform.position;
+
+        // Temporarily disable collider so the raycast doesn't self-hit
+        if (col != null) col.enabled = false;
+        RaycastHit[] hits = Physics.RaycastAll(rayOrigin, Vector3.down, Mathf.Infinity);
+        if (col != null) col.enabled = true;
+
+        // Find the closest hit tagged "SnapSurface"
+        System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+        foreach (RaycastHit h in hits)
+        {
+            if (!h.collider.CompareTag("SnapSurface")) continue;
+
+            // Align object's +Y with the surface normal (minimal rotation, preserves yaw)
+            Quaternion alignmentRot = Quaternion.FromToRotation(selected.transform.up, h.normal);
+            selected.transform.rotation = alignmentRot * selected.transform.rotation;
+
+            // Place the object so its bottom face center sits at the hit point
+            float halfHeight = GetColliderLocalHalfHeight(col, selected.transform);
+            selected.transform.position = h.point + h.normal * halfHeight;
+
+            // Update the lock-pose transformer's cached rotation so grabs don't revert it
+            var lockPose = selected.GetComponent<XRGrabTransformerLockPose>();
+            if (lockPose != null) lockPose.SyncInitialRotation();
+
+            Debug.Log($"WristMenuController: Snapped '{selected.name}' to '{h.collider.name}' normal={h.normal}");
+            return;
+        }
+
+        Debug.LogWarning("WristMenuController: No 'SnapSurface' tagged object found below selected object.");
+    }
+
+    private float GetColliderLocalHalfHeight(Collider col, Transform t)
+    {
+        if (col == null) return t.lossyScale.y * 0.5f;
+        float scaleY = Mathf.Abs(t.lossyScale.y);
+        if (col is BoxCollider box)     return box.size.y * 0.5f * scaleY;
+        if (col is SphereCollider sph)  return sph.radius * scaleY;
+        if (col is CapsuleCollider cap) return cap.height * 0.5f * scaleY;
+        return col.bounds.extents.y; // fallback
+    }
+
     // Cleanup
     private void OnDisable()
     {

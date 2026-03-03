@@ -4,6 +4,7 @@
             <ui:Label text="Options" name="wristMenuOptionsLabel" style="-unity-text-align: upper-center; color: rgb(255, 250, 250); -unity-font-style: bold; border-bottom-width: 3px; border-bottom-color: rgb(255, 250, 250); margin-bottom: 10px; font-size: 24px;" />
             <ui:Button text="Add Shape" name="wristMenuAddShapeButton" style="-unity-font-style: bold; margin-top: 0; margin-bottom: 10px;" />
             <ui:Button text="Edit Shape" name="wristMenuEditShapeButton" style="-unity-font-style: bold; margin-top: 0; margin-bottom: 10px;" />
+            <ui:Button text="Snap to Surface" name="wristMenuSnapSurfaceButton" style="-unity-font-style: bold; margin-top: 0; margin-bottom: 10px;" />
             <ui:Button text="Delete Shape" name="wristMenuDeleteShapeButton" style="-unity-font-style: bold; margin-top: 0; margin-bottom: 10px;" />
         </ui:VisualElement>
         <ui:VisualElement name="wristMenuAddShapePanel" enabled="true" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0.53); color: rgb(255, 250, 250); border-bottom-width: 0; border-bottom-color: rgb(0, 0, 0); display: none; opacity: 1;">

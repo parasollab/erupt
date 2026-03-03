@@ -29,6 +29,16 @@ namespace UnityEngine.XR.Interaction.Toolkit.Transformers
             m_InitialRotation = transform.localRotation;
         }
 
+        /// <summary>
+        /// Re-syncs the stored initial rotation to the current transform rotation.
+        /// Call this after any code-driven rotation change (e.g. snap-to-surface)
+        /// so that subsequent grabs do not revert the object to its old orientation.
+        /// </summary>
+        public void SyncInitialRotation()
+        {
+            m_InitialRotation = transform.localRotation;
+        }
+
         /// <inheritdoc />
         public override void Process(UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable grabInteractable, XRInteractionUpdateOrder.UpdatePhase updatePhase, ref Pose targetPose, ref Vector3 localScale)
         {
