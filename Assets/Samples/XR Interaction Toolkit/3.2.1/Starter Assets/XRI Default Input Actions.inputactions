@@ -7,6 +7,15 @@
             "id": "09ff3ccc-21b4-4346-a3a2-7c978b5af892",
             "actions": [
                 {
+                    "name": "ew action",
+                    "type": "Button",
+                    "id": "ddab80b8-4cca-4275-88e1-8155f2806136",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
                     "name": "Position",
                     "type": "Value",
                     "id": "1a9029f8-7a46-46b9-9eff-e9ae8365f611",
@@ -321,6 +330,17 @@
                     "action": "Eye Gaze Is Tracked",
                     "isComposite": false,
                     "isPartOfComposite": true
+                },
+                {
+                    "name": "",
+                    "id": "55e2cbba-ac9a-4296-b44d-e8e790c56dac",
+                    "path": "",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "ew action",
+                    "isComposite": false,
+                    "isPartOfComposite": false
                 }
             ]
         },
@@ -2171,6 +2191,15 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
+                },
+                {
+                    "name": "ToggleVoice",
+                    "type": "Button",
+                    "id": "3c68c664-ad65-41a0-9b5c-8018eb10aa96",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -2501,6 +2530,17 @@
                     "processors": "",
                     "groups": "",
                     "action": "SelectObject",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "bdb9b0a7-2931-4aab-b87b-68fbe7f8eb4b",
+                    "path": "<OculusTouchController>{RightHand}/primaryButton",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "ToggleVoice",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }
