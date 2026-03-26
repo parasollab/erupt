@@ -40,6 +40,7 @@ public class WristMenuController : MonoBehaviour
     private Button addSphereButton;
     private Button addCylinderButton;
     private Button editShapeBackButton;
+    private Button duplicateShapeButton;
     
     // Input Actions
     private InputAction menuAction;
@@ -269,6 +270,7 @@ public class WristMenuController : MonoBehaviour
         editShapeButton = root.Q<Button>("wristMenuEditShapeButton");
         snapSurfaceButton = root.Q<Button>("wristMenuSnapSurfaceButton");
         deleteShapeButton = root.Q<Button>("wristMenuDeleteShapeButton");
+        duplicateShapeButton = root.Q<Button>("wristMenuDuplicateShapeButton");
 
         // Get buttons from add shape panel
         addShapeBackButton = root.Q<Button>("wristMenuAddShapeBackButton");
@@ -309,6 +311,7 @@ public class WristMenuController : MonoBehaviour
         editShapeButton.clicked += OnEditShapeClicked;
         snapSurfaceButton.clicked += OnSnapSurfaceClicked;
         deleteShapeButton.clicked += OnDeleteShapeClicked;
+        duplicateShapeButton.clicked += OnDuplicateShapeClicked;
 
         // Add shape panel buttons
         addShapeBackButton.clicked += OnAddShapeBackClicked;
@@ -501,6 +504,61 @@ public class WristMenuController : MonoBehaviour
         {
             Debug.LogWarning("WristMenuController: SelectionManager not assigned - cannot delete object");
         }
+    }
+
+    private void OnDuplicateShapeClicked()
+    {
+        DuplicateSelectedShape();
+    }
+
+    private void DuplicateSelectedShape()
+    {
+        if (selectionManager == null)
+        {
+            Debug.LogWarning("WristMenuController: SelectionManager not assigned - cannot duplicate object.");
+            return;
+        }
+
+        GameObject original = selectionManager.SelectedObject;
+        if (original == null)
+        {
+            Debug.LogWarning("WristMenuController: No object selected to duplicate.");
+            return;
+        }
+
+        MeshFilter meshFilter = original.GetComponent<MeshFilter>();
+        if (meshFilter == null || meshFilter.mesh == null)
+        {
+            Debug.LogWarning("WristMenuController: Selected object has no mesh - cannot determine primitive type.");
+            return;
+        }
+
+        string meshName = meshFilter.mesh.name;
+        PrimitiveType primitiveType;
+        if      (meshName.Contains("Cube"))     primitiveType = PrimitiveType.Cube;
+        else if (meshName.Contains("Sphere"))   primitiveType = PrimitiveType.Sphere;
+        else if (meshName.Contains("Cylinder")) primitiveType = PrimitiveType.Cylinder;
+        else if (meshName.Contains("Capsule"))  primitiveType = PrimitiveType.Capsule;
+        else
+        {
+            Debug.LogWarning($"WristMenuController: Unsupported mesh '{meshName}' for duplication.");
+            return;
+        }
+
+        // Capture original transform before AddPrimitiveShape changes selection
+        Vector3 originalScale = original.transform.localScale;
+        original.transform.GetPositionAndRotation(out Vector3 originalPosition, out Quaternion originalRotation);
+
+        AddPrimitiveShape(primitiveType);
+
+        // AddPrimitiveShape auto-selects the new object
+        GameObject duplicate = selectionManager.SelectedObject;
+        if (duplicate == null) return;
+
+        duplicate.transform.localScale = originalScale;
+        duplicate.transform.SetPositionAndRotation(originalPosition + new Vector3(0.2f, 0f, 0f), originalRotation);
+
+        Debug.Log($"WristMenuController: Duplicated '{original.name}' as '{duplicate.name}'");
     }
     
     private void OnAddShapeBackClicked()
