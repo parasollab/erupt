@@ -633,12 +633,15 @@ public class WristMenuController : MonoBehaviour
 
         // Add an XR General Grab Transformer
         shape.AddComponent<XRGeneralGrabTransformer>();
-        shape.GetComponent<XRGeneralGrabTransformer>().allowTwoHandedScaling = true;
+        shape.GetComponent<XRGeneralGrabTransformer>().allowTwoHandedScaling = false;
         shape.GetComponent<XRGeneralGrabTransformer>().clampScaling = false;
 
+        shape.AddComponent<XRTwoHandedScaleTransformer>();
         shape.AddComponent<XRUIScaleTransformer>();
 
         shape.GetComponent<XRGrabInteractable>().AddMultipleGrabTransformer(shape.GetComponent<XRGeneralGrabTransformer>());
+
+        shape.GetComponent<XRGrabInteractable>().AddMultipleGrabTransformer(shape.GetComponent<XRTwoHandedScaleTransformer>());
 
         shape.GetComponent<XRGrabInteractable>().AddMultipleGrabTransformer(shape.GetComponent<XRGrabTransformerScaleAxisLock>());
 

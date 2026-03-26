@@ -115,12 +115,15 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
 
             // Add an XR General Grab Transformer
             child.AddComponent<XRGeneralGrabTransformer>();
-            child.GetComponent<XRGeneralGrabTransformer>().allowTwoHandedScaling = true;
+            child.GetComponent<XRGeneralGrabTransformer>().allowTwoHandedScaling = false;
             child.GetComponent<XRGeneralGrabTransformer>().clampScaling = false;
 
+            child.AddComponent<XRTwoHandedScaleTransformer>();
             child.AddComponent<XRUIScaleTransformer>();
 
             child.GetComponent<XRGrabInteractable>().AddMultipleGrabTransformer(child.GetComponent<XRGeneralGrabTransformer>());
+
+            child.GetComponent<XRGrabInteractable>().AddMultipleGrabTransformer(child.GetComponent<XRTwoHandedScaleTransformer>());
 
             child.GetComponent<XRGrabInteractable>().AddMultipleGrabTransformer(child.GetComponent<XRGrabTransformerScaleAxisLock>());
 
