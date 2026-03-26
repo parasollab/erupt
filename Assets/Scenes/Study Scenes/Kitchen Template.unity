@@ -133,7 +133,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1261993076855398327, guid: 57e3a8d1a8f7945468f6f50ed41c0385, type: 3}
       propertyPath: m_TagString
-      value: Selectable
+      value: Untagged
       objectReference: {fileID: 0}
     - target: {fileID: 1929881126106006797, guid: 57e3a8d1a8f7945468f6f50ed41c0385, type: 3}
       propertyPath: m_LocalScale.x
