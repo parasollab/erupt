@@ -2565,7 +2565,7 @@ GameObject:
   - component: {fileID: 2102471247}
   - component: {fileID: 2102471246}
   m_Layer: 0
-  m_Name: GameObject
+  m_Name: OVRManager
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
