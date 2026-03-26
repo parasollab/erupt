@@ -4355,17 +4355,6 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: abfaad578d05e4a09838223134c41c46, type: 3}
---- !u!114 &1128380531 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 1748868316715821956, guid: abfaad578d05e4a09838223134c41c46, type: 3}
-  m_PrefabInstance: {fileID: 1128380530}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ef9a7893e57c04c0db4114c70954b915, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!1 &1248870825
 GameObject:
   m_ObjectHideFlags: 0
@@ -4551,7 +4540,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   scanner: {fileID: 1297598215}
   envRaycastManager: {fileID: 1297598217}
-  passthroughCameraManager: {fileID: 1128380531}
+  passthroughCameraManager: {fileID: 0}
 --- !u!114 &1297598215
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4564,7 +4553,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c4197e2a9ccb34295a90f328e560ab82, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  camHelper: {fileID: 1128380531}
+  camHelper: {fileID: 0}
   sampleFactor: 2
   detectionMode: 0
   downsampleShader: {fileID: 7200000, guid: 197eeaef5a6cb4347b600c9916e5dea8, type: 3}
@@ -4584,7 +4573,6 @@ MonoBehaviour:
   _removeHands: 0
   CustomTrackingSpace: {fileID: 0}
   <MaskMeshFilters>k__BackingField: []
-  _cameraRig: {fileID: 0}
 --- !u!114 &1297598217
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4597,6 +4585,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2d8affdff7ba47d892cc734baac9ac71, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  CustomTrackingSpace: {fileID: 0}
 --- !u!4 &1297598218
 Transform:
   m_ObjectHideFlags: 0
