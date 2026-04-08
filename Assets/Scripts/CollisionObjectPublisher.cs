@@ -131,7 +131,7 @@ public class CollisionObjectPublisher : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning("No mesh found on this object");
+            Debug.Log("No mesh found on this object");
         }
         
         Debug.Log("=== End Status ===");
@@ -575,13 +575,13 @@ public class CollisionObjectPublisher : MonoBehaviour
                 }
                 else
                 {
-                    Debug.LogError($"Failed to create readable copy of mesh '{originalMesh.name}'");
+                    Debug.Log($"Failed to create readable copy of mesh '{originalMesh.name}'");
                     return null;
                 }
             }
             else
             {
-                Debug.LogError($"Mesh '{originalMesh.name}' is not readable and createReadableMeshCopy is disabled");
+                Debug.Log($"Mesh '{originalMesh.name}' is not readable and createReadableMeshCopy is disabled");
                 return null;
             }
         }

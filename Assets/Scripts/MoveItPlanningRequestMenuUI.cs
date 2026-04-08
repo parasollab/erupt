@@ -386,9 +386,16 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
         if (robotManager == null)
         {
-            Debug.LogWarning("MoveItPlanningRequestMenuUI: RobotManager not assigned.");
+            Debug.Log("MoveItPlanningRequestMenuUI: RobotManager not assigned.");
             return;
         }
+
+        // Print received joint states for debugging
+        string jointStateInfo = "Received JointStateMsg:\n";
+        for (int i = 0; i < jointState.name.Length; i++)        {
+            jointStateInfo += $"  {jointState.name[i]}: {jointState.position[i] * Mathf.Rad2Deg}°\n";
+        }
+        Debug.Log(jointStateInfo);
 
         // Read joint states and map to robot joints
         float[] jointAngles = new float[robotManager.GetJointNames().Count];
