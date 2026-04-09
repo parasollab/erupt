@@ -150,6 +150,10 @@ public class TrajectoryReplay : MonoBehaviour
         for (int i = 0; i < prevPos.Length; i++)
             prevPos[i] = -1 * (points[0].positions[i] * Mathf.Rad2Deg);
 
+        // Snap ghost to trajectory start so knob values are in a clean state before lerping
+        for (int j = 0; j < prevPos.Length; j++)
+            robotManager.SnapJointAngle(j, (float)prevPos[j]);
+
         // Step through points
         for (int i = 1; i < points.Length && isReplaying; i++)
         {
