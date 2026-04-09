@@ -73,13 +73,19 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
             objectsById[co.id] = parent;
         }
 
+        Debug.Log($"[CO Listener] Processing object id={co.id} with {co.primitives?.Length ?? 0} primitives, {co.meshes?.Length ?? 0} meshes, {co.planes?.Length ?? 0} planes");
+
         // ----- Place parent in world using co.pose -----
         var objPose = co.pose ?? new PoseMsg(new PointMsg(0, 0, 0), new QuaternionMsg(0, 0, 0, 1));
         ApplyWorldPose(parent.transform, objPose);
 
+        Debug.Log($"[CO Listener] Applied world pose to '{co.id}': position=({objPose.position.x}, {objPose.position.y}, {objPose.position.z}), orientation=({objPose.orientation.x}, {objPose.orientation.y}, {objPose.orientation.z}, {objPose.orientation.w})");
+
         // Rebuild children fresh for correctness
         for (int i = parent.transform.childCount - 1; i >= 0; i--)
             Destroy(parent.transform.GetChild(i).gameObject);
+
+        Debug.Log($"[CO Listener] Cleared existing children of '{co.id}' before rebuilding");
 
         int built = 0;
 
@@ -151,13 +157,16 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
         }
 
         // ---- MESHES (local to parent) ----
+        Debug.Log($"[CO Listener] Processing meshes for '{co.id}'");
         var meshes = co.meshes ?? System.Array.Empty<MeshMsg>();
         var meshPosesLocal = LocalPoseArrayFor(co.mesh_poses, meshes.Length);
         int nMeshUse = Mathf.Min(meshes.Length, meshPosesLocal.Length);
         for (int i = 0; i < nMeshUse; i++)
         {
             var name = $"{co.id}";
+            Debug.Log($"[CO Listener] Building mesh child '{name}' for '{co.id}'"); 
             var child = BuildMesh(name, meshes[i]);
+            Debug.Log($"[CO Listener] Built mesh child '{name}' for '{co.id}': {(child != null ? "success" : "failure")}");
             if (child)
             {
                 child.transform.SetParent(parent.transform, false);
@@ -325,9 +334,11 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
 
     GameObject BuildMesh(string name, MeshMsg meshMsg)
     {
+        Debug.Log($"[CO Listener] Building mesh '{name}'");
         if (meshMsg.vertices == null || meshMsg.vertices.Length == 0 ||
             meshMsg.triangles == null || meshMsg.triangles.Length == 0)
         {
+            Debug.LogWarning($"[CO Listener] Invalid mesh data for '{name}'");
             return null;
         }
 
@@ -362,6 +373,7 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
         uMesh.RecalculateBounds();
 
         mf.sharedMesh = uMesh;
+        Debug.Log($"[CO Listener] Built mesh '{name}' with {verts.Length} vertices and {tris.Count / 3} triangles");
         return go;
     }
 

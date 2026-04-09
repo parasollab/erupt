@@ -119,37 +119,6 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
---- !u!1 &44677502
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 44677503}
-  m_Layer: 0
-  m_Name: origin_origin
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &44677503
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 44677502}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -4.34763, y: 0.94, z: -0.61}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &127640222 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 3638776585713717107, guid: d81cacb051a1c684eb5ee734b4a6363b, type: 3}
@@ -1753,7 +1722,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1001558310}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5750a2b1e5a0d4a519606a09878a0e61, type: 3}
   m_Name: 
@@ -3521,7 +3490,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: xrviz::CollisionObjectsListenerSimple
   topic: /collision_objects_ros
-  worldOrigin: {fileID: 1235889348}
+  worldOrigin: {fileID: 1122808672}
   litMaterial: {fileID: 2100000, guid: fc226930e8fad4c499969204cecfbc05, type: 2}
 --- !u!4 &1697517153
 Transform:
@@ -3552,7 +3521,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1000011928778752, guid: bac85bcbcdc58924f840d203376147c2, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 224000010550048884, guid: bac85bcbcdc58924f840d203376147c2, type: 3}
       propertyPath: m_Pivot.x
@@ -4379,9 +4348,17 @@ PrefabInstance:
       value: XR Origin (XR Rig)
       objectReference: {fileID: 0}
     - target: {fileID: 3006219390251926832, guid: 48516d5ede86a4731b56a6e555864e5b, type: 3}
+      propertyPath: worldOrigin
+      value: 
+      objectReference: {fileID: 1122808672}
+    - target: {fileID: 3006219390251926832, guid: 48516d5ede86a4731b56a6e555864e5b, type: 3}
       propertyPath: selectionManager
       value: 
       objectReference: {fileID: 647391639}
+    - target: {fileID: 3006219390251926832, guid: 48516d5ede86a4731b56a6e555864e5b, type: 3}
+      propertyPath: collisionObjectsListener
+      value: 
+      objectReference: {fileID: 1697517152}
     - target: {fileID: 3282372009203156751, guid: 48516d5ede86a4731b56a6e555864e5b, type: 3}
       propertyPath: m_LocalPosition.x
       value: -1.004
@@ -4539,7 +4516,6 @@ SceneRoots:
   - {fileID: 1224889471}
   - {fileID: 662138326}
   - {fileID: 1122808673}
-  - {fileID: 44677503}
   - {fileID: 170694376}
   - {fileID: 624433353}
   - {fileID: 1810286216}
