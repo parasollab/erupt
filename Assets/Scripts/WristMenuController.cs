@@ -40,6 +40,7 @@ public class WristMenuController : MonoBehaviour
     private Button addSphereButton;
     private Button addCylinderButton;
     private Button editShapeBackButton;
+    private Button duplicateShapeButton;
     
     // Input Actions
     private InputAction menuAction;
@@ -269,6 +270,7 @@ public class WristMenuController : MonoBehaviour
         editShapeButton = root.Q<Button>("wristMenuEditShapeButton");
         snapSurfaceButton = root.Q<Button>("wristMenuSnapSurfaceButton");
         deleteShapeButton = root.Q<Button>("wristMenuDeleteShapeButton");
+        duplicateShapeButton = root.Q<Button>("wristMenuDuplicateShapeButton");
 
         // Get buttons from add shape panel
         addShapeBackButton = root.Q<Button>("wristMenuAddShapeBackButton");
@@ -309,6 +311,7 @@ public class WristMenuController : MonoBehaviour
         editShapeButton.clicked += OnEditShapeClicked;
         snapSurfaceButton.clicked += OnSnapSurfaceClicked;
         deleteShapeButton.clicked += OnDeleteShapeClicked;
+        duplicateShapeButton.clicked += OnDuplicateShapeClicked;
 
         // Add shape panel buttons
         addShapeBackButton.clicked += OnAddShapeBackClicked;
@@ -502,6 +505,61 @@ public class WristMenuController : MonoBehaviour
             Debug.LogWarning("WristMenuController: SelectionManager not assigned - cannot delete object");
         }
     }
+
+    private void OnDuplicateShapeClicked()
+    {
+        DuplicateSelectedShape();
+    }
+
+    private void DuplicateSelectedShape()
+    {
+        if (selectionManager == null)
+        {
+            Debug.LogWarning("WristMenuController: SelectionManager not assigned - cannot duplicate object.");
+            return;
+        }
+
+        GameObject original = selectionManager.SelectedObject;
+        if (original == null)
+        {
+            Debug.LogWarning("WristMenuController: No object selected to duplicate.");
+            return;
+        }
+
+        MeshFilter meshFilter = original.GetComponent<MeshFilter>();
+        if (meshFilter == null || meshFilter.mesh == null)
+        {
+            Debug.LogWarning("WristMenuController: Selected object has no mesh - cannot determine primitive type.");
+            return;
+        }
+
+        string meshName = meshFilter.mesh.name;
+        PrimitiveType primitiveType;
+        if      (meshName.Contains("Cube"))     primitiveType = PrimitiveType.Cube;
+        else if (meshName.Contains("Sphere"))   primitiveType = PrimitiveType.Sphere;
+        else if (meshName.Contains("Cylinder")) primitiveType = PrimitiveType.Cylinder;
+        else if (meshName.Contains("Capsule"))  primitiveType = PrimitiveType.Capsule;
+        else
+        {
+            Debug.LogWarning($"WristMenuController: Unsupported mesh '{meshName}' for duplication.");
+            return;
+        }
+
+        // Capture original transform before AddPrimitiveShape changes selection
+        Vector3 originalScale = original.transform.localScale;
+        original.transform.GetPositionAndRotation(out Vector3 originalPosition, out Quaternion originalRotation);
+
+        AddPrimitiveShape(primitiveType);
+
+        // AddPrimitiveShape auto-selects the new object
+        GameObject duplicate = selectionManager.SelectedObject;
+        if (duplicate == null) return;
+
+        duplicate.transform.localScale = originalScale;
+        duplicate.transform.SetPositionAndRotation(originalPosition + new Vector3(0.2f, 0f, 0f), originalRotation);
+
+        Debug.Log($"WristMenuController: Duplicated '{original.name}' as '{duplicate.name}'");
+    }
     
     private void OnAddShapeBackClicked()
     {
@@ -538,8 +596,11 @@ public class WristMenuController : MonoBehaviour
     // Shape Creation Methods
     private void AddPrimitiveShape(PrimitiveType primitiveType)
     {
+        Debug.Log("WristMenuController: Adding shape of type " + primitiveType);
         // Create the primitive using Unity's built-in method
         GameObject shape = GameObject.CreatePrimitive(primitiveType);
+
+        Debug.Log($"WristMenuController: Created primitive '{shape.name}'");
         
         // Position the shape in front of the user
         if (Camera.main != null)
@@ -551,18 +612,26 @@ public class WristMenuController : MonoBehaviour
             // Fallback position if no main camera
             shape.transform.position = Vector3.forward * 2f;
         }
+
+        Debug.Log($"WristMenuController: Positioned '{shape.name}' at {shape.transform.position}");
         
         // Add physics components
         Rigidbody rb = shape.AddComponent<Rigidbody>();
         rb.useGravity = false;
         rb.isKinematic = true;
 
+        Debug.Log($"WristMenuController: Added Rigidbody to '{shape.name}' (useGravity={rb.useGravity}, isKinematic={rb.isKinematic})");
+
         // Add XR interaction (will be controlled by SelectableGrabController)
         shape.AddComponent<XRGrabInteractable>();
         shape.GetComponent<XRGrabInteractable>().selectMode = InteractableSelectMode.Multiple;
+
+        Debug.Log($"WristMenuController: Added XRGrabInteractable to '{shape.name}' with selectMode={shape.GetComponent<XRGrabInteractable>().selectMode}");
         
         // Add component to control grabbing based on selection state
         shape.AddComponent<SelectableGrabController>();
+
+        Debug.Log($"WristMenuController: Added SelectableGrabController to '{shape.name}'");
         
         // Set default scale
         shape.transform.localScale = Vector3.one;
@@ -573,20 +642,39 @@ public class WristMenuController : MonoBehaviour
         shape.AddComponent<XRGrabTransformerScaleAxisLock>();
         shape.AddComponent<XRGrabTransformerLockPose>();
 
+        Debug.Log($"WristMenuController: Added XRGrabTransformerScaleAxisLock and XRGrabTransformerLockPose to '{shape.name}'");
+
         // Add an XR General Grab Transformer
         shape.AddComponent<XRGeneralGrabTransformer>();
-        shape.GetComponent<XRGeneralGrabTransformer>().allowTwoHandedScaling = true;
+        shape.GetComponent<XRGeneralGrabTransformer>().allowTwoHandedScaling = false;
         shape.GetComponent<XRGeneralGrabTransformer>().clampScaling = false;
 
+        Debug.Log($"WristMenuController: Added XRGeneralGrabTransformer to '{shape.name}' (allowTwoHandedScaling={shape.GetComponent<XRGeneralGrabTransformer>().allowTwoHandedScaling}, clampScaling={shape.GetComponent<XRGeneralGrabTransformer>().clampScaling})");
+
+        shape.AddComponent<XRTwoHandedScaleTransformer>();
         shape.AddComponent<XRUIScaleTransformer>();
+
+        Debug.Log($"WristMenuController: Added XRTwoHandedScaleTransformer and XRUIScaleTransformer to '{shape.name}'");
 
         shape.GetComponent<XRGrabInteractable>().AddMultipleGrabTransformer(shape.GetComponent<XRGeneralGrabTransformer>());
 
+        Debug.Log($"WristMenuController: Added XRGeneralGrabTransformer to '{shape.name}' grab transformers");
+
+        shape.GetComponent<XRGrabInteractable>().AddMultipleGrabTransformer(shape.GetComponent<XRTwoHandedScaleTransformer>());
+
+        Debug.Log($"WristMenuController: Added XRTwoHandedScaleTransformer to '{shape.name}' grab transformers");
+
         shape.GetComponent<XRGrabInteractable>().AddMultipleGrabTransformer(shape.GetComponent<XRGrabTransformerScaleAxisLock>());
 
+        Debug.Log($"WristMenuController: Added XRGrabTransformerScaleAxisLock to '{shape.name}' grab transformers");
+
         shape.GetComponent<XRGrabInteractable>().AddMultipleGrabTransformer(shape.GetComponent<XRGrabTransformerLockPose>());
+        
+        Debug.Log($"WristMenuController: Added XRGrabTransformerLockPose to '{shape.name}' grab transformers");
 
         shape.GetComponent<XRGrabInteractable>().AddMultipleGrabTransformer(shape.GetComponent<XRUIScaleTransformer>());
+
+        Debug.Log($"WristMenuController: Added XRUIScaleTransformer to '{shape.name}' grab transformers");
 
         // Apply material
         var meshRenderer = shape.GetComponent<MeshRenderer>();
@@ -594,6 +682,8 @@ public class WristMenuController : MonoBehaviour
         {
             meshRenderer.material = litMaterial;
         }
+
+        Debug.Log($"WristMenuController: Applied material to '{shape.name}'");
         
         // Ensure collider is enabled (should already be there from CreatePrimitive)
         Collider collider = shape.GetComponent<Collider>();
@@ -601,6 +691,8 @@ public class WristMenuController : MonoBehaviour
         {
             collider.enabled = true;
         }
+
+        Debug.Log($"WristMenuController: Collider enabled for '{shape.name}'");
         
         // Add CollisionObjectPublisher to automatically publish to ROS
         CollisionObjectPublisher publisher = shape.AddComponent<CollisionObjectPublisher>();
@@ -608,12 +700,16 @@ public class WristMenuController : MonoBehaviour
         // Generate unique ID for each object
         publisher.objectId = $"unity_{primitiveType.ToString().ToLower()}_{System.DateTime.Now.Ticks}";
         publisher.worldOrigin = worldOrigin;
+
+        Debug.Log($"WristMenuController: Added CollisionObjectPublisher to '{shape.name}' with ID {publisher.objectId}");
         
         // Automatically select the newly created object so user can immediately grab it
         if (selectionManager != null)
         {
             selectionManager.SetSelectedObject(shape);
         }
+
+        Debug.Log($"WristMenuController: Selected '{shape.name}' after creation");
 
         // Register the new object with the CollisionObjectsListener
         collisionObjectsListener?.objectsById.Add(publisher.objectId, shape);

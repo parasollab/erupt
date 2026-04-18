@@ -1,6 +1,7 @@
 using UnityEngine;
 
 [ExecuteAlways]
+// a
 public class LightFlicker : MonoBehaviour
 {
     public float minIntensity = 0.5f;

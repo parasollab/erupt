@@ -149,7 +149,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: xrviz::SystemPrewarmer
   prewarmDelay: 2
-  mainSceneName: MainScene
+  mainSceneName: Kitchen
 --- !u!4 &331429881
 Transform:
   m_ObjectHideFlags: 0
