@@ -1,0 +1,15 @@
+Kitchen 1 - There are three sets of dishware: a white set, a red set, and a blue set.
+    Each has a plate, bowl, and mug, but they are all mixed up. 
+    Sort each set all together with the plate on bottom, bowl in the middle, and mug on top.
+
+Kitchen 2 - There will be ingredients falling down for you to make some stew.
+    Add some objects and place them so that the ingredients are directed and fall into the pot. 
+
+Kitchen 3 - The robot is putting the fish into the pot. Change the trajectory of the robot
+    to make it place the fish in the pan by adding and placing objects.
+
+Kitchen 4 - The robot is placing the fish into the pot. Oh no! It's colliding into something.
+    Can you tell what the robot is colliding into?
+
+Kitchen 5 - Someone is throwing knives at your precious potted plants.
+    Add and place objects to defend your plants and prevent them from being hit.
