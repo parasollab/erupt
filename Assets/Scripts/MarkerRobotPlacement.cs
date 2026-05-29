@@ -10,11 +10,15 @@ public class MarkerRobotPlacement : MonoBehaviour
     [SerializeField] private GameObject leftRobot;
     [SerializeField] private GameObject rightRobot;
 
+#if OPENCV_FOR_UNITY
     private ChArUcoTrackingManager _trackingManager;
+#endif
 
     void Start()
     {
+#if OPENCV_FOR_UNITY
         _trackingManager = GetComponent<ChArUcoTrackingManager>();
+#endif
         placeRobotAction.action.performed += OnPlaceRobot;
     }
 
@@ -70,8 +74,10 @@ public class MarkerRobotPlacement : MonoBehaviour
             rightRobot.transform.rotation = newRotation;
         }
 
+#if OPENCV_FOR_UNITY
         if (_trackingManager != null)
             _trackingManager.enabled = false;
+#endif
     }
 
     void OnDestroy()
