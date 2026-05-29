@@ -81,9 +81,13 @@ namespace LudicWorlds
             _fpsSamples++;
             
             //Face the Camera (Billboard)
-            _dirToPlayer = (this.transform.position - _cameraTransform.position).normalized;
-            _dirToPlayer.y = 0; // This ensures rotation only around the Y-axis
-            this.transform.rotation = Quaternion.LookRotation( _dirToPlayer );
+            if (_cameraTransform == null) _cameraTransform = Camera.main?.transform;
+            if (_cameraTransform != null)
+            {
+                _dirToPlayer = (this.transform.position - _cameraTransform.position).normalized;
+                _dirToPlayer.y = 0;
+                this.transform.rotation = Quaternion.LookRotation(_dirToPlayer);
+            }
 
             //Display any queued Debug Log messages...
             if (_queuedMessages.Count > 0)

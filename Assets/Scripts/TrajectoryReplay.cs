@@ -99,6 +99,9 @@ public class TrajectoryReplay : MonoBehaviour
         // Spawn ghost
         robot = Instantiate(robot_prefab, real_robot.transform.position, real_robot.transform.rotation);
 
+        foreach (var col in robot.GetComponentsInChildren<Collider>())
+            col.gameObject.tag = "robot";
+
         // Make the ghost translucent
         var overlay = robot.AddComponent<TranslucentOverride>();
         overlay.overlayColor = ghostColor;

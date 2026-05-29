@@ -1,9 +1,11 @@
 {
   "dependencies": {
     "com.github-glitchenzo.nugetforunity": "https://github.com/GlitchEnzo/NuGetForUnity.git?path=/src/NuGetForUnity",
+    "com.meta.xr.mrutilitykit": "201.0.0",
     "com.meta.xr.sdk.core": "85.0.0",
-    "com.meta.xr.mrutilitykit": "85.0.0",
+    "com.unity.2d.enhancers": "1.0.0",
     "com.unity.2d.sprite": "1.0.0",
+    "com.unity.ai.inference": "2.6.1",
     "com.unity.ai.navigation": "2.0.8",
     "com.unity.collab-proxy": "2.8.2",
     "com.unity.ide.rider": "3.0.36",
@@ -22,7 +24,7 @@
     "com.unity.visualscripting": "1.9.7",
     "com.unity.xr.hands": "1.6.1",
     "com.unity.xr.interaction.toolkit": "3.2.1",
-    "com.unity.xr.meta-openxr": "2.2.0",
+    "com.unity.xr.meta-openxr": "2.2.1",
     "com.unity.xr.openxr": "1.15.1",
     "com.unity.modules.accessibility": "1.0.0",
     "com.unity.modules.ai": "1.0.0",

@@ -2,6 +2,7 @@
 
 Interactive Extended Reality Robotics Visualization Tool
 
+> Note: The AR scene depends on OpenCV for Unity (not included).
 
 ## ROS2 Commands
 

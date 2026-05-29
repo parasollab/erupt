@@ -8,6 +8,8 @@
 *.DS_Store
 
 Assets/Resources/ROSConnectionPrefab.prefab
+Assets/OpenCVForUnity*
+Assets/_Recovery*
 
 # This .gitignore file should be placed at the root of your Unity project directory
 #
