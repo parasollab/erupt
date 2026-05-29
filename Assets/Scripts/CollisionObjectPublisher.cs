@@ -62,21 +62,25 @@ public class CollisionObjectPublisher : MonoBehaviour
 
     void Update()
     {
-        // Check if enough time has passed since last publish
-        // if (Time.time - lastPublishTime >= 1.0f / publishRateHz)
-        // {
-            // Check if this is the first publish or if transform has changed
-            bool shouldPublish = !hasBeenPublished || HasTransformChanged();
-            
-            if (shouldPublish)
-            {
-                Debug.Log($"Publishing collision object for '{gameObject.name}'");
-                PublishCollisionObject();
-                UpdateLastTransform();
-                hasBeenPublished = true;
-                lastPublishTime = Time.time;
-            }
-        // }
+        if (Time.time - lastPublishTime < 1.0f / publishRateHz)
+            return;
+
+        bool shouldPublish = !hasBeenPublished || HasTransformChanged();
+        if (shouldPublish)
+        {
+            Debug.Log($"Publishing collision object '{objectId}' (pos={transform.position}, rot={transform.rotation.eulerAngles}, scale={transform.localScale})");
+
+            PublishCollisionObject();
+            UpdateLastTransform();
+            hasBeenPublished = true;
+            lastPublishTime = Time.time;
+        }
+    }
+
+    public void ForceRepublish()
+    {
+        hasBeenPublished = false;
+        lastPublishTime = 0f;
     }
 
     // Method to check if publisher is properly registered
@@ -174,7 +178,7 @@ public class CollisionObjectPublisher : MonoBehaviour
             header = new HeaderMsg
             {
                 frame_id = frameId,
-                stamp = new TimeMsg() // Stamp left blank by default
+                stamp = GetRosTimestamp()
             },
             operation = CollisionObjectMsg.ADD, // Use REMOVE or MOVE if needed
             pose = new PoseMsg
@@ -232,24 +236,16 @@ public class CollisionObjectPublisher : MonoBehaviour
             }
         }
 
-        // Publish with error handling
         try
         {
             if (isMesh)
-            {
                 ros.Publish(topicName, msg, false);
-            }
             else
-            {
                 ros.Publish(topicName, msg);
-            }
-            Debug.Log($"Successfully published collision object '{objectId}' to topic '{topicName}'");
-            // Log the message
-            Debug.Log($"Message: {msg}");
         }
         catch (System.Exception e)
         {
-            Debug.LogError($"Failed to publish collision object '{objectId}' to topic '{topicName}': {e.Message}");
+            Debug.LogError($"Failed to publish collision object '{objectId}': {e.Message}");
         }
     }
 
@@ -356,7 +352,7 @@ public class CollisionObjectPublisher : MonoBehaviour
                 header = new HeaderMsg
                 {
                     frame_id = frameId,
-                    stamp = new TimeMsg() // Stamp left blank by default
+                    stamp = GetRosTimestamp()
                 },
                 operation = CollisionObjectMsg.REMOVE
             };
@@ -430,14 +426,6 @@ public class CollisionObjectPublisher : MonoBehaviour
                     (uint)triangles[baseIndex + 2]
                 }
             };
-        }
-
-        Debug.Log($"ROS Mesh: {rosVertices.Length} vertices, {rosTriangles.Length} triangles");
-
-        // Log the individual triangles
-        foreach (var triangle in rosTriangles)
-        {
-            Debug.Log($"Triangle: {string.Join(", ", triangle.vertex_indices)}");
         }
 
         return new MeshMsg
@@ -789,6 +777,16 @@ public class CollisionObjectPublisher : MonoBehaviour
         }
         
         Debug.Log($"=== End Analysis ===");
+    }
+
+    private TimeMsg GetRosTimestamp()
+    {
+        long ticks = DateTimeOffset.UtcNow.UtcTicks - DateTimeOffset.UnixEpoch.UtcTicks;
+        return new TimeMsg
+        {
+            sec = (int)(ticks / TimeSpan.TicksPerSecond),
+            nanosec = (uint)((ticks % TimeSpan.TicksPerSecond) * 100L) // 1 tick = 100 ns
+        };
     }
 
     bool IsKnownUnityPrimitive(string meshName)

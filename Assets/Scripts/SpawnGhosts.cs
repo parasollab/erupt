@@ -21,6 +21,9 @@ public class SpawnGhosts : MonoBehaviour
         startGhost = Instantiate(robotPrefab);
         startGhost.name = "StartGhost";
 
+        foreach (var col in startGhost.GetComponentsInChildren<Collider>())
+            col.gameObject.tag = "robot";
+
         // Make the ghost transluscent
         startGhost.AddComponent<TranslucentOverride>().overlayColor = startGhostColor;
 
@@ -51,6 +54,9 @@ public class SpawnGhosts : MonoBehaviour
     {
         goalGhost = Instantiate(robotPrefab);
         goalGhost.name = "GoalGhost";
+
+        foreach (var col in goalGhost.GetComponentsInChildren<Collider>())
+            col.gameObject.tag = "robot";
 
         // Make the ghost transluscent
         goalGhost.AddComponent<TranslucentOverride>().overlayColor = goalGhostColor;

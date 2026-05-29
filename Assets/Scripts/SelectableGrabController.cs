@@ -1,15 +1,19 @@
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
+using UnityEngine.XR.Interaction.Toolkit;
 using System.Collections;
 
 /// <summary>
 /// Controls whether an object can be grabbed based on its selection state.
 /// Objects can only be grabbed when they are selected through the SelectionManager.
+/// Once actively grabbed by an XRI interactor, the interactable stays enabled until
+/// the grab is released, even if SelectionManager clears the selection.
 /// </summary>
 public class SelectableGrabController : MonoBehaviour
 {
     private XRGrabInteractable grabInteractable;
     private bool isSelected = false;
+    private bool isGrabbed = false;
 
     void Start()
     {
@@ -19,6 +23,9 @@ public class SelectableGrabController : MonoBehaviour
             Debug.LogError("SelectableGrabController requires XRGrabInteractable component");
             return;
         }
+
+        grabInteractable.selectEntered.AddListener(OnGrabEntered);
+        grabInteractable.selectExited.AddListener(OnGrabExited);
 
         // Subscribe to selection events
         if (SelectionManager.Instance != null)
@@ -60,6 +67,23 @@ public class SelectableGrabController : MonoBehaviour
             SelectionManager.Instance.OnObjectSelected -= OnObjectSelected;
             SelectionManager.Instance.OnSelectionCleared -= OnSelectionCleared;
         }
+        if (grabInteractable != null)
+        {
+            grabInteractable.selectEntered.RemoveListener(OnGrabEntered);
+            grabInteractable.selectExited.RemoveListener(OnGrabExited);
+        }
+    }
+
+    void OnGrabEntered(SelectEnterEventArgs args)
+    {
+        isGrabbed = true;
+        UpdateGrabState();
+    }
+
+    void OnGrabExited(SelectExitEventArgs args)
+    {
+        isGrabbed = false;
+        UpdateGrabState();
     }
 
     void OnObjectSelected(GameObject selectedObject)
@@ -78,15 +102,15 @@ public class SelectableGrabController : MonoBehaviour
     {
         if (grabInteractable != null)
         {
-            // Enable grabbing only when selected
-            grabInteractable.enabled = isSelected;
+            // Keep enabled while selected OR while actively held by an XRI interactor
+            grabInteractable.enabled = isSelected || isGrabbed;
         }
     }
 
     // Public method to force update grab state (useful for external calls)
     public void RefreshGrabState()
     {
-        isSelected = SelectionManager.Instance != null && 
+        isSelected = SelectionManager.Instance != null &&
                     SelectionManager.Instance.SelectedObject == gameObject;
         UpdateGrabState();
     }

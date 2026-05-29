@@ -596,125 +596,63 @@ public class WristMenuController : MonoBehaviour
     // Shape Creation Methods
     private void AddPrimitiveShape(PrimitiveType primitiveType)
     {
-        Debug.Log("WristMenuController: Adding shape of type " + primitiveType);
-        // Create the primitive using Unity's built-in method
         GameObject shape = GameObject.CreatePrimitive(primitiveType);
 
-        Debug.Log($"WristMenuController: Created primitive '{shape.name}'");
-        
-        // Position the shape in front of the user
-        if (Camera.main != null)
-        {
-            shape.transform.position = Camera.main.transform.position + Camera.main.transform.forward * 2f;
-        }
-        else
-        {
-            // Fallback position if no main camera
-            shape.transform.position = Vector3.forward * 2f;
-        }
+        // Position 2 m in front of the user
+        shape.transform.position = Camera.main != null
+            ? Camera.main.transform.position + Camera.main.transform.forward * 2f
+            : Vector3.forward * 2f;
 
-        Debug.Log($"WristMenuController: Positioned '{shape.name}' at {shape.transform.position}");
-        
-        // Add physics components
+        // Physics
         Rigidbody rb = shape.AddComponent<Rigidbody>();
         rb.useGravity = false;
         rb.isKinematic = true;
 
-        Debug.Log($"WristMenuController: Added Rigidbody to '{shape.name}' (useGravity={rb.useGravity}, isKinematic={rb.isKinematic})");
-
-        // Add XR interaction (will be controlled by SelectableGrabController)
+        // XR interaction — Single mode so only the NearFarInteractor (one hand) holds it.
+        // This keeps the InteractionAttachController's thumbstick push/pull working correctly.
         shape.AddComponent<XRGrabInteractable>();
-        shape.GetComponent<XRGrabInteractable>().selectMode = InteractableSelectMode.Multiple;
+        var gi = shape.GetComponent<XRGrabInteractable>();
+        gi.selectMode = InteractableSelectMode.Single;
 
-        Debug.Log($"WristMenuController: Added XRGrabInteractable to '{shape.name}' with selectMode={shape.GetComponent<XRGrabInteractable>().selectMode}");
-        
-        // Add component to control grabbing based on selection state
+        // Controls grabbing based on SelectionManager selection state
         shape.AddComponent<SelectableGrabController>();
 
-        Debug.Log($"WristMenuController: Added SelectableGrabController to '{shape.name}'");
-        
-        // Set default scale
         shape.transform.localScale = Vector3.one;
-        
-        // Add tag for selection
         shape.tag = "Selectable";
 
         shape.AddComponent<XRGrabTransformerScaleAxisLock>();
         shape.AddComponent<XRGrabTransformerLockPose>();
 
-        Debug.Log($"WristMenuController: Added XRGrabTransformerScaleAxisLock and XRGrabTransformerLockPose to '{shape.name}'");
-
-        // Add an XR General Grab Transformer
         shape.AddComponent<XRGeneralGrabTransformer>();
         shape.GetComponent<XRGeneralGrabTransformer>().allowTwoHandedScaling = false;
         shape.GetComponent<XRGeneralGrabTransformer>().clampScaling = false;
 
-        Debug.Log($"WristMenuController: Added XRGeneralGrabTransformer to '{shape.name}' (allowTwoHandedScaling={shape.GetComponent<XRGeneralGrabTransformer>().allowTwoHandedScaling}, clampScaling={shape.GetComponent<XRGeneralGrabTransformer>().clampScaling})");
-
         shape.AddComponent<XRTwoHandedScaleTransformer>();
         shape.AddComponent<XRUIScaleTransformer>();
 
-        Debug.Log($"WristMenuController: Added XRTwoHandedScaleTransformer and XRUIScaleTransformer to '{shape.name}'");
+        gi.AddMultipleGrabTransformer(shape.GetComponent<XRGeneralGrabTransformer>());
+        gi.AddMultipleGrabTransformer(shape.GetComponent<XRTwoHandedScaleTransformer>());
+        gi.AddMultipleGrabTransformer(shape.GetComponent<XRGrabTransformerScaleAxisLock>());
+        gi.AddMultipleGrabTransformer(shape.GetComponent<XRGrabTransformerLockPose>());
+        gi.AddMultipleGrabTransformer(shape.GetComponent<XRUIScaleTransformer>());
 
-        shape.GetComponent<XRGrabInteractable>().AddMultipleGrabTransformer(shape.GetComponent<XRGeneralGrabTransformer>());
-
-        Debug.Log($"WristMenuController: Added XRGeneralGrabTransformer to '{shape.name}' grab transformers");
-
-        shape.GetComponent<XRGrabInteractable>().AddMultipleGrabTransformer(shape.GetComponent<XRTwoHandedScaleTransformer>());
-
-        Debug.Log($"WristMenuController: Added XRTwoHandedScaleTransformer to '{shape.name}' grab transformers");
-
-        shape.GetComponent<XRGrabInteractable>().AddMultipleGrabTransformer(shape.GetComponent<XRGrabTransformerScaleAxisLock>());
-
-        Debug.Log($"WristMenuController: Added XRGrabTransformerScaleAxisLock to '{shape.name}' grab transformers");
-
-        shape.GetComponent<XRGrabInteractable>().AddMultipleGrabTransformer(shape.GetComponent<XRGrabTransformerLockPose>());
-        
-        Debug.Log($"WristMenuController: Added XRGrabTransformerLockPose to '{shape.name}' grab transformers");
-
-        shape.GetComponent<XRGrabInteractable>().AddMultipleGrabTransformer(shape.GetComponent<XRUIScaleTransformer>());
-
-        Debug.Log($"WristMenuController: Added XRUIScaleTransformer to '{shape.name}' grab transformers");
-
-        // Apply material
         var meshRenderer = shape.GetComponent<MeshRenderer>();
         if (meshRenderer != null && litMaterial != null)
-        {
             meshRenderer.material = litMaterial;
-        }
 
-        Debug.Log($"WristMenuController: Applied material to '{shape.name}'");
-        
-        // Ensure collider is enabled (should already be there from CreatePrimitive)
         Collider collider = shape.GetComponent<Collider>();
         if (collider != null)
-        {
             collider.enabled = true;
-        }
 
-        Debug.Log($"WristMenuController: Collider enabled for '{shape.name}'");
-        
-        // Add CollisionObjectPublisher to automatically publish to ROS
         CollisionObjectPublisher publisher = shape.AddComponent<CollisionObjectPublisher>();
         publisher.isMesh = false;
-        // Generate unique ID for each object
         publisher.objectId = $"unity_{primitiveType.ToString().ToLower()}_{System.DateTime.Now.Ticks}";
         publisher.worldOrigin = worldOrigin;
 
-        Debug.Log($"WristMenuController: Added CollisionObjectPublisher to '{shape.name}' with ID {publisher.objectId}");
-        
-        // Automatically select the newly created object so user can immediately grab it
         if (selectionManager != null)
-        {
             selectionManager.SetSelectedObject(shape);
-        }
-
-        Debug.Log($"WristMenuController: Selected '{shape.name}' after creation");
-
-        // Register the new object with the CollisionObjectsListener
-        collisionObjectsListener?.objectsById.Add(publisher.objectId, shape);
-        
-        Debug.Log($"WristMenuController: Created {primitiveType} with ID {publisher.objectId}");
+        if (collisionObjectsListener != null)
+            collisionObjectsListener.objectsById.Add(publisher.objectId, shape);
     }
     
     // Public convenience methods for external access

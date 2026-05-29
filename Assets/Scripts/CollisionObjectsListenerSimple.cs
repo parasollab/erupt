@@ -108,7 +108,7 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
 
             // Add XR interaction (will be controlled by SelectableGrabController)
             child.AddComponent<XRGrabInteractable>();
-            child.GetComponent<XRGrabInteractable>().selectMode = InteractableSelectMode.Multiple;
+            child.GetComponent<XRGrabInteractable>().selectMode = InteractableSelectMode.Single;
 
             // Add component to control grabbing based on selection state
             child.AddComponent<SelectableGrabController>();

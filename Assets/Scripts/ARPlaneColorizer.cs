@@ -10,18 +10,34 @@ public class ARPlaneColorizer : MonoBehaviour
 {
         ARPlane m_ARPlane;
         MeshRenderer m_PlaneMeshRenderer;
-        
+
         void Awake()
         {
             m_ARPlane = GetComponent<ARPlane>();
             m_PlaneMeshRenderer = GetComponent<MeshRenderer>();
         }
 
+        void OnEnable()
+        {
+            m_ARPlane.boundaryChanged += OnBoundaryChanged;
+        }
+
+        void OnDisable()
+        {
+            m_ARPlane.boundaryChanged -= OnBoundaryChanged;
+        }
+
         void Start()
         {
-           UpdatePlaneColor();
+            Debug.Log($"[ARPlaneColorizer] Plane started: classification={m_ARPlane.classification} trackingState={m_ARPlane.trackingState}");
+            UpdatePlaneColor();
         }
-        
+
+        void OnBoundaryChanged(ARPlaneBoundaryChangedEventArgs args)
+        {
+            UpdatePlaneColor();
+        }
+
         void UpdatePlaneColor()
         {
             Color planeMatColor = Color.gray; //i.e. 'None'
