@@ -35,7 +35,10 @@ public class MarkerRobotPlacement : MonoBehaviour
         if (Physics.Raycast(markerPosition + Vector3.up * 0.1f, Vector3.down, out RaycastHit hit, 3f))
         {
             placementPosition = hit.point;
-            surfaceNormal = hit.normal;
+            // A hit normal with a small Y component means the ray clipped a side face of a
+            // box collider (e.g. anchor bridge furniture). Snap to up so the robot doesn't
+            // end up on its side.
+            surfaceNormal = hit.normal.y >= 0.5f ? hit.normal : Vector3.up;
         }
         else if (anchorBridge != null && anchorBridge.HasFloor)
         {

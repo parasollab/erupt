@@ -2,28 +2,29 @@ using System.IO;
 using UnityEditor;
 using UnityEngine;
 
-/// Automatically adds OPENCV_FOR_UNITY to scripting defines when the OpenCVForUnity
-/// asset package is present in the project, and removes it when the folder is absent.
-/// This keeps the define in sync with the package without any manual setup.
+/// Automatically adds/removes OPENCV_FOR_UNITY from scripting defines based on whether
+/// the OpenCVForUnity asset package is present in Assets/OpenCVForUnity.
+///
+/// Uses two hooks:
+///   [InitializeOnLoad]          — syncs the define on every domain reload (startup, script change).
+///   AssetModificationProcessor  — removes the define BEFORE the folder is deleted so the
+///                                  next compilation doesn't see a stale define.
 [InitializeOnLoad]
 public static class OpenCVForUnityDefine
 {
     const string Define = "OPENCV_FOR_UNITY";
+    const string PackageFolder = "Assets/OpenCVForUnity";
+
     static readonly string PackagePath = Path.Combine(Application.dataPath, "OpenCVForUnity");
 
     static OpenCVForUnityDefine()
     {
-        bool present = Directory.Exists(PackagePath);
-        SetDefine(present);
+        SetDefine(Directory.Exists(PackagePath));
     }
 
-    static void SetDefine(bool enable)
+    public static void SetDefine(bool enable)
     {
-        var targets = new[]
-        {
-            BuildTargetGroup.Android,
-            BuildTargetGroup.Standalone,
-        };
+        var targets = new[] { BuildTargetGroup.Android, BuildTargetGroup.Standalone };
 
         foreach (var group in targets)
         {
@@ -43,5 +44,19 @@ public static class OpenCVForUnityDefine
                 Debug.Log($"[OpenCVForUnityDefine] Removed {Define} for {group}");
             }
         }
+    }
+}
+
+/// Fires before an asset is deleted so we can remove the define before compilation
+/// sees the OpenCV folder as gone. Without this, deletion outside the Unity Project
+/// window leaves a stale define that causes a compile error on next reload.
+public class OpenCVForUnityDeleteWatcher : AssetModificationProcessor
+{
+    static AssetDeleteResult OnWillDeleteAsset(string path, RemoveAssetOptions options)
+    {
+        if (path == "Assets/OpenCVForUnity" || path.StartsWith("Assets/OpenCVForUnity/"))
+            OpenCVForUnityDefine.SetDefine(false);
+
+        return AssetDeleteResult.DidNotDelete;
     }
 }

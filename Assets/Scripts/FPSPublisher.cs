@@ -15,6 +15,7 @@ public class FPSPublisher : MonoBehaviour
     {
         ros = ROSConnection.GetOrCreateInstance();
         ros.RegisterPublisher<Int32Msg>(topic);
+        
     }
 
     void Update()
