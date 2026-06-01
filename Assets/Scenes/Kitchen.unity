@@ -3213,7 +3213,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: xrviz::FPSPublisher
   topic: /fps
-  publishRateHz: 1
 --- !u!114 &1496867190
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4266,6 +4265,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2102471247}
   - component: {fileID: 2102471246}
+  - component: {fileID: 2102471248}
   m_Layer: 0
   m_Name: OVRManager
   m_TagString: Untagged
@@ -4379,6 +4379,19 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2102471248
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2102471245}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d465e28822e364b7c94cc36f3d38ffb0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: xrviz::FPSSetter
+  targetFPS: 72
 --- !u!23 &757586001748683128
 MeshRenderer:
   m_ObjectHideFlags: 0
