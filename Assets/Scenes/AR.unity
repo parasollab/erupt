@@ -3478,8 +3478,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: RADER::CollisionHaptics
   maxIntensity: 1
   minDistance: 0.3
-  leftController: {fileID: 0}
-  rightController: {fileID: 0}
+  leftHapticAction: {fileID: 0}
+  rightHapticAction: {fileID: 0}
+  tipLink: {fileID: 0}
+  excludeTransforms: []
+  robotRoot: {fileID: 0}
+  obstacleLayerMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  debugMode: 0
 --- !u!1 &355009885
 GameObject:
   m_ObjectHideFlags: 0
@@ -5039,7 +5046,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 595720460}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7b1b7b51b49a7415f940cdceb2d0221d, type: 3}
   m_Name: 
@@ -5059,7 +5066,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 595720460}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b0929a72ac1c04730b71eef5454e0a20, type: 3}
   m_Name: 
@@ -5076,7 +5083,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 595720460}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 04a0da69453af4ae28b22611a7a42e50, type: 3}
   m_Name: 
@@ -5233,7 +5240,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: xrviz::FPSPublisher
   topic: /fps
-  publishRateHz: 1
+  _togglePublishAction: {fileID: 0}
 --- !u!1 &597799757
 GameObject:
   m_ObjectHideFlags: 0
@@ -16942,8 +16949,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3e19ba71cdd974f6abcbe5c53c964e22, type: 3}
   m_Name: 
   m_EditorClassIdentifier: xrviz::SceneController
-  _togglePlanesAction: {fileID: 0}
-  _anchorBridge: {fileID: 0}
 --- !u!114 &1736367596
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -39,16 +39,28 @@ public class CollisionObjectPublisher : MonoBehaviour
             return;
         }
 
-        // Register publisher with error handling
+        // Register collision object publisher
         try
         {
             ros.RegisterPublisher<CollisionObjectMsg>("/collision_object");
-            Debug.Log($"Successfully registered publisher for object '{gameObject.name}' on topic '/collision_object'");
+            Debug.Log($"[{gameObject.name}] Registered /collision_object publisher");
         }
         catch (System.Exception e)
         {
-            Debug.LogError($"Failed to register publisher for object '{gameObject.name}': {e.Message}");
+            Debug.LogError($"[{gameObject.name}] Failed to register /collision_object publisher: {e.Message}");
             return;
+        }
+
+        // Register latency round-trip publisher and subscriber
+        try
+        {
+            ros.RegisterPublisher<StringMsg>("/latency_data");
+            ros.Subscribe<HeaderMsg>("/collision_object_pong", OnLatencyPong);
+            Debug.Log($"[{gameObject.name}] Registered /latency_data publisher and /collision_object_pong subscriber");
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError($"[{gameObject.name}] Failed to register latency topics: {e.Message}");
         }
         
         // Initialize tracking variables
@@ -236,6 +248,7 @@ public class CollisionObjectPublisher : MonoBehaviour
             }
         }
 
+        Debug.Log($"[Latency] Publishing '{objectId}' op={msg.operation} stamp.sec={msg.header.stamp.sec} stamp.nanosec={msg.header.stamp.nanosec}");
         try
         {
             if (isMesh)
@@ -777,6 +790,28 @@ public class CollisionObjectPublisher : MonoBehaviour
         }
         
         Debug.Log($"=== End Analysis ===");
+    }
+
+    private void OnLatencyPong(HeaderMsg msg)
+    {
+        Debug.Log($"[Latency] Pong received: frame_id='{msg.frame_id}' stamp.sec={msg.stamp.sec} stamp.nanosec={msg.stamp.nanosec}");
+        if (msg.stamp.sec == 0 && msg.stamp.nanosec == 0)
+        {
+            Debug.LogWarning("[Latency] Pong stamp is zero — ROS node sent a blank timestamp");
+            return;
+        }
+        long sentTicks = (long)msg.stamp.sec * TimeSpan.TicksPerSecond
+                       + (long)msg.stamp.nanosec / 100L;
+        var sentTime = new DateTimeOffset(DateTimeOffset.UnixEpoch.Ticks + sentTicks, TimeSpan.Zero);
+        double rttMs = (DateTimeOffset.UtcNow - sentTime).TotalMilliseconds;
+
+        // frame_id is encoded as "OPERATION:object_id"
+        int sep = msg.frame_id.IndexOf(':');
+        string operation = sep >= 0 ? msg.frame_id.Substring(0, sep) : "UNKNOWN";
+        string objectId  = sep >= 0 ? msg.frame_id.Substring(sep + 1) : msg.frame_id;
+
+        Debug.Log($"[Latency] {operation} '{objectId}'  RTT={rttMs:F1} ms  (~{rttMs / 2:F1} ms one-way)");
+        ros.Publish("/latency_data", new StringMsg($"{operation},{objectId},{rttMs:F3}"));
     }
 
     private TimeMsg GetRosTimestamp()
