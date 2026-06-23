@@ -11,26 +11,6 @@ public class DirectArticulationIKController : MonoBehaviour
     [SerializeField] private float maxAngleStepDegrees = 4f;
     [SerializeField] private float solveWeight = 0.85f;
 
-    private readonly string[] ur5eLinkNames =
-    {
-        "shoulder_link",
-        "upper_arm_link",
-        "forearm_link",
-        "wrist_1_link",
-        "wrist_2_link",
-        "wrist_3_link"
-    };
-
-    private readonly string[] ur5eJointNames =
-    {
-        "shoulder_pan_joint",
-        "shoulder_lift_joint",
-        "elbow_joint",
-        "wrist_1_joint",
-        "wrist_2_joint",
-        "wrist_3_joint"
-    };
-
     private readonly List<ArticulationBody> joints = new List<ArticulationBody>();
     private readonly List<string> jointNames = new List<string>();
     private readonly Dictionary<string, ArticulationBody> jointByName = new Dictionary<string, ArticulationBody>();
@@ -223,37 +203,30 @@ public class DirectArticulationIKController : MonoBehaviour
         jointNames.Clear();
         jointByName.Clear();
         if (robotRoot == null)
-        {
             return;
-        }
 
-        for (int i = 0; i < ur5eLinkNames.Length; i++)
-        {
-            Transform jointTransform = FindJointTransform(robotRoot, ur5eJointNames[i], ur5eLinkNames[i]);
-            if (jointTransform == null)
-            {
-                continue;
-            }
-
-            ArticulationBody articulationBody = jointTransform.GetComponent<ArticulationBody>();
-            if (articulationBody != null && articulationBody.jointType == ArticulationJointType.RevoluteJoint)
-            {
-                AddJoint(articulationBody, ResolveJointName(articulationBody, ur5eJointNames[i]));
-            }
-        }
-    }
-
-    private Transform FindJointTransform(Transform robotRoot, string jointName, string linkName)
-    {
         foreach (MonoBehaviour component in robotRoot.GetComponentsInChildren<MonoBehaviour>(true))
         {
-            if (TryGetUrdfJointName(component, out string candidateJointName) && candidateJointName == jointName)
-            {
-                return component.transform;
-            }
+            if (component.GetType().FullName != "Unity.Robotics.UrdfImporter.UrdfJoint")
+                continue;
+
+            ArticulationBody body = component.GetComponent<ArticulationBody>();
+            if (body == null || body.jointType != ArticulationJointType.RevoluteJoint)
+                continue;
+
+            TryGetUrdfJointName(component, out string name);
+            AddJoint(body, !string.IsNullOrWhiteSpace(name) ? name : component.name);
         }
 
-        return robotRoot.FindDescendant(linkName);
+        // Fallback for robots not imported via the URDF importer.
+        if (joints.Count == 0)
+        {
+            foreach (ArticulationBody body in robotRoot.GetComponentsInChildren<ArticulationBody>(true))
+            {
+                if (body.jointType == ArticulationJointType.RevoluteJoint)
+                    AddJoint(body, body.name);
+            }
+        }
     }
 
     private void AddJoint(ArticulationBody joint, string jointName)
@@ -261,29 +234,6 @@ public class DirectArticulationIKController : MonoBehaviour
         joints.Add(joint);
         jointNames.Add(jointName);
         jointByName[jointName] = joint;
-    }
-
-    private static string ResolveJointName(ArticulationBody joint, string fallbackName)
-    {
-        foreach (MonoBehaviour component in joint.GetComponents<MonoBehaviour>())
-        {
-            if (TryGetUrdfJointName(component, out string urdfJointName) &&
-                !string.IsNullOrWhiteSpace(urdfJointName))
-            {
-                string generatedName = joint.transform.parent != null
-                    ? joint.transform.parent.name + "_" + joint.name + "_joint"
-                    : string.Empty;
-
-                if (urdfJointName == generatedName)
-                {
-                    return fallbackName;
-                }
-
-                return urdfJointName;
-            }
-        }
-
-        return fallbackName;
     }
 
     private static bool TryGetUrdfJointName(MonoBehaviour component, out string jointName)
@@ -422,6 +372,7 @@ public class DirectArticulationIKController : MonoBehaviour
     {
         foreach (ArticulationBody body in allBodies)
         {
+            if (body is null) continue;
             SetZeroJointVelocity(body);
             body.linearVelocity = Vector3.zero;
             body.angularVelocity = Vector3.zero;

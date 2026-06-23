@@ -17,12 +17,18 @@ EditorBuildSettings:
   - enabled: 0
     path: Assets/Scenes/AR.unity
     guid: 49dca3fc627f34e8ea835ac53e590d93
-  - enabled: 1
+  - enabled: 0
     path: Assets/Scenes/KitchenLoadingScene.unity
     guid: 460ff48f0e3c9432cac9b71597ccf702
-  - enabled: 1
+  - enabled: 0
     path: Assets/Scenes/Kitchen.unity
     guid: 332a5352bed064330b7ad52128992f65
+  - enabled: 1
+    path: Assets/Scenes/KitchenLoadingSceneFR3.unity
+    guid: 9b6ef03e31cc541128e1684e6ef1b663
+  - enabled: 1
+    path: Assets/Scenes/KitchenFR3.unity
+    guid: 18c0e714e847d40e0801c1265a0508df
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: c348712bda248c246b8c49b3db54643f, type: 3}
     com.unity.xr.arfoundation.simulation_settings: {fileID: 11400000, guid: e5d25a27610f74c049fefa1b04bb0f96, type: 2}
