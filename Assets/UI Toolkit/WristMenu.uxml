@@ -7,6 +7,8 @@
             <ui:Button text="Duplicate Shape" name="wristMenuDuplicateShapeButton" selectable="false" focusable="false" style="-unity-font-style: bold; margin-top: 0; margin-bottom: 10px;" />
             <ui:Button text="Snap to Surface" name="wristMenuSnapSurfaceButton" selectable="false" focusable="false" style="-unity-font-style: bold; margin-top: 0; margin-bottom: 10px;" />
             <ui:Button text="Delete Shape" name="wristMenuDeleteShapeButton" selectable="false" focusable="false" style="-unity-font-style: bold; margin-top: 0; margin-bottom: 10px;" />
+            <ui:Button text="Record Pick &amp; Place" name="wristMenuRecordPickPlaceButton" selectable="false" focusable="false" style="-unity-font-style: bold; margin-top: 0; margin-bottom: 4px;" />
+            <ui:Label text="Idle" name="wristMenuRecordStatusLabel" style="-unity-text-align: upper-center; color: rgb(200, 200, 200); font-size: 14px; margin-bottom: 10px;" />
         </ui:VisualElement>
         <ui:VisualElement name="wristMenuAddShapePanel" enabled="true" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0.53); color: rgb(255, 250, 250); border-bottom-width: 0; border-bottom-color: rgb(0, 0, 0); display: none; opacity: 1;">
             <ui:Label text="Add Shape" name="wristMenuAddShapeLabel" style="-unity-text-align: upper-center; -unity-font-style: bold; border-bottom-width: 3px; border-bottom-color: rgb(255, 250, 250); margin-bottom: 10px; font-size: 24px;" />

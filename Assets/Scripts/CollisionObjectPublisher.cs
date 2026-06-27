@@ -17,6 +17,7 @@ public class CollisionObjectPublisher : MonoBehaviour
     public bool autoDetectMeshType = false; // New field for automatic detection
     public bool createReadableMeshCopy = false; // Create readable copy of non-readable meshes
     public float publishRateHz = 1f;
+    public bool pausePublishing = false;
     public GameObject worldOrigin; // Optional world origin for relative positioning
 
     private ROSConnection ros;
@@ -74,6 +75,8 @@ public class CollisionObjectPublisher : MonoBehaviour
 
     void Update()
     {
+        if (pausePublishing) return;
+
         if (Time.time - lastPublishTime < 1.0f / publishRateHz)
             return;
 
@@ -794,7 +797,7 @@ public class CollisionObjectPublisher : MonoBehaviour
 
     private void OnLatencyPong(HeaderMsg msg)
     {
-        Debug.Log($"[Latency] Pong received: frame_id='{msg.frame_id}' stamp.sec={msg.stamp.sec} stamp.nanosec={msg.stamp.nanosec}");
+        // Debug.Log($"[Latency] Pong received: frame_id='{msg.frame_id}' stamp.sec={msg.stamp.sec} stamp.nanosec={msg.stamp.nanosec}");
         if (msg.stamp.sec == 0 && msg.stamp.nanosec == 0)
         {
             Debug.LogWarning("[Latency] Pong stamp is zero — ROS node sent a blank timestamp");
@@ -810,7 +813,7 @@ public class CollisionObjectPublisher : MonoBehaviour
         string operation = sep >= 0 ? msg.frame_id.Substring(0, sep) : "UNKNOWN";
         string objectId  = sep >= 0 ? msg.frame_id.Substring(sep + 1) : msg.frame_id;
 
-        Debug.Log($"[Latency] {operation} '{objectId}'  RTT={rttMs:F1} ms  (~{rttMs / 2:F1} ms one-way)");
+        // Debug.Log($"[Latency] {operation} '{objectId}'  RTT={rttMs:F1} ms  (~{rttMs / 2:F1} ms one-way)");
         ros.Publish("/latency_data", new StringMsg($"{operation},{objectId},{rttMs:F3}"));
     }
 

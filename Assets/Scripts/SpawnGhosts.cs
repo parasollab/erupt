@@ -1,156 +1,122 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public class SpawnGhosts : MonoBehaviour
 {
-
     public GameObject robotPrefab;
 
-    // Default start color is transluscent green
-    public Color startGhostColor = new Color(0, 1, 0, 0.5f); // RGBA
-
-    // Default goal color is transluscent orange
-    public Color goalGhostColor = new Color(1, 0.5f, 0, 0.5f); // RGBA
+    public Color startGhostColor = new Color(0, 1, 0, 0.5f);
+    public Color goalGhostColor = new Color(1, 0.5f, 0, 0.5f);
 
     public GameObject realRobot;
 
     private GameObject startGhost;
     private GameObject goalGhost;
 
-    public void SpawnStartGhost(float[] jointAngles)
-    {
-        startGhost = Instantiate(robotPrefab);
-        startGhost.name = "StartGhost";
-
-        foreach (var col in startGhost.GetComponentsInChildren<Collider>())
-            col.gameObject.tag = "robot";
-
-        // Make the ghost transluscent
-        startGhost.AddComponent<TranslucentOverride>().overlayColor = startGhostColor;
-
-        // Move the ghost to the real robot's position and rotation
-        startGhost.transform.position = realRobot.transform.position;
-        startGhost.transform.rotation = realRobot.transform.rotation;
-
-        // Get the RobotManager component attached to the ghost
-        RobotManager robotManager = startGhost.GetComponent<RobotManager>();
-        if (robotManager != null)
-        {
-            robotManager.SetJointAngles(jointAngles);
-        }
-    }
-
     public void SpawnStartGhost()
     {
-        // Get the joint angles from the real robot
-        RobotManager robotManager = realRobot.GetComponent<RobotManager>();
-        if (robotManager != null)
-        {
-            float[] jointAngles = robotManager.GetJointAngles();
-            SpawnStartGhost(jointAngles);
-        }
-    }
-
-    public void SpawnGoalGhost(float[] jointAngles)
-    {
-        goalGhost = Instantiate(robotPrefab);
-        goalGhost.name = "GoalGhost";
-
-        foreach (var col in goalGhost.GetComponentsInChildren<Collider>())
-            col.gameObject.tag = "robot";
-
-        // Make the ghost transluscent
-        goalGhost.AddComponent<TranslucentOverride>().overlayColor = goalGhostColor;
-
-        // Move the ghost to the real robot's position and rotation
-        goalGhost.transform.position = realRobot.transform.position;
-        goalGhost.transform.rotation = realRobot.transform.rotation;
-
-        // Get the RobotManager component attached to the ghost
-        RobotManager robotManager = goalGhost.GetComponent<RobotManager>();
-        if (robotManager != null)
-        {
-            robotManager.SetJointAngles(jointAngles);
-        }
+        ClearStartGhost();
+        startGhost = SpawnGhost("StartGhost", startGhostColor);
+        CopyPoseToGhost(realRobot, startGhost);
     }
 
     public void SpawnGoalGhost()
     {
-        // Get the joint angles from the real robot
-        RobotManager robotManager = realRobot.GetComponent<RobotManager>();
-        if (robotManager != null)
-        {
-            float[] jointAngles = robotManager.GetJointAngles();
-            SpawnGoalGhost(jointAngles);
-        }
-    }
-
-    public void UpdateStartGhost(float[] jointAngles)
-    {
-        if (startGhost != null)
-        {
-            RobotManager robotManager = startGhost.GetComponent<RobotManager>();
-            if (robotManager != null)
-            {
-                robotManager.SetJointAngles(jointAngles);
-                Debug.Log("Start ghost updated to: " + string.Join(", ", jointAngles));
-            }
-        }
+        ClearGoalGhost();
+        goalGhost = SpawnGhost("GoalGhost", goalGhostColor);
+        CopyPoseToGhost(realRobot, goalGhost);
     }
 
     public void UpdateStartGhost()
     {
-        // Get the joint angles from the real robot
-        RobotManager robotManager = realRobot.GetComponent<RobotManager>();
-        if (robotManager != null)
-        {
-            float[] jointAngles = robotManager.GetJointAngles();
-            UpdateStartGhost(jointAngles);
-        }
-    }
-
-    public void UpdateGoalGhost(float[] jointAngles)
-    {
-        if (goalGhost != null)
-        {
-            RobotManager robotManager = goalGhost.GetComponent<RobotManager>();
-            if (robotManager != null)
-            {
-                robotManager.SetJointAngles(jointAngles);
-            }
-        }
+        if (startGhost == null) return;
+        CopyPoseToGhost(realRobot, startGhost);
     }
 
     public void UpdateGoalGhost()
     {
-        // Get the joint angles from the real robot
-        RobotManager robotManager = realRobot.GetComponent<RobotManager>();
-        if (robotManager != null)
-        {
-            float[] jointAngles = robotManager.GetJointAngles();
-            UpdateGoalGhost(jointAngles);
-            Debug.Log("Goal ghost updated to: " + string.Join(", ", jointAngles));
-        }
+        if (goalGhost == null) return;
+        CopyPoseToGhost(realRobot, goalGhost);
     }
 
     public void ClearStartGhost()
     {
-        if (startGhost != null)
-        {
-            Destroy(startGhost);
-        }
+        if (startGhost != null) Destroy(startGhost);
+        startGhost = null;
     }
 
     public void ClearGoalGhost()
     {
-        if (goalGhost != null)
-        {
-            Destroy(goalGhost);
-        }
+        if (goalGhost != null) Destroy(goalGhost);
+        goalGhost = null;
     }
 
     public void ClearGhosts()
     {
         ClearStartGhost();
         ClearGoalGhost();
+    }
+
+    private GameObject SpawnGhost(string ghostName, Color color)
+    {
+        // Instantiate under an inactive parent so Awake is deferred until after cleanup.
+        var deferParent = new GameObject();
+        deferParent.SetActive(false);
+
+        GameObject ghost = Instantiate(robotPrefab, deferParent.transform);
+        ghost.name = ghostName;
+
+        // Strip all behavior scripts before Awake can run — ghost is purely visual.
+        foreach (var mb in ghost.GetComponentsInChildren<MonoBehaviour>(true))
+            DestroyImmediate(mb);
+
+        foreach (var col in ghost.GetComponentsInChildren<Collider>())
+            col.enabled = false;
+
+        foreach (var ab in ghost.GetComponentsInChildren<ArticulationBody>(true))
+        {
+            ab.useGravity = false;
+            ab.linearVelocity = Vector3.zero;
+            ab.angularVelocity = Vector3.zero;
+            if (ab.isRoot) ab.immovable = true;
+        }
+
+        var overlay = ghost.AddComponent<TranslucentOverride>();
+        overlay.overlayColor = color;
+        overlay.SetTranslucent(true);  // Apply immediately; don't wait for Start()
+
+        // Set world position before activating so ArticulationBody physics registers at the right location.
+        ghost.transform.SetPositionAndRotation(realRobot.transform.position, realRobot.transform.rotation);
+
+        ghost.transform.SetParent(null);
+        ghost.SetActive(true);
+        Destroy(deferParent);
+
+        return ghost;
+    }
+
+    // Copies joint positions from each source ArticulationBody to the matching ghost ArticulationBody by name.
+    // Both hierarchies come from the same URDF so names match.
+    private static void CopyPoseToGhost(GameObject source, GameObject ghost)
+    {
+        var ghostAbByName = new Dictionary<string, ArticulationBody>();
+        foreach (var ab in ghost.GetComponentsInChildren<ArticulationBody>(true))
+            ghostAbByName[ab.name] = ab;
+
+        foreach (var sourceAb in source.GetComponentsInChildren<ArticulationBody>(true))
+        {
+            if (!ghostAbByName.TryGetValue(sourceAb.name, out ArticulationBody ghostAb)) continue;
+            if (sourceAb.dofCount == 0) continue;
+
+            ghostAb.jointPosition = sourceAb.jointPosition;
+
+            ArticulationDrive drive = ghostAb.xDrive;
+            drive.target = sourceAb.xDrive.target;
+            ghostAb.xDrive = drive;
+
+            ghostAb.PublishTransform();
+        }
+
+        Physics.SyncTransforms();
     }
 }

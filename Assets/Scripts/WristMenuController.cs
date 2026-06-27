@@ -21,6 +21,9 @@ public class WristMenuController : MonoBehaviour
     [Header("CollisionObjectsListener")]
     public CollisionObjectsListenerSimple collisionObjectsListener;
     public GameObject worldOrigin;
+
+    [Header("Pick & Place Recording")]
+    [SerializeField] private PickPlaceTaskRecorder pickPlaceRecorder;
     
     // UI Elements
     private VisualElement root;
@@ -41,6 +44,8 @@ public class WristMenuController : MonoBehaviour
     private Button addCylinderButton;
     private Button editShapeBackButton;
     private Button duplicateShapeButton;
+    private Button recordPickPlaceButton;
+    private Label recordStatusLabel;
     
     // Input Actions
     private InputAction menuAction;
@@ -271,6 +276,8 @@ public class WristMenuController : MonoBehaviour
         snapSurfaceButton = root.Q<Button>("wristMenuSnapSurfaceButton");
         deleteShapeButton = root.Q<Button>("wristMenuDeleteShapeButton");
         duplicateShapeButton = root.Q<Button>("wristMenuDuplicateShapeButton");
+        recordPickPlaceButton = root.Q<Button>("wristMenuRecordPickPlaceButton");
+        recordStatusLabel = root.Q<Label>("wristMenuRecordStatusLabel");
 
         // Get buttons from add shape panel
         addShapeBackButton = root.Q<Button>("wristMenuAddShapeBackButton");
@@ -312,6 +319,8 @@ public class WristMenuController : MonoBehaviour
         snapSurfaceButton.clicked += OnSnapSurfaceClicked;
         deleteShapeButton.clicked += OnDeleteShapeClicked;
         duplicateShapeButton.clicked += OnDuplicateShapeClicked;
+        if (recordPickPlaceButton != null)
+            recordPickPlaceButton.clicked += OnRecordPickPlaceClicked;
 
         // Add shape panel buttons
         addShapeBackButton.clicked += OnAddShapeBackClicked;
@@ -711,6 +720,47 @@ public class WristMenuController : MonoBehaviour
         }
     }
     
+    private void OnRecordPickPlaceClicked()
+    {
+        if (pickPlaceRecorder == null) return;
+
+        if (!pickPlaceRecorder.IsRecording)
+        {
+            pickPlaceRecorder.OnRecordingComplete = OnPickPlaceRecorded;
+            pickPlaceRecorder.StartRecording();
+            if (recordPickPlaceButton != null)
+            {
+                recordPickPlaceButton.text = "Recording...";
+                recordPickPlaceButton.style.color = new UnityEngine.UIElements.StyleColor(UnityEngine.Color.yellow);
+            }
+            if (recordStatusLabel != null)
+                recordStatusLabel.text = "Waiting for grab...";
+        }
+        else
+        {
+            pickPlaceRecorder.StopRecording();
+            ResetRecordUI();
+        }
+    }
+
+    private void OnPickPlaceRecorded(string objectId)
+    {
+        if (recordStatusLabel != null)
+            recordStatusLabel.text = $"Sent: {objectId}";
+        ResetRecordUI(resetLabel: false);
+    }
+
+    private void ResetRecordUI(bool resetLabel = true)
+    {
+        if (recordPickPlaceButton != null)
+        {
+            recordPickPlaceButton.text = "Record Pick & Place";
+            recordPickPlaceButton.style.color = new UnityEngine.UIElements.StyleColor(StyleKeyword.Null);
+        }
+        if (resetLabel && recordStatusLabel != null)
+            recordStatusLabel.text = "Idle";
+    }
+
     private void OnSnapSurfaceClicked()
     {
         SnapSelectedToSurface();
