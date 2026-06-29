@@ -24,6 +24,9 @@ public class WristMenuController : MonoBehaviour
 
     [Header("Pick & Place Recording")]
     [SerializeField] private PickPlaceTaskRecorder pickPlaceRecorder;
+
+    [Header("MTC Dashboard")]
+    [SerializeField] private GameObject mtcDashboardPanel;
     
     // UI Elements
     private VisualElement root;
@@ -46,6 +49,7 @@ public class WristMenuController : MonoBehaviour
     private Button duplicateShapeButton;
     private Button recordPickPlaceButton;
     private Label recordStatusLabel;
+    private Button mtcButton;
     
     // Input Actions
     private InputAction menuAction;
@@ -278,6 +282,7 @@ public class WristMenuController : MonoBehaviour
         duplicateShapeButton = root.Q<Button>("wristMenuDuplicateShapeButton");
         recordPickPlaceButton = root.Q<Button>("wristMenuRecordPickPlaceButton");
         recordStatusLabel = root.Q<Label>("wristMenuRecordStatusLabel");
+        mtcButton = root.Q<Button>("wristMenuMTCButton");
 
         // Get buttons from add shape panel
         addShapeBackButton = root.Q<Button>("wristMenuAddShapeBackButton");
@@ -321,6 +326,8 @@ public class WristMenuController : MonoBehaviour
         duplicateShapeButton.clicked += OnDuplicateShapeClicked;
         if (recordPickPlaceButton != null)
             recordPickPlaceButton.clicked += OnRecordPickPlaceClicked;
+        if (mtcButton != null)
+            mtcButton.clicked += OnMTCClicked;
 
         // Add shape panel buttons
         addShapeBackButton.clicked += OnAddShapeBackClicked;
@@ -720,6 +727,12 @@ public class WristMenuController : MonoBehaviour
         }
     }
     
+    private void OnMTCClicked()
+    {
+        if (mtcDashboardPanel == null) return;
+        mtcDashboardPanel.SetActive(!mtcDashboardPanel.activeSelf);
+    }
+
     private void OnRecordPickPlaceClicked()
     {
         if (pickPlaceRecorder == null) return;

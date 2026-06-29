@@ -1,0 +1,49 @@
+<ui:UXML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ui="UnityEngine.UIElements" noNamespaceSchemaLocation="../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
+    <ui:VisualElement name="mtcRoot" style="flex-grow: 1; background-color: rgb(20, 20, 20);">
+
+        <!-- Header -->
+        <ui:Label text="MTC Dashboard" name="mtcTitleLabel" style="-unity-text-align: upper-center; -unity-font-style: bold; font-size: 20px; color: rgb(255, 255, 255); border-bottom-width: 2px; border-bottom-color: rgb(80, 80, 80); padding-top: 6px; padding-bottom: 6px;" />
+        <ui:Label text="Task: ---" name="mtcTaskIdLabel" style="-unity-text-align: upper-center; color: rgb(140, 140, 140); font-size: 11px; margin-bottom: 4px;" />
+
+        <!-- Tab bar -->
+        <ui:VisualElement name="mtcTabBar" style="flex-direction: row; border-bottom-width: 2px; border-bottom-color: rgb(80, 80, 80); margin-bottom: 4px;">
+            <ui:Button text="Plan" name="mtcTabPlan" style="flex-grow: 1; -unity-font-style: bold; color: rgb(255, 255, 255);" />
+            <ui:Button text="Stages" name="mtcTabStages" style="flex-grow: 1; -unity-font-style: bold; color: rgb(255, 255, 255);" />
+            <ui:Button text="Solutions" name="mtcTabSolutions" style="flex-grow: 1; -unity-font-style: bold; color: rgb(255, 255, 255);" />
+        </ui:VisualElement>
+
+        <!-- Tab 1: Plan -->
+        <ui:VisualElement name="mtcPanelPlan" style="flex-grow: 1; padding-left: 8px; padding-right: 8px; padding-top: 6px; padding-bottom: 6px;">
+            <ui:Label text="Pick &amp; Place Recording" style="-unity-font-style: bold; color: rgb(255, 255, 255); font-size: 15px; margin-bottom: 8px;" />
+            <ui:Label text="Selected object:" style="color: rgb(140, 140, 140); font-size: 12px;" />
+            <ui:Label text="---" name="mtcPlanObjectIdLabel" style="color: rgb(100, 220, 100); font-size: 13px; margin-bottom: 12px;" />
+            <ui:Button text="Start Recording" name="mtcPlanRecordButton" selectable="false" focusable="false" style="-unity-font-style: bold; margin-bottom: 8px;" />
+            <ui:Label text="Idle" name="mtcPlanStatusLabel" style="-unity-text-align: upper-center; color: rgb(190, 190, 190); font-size: 12px;" />
+        </ui:VisualElement>
+
+        <!-- Tab 2: Stages -->
+        <ui:VisualElement name="mtcPanelStages" style="flex-grow: 1; padding-left: 8px; padding-right: 8px; padding-top: 6px; padding-bottom: 6px; display: none;">
+            <ui:Label text="Stage Tree" style="-unity-font-style: bold; color: rgb(255, 255, 255); font-size: 15px; margin-bottom: 6px;" />
+            <ui:ScrollView name="mtcStageScrollView" style="flex-grow: 1;">
+                <ui:VisualElement name="mtcStageTreeContainer" />
+            </ui:ScrollView>
+        </ui:VisualElement>
+
+        <!-- Tab 3: Solutions -->
+        <ui:VisualElement name="mtcPanelSolutions" style="flex-grow: 1; padding-left: 8px; padding-right: 8px; padding-top: 6px; padding-bottom: 6px; display: none;">
+            <ui:Label text="Solutions" style="-unity-font-style: bold; color: rgb(255, 255, 255); font-size: 15px; margin-bottom: 4px;" />
+            <ui:ScrollView name="mtcSolutionScrollView" style="height: 180px; border-bottom-width: 1px; border-bottom-color: rgb(60, 60, 60); margin-bottom: 6px;">
+                <ui:VisualElement name="mtcSolutionListContainer" />
+            </ui:ScrollView>
+            <ui:Label text="Stage Breakdown" name="mtcBreakdownTitle" style="-unity-font-style: bold; color: rgb(200, 200, 200); font-size: 13px; margin-bottom: 4px;" />
+            <ui:ScrollView name="mtcBreakdownScrollView" style="flex-grow: 1; margin-bottom: 6px;">
+                <ui:VisualElement name="mtcBreakdownContainer" />
+            </ui:ScrollView>
+            <ui:VisualElement style="flex-direction: row;">
+                <ui:Button text="Preview" name="mtcPreviewButton" selectable="false" focusable="false" style="flex-grow: 1; -unity-font-style: bold;" />
+                <ui:Button text="Stop" name="mtcStopPreviewButton" selectable="false" focusable="false" style="flex-grow: 1; -unity-font-style: bold;" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+    </ui:VisualElement>
+</ui:UXML>
