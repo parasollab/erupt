@@ -8752,7 +8752,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e83d9c23e85694d8da9eb919cdc48828, type: 3}
   m_Name: 
   m_EditorClassIdentifier: xrviz::SpawnGhosts
-  robotPrefab: {fileID: 9070249297578840568}
+  robotPrefab: {fileID: 7221753471698987375}
   startGhostColor: {r: 0, g: 1, b: 0, a: 0.5}
   goalGhostColor: {r: 1, g: 0.5, b: 0, a: 0.5}
   realRobot: {fileID: 1747086}
@@ -9610,7 +9610,7 @@ PrefabInstance:
       insertIndex: -1
       addedObject: {fileID: 0}
   m_SourcePrefab: {fileID: 100100000, guid: 46fae3e1bd65645b4835315513e75b34, type: 3}
---- !u!1001 &9070249297578840567
+--- !u!1001 &7221753471698987374
 PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
@@ -9618,52 +9618,52 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
-    - target: {fileID: 687428151135250285, guid: 9c40eacaa5e71496185234e83df13248, type: 3}
+    - target: {fileID: 7648852534631340608, guid: 9c40eacaa5e71496185234e83df13248, type: 3}
+      propertyPath: m_Name
+      value: ur5e_real_robot
+      objectReference: {fileID: 0}
+    - target: {fileID: 7648852534631340608, guid: 9c40eacaa5e71496185234e83df13248, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8683599233013093785, guid: 9c40eacaa5e71496185234e83df13248, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 0
+      value: -4.3476295
       objectReference: {fileID: 0}
-    - target: {fileID: 687428151135250285, guid: 9c40eacaa5e71496185234e83df13248, type: 3}
+    - target: {fileID: 8683599233013093785, guid: 9c40eacaa5e71496185234e83df13248, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0
+      value: 0.94
       objectReference: {fileID: 0}
-    - target: {fileID: 687428151135250285, guid: 9c40eacaa5e71496185234e83df13248, type: 3}
+    - target: {fileID: 8683599233013093785, guid: 9c40eacaa5e71496185234e83df13248, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 0
+      value: -0.61
       objectReference: {fileID: 0}
-    - target: {fileID: 687428151135250285, guid: 9c40eacaa5e71496185234e83df13248, type: 3}
+    - target: {fileID: 8683599233013093785, guid: 9c40eacaa5e71496185234e83df13248, type: 3}
       propertyPath: m_LocalRotation.w
-      value: 1
+      value: 0.7071068
       objectReference: {fileID: 0}
-    - target: {fileID: 687428151135250285, guid: 9c40eacaa5e71496185234e83df13248, type: 3}
+    - target: {fileID: 8683599233013093785, guid: 9c40eacaa5e71496185234e83df13248, type: 3}
       propertyPath: m_LocalRotation.x
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 687428151135250285, guid: 9c40eacaa5e71496185234e83df13248, type: 3}
+    - target: {fileID: 8683599233013093785, guid: 9c40eacaa5e71496185234e83df13248, type: 3}
       propertyPath: m_LocalRotation.y
-      value: 0
+      value: 0.7071068
       objectReference: {fileID: 0}
-    - target: {fileID: 687428151135250285, guid: 9c40eacaa5e71496185234e83df13248, type: 3}
+    - target: {fileID: 8683599233013093785, guid: 9c40eacaa5e71496185234e83df13248, type: 3}
       propertyPath: m_LocalRotation.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 687428151135250285, guid: 9c40eacaa5e71496185234e83df13248, type: 3}
+    - target: {fileID: 8683599233013093785, guid: 9c40eacaa5e71496185234e83df13248, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 687428151135250285, guid: 9c40eacaa5e71496185234e83df13248, type: 3}
+    - target: {fileID: 8683599233013093785, guid: 9c40eacaa5e71496185234e83df13248, type: 3}
       propertyPath: m_LocalEulerAnglesHint.y
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 687428151135250285, guid: 9c40eacaa5e71496185234e83df13248, type: 3}
+    - target: {fileID: 8683599233013093785, guid: 9c40eacaa5e71496185234e83df13248, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6026025494442049558, guid: 9c40eacaa5e71496185234e83df13248, type: 3}
-      propertyPath: m_Name
-      value: ur5e_robot (1)
-      objectReference: {fileID: 0}
-    - target: {fileID: 6026025494442049558, guid: 9c40eacaa5e71496185234e83df13248, type: 3}
-      propertyPath: m_IsActive
       value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
@@ -9671,10 +9671,10 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 9c40eacaa5e71496185234e83df13248, type: 3}
---- !u!1 &9070249297578840568 stripped
+--- !u!1 &7221753471698987375 stripped
 GameObject:
-  m_CorrespondingSourceObject: {fileID: 6026025494442049558, guid: 9c40eacaa5e71496185234e83df13248, type: 3}
-  m_PrefabInstance: {fileID: 9070249297578840567}
+  m_CorrespondingSourceObject: {fileID: 7648852534631340608, guid: 9c40eacaa5e71496185234e83df13248, type: 3}
+  m_PrefabInstance: {fileID: 7221753471698987374}
   m_PrefabAsset: {fileID: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
@@ -9708,4 +9708,4 @@ SceneRoots:
   - {fileID: 1697517153}
   - {fileID: 326645955}
   - {fileID: 1747090}
-  - {fileID: 9070249297578840567}
+  - {fileID: 7221753471698987374}
