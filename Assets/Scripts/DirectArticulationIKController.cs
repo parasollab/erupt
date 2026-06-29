@@ -1,15 +1,38 @@
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
 
 public class DirectArticulationIKController : MonoBehaviour
 {
+    [System.Serializable]
+    public struct JointInitialPosition
+    {
+        public string name;
+        public float positionRadians;
+    }
+
     [SerializeField] private Transform robotRoot;
     [SerializeField] private Transform endEffector;
     [SerializeField] private int maxIterations = 12;
     [SerializeField] private float positionTolerance = 0.008f;
     [SerializeField] private float maxAngleStepDegrees = 4f;
     [SerializeField] private float solveWeight = 0.85f;
+    [SerializeField] private JointInitialPosition[] initialPose;
+
+    private readonly HashSet<string> warnedMissingJoints = new HashSet<string>();
+
+    private static readonly string[] DefaultInitialJointNames =
+    {
+        "fr3_finger_joint1", "fr3_finger_joint2",
+        "fr3_joint1", "fr3_joint2", "fr3_joint3",
+        "fr3_joint4", "fr3_joint5", "fr3_joint6", "fr3_joint7"
+    };
+
+    private static readonly float[] DefaultInitialJointPositions =
+    {
+        0.0f, 0.0f, 0.0f, -0.785f, 0.0f, -2.356f, 0.0f, 1.571f, 0.785f
+    };
 
     private readonly List<ArticulationBody> joints = new List<ArticulationBody>();
     private readonly List<string> jointNames = new List<string>();
@@ -32,6 +55,7 @@ public class DirectArticulationIKController : MonoBehaviour
         endEffector = toolTransform;
         StabilizeRobot(robotRoot);
         BuildJointChain(robotRoot);
+        ApplyInitialPose();
         CaptureHeldPose();
         ZeroJointVelocities();
     }
@@ -99,7 +123,7 @@ public class DirectArticulationIKController : MonoBehaviour
             return;
         }
 
-        ApplyJointPosition(joint, joint.jointPosition[0] + deltaRadians);
+        ApplyJointPosition(joint, ClampJointPosition(joint, joint.jointPosition[0] + deltaRadians));
         CaptureHeldPose();
         ZeroJointVelocities();
     }
@@ -109,12 +133,25 @@ public class DirectArticulationIKController : MonoBehaviour
         return jointNames.ToArray();
     }
 
+    public void LogJointDriveLimits()
+    {
+        Debug.Log($"[IK] LogJointDriveLimits: {joints.Count} joints tracked.");
+        for (int i = 0; i < joints.Count; i++)
+        {
+            ArticulationBody j = joints[i];
+            ArticulationDrive d = j.xDrive;
+            float rosLower = -d.upperLimit * Mathf.Deg2Rad;
+            float rosUpper = -d.lowerLimit * Mathf.Deg2Rad;
+            Debug.Log($"[IK] {jointNames[i]} ({j.name}): Unity [{d.lowerLimit:F2}, {d.upperLimit:F2}] deg | ROS [{rosLower:F4}, {rosUpper:F4}] rad | stiffness={d.stiffness} twistLock={j.twistLock}");
+        }
+    }
+
     public float[] GetJointStatePositions()
     {
         float[] positions = new float[joints.Count];
         for (int i = 0; i < joints.Count; i++)
         {
-            positions[i] = UnityToRosJointPosition(joints[i], joints[i].jointPosition[0]);
+            positions[i] = ClampedRosPosition(joints[i]);
         }
 
         return positions;
@@ -128,8 +165,24 @@ public class DirectArticulationIKController : MonoBehaviour
             return false;
         }
 
-        positionRadians = UnityToRosJointPosition(joint, joint.jointPosition[0]);
+        positionRadians = ClampedRosPosition(joint);
         return true;
+    }
+
+    // Reads the current joint position as a ROS-convention radian value.
+    private static float ClampedRosPosition(ArticulationBody joint)
+    {
+        float rosPos = joint.jointPosition[0];
+        if (joint.jointType != ArticulationJointType.RevoluteJoint ||
+            joint.twistLock != ArticulationDofLock.LimitedMotion)
+            return rosPos;
+
+        ArticulationDrive drive = joint.xDrive;
+        float rosLower = -drive.upperLimit * Mathf.Deg2Rad;
+        float rosUpper = -drive.lowerLimit * Mathf.Deg2Rad;
+        if (rosPos < rosLower - 0.001f || rosPos > rosUpper + 0.001f)
+            Debug.LogWarning($"[IK] {joint.name} ROS pos {rosPos:F4} is outside URDF bounds [{rosLower:F4}, {rosUpper:F4}]");
+        return rosPos;
     }
 
     public void ApplyJointState(string[] names, double[] positions)
@@ -194,6 +247,9 @@ public class DirectArticulationIKController : MonoBehaviour
             {
                 body.immovable = true;
             }
+
+            if (body.jointType == ArticulationJointType.RevoluteJoint)
+                body.twistLock = ArticulationDofLock.FreeMotion;
         }
     }
 
@@ -207,16 +263,24 @@ public class DirectArticulationIKController : MonoBehaviour
 
         foreach (MonoBehaviour component in robotRoot.GetComponentsInChildren<MonoBehaviour>(true))
         {
-            if (component.GetType().FullName != "Unity.Robotics.UrdfImporter.UrdfJoint")
+            if (!IsUrdfJoint(component))
                 continue;
 
             ArticulationBody body = component.GetComponent<ArticulationBody>();
             if (body == null || body.jointType != ArticulationJointType.RevoluteJoint)
                 continue;
 
-            TryGetUrdfJointName(component, out string name);
-            AddJoint(body, !string.IsNullOrWhiteSpace(name) ? name : component.name);
+            bool gotName = TryGetUrdfJointName(component, out string name);
+            string resolvedName = !string.IsNullOrWhiteSpace(name) ? name : component.name;
+            if (!gotName || string.IsNullOrWhiteSpace(name))
+                Debug.LogWarning($"[IK] BuildJointChain: could not read joint name from UrdfJoint on '{component.name}', falling back to GameObject name '{resolvedName}'");
+            AddJoint(body, resolvedName);
         }
+
+        var sb = new System.Text.StringBuilder("[IK] BuildJointChain discovered joints:");
+        for (int i = 0; i < jointNames.Count; i++)
+            sb.Append($"\n  [{i}] name='{jointNames[i]}' go='{joints[i].name}'");
+        Debug.Log(sb.ToString());
 
         // Fallback for robots not imported via the URDF importer.
         if (joints.Count == 0)
@@ -236,13 +300,23 @@ public class DirectArticulationIKController : MonoBehaviour
         jointByName[jointName] = joint;
     }
 
+    private static bool IsUrdfJoint(MonoBehaviour component)
+    {
+        if (component == null) return false;
+        Type t = component.GetType();
+        while (t != null)
+        {
+            if (t.FullName == "Unity.Robotics.UrdfImporter.UrdfJoint") return true;
+            t = t.BaseType;
+        }
+        return false;
+    }
+
     private static bool TryGetUrdfJointName(MonoBehaviour component, out string jointName)
     {
         jointName = null;
-        if (component == null || component.GetType().FullName != "Unity.Robotics.UrdfImporter.UrdfJoint")
-        {
+        if (!IsUrdfJoint(component))
             return false;
-        }
 
         FieldInfo field = component.GetType().GetField("jointName", BindingFlags.Instance | BindingFlags.Public);
         if (field != null)
@@ -297,14 +371,14 @@ public class DirectArticulationIKController : MonoBehaviour
         float currentError = (targetPosition - endEffector.position).sqrMagnitude;
         float startPosition = joint.jointPosition[0];
 
-        ApplyJointPosition(joint, startPosition + deltaRadians);
+        ApplyJointPosition(joint, ClampJointPosition(joint, startPosition + deltaRadians));
         float forwardError = (targetPosition - endEffector.position).sqrMagnitude;
         if (forwardError <= currentError)
         {
             return;
         }
 
-        ApplyJointPosition(joint, startPosition - deltaRadians);
+        ApplyJointPosition(joint, ClampJointPosition(joint, startPosition - deltaRadians));
         float reverseError = (targetPosition - endEffector.position).sqrMagnitude;
         if (reverseError <= currentError)
         {
@@ -314,24 +388,45 @@ public class DirectArticulationIKController : MonoBehaviour
         ApplyJointPosition(joint, startPosition);
     }
 
+    private static float ClampJointPosition(ArticulationBody joint, float positionRadians)
+    {
+        ArticulationDrive drive = joint.xDrive;
+        return Mathf.Clamp(positionRadians, drive.lowerLimit * Mathf.Deg2Rad, drive.upperLimit * Mathf.Deg2Rad);
+    }
+
     private static void ApplyJointPosition(ArticulationBody joint, float positionRadians)
     {
-        float nextPosition = ClampJointPosition(joint, positionRadians);
-        joint.jointPosition = new ArticulationReducedSpace(nextPosition);
-        SetDriveTarget(joint, nextPosition);
+        joint.jointPosition = new ArticulationReducedSpace(positionRadians);
+        SetDriveTarget(joint, positionRadians);
         SetZeroJointVelocity(joint);
         joint.PublishTransform();
         Physics.SyncTransforms();
+    }
+
+    private void ApplyInitialPose()
+    {
+        if (initialPose != null && initialPose.Length > 0)
+        {
+            foreach (JointInitialPosition jp in initialPose)
+                ApplyNamedJointPosition(jp.name, jp.positionRadians);
+        }
+        else
+        {
+            for (int i = 0; i < DefaultInitialJointNames.Length; i++)
+                ApplyNamedJointPosition(DefaultInitialJointNames[i], DefaultInitialJointPositions[i]);
+        }
     }
 
     private void ApplyNamedJointPosition(string jointName, float positionRadians)
     {
         if (string.IsNullOrWhiteSpace(jointName) || !jointByName.TryGetValue(jointName, out ArticulationBody joint))
         {
+            if (!string.IsNullOrWhiteSpace(jointName) && warnedMissingJoints.Add(jointName))
+                Debug.LogWarning($"[IK] ApplyNamedJointPosition: joint '{jointName}' not found (known: {string.Join(", ", jointNames)})");
             return;
         }
 
-        ApplyJointPosition(joint, RosToUnityJointPosition(joint, positionRadians));
+        ApplyJointPosition(joint, positionRadians);
     }
 
     private static void SetDriveTarget(ArticulationBody joint, float positionRadians)
@@ -343,30 +438,6 @@ public class DirectArticulationIKController : MonoBehaviour
         joint.xDrive = drive;
     }
 
-    private static float RosToUnityJointPosition(ArticulationBody joint, float position)
-    {
-        // URDF revolute axes are imported onto the negative Unity articulation axis.
-        return joint.jointType == ArticulationJointType.RevoluteJoint ? -position : position;
-    }
-
-    private static float UnityToRosJointPosition(ArticulationBody joint, float position)
-    {
-        return joint.jointType == ArticulationJointType.RevoluteJoint ? -position : position;
-    }
-
-    private static float ClampJointPosition(ArticulationBody joint, float positionRadians)
-    {
-        if (joint.twistLock != ArticulationDofLock.LimitedMotion)
-        {
-            return positionRadians;
-        }
-
-        ArticulationDrive drive = joint.xDrive;
-        return Mathf.Clamp(
-            positionRadians,
-            drive.lowerLimit * Mathf.Deg2Rad,
-            drive.upperLimit * Mathf.Deg2Rad);
-    }
 
     private void ZeroJointVelocities()
     {

@@ -1,6 +1,7 @@
 [submodule "Packages/RADER"]
 	path = Packages/RADER
 	url = git@github.com:parasollab/RADER.git
+    branch = xrviz
 [submodule "Packages/ROS-TCP-Connector"]
 	path = Packages/ROS-TCP-Connector
 	url = git@github.com:parasollab/ROS-TCP-Connector.git

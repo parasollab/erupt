@@ -18,6 +18,7 @@ public class CollisionObjectPublisher : MonoBehaviour
     public bool createReadableMeshCopy = false; // Create readable copy of non-readable meshes
     public float publishRateHz = 1f;
     public bool trackLatency = false;
+    public bool pausePublishing = false;
     public GameObject worldOrigin; // Optional world origin for relative positioning
 
     private ROSConnection ros;
@@ -78,6 +79,8 @@ public class CollisionObjectPublisher : MonoBehaviour
 
     void Update()
     {
+        if (pausePublishing) return;
+
         if (Time.time - lastPublishTime < 1.0f / publishRateHz)
             return;
 
@@ -816,7 +819,7 @@ public class CollisionObjectPublisher : MonoBehaviour
         string operation = sep >= 0 ? msg.frame_id.Substring(0, sep) : "UNKNOWN";
         string objectId  = sep >= 0 ? msg.frame_id.Substring(sep + 1) : msg.frame_id;
 
-        Debug.Log($"[Latency] {operation} '{objectId}'  RTT={rttMs:F1} ms  (~{rttMs / 2:F1} ms one-way)");
+        // Debug.Log($"[Latency] {operation} '{objectId}'  RTT={rttMs:F1} ms  (~{rttMs / 2:F1} ms one-way)");
         ros.Publish("/latency_data", new StringMsg($"{operation},{objectId},{rttMs:F3}"));
     }
 

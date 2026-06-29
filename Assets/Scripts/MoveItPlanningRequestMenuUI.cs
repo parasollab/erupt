@@ -14,7 +14,7 @@ using System;
 public class MoveItPlanningRequestMenuUI : MonoBehaviour
 {
     [Header("Robot")]
-    [SerializeField] private GameObject robot;
+    [SerializeField] private DirectArticulationIKController ikController;
     [SerializeField] private string jointStateTopic = "/joint_states";
     [SerializeField] private string executeTrajectoryTopic = "/joint_trajectory_controller/joint_trajectory";
 
@@ -41,8 +41,14 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     [SerializeField] private SpawnGhosts ghostSpawner;
     [SerializeField] private TrajectoryReplay trajectoryReplayer;
 
+    [Header("Joint Name Remapping")]
+    [Tooltip("Prefix in the incoming ROS joint_states topic (e.g. 'panda_')")]
+    [SerializeField] private string rosJointNamePrefix = "panda_";
+    [Tooltip("Prefix used by the Unity robot prefab joints (e.g. 'fr3_')")]
+    [SerializeField] private string unityJointNamePrefix = "fr3_";
+
     // Robot
-    private RobotManager robotManager;
+    private DirectArticulationIKController robotController;
     
     // UI Elements
     private VisualElement root;
@@ -105,9 +111,9 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
     private void Awake()
     {
-        if (robot == null)
+        if (ikController == null)
         {
-            Debug.LogError("MoveItPlanningRequestMenuUI: Robot GameObject not assigned.");
+            Debug.LogError("MoveItPlanningRequestMenuUI: ikController not assigned — drag the Robot IK Manager's DirectArticulationIKController here.");
             return;
         }
 
@@ -130,8 +136,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
             return;
         }
 
-        // Get the robot manager
-        robotManager = robot.GetComponent<RobotManager>();
+        robotController = ikController;
 
         InitializeUIElements();
         SetupEventHandlers();
@@ -384,30 +389,55 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     {
         if (!isMirroring) return;
 
-        if (robotManager == null)
+        if (robotController == null)
         {
-            Debug.Log("MoveItPlanningRequestMenuUI: RobotManager not assigned.");
+            Debug.Log("MoveItPlanningRequestMenuUI: DirectArticulationIKController not assigned.");
             return;
         }
 
-        // Print received joint states for debugging
-        string jointStateInfo = "Received JointStateMsg:\n";
-        for (int i = 0; i < jointState.name.Length; i++)        {
-            jointStateInfo += $"  {jointState.name[i]}: {jointState.position[i] * Mathf.Rad2Deg}°\n";
-        }
-        Debug.Log(jointStateInfo);
-
-        // Read joint states and map to robot joints
-        float[] jointAngles = new float[robotManager.GetJointNames().Count];
+        var sb = new System.Text.StringBuilder("MoveItPlanningRequestMenuUI: Mirror joints —");
         for (int i = 0; i < jointState.name.Length; i++)
-        {
-            string jointName = jointState.name[i];
-            int jointIndex = jointNameToIndex[jointName];
-            jointAngles[jointIndex] = -((float)jointState.position[i] * Mathf.Rad2Deg);
-        }
+            sb.Append($"\n  {jointState.name[i]}: {(i < jointState.position.Length ? jointState.position[i] : double.NaN):F4} rad");
+        Debug.Log(sb.ToString());
 
-        // Apply mirrored joint angles back to the robot
-        robotManager.SetJointAngles(jointAngles);
+        robotController.ApplyJointState(RemapJointNames(jointState.name), jointState.position);
+
+        string[] unityNames = robotController.GetJointStateNames();
+        float[] unityPositions = robotController.GetJointStatePositions();
+        var sb2 = new System.Text.StringBuilder("MoveItPlanningRequestMenuUI: Unity joint state after apply —");
+        for (int i = 0; i < unityNames.Length; i++)
+            sb2.Append($"\n  {unityNames[i]}: {(i < unityPositions.Length ? unityPositions[i] : float.NaN):F4} rad");
+        Debug.Log(sb2.ToString());
+    }
+
+    private string[] RemapJointNames(string[] rosNames)
+    {
+        if (string.IsNullOrEmpty(rosJointNamePrefix) || rosJointNamePrefix == unityJointNamePrefix)
+            return rosNames;
+
+        string[] remapped = new string[rosNames.Length];
+        for (int i = 0; i < rosNames.Length; i++)
+        {
+            remapped[i] = rosNames[i].StartsWith(rosJointNamePrefix)
+                ? unityJointNamePrefix + rosNames[i].Substring(rosJointNamePrefix.Length)
+                : rosNames[i];
+        }
+        return remapped;
+    }
+
+    private string[] RemapJointNamesToRos(string[] unityNames)
+    {
+        if (string.IsNullOrEmpty(unityJointNamePrefix) || rosJointNamePrefix == unityJointNamePrefix)
+            return unityNames;
+
+        string[] remapped = new string[unityNames.Length];
+        for (int i = 0; i < unityNames.Length; i++)
+        {
+            remapped[i] = unityNames[i].StartsWith(unityJointNamePrefix)
+                ? rosJointNamePrefix + unityNames[i].Substring(unityJointNamePrefix.Length)
+                : unityNames[i];
+        }
+        return remapped;
     }
 
     private void ToggleMirroring()
@@ -415,6 +445,8 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         isMirroring = !isMirroring;
         mirrorButton.text = isMirroring ? "Stop Mirroring" : "Mirror Joint States";
         Debug.Log($"MoveItPlanningRequestMenuUI: Mirroring {(isMirroring ? "enabled" : "disabled")}.");
+        if (isMirroring && robotController != null)
+            robotController.LogJointDriveLimits();
     }
 
     private void OnSetStartStateClicked()
@@ -570,51 +602,21 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         return constraints.ToArray();
     }
 
-    private double[] ConvertJointAnglesWithinRange(double[] angles)
+    private RobotStateMsg GetRobotStateMsgFromController()
     {
-        // Assumes angles are in degrees, convert to radians and adjust within joint limits
-        double[] adjustedAngles = new double[angles.Length];
-        
-        for (int i = 0; i < angles.Length; i++)
-        {
-            float minLimit = jointLimits[i].Item1 * Mathf.Deg2Rad;
-            float maxLimit = jointLimits[i].Item2 * Mathf.Deg2Rad;
-            double angle = angles[i] * Mathf.Deg2Rad;
+        if (robotController == null) return new RobotStateMsg();
 
-            // Normalize angle to be within -π to π
-            angle = (angle + Math.PI) % (2 * Math.PI);
-            if (angle < 0)
-                angle += 2 * Math.PI;
-            angle -= Math.PI;
+        string[] names = RemapJointNamesToRos(robotController.GetJointStateNames());
+        float[] positionsF = robotController.GetJointStatePositions();
+        double[] positions = Array.ConvertAll(positionsF, p => (double)p);
+        double[] zeros = new double[names.Length];
 
-            // Adjust angle to be within joint limits
-            if (angle < minLimit)
-                angle += 2 * Math.PI;
-            else if (angle > maxLimit)
-                angle -= 2 * Math.PI;
+        var sb = new System.Text.StringBuilder("[MoveIt] Robot state being sent:\n");
+        for (int i = 0; i < names.Length; i++)
+            sb.AppendLine($"  {names[i]}: {positions[i]:F4} rad");
+        Debug.Log(sb.ToString());
 
-            // Final check to ensure it's within limits
-            if (angle < minLimit || angle > maxLimit)
-            {
-                Debug.LogWarning($"MoveItPlanningRequestMenuUI: Joint {i} angle {angle * Mathf.Rad2Deg}° is out of limits ({minLimit * Mathf.Rad2Deg}°, {maxLimit * Mathf.Rad2Deg}°). Clamping.");
-                angle = Math.Max(minLimit, Math.Min(maxLimit, angle));
-            }
-
-            adjustedAngles[i] = angle;
-        }
-        
-        return adjustedAngles;
-    }
-
-    private RobotStateMsg GetCurrentRobotState()
-    {
-        // This method should get the current robot state from your robot or simulation
-        // For now, we'll create a placeholder state
-        // Convert joint angles from degrees to radians
-        var jointAnglesDegrees = robotManager.GetJointAngles();
-        var jointAnglesRadians = ConvertJointAnglesWithinRange(jointAnglesDegrees.Select(x => (double)x * -1).ToArray());
-
-        var robotState = new RobotStateMsg
+        return new RobotStateMsg
         {
             joint_state = new JointStateMsg
             {
@@ -627,46 +629,18 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
                         nanosec = (uint)((Time.time - (int)Time.time) * 1e9)
                     }
                 },
-                name = jointNames,
-                position = jointAnglesRadians,
-                velocity = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 },
-                effort = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 }
+                name = names,
+                position = positions,
+                velocity = zeros,
+                effort = zeros
             },
             multi_dof_joint_state = new MultiDOFJointStateMsg()
         };
-
-        return robotState;
     }
 
-    private RobotStateMsg GetGoalRobotState()
-    {
-        // This method should get the goal robot state from user interaction or predefined poses
-        // For now, we'll create a placeholder state with different joint values
-        var jointAnglesDegrees = robotManager.GetJointAngles();
-        var jointAnglesRadians = ConvertJointAnglesWithinRange(jointAnglesDegrees.Select(x => (double)x * -1).ToArray());
+    private RobotStateMsg GetCurrentRobotState() => GetRobotStateMsgFromController();
 
-        var robotState = new RobotStateMsg
-        {
-            joint_state = new JointStateMsg
-            {
-            header = new HeaderMsg
-            {
-                frame_id = "base_link",
-                stamp = new TimeMsg { 
-                sec = (int)Time.time,
-                nanosec = (uint)((Time.time - (int)Time.time) * 1e9)
-                }
-            },
-            name = jointNames,
-            position = jointAnglesRadians,
-            velocity = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 },
-            effort = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 }
-            },
-            multi_dof_joint_state = new MultiDOFJointStateMsg()
-        };
-        
-        return robotState;
-    }
+    private RobotStateMsg GetGoalRobotState() => GetRobotStateMsgFromController();
 
     private void OnMotionPlanResponse(GetMotionPlanResponse response)
     {
@@ -701,18 +675,29 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
     private void PreviewTrajectory(JointTrajectoryMsg trajectory)
     {
-        // Use the TrajectoryReplay component to visualize the trajectory
         if (trajectoryReplayer != null)
         {
             stopReplayButton.SetEnabled(true);
             isReplaying = true;
             stopReplayButton.text = "Stop Replay";
-            trajectoryReplayer.StartReplay(trajectory);
+            // Remap joint names from ROS convention (panda_) to Unity convention (fr3_)
+            // so ApplyJointState can find joints in the dictionary.
+            trajectoryReplayer.StartReplay(BuildLocalTrajectory(trajectory));
         }
         else
         {
             Debug.Log("MoveItPlanningRequestMenuUI: No TrajectoryReplay component assigned.");
         }
+    }
+
+    private JointTrajectoryMsg BuildLocalTrajectory(JointTrajectoryMsg traj)
+    {
+        return new JointTrajectoryMsg
+        {
+            header = traj.header,
+            joint_names = RemapJointNames(traj.joint_names),
+            points = traj.points
+        };
     }
     
     private void StopPreview()

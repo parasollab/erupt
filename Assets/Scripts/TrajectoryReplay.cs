@@ -1,127 +1,83 @@
 using System.Collections;
 using UnityEngine;
-using Unity.Robotics.ROSTCPConnector;
 using RosMessageTypes.Trajectory;
 using RosMessageTypes.BuiltinInterfaces;
 
 public class TrajectoryReplay : MonoBehaviour
 {
-    // State
+    [SerializeField] private DirectArticulationIKController ikController;
+
     private bool isReplaying = false;
     private Coroutine replayRoutine;
-
-    // Prefabs & refs
-    public GameObject real_robot;
-    public GameObject robot_prefab;
-
-    private GameObject robot;
-    private RobotManager robotManager;
-
     private bool hasFinishedOneLoop = false;
 
-    // Default ghost color is cyan with 0.5 alpha
-    public Color ghostColor = new Color(0, 1, 1, 0.5f);
+    private string[] savedNames;
+    private float[] savedPositions;
 
     public bool HasFinishedOneLoop() => hasFinishedOneLoop;
 
-    // ---------- Public API ----------
-
-    // Start only if nothing is already running (extra-safe guard)
     public void StartReplay(JointTrajectoryMsg trajectory)
     {
         if (replayRoutine != null)
         {
-            Debug.LogWarning("[TrajectoryReplay] StartReplay ignored: a replay is already running.");
+            Debug.LogWarning("[TrajectoryReplay] StartReplay ignored: already running.");
             return;
         }
         replayRoutine = StartCoroutine(RunReplay(trajectory));
     }
 
-    // Force a restart with a new trajectory (stop current, wait for cleanup, then start)
     public void RestartReplay(JointTrajectoryMsg trajectory)
     {
         if (replayRoutine != null)
-        {
             StartCoroutine(RestartRoutine(trajectory));
-        }
         else
-        {
             StartReplay(trajectory);
-        }
     }
 
-    // Stop current replay and clean up
     public void StopReplay()
     {
-        if (!isReplaying && replayRoutine == null)
-            return;
-
-        isReplaying = false; // signals the running coroutine to exit
-    }
-
-    private IEnumerator RestartRoutine(JointTrajectoryMsg newTrajectory)
-    {
-        // Signal stop and wait for current routine to finish & cleanup
+        if (!isReplaying && replayRoutine == null) return;
         isReplaying = false;
-        if (replayRoutine != null)
-        {
-            yield return replayRoutine; // waits until RunReplay completes
-        }
-        // Now safe to start again
-        StartReplay(newTrajectory);
     }
 
     private void OnDisable()
     {
-        // Ensure cleanup if object is disabled/destroyed mid-replay
         isReplaying = false;
         if (replayRoutine != null)
         {
             StopCoroutine(replayRoutine);
             replayRoutine = null;
         }
-        SafeDestroyRobot();
+        RestoreSavedPose();
     }
 
-    // ---------- Core flow ----------
+    private IEnumerator RestartRoutine(JointTrajectoryMsg newTrajectory)
+    {
+        isReplaying = false;
+        if (replayRoutine != null)
+            yield return replayRoutine;
+        StartReplay(newTrajectory);
+    }
 
     private IEnumerator RunReplay(JointTrajectoryMsg trajectory)
     {
         hasFinishedOneLoop = false;
 
-        // Guard: if the prefab or real robot refs are missing, fail gracefully
-        if (robot_prefab == null || real_robot == null)
+        if (ikController == null)
         {
-            Debug.LogError("[TrajectoryReplay] Missing references (robot_prefab or real_robot).");
+            Debug.LogError("[TrajectoryReplay] ikController not assigned.");
             yield break;
         }
 
-        // Spawn ghost
-        robot = Instantiate(robot_prefab, real_robot.transform.position, real_robot.transform.rotation);
-
-        foreach (var col in robot.GetComponentsInChildren<Collider>())
-            col.gameObject.tag = "robot";
-
-        // Make the ghost translucent
-        var overlay = robot.AddComponent<TranslucentOverride>();
-        overlay.overlayColor = ghostColor;
-
-        robotManager = robot.GetComponent<RobotManager>();
-        if (robotManager == null)
-        {
-            Debug.LogError("[TrajectoryReplay] RobotManager not found on robot prefab.");
-            SafeDestroyRobot();
-            yield break;
-        }
+        savedNames = ikController.GetJointStateNames();
+        savedPositions = ikController.GetJointStatePositions();
 
         isReplaying = true;
 
         try
         {
-            // Loop the trajectory while replaying is true
             while (isReplaying)
             {
-                // If playTrajectory bails (e.g., mismatch), stop the replay
                 bool ok = true;
                 yield return StartCoroutine(PlayTrajectory(trajectory, success => ok = success));
                 if (!ok) isReplaying = false;
@@ -129,56 +85,45 @@ public class TrajectoryReplay : MonoBehaviour
         }
         finally
         {
-            // Always cleanup even on early exits/errors
-            SafeDestroyRobot();
+            RestoreSavedPose();
             replayRoutine = null;
             isReplaying = false;
         }
     }
 
-    // Return success flag via callback so we can stop the outer loop if needed
     private IEnumerator PlayTrajectory(JointTrajectoryMsg trajectory, System.Action<bool> done)
     {
         var points = trajectory.points;
         if (points == null || points.Length == 0)
         {
-            Debug.LogWarning("[TrajectoryReplay] Empty trajectory points.");
+            Debug.LogWarning("[TrajectoryReplay] Empty trajectory.");
             done?.Invoke(false);
             yield break;
         }
 
-        // Init
+        string[] names = trajectory.joint_names;
+
+        ikController.ApplyJointState(names, points[0].positions);
+
         double prevTime = DurationToSeconds(points[0].time_from_start);
-        double[] prevPos = new double[points[0].positions.Length];
-        for (int i = 0; i < prevPos.Length; i++)
-            prevPos[i] = -1 * (points[0].positions[i] * Mathf.Rad2Deg);
+        double[] prevPos = points[0].positions;
 
-        // Snap ghost to trajectory start so knob values are in a clean state before lerping
-        for (int j = 0; j < prevPos.Length; j++)
-            robotManager.SnapJointAngle(j, (float)prevPos[j]);
-
-        // Step through points
         for (int i = 1; i < points.Length && isReplaying; i++)
         {
-            double[] positions = points[i].positions;
-            if (positions == null || positions.Length != robotManager.GetJointNames().Count)
+            double[] targetPos = points[i].positions;
+            if (targetPos == null || targetPos.Length != names.Length)
             {
-                Debug.LogError("[TrajectoryReplay] Positions length mismatch with joint count.");
+                Debug.LogError("[TrajectoryReplay] Positions length mismatch.");
                 done?.Invoke(false);
                 yield break;
             }
 
-            double[] modifiedPositions = new double[positions.Length];
-            for (int j = 0; j < positions.Length; j++)
-                modifiedPositions[j] = -1 * (positions[j] * Mathf.Rad2Deg);
-
             double currTime = DurationToSeconds(points[i].time_from_start);
-            double movingTime = currTime - prevTime;
-            if (movingTime < 0) movingTime = 0;
+            float duration = Mathf.Max(0.000001f, (float)(currTime - prevTime));
 
-            yield return MoveKnobsOverTime(prevPos, modifiedPositions, movingTime);
+            yield return LerpJointsOverTime(names, prevPos, targetPos, duration);
 
-            prevPos = modifiedPositions;
+            prevPos = targetPos;
             prevTime = currTime;
         }
 
@@ -186,45 +131,35 @@ public class TrajectoryReplay : MonoBehaviour
         done?.Invoke(true);
     }
 
-    private IEnumerator MoveKnobsOverTime(double[] startPositions, double[] endPositions, double duration)
+    private IEnumerator LerpJointsOverTime(string[] names, double[] from, double[] to, float duration)
     {
-        float elapsedTime = 0f;
-        float dur = Mathf.Max(0.000001f, (float)duration);
+        float elapsed = 0f;
+        double[] lerped = new double[names.Length];
 
-        int jointCount = robotManager.GetJointNames().Count;
-
-        while (elapsedTime < dur && isReplaying)
+        while (elapsed < duration && isReplaying)
         {
-            elapsedTime += Time.deltaTime;
-            float t = Mathf.Clamp01(elapsedTime / dur);
-
-            for (int j = 0; j < jointCount; j++)
-            {
-                float newPos = Mathf.Lerp((float)startPositions[j], (float)endPositions[j], t);
-                robotManager.SetJointAngle(j, newPos);
-            }
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            for (int j = 0; j < names.Length; j++)
+                lerped[j] = from[j] + (to[j] - from[j]) * t;
+            ikController.ApplyJointState(names, lerped);
             yield return null;
         }
 
-        // Snap to exact end on completion (only if still replaying)
         if (isReplaying)
-        {
-            for (int j = 0; j < jointCount; j++)
-                robotManager.SetJointAngle(j, (float)endPositions[j]);
-        }
+            ikController.ApplyJointState(names, to);
     }
 
-    private double DurationToSeconds(DurationMsg duration)
+    private void RestoreSavedPose()
+    {
+        if (savedNames != null && savedPositions != null && ikController != null)
+            ikController.ApplyJointState(savedNames, savedPositions);
+        savedNames = null;
+        savedPositions = null;
+    }
+
+    private static double DurationToSeconds(DurationMsg duration)
     {
         return duration.sec + (duration.nanosec * 1e-9);
-    }
-
-    private void SafeDestroyRobot()
-    {
-        if (robot != null)
-        {
-            Destroy(robot);
-            robot = null;
-        }
     }
 }
