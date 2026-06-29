@@ -39,16 +39,28 @@ public class CollisionObjectPublisher : MonoBehaviour
             return;
         }
 
-        // Register publisher with error handling
+        // Register collision object publisher
         try
         {
             ros.RegisterPublisher<CollisionObjectMsg>("/collision_object");
-            Debug.Log($"Successfully registered publisher for object '{gameObject.name}' on topic '/collision_object'");
+            Debug.Log($"[{gameObject.name}] Registered /collision_object publisher");
         }
         catch (System.Exception e)
         {
-            Debug.LogError($"Failed to register publisher for object '{gameObject.name}': {e.Message}");
+            Debug.LogError($"[{gameObject.name}] Failed to register /collision_object publisher: {e.Message}");
             return;
+        }
+
+        // Register latency round-trip publisher and subscriber
+        try
+        {
+            ros.RegisterPublisher<StringMsg>("/latency_data");
+            ros.Subscribe<HeaderMsg>("/collision_object_pong", OnLatencyPong);
+            Debug.Log($"[{gameObject.name}] Registered /latency_data publisher and /collision_object_pong subscriber");
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError($"[{gameObject.name}] Failed to register latency topics: {e.Message}");
         }
         
         // Initialize tracking variables
@@ -62,21 +74,25 @@ public class CollisionObjectPublisher : MonoBehaviour
 
     void Update()
     {
-        // Check if enough time has passed since last publish
-        // if (Time.time - lastPublishTime >= 1.0f / publishRateHz)
-        // {
-            // Check if this is the first publish or if transform has changed
-            bool shouldPublish = !hasBeenPublished || HasTransformChanged();
-            
-            if (shouldPublish)
-            {
-                Debug.Log($"Publishing collision object for '{gameObject.name}'");
-                PublishCollisionObject();
-                UpdateLastTransform();
-                hasBeenPublished = true;
-                lastPublishTime = Time.time;
-            }
-        // }
+        if (Time.time - lastPublishTime < 1.0f / publishRateHz)
+            return;
+
+        bool shouldPublish = !hasBeenPublished || HasTransformChanged();
+        if (shouldPublish)
+        {
+            Debug.Log($"Publishing collision object '{objectId}' (pos={transform.position}, rot={transform.rotation.eulerAngles}, scale={transform.localScale})");
+
+            PublishCollisionObject();
+            UpdateLastTransform();
+            hasBeenPublished = true;
+            lastPublishTime = Time.time;
+        }
+    }
+
+    public void ForceRepublish()
+    {
+        hasBeenPublished = false;
+        lastPublishTime = 0f;
     }
 
     // Method to check if publisher is properly registered
@@ -174,7 +190,7 @@ public class CollisionObjectPublisher : MonoBehaviour
             header = new HeaderMsg
             {
                 frame_id = frameId,
-                stamp = new TimeMsg() // Stamp left blank by default
+                stamp = GetRosTimestamp()
             },
             operation = CollisionObjectMsg.ADD, // Use REMOVE or MOVE if needed
             pose = new PoseMsg
@@ -232,24 +248,17 @@ public class CollisionObjectPublisher : MonoBehaviour
             }
         }
 
-        // Publish with error handling
+        Debug.Log($"[Latency] Publishing '{objectId}' op={msg.operation} stamp.sec={msg.header.stamp.sec} stamp.nanosec={msg.header.stamp.nanosec}");
         try
         {
             if (isMesh)
-            {
                 ros.Publish(topicName, msg, false);
-            }
             else
-            {
                 ros.Publish(topicName, msg);
-            }
-            Debug.Log($"Successfully published collision object '{objectId}' to topic '{topicName}'");
-            // Log the message
-            Debug.Log($"Message: {msg}");
         }
         catch (System.Exception e)
         {
-            Debug.LogError($"Failed to publish collision object '{objectId}' to topic '{topicName}': {e.Message}");
+            Debug.LogError($"Failed to publish collision object '{objectId}': {e.Message}");
         }
     }
 
@@ -356,7 +365,7 @@ public class CollisionObjectPublisher : MonoBehaviour
                 header = new HeaderMsg
                 {
                     frame_id = frameId,
-                    stamp = new TimeMsg() // Stamp left blank by default
+                    stamp = GetRosTimestamp()
                 },
                 operation = CollisionObjectMsg.REMOVE
             };
@@ -430,14 +439,6 @@ public class CollisionObjectPublisher : MonoBehaviour
                     (uint)triangles[baseIndex + 2]
                 }
             };
-        }
-
-        Debug.Log($"ROS Mesh: {rosVertices.Length} vertices, {rosTriangles.Length} triangles");
-
-        // Log the individual triangles
-        foreach (var triangle in rosTriangles)
-        {
-            Debug.Log($"Triangle: {string.Join(", ", triangle.vertex_indices)}");
         }
 
         return new MeshMsg
@@ -789,6 +790,38 @@ public class CollisionObjectPublisher : MonoBehaviour
         }
         
         Debug.Log($"=== End Analysis ===");
+    }
+
+    private void OnLatencyPong(HeaderMsg msg)
+    {
+        Debug.Log($"[Latency] Pong received: frame_id='{msg.frame_id}' stamp.sec={msg.stamp.sec} stamp.nanosec={msg.stamp.nanosec}");
+        if (msg.stamp.sec == 0 && msg.stamp.nanosec == 0)
+        {
+            Debug.LogWarning("[Latency] Pong stamp is zero — ROS node sent a blank timestamp");
+            return;
+        }
+        long sentTicks = (long)msg.stamp.sec * TimeSpan.TicksPerSecond
+                       + (long)msg.stamp.nanosec / 100L;
+        var sentTime = new DateTimeOffset(DateTimeOffset.UnixEpoch.Ticks + sentTicks, TimeSpan.Zero);
+        double rttMs = (DateTimeOffset.UtcNow - sentTime).TotalMilliseconds;
+
+        // frame_id is encoded as "OPERATION:object_id"
+        int sep = msg.frame_id.IndexOf(':');
+        string operation = sep >= 0 ? msg.frame_id.Substring(0, sep) : "UNKNOWN";
+        string objectId  = sep >= 0 ? msg.frame_id.Substring(sep + 1) : msg.frame_id;
+
+        Debug.Log($"[Latency] {operation} '{objectId}'  RTT={rttMs:F1} ms  (~{rttMs / 2:F1} ms one-way)");
+        ros.Publish("/latency_data", new StringMsg($"{operation},{objectId},{rttMs:F3}"));
+    }
+
+    private TimeMsg GetRosTimestamp()
+    {
+        long ticks = DateTimeOffset.UtcNow.UtcTicks - DateTimeOffset.UnixEpoch.UtcTicks;
+        return new TimeMsg
+        {
+            sec = (int)(ticks / TimeSpan.TicksPerSecond),
+            nanosec = (uint)((ticks % TimeSpan.TicksPerSecond) * 100L) // 1 tick = 100 ns
+        };
     }
 
     bool IsKnownUnityPrimitive(string meshName)

@@ -780,6 +780,11 @@ PrefabInstance:
       insertIndex: -1
       addedObject: {fileID: 1246145205}
   m_SourcePrefab: {fileID: 100100000, guid: 66fd8be8963c9574394184186cb1988a, type: 3}
+--- !u!4 &289836673 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 4194107546450248929, guid: 75a7667bb6680412091ea4ee29978066, type: 3}
+  m_PrefabInstance: {fileID: 1235889347}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &399190895
 GameObject:
   m_ObjectHideFlags: 0
@@ -2319,6 +2324,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 6218579206858659184, guid: 75a7667bb6680412091ea4ee29978066, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1235889350}
+    - targetCorrespondingSourceObject: {fileID: 6218579206858659184, guid: 75a7667bb6680412091ea4ee29978066, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1235889351}
   m_SourcePrefab: {fileID: 100100000, guid: 75a7667bb6680412091ea4ee29978066, type: 3}
 --- !u!1 &1235889348 stripped
 GameObject:
@@ -2342,6 +2350,29 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6f3f79abf2f0a4f8fa1fedbc4c4161e3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: RADER::UR5eAnalyticalIK
+--- !u!114 &1235889351
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1235889348}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8d02fcfc20ae90448b306693faa081ce, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: RADER::CollisionHaptics
+  maxIntensity: 1
+  minDistance: 0.3
+  leftHapticAction: {fileID: 0}
+  rightHapticAction: {fileID: 0}
+  tipLink: {fileID: 0}
+  excludeTransforms: []
+  robotRoot: {fileID: 0}
+  obstacleLayerMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  debugMode: 0
 --- !u!1 &1246145200 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 5497254662541490085, guid: 66fd8be8963c9574394184186cb1988a, type: 3}
@@ -3169,6 +3200,44 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: xrviz::ResetKitchenScene
   _resetAction: {fileID: 3560553268391670994, guid: c348712bda248c246b8c49b3db54643f, type: 3}
+--- !u!114 &1496867189
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1496867181}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e1bdbfff9e7174140b4aae0bac58c085, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: xrviz::FPSPublisher
+  topic: /fps
+  _togglePublishAction: {fileID: -6173015383206609024, guid: c348712bda248c246b8c49b3db54643f, type: 3}
+--- !u!114 &1496867190
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1496867181}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8d02fcfc20ae90448b306693faa081ce, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: RADER::CollisionHaptics
+  maxIntensity: 1
+  minDistance: 0.3
+  leftHapticAction: {fileID: -8785819595477538065, guid: c348712bda248c246b8c49b3db54643f, type: 3}
+  rightHapticAction: {fileID: -8222252007134549311, guid: c348712bda248c246b8c49b3db54643f, type: 3}
+  tipLink: {fileID: 289836673}
+  excludeTransforms:
+  - {fileID: 1932406498}
+  robotRoot: {fileID: 1235889349}
+  obstacleLayerMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  debugMode: 1
 --- !u!114 &1549528033
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3557,7 +3626,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1000011928778752, guid: bac85bcbcdc58924f840d203376147c2, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 224000010550048884, guid: bac85bcbcdc58924f840d203376147c2, type: 3}
       propertyPath: m_Pivot.x
@@ -3986,6 +4055,11 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 6876262152510213598, guid: d2f2c99c1ab6b4048b5ca004d72b72ae, type: 3}
   m_PrefabInstance: {fileID: 1932406491}
   m_PrefabAsset: {fileID: 0}
+--- !u!4 &1932406498 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 7720671098241089738, guid: d2f2c99c1ab6b4048b5ca004d72b72ae, type: 3}
+  m_PrefabInstance: {fileID: 1932406491}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1936320620
 GameObject:
   m_ObjectHideFlags: 0
@@ -4192,6 +4266,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2102471247}
   - component: {fileID: 2102471246}
+  - component: {fileID: 2102471248}
   m_Layer: 0
   m_Name: OVRManager
   m_TagString: Untagged
@@ -4213,6 +4288,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Oculus.VR::OVRManager
   _monoscopic: 0
   _sharpenType: 0
+  _disableRecording: 0
   _enableDynamicResolution: 0
   minDynamicResolutionScale: 1
   maxDynamicResolutionScale: 1
@@ -4284,6 +4360,10 @@ MonoBehaviour:
   SimultaneousHandsAndControllersEnabled: 0
   _readOnlyWideMotionModeHandPosesEnabled: 0
   wideMotionModeHandPosesEnabled: 0
+  _readOnlyFastMotionModeHandPosesEnabled: 0
+  fastMotionModeHandPosesEnabled: 0
+  _readOnlyWideMotionMode2HandPosesEnabled: 0
+  wideMotionMode2HandPosesEnabled: 0
   dynamicResolutionVersion: 1
 --- !u!4 &2102471247
 Transform:
@@ -4300,6 +4380,19 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2102471248
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2102471245}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d465e28822e364b7c94cc36f3d38ffb0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: xrviz::FPSSetter
+  targetFPS: 120
 --- !u!23 &757586001748683128
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -4446,6 +4539,12 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 533696785845029135, guid: 48516d5ede86a4731b56a6e555864e5b, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1496867188}
+    - targetCorrespondingSourceObject: {fileID: 533696785845029135, guid: 48516d5ede86a4731b56a6e555864e5b, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1496867189}
+    - targetCorrespondingSourceObject: {fileID: 533696785845029135, guid: 48516d5ede86a4731b56a6e555864e5b, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1496867190}
     - targetCorrespondingSourceObject: {fileID: 1375403636790619792, guid: 48516d5ede86a4731b56a6e555864e5b, type: 3}
       insertIndex: -1
       addedObject: {fileID: 0}
