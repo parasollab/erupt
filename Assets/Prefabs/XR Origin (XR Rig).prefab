@@ -3302,6 +3302,8 @@ MonoBehaviour:
   selectionManager: {fileID: 0}
   collisionObjectsListener: {fileID: 0}
   worldOrigin: {fileID: 0}
+  pickPlaceRecorder: {fileID: 0}
+  mtcDashboardPanel: {fileID: 0}
 --- !u!114 &4517080356610878557 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 1961351108226525195, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}

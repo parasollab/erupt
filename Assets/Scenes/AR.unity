@@ -2652,9 +2652,6 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 3927579247218649798, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
       insertIndex: -1
       addedObject: {fileID: 277060373}
-    - targetCorrespondingSourceObject: {fileID: 3927579247218649798, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 0}
   m_SourcePrefab: {fileID: 100100000, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
 --- !u!114 &277060370 stripped
 MonoBehaviour:
@@ -2695,7 +2692,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 05c065f740c1f4c94b68815678f02569, type: 3}
   m_Name: 
   m_EditorClassIdentifier: xrviz::MoveItPlanningRequestMenuUI
-  robot: {fileID: 1981893040}
+  ikController: {fileID: 0}
   jointStateTopic: /joint_states
   executeTrajectoryTopic: /scaled_joint_trajectory_controller/joint_trajectory
   uiDocument: {fileID: 277060372}
@@ -2711,6 +2708,8 @@ MonoBehaviour:
   plannerQueryServiceName: /query_planner_interface
   ghostSpawner: {fileID: 2049209135}
   trajectoryReplayer: {fileID: 2049209137}
+  rosJointNamePrefix: panda_
+  unityJointNamePrefix: fr3_
   PlannerResults: []
 --- !u!1 &277324831
 GameObject:
@@ -12240,6 +12239,8 @@ MonoBehaviour:
   selectionManager: {fileID: 1578009742}
   collisionObjectsListener: {fileID: 909369343}
   worldOrigin: {fileID: 737031959}
+  pickPlaceRecorder: {fileID: 0}
+  mtcDashboardPanel: {fileID: 0}
 --- !u!1001 &1372353813
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -13185,9 +13186,6 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 3927579247218649798, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1481755732}
-    - targetCorrespondingSourceObject: {fileID: 3927579247218649798, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 0}
   m_SourcePrefab: {fileID: 100100000, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
 --- !u!4 &1481755726 stripped
 Transform:
@@ -13255,6 +13253,8 @@ MonoBehaviour:
   selectionManager: {fileID: 1578009742}
   collisionObjectsListener: {fileID: 909369343}
   worldOrigin: {fileID: 737031959}
+  pickPlaceRecorder: {fileID: 0}
+  mtcDashboardPanel: {fileID: 0}
 --- !u!1 &1485449318
 GameObject:
   m_ObjectHideFlags: 0
@@ -19623,9 +19623,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: def60ca2db7f14a38a20ba986fcb8496, type: 3}
   m_Name: 
   m_EditorClassIdentifier: xrviz::TrajectoryReplay
-  real_robot: {fileID: 1981893040}
-  robot_prefab: {fileID: 6218579206858659184, guid: 75a7667bb6680412091ea4ee29978066, type: 3}
-  ghostColor: {r: 0, g: 1, b: 1, a: 0.5}
+  ikController: {fileID: 0}
 --- !u!1 &2060692696
 GameObject:
   m_ObjectHideFlags: 0
