@@ -7481,9 +7481,6 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 3927579247218649798, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
       insertIndex: -1
       addedObject: {fileID: 889964026}
-    - targetCorrespondingSourceObject: {fileID: 3927579247218649798, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 0}
   m_SourcePrefab: {fileID: 100100000, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
 --- !u!4 &889964020 stripped
 Transform:
@@ -7551,6 +7548,8 @@ MonoBehaviour:
   selectionManager: {fileID: 0}
   collisionObjectsListener: {fileID: 0}
   worldOrigin: {fileID: 0}
+  pickPlaceRecorder: {fileID: 0}
+  mtcDashboardPanel: {fileID: 0}
 --- !u!1 &896880004
 GameObject:
   m_ObjectHideFlags: 0
