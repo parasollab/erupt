@@ -29,6 +29,9 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
     private ROSConnection ros;
     public Dictionary<string, GameObject> objectsById = new();
 
+    // IDs owned by CollisionObjectPublisher components already in the scene — never spawn duplicates for these
+    private readonly HashSet<string> _publisherOwnedIds = new();
+
     // MoveIt op codes (per message spec)
     const byte OP_ADD = 0;
     const byte OP_REMOVE = 1;
@@ -38,6 +41,11 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
     void Start()
     {
         ros = ROSConnection.GetOrCreateInstance();
+
+        foreach (var pub in FindObjectsByType<CollisionObjectPublisher>(FindObjectsSortMode.None))
+            if (!string.IsNullOrEmpty(pub.objectId))
+                _publisherOwnedIds.Add(pub.objectId);
+
         ros.Subscribe<CollisionObjectMsg>(topic, OnCollisionObject);
     }
 
@@ -46,6 +54,12 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
         if (string.IsNullOrEmpty(co.id))
         {
             Debug.LogWarning("[CO Listener] Empty id; ignoring.");
+            return;
+        }
+
+        if (_publisherOwnedIds.Contains(co.id))
+        {
+            Debug.Log($"[CO Listener] Skipping '{co.id}' — already managed by CollisionObjectPublisher.");
             return;
         }
 
