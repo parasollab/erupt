@@ -8523,9 +8523,6 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 3927579247218649798, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1473340609}
-    - targetCorrespondingSourceObject: {fileID: 3927579247218649798, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 0}
   m_SourcePrefab: {fileID: 100100000, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
 --- !u!1 &1473340604 stripped
 GameObject:
@@ -8588,6 +8585,8 @@ MonoBehaviour:
   selectionManager: {fileID: 647391639}
   collisionObjectsListener: {fileID: 0}
   worldOrigin: {fileID: 0}
+  pickPlaceRecorder: {fileID: 0}
+  mtcDashboardPanel: {fileID: 0}
 --- !u!1 &1485003921
 GameObject:
   m_ObjectHideFlags: 0
@@ -11467,9 +11466,6 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 3927579247218649798, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
       insertIndex: -1
       addedObject: {fileID: 2028685347}
-    - targetCorrespondingSourceObject: {fileID: 3927579247218649798, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 0}
   m_SourcePrefab: {fileID: 100100000, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
 --- !u!114 &2028685344 stripped
 MonoBehaviour:
@@ -11510,7 +11506,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 05c065f740c1f4c94b68815678f02569, type: 3}
   m_Name: 
   m_EditorClassIdentifier: xrviz::MoveItPlanningRequestMenuUI
-  robot: {fileID: 0}
+  ikController: {fileID: 0}
   jointStateTopic: /joint_states
   executeTrajectoryTopic: /joint_trajectory_controller/joint_trajectory
   uiDocument: {fileID: 2028685346}
@@ -11526,6 +11522,8 @@ MonoBehaviour:
   plannerQueryServiceName: /query_planner_interface
   ghostSpawner: {fileID: 0}
   trajectoryReplayer: {fileID: 0}
+  rosJointNamePrefix: panda_
+  unityJointNamePrefix: fr3_
   PlannerResults: []
 --- !u!1001 &2032463793
 PrefabInstance:
