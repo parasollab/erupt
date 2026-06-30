@@ -17,6 +17,7 @@ public class CollisionObjectPublisher : MonoBehaviour
     public bool autoDetectMeshType = false; // New field for automatic detection
     public bool createReadableMeshCopy = false; // Create readable copy of non-readable meshes
     public float publishRateHz = 1f;
+    public bool trackLatency = false;
     public bool pausePublishing = false;
     public GameObject worldOrigin; // Optional world origin for relative positioning
 
@@ -52,16 +53,19 @@ public class CollisionObjectPublisher : MonoBehaviour
             return;
         }
 
-        // Register latency round-trip publisher and subscriber
-        try
+        if (trackLatency)
         {
-            ros.RegisterPublisher<StringMsg>("/latency_data");
-            ros.Subscribe<HeaderMsg>("/collision_object_pong", OnLatencyPong);
-            Debug.Log($"[{gameObject.name}] Registered /latency_data publisher and /collision_object_pong subscriber");
-        }
-        catch (System.Exception e)
-        {
-            Debug.LogError($"[{gameObject.name}] Failed to register latency topics: {e.Message}");
+            // Register latency round-trip publisher and subscriber
+            try
+            {
+                ros.RegisterPublisher<StringMsg>("/latency_data");
+                ros.Subscribe<HeaderMsg>("/collision_object_pong", OnLatencyPong);
+                Debug.Log($"[{gameObject.name}] Registered /latency_data publisher and /collision_object_pong subscriber");
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError($"[{gameObject.name}] Failed to register latency topics: {e.Message}");
+            }
         }
         
         // Initialize tracking variables
@@ -251,7 +255,8 @@ public class CollisionObjectPublisher : MonoBehaviour
             }
         }
 
-        Debug.Log($"[Latency] Publishing '{objectId}' op={msg.operation} stamp.sec={msg.header.stamp.sec} stamp.nanosec={msg.header.stamp.nanosec}");
+        if (trackLatency)
+            Debug.Log($"[Latency] Publishing '{objectId}' op={msg.operation} stamp.sec={msg.header.stamp.sec} stamp.nanosec={msg.header.stamp.nanosec}");
         try
         {
             if (isMesh)
@@ -797,7 +802,8 @@ public class CollisionObjectPublisher : MonoBehaviour
 
     private void OnLatencyPong(HeaderMsg msg)
     {
-        // Debug.Log($"[Latency] Pong received: frame_id='{msg.frame_id}' stamp.sec={msg.stamp.sec} stamp.nanosec={msg.stamp.nanosec}");
+        if (!trackLatency) return;
+        Debug.Log($"[Latency] Pong received: frame_id='{msg.frame_id}' stamp.sec={msg.stamp.sec} stamp.nanosec={msg.stamp.nanosec}");
         if (msg.stamp.sec == 0 && msg.stamp.nanosec == 0)
         {
             Debug.LogWarning("[Latency] Pong stamp is zero — ROS node sent a blank timestamp");
