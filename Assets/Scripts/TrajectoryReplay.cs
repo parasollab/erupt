@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using RosMessageTypes.Trajectory;
 using RosMessageTypes.BuiltinInterfaces;
@@ -6,15 +7,23 @@ using RosMessageTypes.BuiltinInterfaces;
 public class TrajectoryReplay : MonoBehaviour
 {
     [SerializeField] private DirectArticulationIKController ikController;
+    [SerializeField] private SpawnGhosts ghostSpawner;
+    [SerializeField] private Color replayGhostColor = new Color(0f, 0.5f, 1f, 0.5f);
 
     private bool isReplaying = false;
     private Coroutine replayRoutine;
     private bool hasFinishedOneLoop = false;
 
-    private string[] savedNames;
-    private float[] savedPositions;
+    private GameObject replayGhost;
+    private Dictionary<string, ArticulationBody> ghostJointsByRosName;
 
     public bool HasFinishedOneLoop() => hasFinishedOneLoop;
+
+    private void Awake()
+    {
+        if (ghostSpawner == null)
+            ghostSpawner = GetComponent<SpawnGhosts>();
+    }
 
     public void StartReplay(JointTrajectoryMsg trajectory)
     {
@@ -48,7 +57,7 @@ public class TrajectoryReplay : MonoBehaviour
             StopCoroutine(replayRoutine);
             replayRoutine = null;
         }
-        RestoreSavedPose();
+        DestroyReplayGhost();
     }
 
     private IEnumerator RestartRoutine(JointTrajectoryMsg newTrajectory)
@@ -63,14 +72,18 @@ public class TrajectoryReplay : MonoBehaviour
     {
         hasFinishedOneLoop = false;
 
-        if (ikController == null)
+        if (ikController == null || ghostSpawner == null)
         {
-            Debug.LogError("[TrajectoryReplay] ikController not assigned.");
+            Debug.LogError("[TrajectoryReplay] ikController or ghostSpawner not assigned.");
+            replayRoutine = null;
             yield break;
         }
 
-        savedNames = ikController.GetJointStateNames();
-        savedPositions = ikController.GetJointStatePositions();
+        if (!SpawnReplayGhost())
+        {
+            replayRoutine = null;
+            yield break;
+        }
 
         isReplaying = true;
 
@@ -85,10 +98,47 @@ public class TrajectoryReplay : MonoBehaviour
         }
         finally
         {
-            RestoreSavedPose();
+            DestroyReplayGhost();
             replayRoutine = null;
             isReplaying = false;
         }
+    }
+
+    // Spawns a translucent ghost robot and maps each ROS joint name (from the real robot's
+    // DirectArticulationIKController) to the ghost's matching ArticulationBody, so replay can
+    // drive the ghost directly and leave the real robot free for the user to grab and replan.
+    private bool SpawnReplayGhost()
+    {
+        replayGhost = ghostSpawner.SpawnGhost("ReplayGhost", replayGhostColor);
+        if (replayGhost == null)
+        {
+            Debug.LogError("[TrajectoryReplay] Failed to spawn replay ghost.");
+            return false;
+        }
+
+        var ghostArticulationsByGameObjectName = new Dictionary<string, ArticulationBody>();
+        foreach (ArticulationBody ab in replayGhost.GetComponentsInChildren<ArticulationBody>(true))
+            ghostArticulationsByGameObjectName[ab.name] = ab;
+
+        IReadOnlyList<string> rosNames = ikController.JointNames;
+        IReadOnlyList<ArticulationBody> realJoints = ikController.Joints;
+
+        ghostJointsByRosName = new Dictionary<string, ArticulationBody>();
+        for (int i = 0; i < rosNames.Count && i < realJoints.Count; i++)
+        {
+            if (ghostArticulationsByGameObjectName.TryGetValue(realJoints[i].name, out ArticulationBody ghostJoint))
+                ghostJointsByRosName[rosNames[i]] = ghostJoint;
+        }
+
+        return true;
+    }
+
+    private void DestroyReplayGhost()
+    {
+        if (replayGhost != null)
+            Destroy(replayGhost);
+        replayGhost = null;
+        ghostJointsByRosName = null;
     }
 
     private IEnumerator PlayTrajectory(JointTrajectoryMsg trajectory, System.Action<bool> done)
@@ -103,7 +153,7 @@ public class TrajectoryReplay : MonoBehaviour
 
         string[] names = trajectory.joint_names;
 
-        ikController.ApplyJointState(names, points[0].positions);
+        ApplyGhostJointState(names, points[0].positions);
 
         double prevTime = DurationToSeconds(points[0].time_from_start);
         double[] prevPos = points[0].positions;
@@ -142,20 +192,38 @@ public class TrajectoryReplay : MonoBehaviour
             float t = Mathf.Clamp01(elapsed / duration);
             for (int j = 0; j < names.Length; j++)
                 lerped[j] = from[j] + (to[j] - from[j]) * t;
-            ikController.ApplyJointState(names, lerped);
+            ApplyGhostJointState(names, lerped);
             yield return null;
         }
 
         if (isReplaying)
-            ikController.ApplyJointState(names, to);
+            ApplyGhostJointState(names, to);
     }
 
-    private void RestoreSavedPose()
+    // Mirrors SpawnGhosts.CopyPoseToGhost: drives the ghost's ArticulationBody joints directly,
+    // bypassing DirectArticulationIKController entirely so the real robot is never touched.
+    private void ApplyGhostJointState(string[] names, double[] positions)
     {
-        if (savedNames != null && savedPositions != null && ikController != null)
-            ikController.ApplyJointState(savedNames, savedPositions);
-        savedNames = null;
-        savedPositions = null;
+        if (ghostJointsByRosName == null) return;
+
+        for (int i = 0; i < names.Length; i++)
+        {
+            if (!ghostJointsByRosName.TryGetValue(names[i], out ArticulationBody joint))
+                continue;
+
+            float positionRadians = (float)positions[i];
+            joint.jointPosition = new ArticulationReducedSpace(positionRadians);
+
+            ArticulationDrive drive = joint.xDrive;
+            drive.target = joint.jointType == ArticulationJointType.RevoluteJoint
+                ? positionRadians * Mathf.Rad2Deg
+                : positionRadians;
+            joint.xDrive = drive;
+
+            joint.PublishTransform();
+        }
+
+        Physics.SyncTransforms();
     }
 
     private static double DurationToSeconds(DurationMsg duration)

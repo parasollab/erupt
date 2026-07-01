@@ -57,7 +57,7 @@ public class SpawnGhosts : MonoBehaviour
         ClearGoalGhost();
     }
 
-    private GameObject SpawnGhost(string ghostName, Color color)
+    public GameObject SpawnGhost(string ghostName, Color color)
     {
         // Instantiate under an inactive parent so Awake is deferred until after cleanup.
         var deferParent = new GameObject();

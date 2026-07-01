@@ -7239,6 +7239,53 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 172587232}
   m_Mesh: {fileID: -1808805935697600475, guid: c4ba858ad4f94a1468a631110d7e09fd, type: 3}
+--- !u!1 &172883410
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 172883412}
+  - component: {fileID: 172883411}
+  m_Layer: 0
+  m_Name: TrajBaker
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &172883411
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 172883410}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 785327df4fe594e159ee40c407b37956, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: xrviz::TrajectoryAutoPlayer
+  trajectoryReplayer: {fileID: 0}
+  trajectoryData: {fileID: 0}
+  startDelay: 0
+--- !u!4 &172883412
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 172883410}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0.02036, y: 1.73944, z: 0.7746}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &173523686
 GameObject:
   m_ObjectHideFlags: 0
@@ -56224,14 +56271,17 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 3218536283543100608, guid: 5a898bca8115f465ba729909cf9fa37f, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1280718202}
   m_SourcePrefab: {fileID: 100100000, guid: 5a898bca8115f465ba729909cf9fa37f, type: 3}
 --- !u!114 &1236116080 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 8298115101934582173, guid: 5a898bca8115f465ba729909cf9fa37f, type: 3}
   m_PrefabInstance: {fileID: 1236116079}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
+  m_GameObject: {fileID: 1280718200}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9b3fd1034358f4465bdc4ef621b4e976, type: 3}
@@ -56242,7 +56292,7 @@ MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 3018039000156688218, guid: 5a898bca8115f465ba729909cf9fa37f, type: 3}
   m_PrefabInstance: {fileID: 1236116079}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
+  m_GameObject: {fileID: 1280718200}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0268aa6865a994eac99e17415866547d, type: 3}
@@ -58540,6 +58590,29 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1278891415}
   m_Mesh: {fileID: -116342006936820736, guid: c4ba858ad4f94a1468a631110d7e09fd, type: 3}
+--- !u!1 &1280718200 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 3218536283543100608, guid: 5a898bca8115f465ba729909cf9fa37f, type: 3}
+  m_PrefabInstance: {fileID: 1236116079}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1280718202
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1280718200}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8a92f76e68b2f4499a56096f473abf0b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: xrviz::MouseRobotRayInteractor
+  robotInteraction: {fileID: 1236116080}
+  rayCamera: {fileID: 0}
+  rayLength: 6
+  raycastLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
 --- !u!1 &1281709734
 GameObject:
   m_ObjectHideFlags: 0
@@ -99251,3 +99324,4 @@ SceneRoots:
   - {fileID: 667596940}
   - {fileID: 1094739768}
   - {fileID: 599398977}
+  - {fileID: 172883412}

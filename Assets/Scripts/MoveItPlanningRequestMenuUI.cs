@@ -78,7 +78,8 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     private bool hasStartState = false;
     private bool hasGoalState = false;
     private JointTrajectoryMsg lastPlannedTrajectory;
-    
+    public JointTrajectoryMsg LastPlannedTrajectory => lastPlannedTrajectory;
+
     // Planner querying
     private bool isQueryingPlanners = false;
     private Dictionary<string, string[]> pipelineToPlanners = new Dictionary<string, string[]>();

@@ -13,7 +13,7 @@ public class Quest3RobotInteractionController : MonoBehaviour
     private ArticulationBody selectedJoint;
     private Renderer[] selectedRenderers;
     private Color[] originalColors;
-    private Quest3ControllerRayInteractor activeDragInteractor;
+    private object activeDragInteractor;
     private float dragDistance;
     private Vector3 dragOffset;
 
@@ -64,7 +64,7 @@ public class Quest3RobotInteractionController : MonoBehaviour
         }
     }
 
-    public bool TryBeginHandleDrag(Quest3ControllerRayInteractor interactor, Ray ray, RaycastHit hit)
+    public bool TryBeginHandleDrag(object interactor, Ray ray, RaycastHit hit)
     {
         if (ikController == null || handle == null || interactor == null)
         {
@@ -86,7 +86,7 @@ public class Quest3RobotInteractionController : MonoBehaviour
         return true;
     }
 
-    public void UpdateHandleDrag(Quest3ControllerRayInteractor interactor, Ray ray)
+    public void UpdateHandleDrag(object interactor, Ray ray)
     {
         if (activeDragInteractor != interactor || ikController == null || handle == null)
         {
@@ -98,7 +98,7 @@ public class Quest3RobotInteractionController : MonoBehaviour
         ikController.SolveToTarget(target);
     }
 
-    public void EndHandleDrag(Quest3ControllerRayInteractor interactor)
+    public void EndHandleDrag(object interactor)
     {
         if (activeDragInteractor != interactor)
         {
