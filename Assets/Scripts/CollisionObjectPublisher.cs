@@ -169,6 +169,15 @@ public class CollisionObjectPublisher : MonoBehaviour
         return position;
     }
 
+    Quaternion GetRelativeRotation(Quaternion rotation)
+    {
+        if (worldOrigin != null)
+        {
+            return Quaternion.Inverse(worldOrigin.transform.rotation) * rotation;
+        }
+        return rotation;
+    }
+
     void PublishCollisionObject()
     {
         bool isMesh = false;
@@ -203,7 +212,7 @@ public class CollisionObjectPublisher : MonoBehaviour
             pose = new PoseMsg
             {
                 position = RosUnityConversion.UnityToRosPosition(relativePosition),
-                orientation = RosUnityConversion.UnityToRosQuaternion(transform.rotation)
+                orientation = RosUnityConversion.UnityToRosQuaternion(GetRelativeRotation(transform.rotation))
             }
         };
 

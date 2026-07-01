@@ -149,6 +149,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: xrviz::StudyController
   _advanceAction: {fileID: -6469114226445947990, guid: c348712bda248c246b8c49b3db54643f, type: 3}
+  _startSceneAutoAdvanceDelay: 0
   _task1:
     interludeSceneName: Task1_Interlude
     scenePool:
@@ -166,10 +167,8 @@ MonoBehaviour:
   _task2:
     interludeSceneName: Task2_Interlude
     scenePool:
-    - Task2_Placeholder1
-    - Task2_Placeholder2
-    - Task2_Placeholder3
-    numScenesToPlay: 3
+    - Task2_Factory1
+    numScenesToPlay: 5
   _task3:
     interludeSceneName: Task3_Interlude
     scenePool:

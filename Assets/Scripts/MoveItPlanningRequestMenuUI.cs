@@ -524,6 +524,8 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
         // Disable replay button until we have a new trajectory
         StopPreview();
+        if (trajectoryReplayer != null)
+            trajectoryReplayer.StopReplay();
         stopReplayButton.SetEnabled(false);
         executeTrajectoryButton.SetEnabled(false);
         

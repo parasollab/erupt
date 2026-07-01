@@ -6,6 +6,7 @@ public class MouseRobotRayInteractor : MonoBehaviour
     [SerializeField] private Camera rayCamera;
     [SerializeField] private float rayLength = 6f;
     [SerializeField] private LayerMask raycastLayers = ~0;
+    [SerializeField] private float jointJogRadiansPerSecond = 0.8f;
 
     private bool isDraggingHandle;
 
@@ -25,6 +26,8 @@ public class MouseRobotRayInteractor : MonoBehaviour
         if (Input.GetMouseButtonDown(0) && hasHit)
         {
             isDraggingHandle = robotInteraction.TryBeginHandleDrag(this, ray, hit);
+            if (!isDraggingHandle)
+                robotInteraction.SelectFromHit(hit);
         }
 
         if (isDraggingHandle && Input.GetMouseButton(0))
@@ -36,6 +39,15 @@ public class MouseRobotRayInteractor : MonoBehaviour
         {
             robotInteraction.EndHandleDrag(this);
             isDraggingHandle = false;
+        }
+
+        if (!isDraggingHandle)
+        {
+            float direction = 0f;
+            if (Input.GetKey(KeyCode.RightArrow)) direction += 1f;
+            if (Input.GetKey(KeyCode.LeftArrow)) direction -= 1f;
+            if (direction != 0f)
+                robotInteraction.JogSelectedJoint(direction * jointJogRadiansPerSecond * Time.deltaTime);
         }
     }
 }
