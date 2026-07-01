@@ -171,6 +171,8 @@ MonoBehaviour:
     - Task2_Factory2
     - Task2_Factory3
     - Task2_Factory4
+    - Task2_Factory5
+    - Task2_Kitchen1
     numScenesToPlay: 5
   _task3:
     interludeSceneName: Task3_Interlude
