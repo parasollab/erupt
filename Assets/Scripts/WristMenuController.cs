@@ -22,10 +22,9 @@ public class WristMenuController : MonoBehaviour
     public CollisionObjectsListenerSimple collisionObjectsListener;
     public GameObject worldOrigin;
 
-    [Header("Pick & Place Recording")]
+    [Header("MTC")]
+    [SerializeField] private bool enableMTC = false;
     [SerializeField] private PickPlaceTaskRecorder pickPlaceRecorder;
-
-    [Header("MTC Dashboard")]
     [SerializeField] private GameObject mtcDashboardPanel;
     
     // UI Elements
@@ -283,6 +282,12 @@ public class WristMenuController : MonoBehaviour
         recordPickPlaceButton = root.Q<Button>("wristMenuRecordPickPlaceButton");
         recordStatusLabel = root.Q<Label>("wristMenuRecordStatusLabel");
         mtcButton = root.Q<Button>("wristMenuMTCButton");
+        if (mtcButton != null)
+            mtcButton.style.display = enableMTC ? DisplayStyle.Flex : DisplayStyle.None;
+        if (recordPickPlaceButton != null)
+            recordPickPlaceButton.style.display = enableMTC ? DisplayStyle.Flex : DisplayStyle.None;
+        if (recordStatusLabel != null)
+            recordStatusLabel.style.display = enableMTC ? DisplayStyle.Flex : DisplayStyle.None;
 
         // Get buttons from add shape panel
         addShapeBackButton = root.Q<Button>("wristMenuAddShapeBackButton");
@@ -324,9 +329,9 @@ public class WristMenuController : MonoBehaviour
         snapSurfaceButton.clicked += OnSnapSurfaceClicked;
         deleteShapeButton.clicked += OnDeleteShapeClicked;
         duplicateShapeButton.clicked += OnDuplicateShapeClicked;
-        if (recordPickPlaceButton != null)
+        if (recordPickPlaceButton != null && enableMTC)
             recordPickPlaceButton.clicked += OnRecordPickPlaceClicked;
-        if (mtcButton != null)
+        if (mtcButton != null && enableMTC)
             mtcButton.clicked += OnMTCClicked;
 
         // Add shape panel buttons
@@ -463,12 +468,12 @@ public class WristMenuController : MonoBehaviour
         }
 
         MeshFilter meshFilter = selectedObject.GetComponent<MeshFilter>();
-        if (meshFilter == null || meshFilter.mesh == null)
+        if (meshFilter == null || meshFilter.sharedMesh == null)
         {
             return;
         }
 
-        string meshName = meshFilter.mesh.name;
+        string meshName = meshFilter.sharedMesh.name;
 
         if (meshName.Contains("Cube"))
         {
@@ -501,12 +506,14 @@ public class WristMenuController : MonoBehaviour
     
     private void OnEditShapeClicked()
     {
-        // TODO: Implement edit functionality
+        if (selectionManager == null || selectionManager.SelectedObject == null)
+        {
+            Debug.LogWarning("WristMenuController: No object selected for editing.");
+            return;
+        }
 
         PopulateEditShapePanel(selectionManager.SelectedObject);
-
         ShowEditShapePanel();
-        Debug.Log("WristMenuController: Edit Shape functionality not yet implemented");
     }
     
     private void OnDeleteShapeClicked()

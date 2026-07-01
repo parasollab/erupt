@@ -2211,6 +2211,15 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
+                },
+                {
+                    "name": "AdvanceStudy",
+                    "type": "Button",
+                    "id": "2564b602-6e34-476c-8d5e-734f28858022",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -2563,6 +2572,39 @@
                     "processors": "",
                     "groups": "",
                     "action": "ToggleFPS",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "a2f91f67-6053-4bb6-8e66-f6ec1bb18a89",
+                    "path": "<OculusTouchController>{RightHand}/secondaryButton",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "AdvanceStudy",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "5e4d62a9-62e2-4cd7-887a-c2e8ecfd7741",
+                    "path": "<QuestTouchPlusController>{RightHand}/secondaryButton",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "AdvanceStudy",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "43e7b91f-0991-48bf-939e-fe8f7da99cdf",
+                    "path": "<Keyboard>/space",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "AdvanceStudy",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

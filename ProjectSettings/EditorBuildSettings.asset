@@ -23,12 +23,75 @@ EditorBuildSettings:
   - enabled: 0
     path: Assets/Scenes/Kitchen.unity
     guid: 332a5352bed064330b7ad52128992f65
-  - enabled: 1
+  - enabled: 0
     path: Assets/Scenes/KitchenLoadingSceneFR3.unity
     guid: 9b6ef03e31cc541128e1684e6ef1b663
-  - enabled: 1
+  - enabled: 0
     path: Assets/Scenes/KitchenFR3.unity
     guid: 18c0e714e847d40e0801c1265a0508df
+  - enabled: 1
+    path: Assets/Scenes/StartScene.unity
+    guid: a38984d3ded1b4467a2fe4cca40336ce
+  - enabled: 1
+    path: Assets/Scenes/Task1_Interlude.unity
+    guid: d0bb3f1a2b41b4ec9a29a70522c914c1
+  - enabled: 1
+    path: Assets/Scenes/Task1_Factory1.unity
+    guid: 7c48ac3c86f1c44049502262c16f03c9
+  - enabled: 1
+    path: Assets/Scenes/Task1_Factory2.unity
+    guid: fbda8eed62bc94bb1bf9a76773a53908
+  - enabled: 1
+    path: Assets/Scenes/Task1_Factory3.unity
+    guid: cd3e599f2ee7741b39d161004d9d83e8
+  - enabled: 1
+    path: Assets/Scenes/Task1_Factory4.unity
+    guid: ac09fb184304a4cbba271bfd583d4715
+  - enabled: 1
+    path: Assets/Scenes/Task1_Factory5.unity
+    guid: bf8c246261efa4b3bb2ffde2d83425de
+  - enabled: 1
+    path: Assets/Scenes/Task1_Kitchen1.unity
+    guid: 20ceb4eaaf72942828bbcb0e38ab5c6d
+  - enabled: 1
+    path: Assets/Scenes/Task1_Kitchen2.unity
+    guid: 293cac30624454fdb814243813c2f6dc
+  - enabled: 1
+    path: Assets/Scenes/Task1_Kitchen3.unity
+    guid: 6cba5ad97eb2f4f9d9627fd175acc8d6
+  - enabled: 1
+    path: Assets/Scenes/Task1_Kitchen4.unity
+    guid: 2740fc7c7a2354ff0a62fa33b63dcf60
+  - enabled: 1
+    path: Assets/Scenes/Task1_Kitchen5.unity
+    guid: 8f03791fec3ec4a609083e7a2ce631b7
+  - enabled: 1
+    path: Assets/Scenes/Task2_Interlude.unity
+    guid: eb430027bef84ccab88315004b8308d4
+  - enabled: 1
+    path: Assets/Scenes/Task2_Placeholder1.unity
+    guid: 3364aa58990b480399ddec14763b4fb3
+  - enabled: 1
+    path: Assets/Scenes/Task2_Placeholder2.unity
+    guid: b5a9fa58cfd9406899d31316b1825245
+  - enabled: 1
+    path: Assets/Scenes/Task2_Placeholder3.unity
+    guid: 2bf21ccc4bd54207b2571ee972bd1c26
+  - enabled: 1
+    path: Assets/Scenes/Task3_Interlude.unity
+    guid: 3852ccefe06041c8b1b181386f9c6903
+  - enabled: 1
+    path: Assets/Scenes/Task3_Placeholder1.unity
+    guid: d730e345407a4817841a7f6b32fc481c
+  - enabled: 1
+    path: Assets/Scenes/Task3_Placeholder2.unity
+    guid: 012b966aa1df4fe7baace12cc4d6420f
+  - enabled: 1
+    path: Assets/Scenes/Task3_Placeholder3.unity
+    guid: 0b3476cb2e6f48a981ed080cb7082fe1
+  - enabled: 1
+    path: Assets/Scenes/StudyComplete.unity
+    guid: 1e0b1ed55ff747b695d1743f0b6fd493
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: c348712bda248c246b8c49b3db54643f, type: 3}
     com.unity.xr.arfoundation.simulation_settings: {fileID: 11400000, guid: e5d25a27610f74c049fefa1b04bb0f96, type: 2}

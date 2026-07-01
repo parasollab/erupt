@@ -1,6 +1,5 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
-using UnityEngine.XR.Interaction.Toolkit.Interactors;
 using UnityEngine.EventSystems;
 using System.Collections.Generic;
 
@@ -11,7 +10,7 @@ public class SelectionManager : MonoBehaviour
     public InputActionReference selectAction;
 
     [Header("Ray Interactor")]
-    public XRRayInteractor rayInteractor; // Assign your controller's ray interactor in the Inspector
+    public Quest3ControllerRayInteractor rayInteractor;
 
     [Header("Highlighting")]
     public Material highlightMaterial;
@@ -49,9 +48,9 @@ public class SelectionManager : MonoBehaviour
         if (IsInteractingWithUI())
             return;
 
-        if (rayInteractor == null || !rayInteractor.TryGetCurrent3DRaycastHit(out RaycastHit hit))
+        if (rayInteractor == null || !rayInteractor.TryGetCurrentHit(out RaycastHit hit))
         {
-            ClearSelection();
+            // Ray hitting nothing — could be UI interaction with misaligned physics ray; don't clear
             return;
         }
 
@@ -74,23 +73,6 @@ public class SelectionManager : MonoBehaviour
 
     bool IsInteractingWithUI()
     {
-        if (rayInteractor == null) return false;
-        if (rayInteractor.TryGetCurrentUIRaycastResult(out RaycastResult uiHit))
-            return IsPartOfWristUIHierarchy(uiHit.gameObject);
-        return false;
-    }
-
-    bool IsPartOfWristUIHierarchy(GameObject obj)
-    {
-        Transform current = obj.transform;
-        while (current != null)
-        {
-            if (current.GetComponent<WristMenuController>() != null)
-            {
-                return true;
-            }
-            current = current.parent;
-        }
         return false;
     }
 

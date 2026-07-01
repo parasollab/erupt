@@ -20,6 +20,15 @@ public class Quest3ControllerRayInteractor : MonoBehaviour
     private bool wasGripPressed;
     private bool isDraggingHandle;
 
+    private RaycastHit currentHit;
+    private bool hasCurrentHit;
+
+    public bool TryGetCurrentHit(out RaycastHit hit)
+    {
+        hit = currentHit;
+        return hasCurrentHit;
+    }
+
     public void Configure(XRNode node, Quest3RobotInteractionController interactionController)
     {
         controllerNode = node;
@@ -52,6 +61,9 @@ public class Quest3ControllerRayInteractor : MonoBehaviour
             rayLength,
             raycastLayers,
             QueryTriggerInteraction.Collide);
+
+        hasCurrentHit = hasHit;
+        if (hasHit) currentHit = hit;
 
         UpdateLine(ray, hasHit ? hit.distance : rayLength, hasHit);
 
