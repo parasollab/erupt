@@ -457,12 +457,16 @@ MonoBehaviour:
   instructionsText: 'You are about to start Task 2.
 
 
-    [Instructions for Task
-    2]
+    You will be placed in several
+    scenes. In each, there will be a robot trajectory playing that places the robot
+    in an undesired portion of the environment indicated using a red box. Create
+    obstacles in the scene using the Scene Menu to prevent the robot from entering
+    these undesired regions.
 
 
-    Press ''B'' on the Right Hand Controller to advance to the first scene.
-    Press ''B'' again when finished with each scene to advance to the next.'
+    Press ''B'' on the Right Hand Controller to advance
+    to the first scene. Press ''B'' again when finished with each scene to advance
+    to the next.'
 --- !u!4 &890748242
 Transform:
   m_ObjectHideFlags: 0
