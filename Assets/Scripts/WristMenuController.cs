@@ -662,7 +662,7 @@ public class WristMenuController : MonoBehaviour
         // Controls grabbing based on SelectionManager selection state
         shape.AddComponent<SelectableGrabController>();
 
-        shape.transform.localScale = Vector3.one;
+        shape.transform.localScale = Vector3.one * 0.5f;
         shape.tag = "Selectable";
 
         shape.AddComponent<XRGrabTransformerScaleAxisLock>();
