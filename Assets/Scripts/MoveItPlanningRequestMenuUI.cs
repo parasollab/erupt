@@ -78,7 +78,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     private bool hasStartState = false;
     private bool hasGoalState = false;
     private JointTrajectoryMsg lastPlannedTrajectory;
-    public JointTrajectoryMsg LastPlannedTrajectory => lastPlannedTrajectory;
+    public JointTrajectoryMsg LastPlannedTrajectory => lastPlannedTrajectory != null ? BuildLocalTrajectory(lastPlannedTrajectory) : null;
 
     // Planner querying
     private bool isQueryingPlanners = false;
@@ -642,6 +642,80 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     private RobotStateMsg GetCurrentRobotState() => GetRobotStateMsgFromController();
 
     private RobotStateMsg GetGoalRobotState() => GetRobotStateMsgFromController();
+
+    // Populates start/goal state and ghosts from a pre-baked trajectory's first/last waypoint,
+    // instead of the live robot pose — used when a scene auto-plays a trajectory at Start().
+    public void SetStartAndGoalFromTrajectory(TrajectoryData trajectoryData)
+    {
+        if (trajectoryData == null || trajectoryData.waypoints == null || trajectoryData.waypoints.Length == 0)
+        {
+            Debug.LogWarning("MoveItPlanningRequestMenuUI: TrajectoryData has no waypoints.");
+            return;
+        }
+
+        if (ghostSpawner == null || robotController == null)
+        {
+            Debug.LogWarning("MoveItPlanningRequestMenuUI: ghostSpawner or robotController not assigned.");
+            return;
+        }
+
+        string[] names = trajectoryData.jointNames;
+        TrajectoryData.Waypoint first = trajectoryData.waypoints[0];
+        TrajectoryData.Waypoint last = trajectoryData.waypoints[trajectoryData.waypoints.Length - 1];
+
+        if (!startSet)
+        {
+            ghostSpawner.SpawnStartGhostFromPose(robotController, names, first.positions);
+            startSet = true;
+        }
+        else
+        {
+            ghostSpawner.UpdateStartGhostFromPose(robotController, names, first.positions);
+        }
+        currentStartState = BuildRobotStateMsgFromNamedPositions(names, first.positions);
+        hasStartState = true;
+
+        if (!goalSet)
+        {
+            ghostSpawner.SpawnGoalGhostFromPose(robotController, names, last.positions);
+            goalSet = true;
+        }
+        else
+        {
+            ghostSpawner.UpdateGoalGhostFromPose(robotController, names, last.positions);
+        }
+        currentGoalState = BuildRobotStateMsgFromNamedPositions(names, last.positions);
+        hasGoalState = true;
+
+        UpdateButtonStates();
+    }
+
+    private RobotStateMsg BuildRobotStateMsgFromNamedPositions(string[] unityNames, double[] positions)
+    {
+        string[] rosNames = RemapJointNamesToRos(unityNames);
+        double[] zeros = new double[rosNames.Length];
+
+        return new RobotStateMsg
+        {
+            joint_state = new JointStateMsg
+            {
+                header = new HeaderMsg
+                {
+                    frame_id = "base_link",
+                    stamp = new TimeMsg
+                    {
+                        sec = (int)Time.time,
+                        nanosec = (uint)((Time.time - (int)Time.time) * 1e9)
+                    }
+                },
+                name = rosNames,
+                position = positions,
+                velocity = zeros,
+                effort = zeros
+            },
+            multi_dof_joint_state = new MultiDOFJointStateMsg()
+        };
+    }
 
     private void OnMotionPlanResponse(GetMotionPlanResponse response)
     {

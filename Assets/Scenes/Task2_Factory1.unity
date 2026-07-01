@@ -46722,6 +46722,17 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 988071883}
   m_Mesh: {fileID: 2076452596260902097, guid: c4ba858ad4f94a1468a631110d7e09fd, type: 3}
+--- !u!114 &988414858 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 4209543171811604821, guid: 46fae3e1bd65645b4835315513e75b34, type: 3}
+  m_PrefabInstance: {fileID: 503667396}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 05c065f740c1f4c94b68815678f02569, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: xrviz::MoveItPlanningRequestMenuUI
 --- !u!1 &990904256
 GameObject:
   m_ObjectHideFlags: 0
@@ -53658,7 +53669,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: xrviz::TrajectoryReplay
   ikController: {fileID: 1236116081}
-  ghostSpawner: {fileID: 0}
+  ghostSpawner: {fileID: 1184726767}
   replayGhostColor: {r: 0, g: 0.5, b: 1, a: 0.5}
 --- !u!114 &1184726767
 MonoBehaviour:
@@ -94031,6 +94042,54 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2055195853}
   m_Mesh: {fileID: 3019060584806833026, guid: c4ba858ad4f94a1468a631110d7e09fd, type: 3}
+--- !u!1 &2055505195
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2055505197}
+  - component: {fileID: 2055505196}
+  m_Layer: 0
+  m_Name: TrajPlayer
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &2055505196
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2055505195}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 785327df4fe594e159ee40c407b37956, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: xrviz::TrajectoryAutoPlayer
+  trajectoryReplayer: {fileID: 1184726766}
+  trajectoryData: {fileID: 11400000, guid: c58699a546b3d41efb5c5d024d28977b, type: 2}
+  startDelay: 0
+  moveItMenu: {fileID: 988414858}
+--- !u!4 &2055505197
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2055505195}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0.94729, y: 0.912, z: 0.269}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &2056050382
 GameObject:
   m_ObjectHideFlags: 0
@@ -99262,6 +99321,7 @@ SceneRoots:
   - {fileID: 2043520666}
   - {fileID: 1184726768}
   - {fileID: 503667396}
+  - {fileID: 2055505197}
   - {fileID: 922926357}
   - {fileID: 738692200}
   - {fileID: 2073005101}
