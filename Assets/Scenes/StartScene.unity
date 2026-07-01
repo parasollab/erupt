@@ -168,6 +168,7 @@ MonoBehaviour:
     interludeSceneName: Task2_Interlude
     scenePool:
     - Task2_Factory1
+    - Task2_Factory2
     numScenesToPlay: 5
   _task3:
     interludeSceneName: Task3_Interlude

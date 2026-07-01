@@ -72,6 +72,9 @@ EditorBuildSettings:
     path: Assets/Scenes/Task2_Factory1.unity
     guid: 821a61324ed85443c984aa72faa438e8
   - enabled: 1
+    path: Assets/Scenes/Task2_Factory2.unity
+    guid: da00f0870631c4780abbb5dad255f010
+  - enabled: 1
     path: Assets/Scenes/Task3_Interlude.unity
     guid: 3852ccefe06041c8b1b181386f9c6903
   - enabled: 1
