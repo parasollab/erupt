@@ -105,6 +105,33 @@ EditorBuildSettings:
     path: Assets/Scenes/Task3_Factory1.unity
     guid: af35ed476fa8644f290feb6dcb54694c
   - enabled: 1
+    path: Assets/Scenes/Task3_Factory2.unity
+    guid: ca73ba9f049bf408bb810234453c5e2e
+  - enabled: 1
+    path: Assets/Scenes/Task3_Factory3.unity
+    guid: aefa361297881480abad6b15df510501
+  - enabled: 1
+    path: Assets/Scenes/Task3_Factory4.unity
+    guid: d765d9f68ced346d89a677330e17bc60
+  - enabled: 1
+    path: Assets/Scenes/Task3_Factory5.unity
+    guid: df9d8c20285114177b549f5b71f7f60b
+  - enabled: 1
+    path: Assets/Scenes/Task3_Kitchen1.unity
+    guid: 860330dd712334ac0a1c99972382c8b5
+  - enabled: 1
+    path: Assets/Scenes/Task3_Kitchen2.unity
+    guid: 0341acf85ec4d4187bbe924714fe9b51
+  - enabled: 1
+    path: Assets/Scenes/Task3_Kitchen3.unity
+    guid: 8e521508b3de24078a4d06d4afd2ab6b
+  - enabled: 1
+    path: Assets/Scenes/Task3_Kitchen4.unity
+    guid: 428f67fad2e714ac5bd055882c3af45b
+  - enabled: 1
+    path: Assets/Scenes/Task3_Kitchen5.unity
+    guid: 2a85060ab61984a768c6f5a50ec36748
+  - enabled: 1
     path: Assets/Scenes/StudyComplete.unity
     guid: 1e0b1ed55ff747b695d1743f0b6fd493
   - enabled: 0

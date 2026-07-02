@@ -182,6 +182,15 @@ MonoBehaviour:
     interludeSceneName: Task3_Interlude
     scenePool:
     - Task3_Factory1
+    - Task3_Factory2
+    - Task3_Factory3
+    - Task3_Factory4
+    - Task3_Factory5
+    - Task3_Kitchen1
+    - Task3_Kitchen2
+    - Task3_Kitchen3
+    - Task3_Kitchen4
+    - Task3_Kitchen5
     numScenesToPlay: 5
 --- !u!4 &224257073
 Transform:
