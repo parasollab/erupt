@@ -87,6 +87,18 @@ EditorBuildSettings:
     path: Assets/Scenes/Task2_Kitchen1.unity
     guid: f442d36e6f7644254b76b2b6464d988e
   - enabled: 1
+    path: Assets/Scenes/Task2_Kitchen2.unity
+    guid: 72b58d2e526ae4b4b96d1383d0f40b9b
+  - enabled: 1
+    path: Assets/Scenes/Task2_Kitchen3.unity
+    guid: a8779a9d148e54127a70dcd88b36e399
+  - enabled: 1
+    path: Assets/Scenes/Task2_Kitchen4.unity
+    guid: aca21414cae1a4aa69e013b3e1093023
+  - enabled: 1
+    path: Assets/Scenes/Task2_Kitchen5.unity
+    guid: c234719db45f94d988902cd0fd7dceaa
+  - enabled: 1
     path: Assets/Scenes/Task3_Interlude.unity
     guid: 3852ccefe06041c8b1b181386f9c6903
   - enabled: 1
