@@ -26,6 +26,9 @@ public class WristMenuController : MonoBehaviour
     [SerializeField] private bool enableMTC = false;
     [SerializeField] private PickPlaceTaskRecorder pickPlaceRecorder;
     [SerializeField] private GameObject mtcDashboardPanel;
+
+    [Header("Shape Spawning")]
+    [SerializeField] private float shapeSpawnDistance = 0.75f;
     
     // UI Elements
     private VisualElement root;
@@ -643,10 +646,10 @@ public class WristMenuController : MonoBehaviour
     {
         GameObject shape = GameObject.CreatePrimitive(primitiveType);
 
-        // Position 2 m in front of the user
+        // Position in front of the user, within easy reach
         shape.transform.position = Camera.main != null
-            ? Camera.main.transform.position + Camera.main.transform.forward * 2f
-            : Vector3.forward * 2f;
+            ? Camera.main.transform.position + Camera.main.transform.forward * shapeSpawnDistance
+            : Vector3.forward * shapeSpawnDistance;
 
         // Physics
         Rigidbody rb = shape.AddComponent<Rigidbody>();
