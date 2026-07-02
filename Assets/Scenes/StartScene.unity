@@ -181,10 +181,8 @@ MonoBehaviour:
   _task3:
     interludeSceneName: Task3_Interlude
     scenePool:
-    - Task3_Placeholder1
-    - Task3_Placeholder2
-    - Task3_Placeholder3
-    numScenesToPlay: 3
+    - Task3_Factory1
+    numScenesToPlay: 5
 --- !u!4 &224257073
 Transform:
   m_ObjectHideFlags: 0
