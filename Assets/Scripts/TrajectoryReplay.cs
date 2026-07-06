@@ -10,28 +10,37 @@ public class TrajectoryReplay : MonoBehaviour
     private bool isReplaying = false;
     private Coroutine replayRoutine;
     private bool hasFinishedOneLoop = false;
+    private bool loopReplay = true;
 
     private string[] savedNames;
     private float[] savedPositions;
 
     public bool HasFinishedOneLoop() => hasFinishedOneLoop;
 
-    public void StartReplay(JointTrajectoryMsg trajectory)
+    public bool IsRunning => replayRoutine != null;
+
+    public void SetIKController(DirectArticulationIKController controller)
+    {
+        ikController = controller;
+    }
+
+    public void StartReplay(JointTrajectoryMsg trajectory, bool loop = true)
     {
         if (replayRoutine != null)
         {
             Debug.LogWarning("[TrajectoryReplay] StartReplay ignored: already running.");
             return;
         }
+        loopReplay = loop;
         replayRoutine = StartCoroutine(RunReplay(trajectory));
     }
 
-    public void RestartReplay(JointTrajectoryMsg trajectory)
+    public void RestartReplay(JointTrajectoryMsg trajectory, bool loop = true)
     {
         if (replayRoutine != null)
-            StartCoroutine(RestartRoutine(trajectory));
+            StartCoroutine(RestartRoutine(trajectory, loop));
         else
-            StartReplay(trajectory);
+            StartReplay(trajectory, loop);
     }
 
     public void StopReplay()
@@ -51,12 +60,12 @@ public class TrajectoryReplay : MonoBehaviour
         RestoreSavedPose();
     }
 
-    private IEnumerator RestartRoutine(JointTrajectoryMsg newTrajectory)
+    private IEnumerator RestartRoutine(JointTrajectoryMsg newTrajectory, bool loop)
     {
         isReplaying = false;
         if (replayRoutine != null)
             yield return replayRoutine;
-        StartReplay(newTrajectory);
+        StartReplay(newTrajectory, loop);
     }
 
     private IEnumerator RunReplay(JointTrajectoryMsg trajectory)
@@ -80,7 +89,7 @@ public class TrajectoryReplay : MonoBehaviour
             {
                 bool ok = true;
                 yield return StartCoroutine(PlayTrajectory(trajectory, success => ok = success));
-                if (!ok) isReplaying = false;
+                if (!ok || !loopReplay) isReplaying = false;
             }
         }
         finally

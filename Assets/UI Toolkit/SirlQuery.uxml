@@ -1,0 +1,13 @@
+<ui:UXML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" noNamespaceSchemaLocation="../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
+    <ui:VisualElement style="flex-grow: 1; background-color: rgb(142, 142, 142);">
+        <ui:Label text="SIRL Query" name="sirlTitleLabel" style="-unity-text-align: upper-center; -unity-font-style: bold; font-size: 20px; border-bottom-width: 3px; border-bottom-color: rgb(0, 0, 0);" />
+        <ui:Button text="Mode: Similarity" name="sirlModeButton" style="-unity-font-style: bold;" />
+        <ui:Button text="Request Trajectories" name="sirlRequestButton" style="-unity-font-style: bold;" />
+        <ui:Label text="Trajectories" name="sirlListHeaderLabel" style="-unity-font-style: bold; padding-top: 6px;" />
+        <ui:VisualElement name="sirlTrajectoryList" style="flex-grow: 0; min-height: 90px;" />
+        <ui:Button text="Play All" name="sirlPlayAllButton" style="-unity-font-style: bold;" />
+        <ui:Button text="Stop" name="sirlStopButton" style="-unity-font-style: bold;" />
+        <ui:Button text="Publish Selection" name="sirlConfirmButton" style="-unity-font-style: bold;" />
+        <ui:Label text="Idle. Request trajectories to begin." name="sirlStatusLabel" parse-escape-sequences="true" style="height: 90px; white-space: normal;" />
+    </ui:VisualElement>
+</ui:UXML>
