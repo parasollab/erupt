@@ -13,7 +13,7 @@ GameObject:
   - component: {fileID: 7893321456823679116}
   - component: {fileID: 4310978893044305010}
   - component: {fileID: 5340731310530753219}
-  - component: {fileID: 5798176366573616916}
+  - component: {fileID: 6964799690993586911}
   m_Layer: 5
   m_Name: XRI UIDocument
   m_TagString: Untagged
@@ -174,7 +174,7 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 3, y: 6, z: 0.4}
   m_Center: {x: 1.5, y: -3, z: 0}
---- !u!114 &5798176366573616916
+--- !u!114 &6964799690993586911
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}

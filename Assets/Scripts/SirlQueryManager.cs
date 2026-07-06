@@ -5,7 +5,7 @@ using System.Linq;
 using UnityEngine;
 using Unity.Robotics.ROSTCPConnector;
 using RosMessageTypes.BuiltinInterfaces;
-using RosMessageTypes.Sirl;
+using RosMessageTypes.SirlVrMsgs;
 using RosMessageTypes.Std;
 using RosMessageTypes.Trajectory;
 
@@ -27,11 +27,14 @@ public class SirlQueryManager : MonoBehaviour
     [Tooltip("Show only the ghost whose trajectory is playing; all ghosts reappear for selection.")]
     [SerializeField] private bool hideOthersDuringPlayback = true;
 
-    [Header("ROS names (placeholders until real interfaces exist)")]
-    [SerializeField] private string similarityServiceName = "/sirl/similarity_query_trajectories";
-    [SerializeField] private string preferenceServiceName = "/sirl/preference_query_trajectories";
-    [SerializeField] private string similarityResultTopic = "/sirl/similarity_query_result";
-    [SerializeField] private string preferenceResultTopic = "/sirl/preference_query_result";
+    [Header("ROS names (sirl_vr_msgs / query_node.py in Desktop/sirl)")]
+    [SerializeField] private string similarityServiceName = "/sirl/get_similarity_query";
+    [SerializeField] private string preferenceServiceName = "/sirl/get_preference_query";
+    [SerializeField] private string similarityAnswerTopic = "/sirl/similarity/answer";
+    [SerializeField] private string preferenceAnswerTopic = "/sirl/preference/answer";
+
+    [Tooltip("Sent with every query and answer so query_node.py can group a user's session. Auto-generated if left blank.")]
+    [SerializeField] private string sessionId = "";
 
     [SerializeField] private Color[] ghostColors =
     {
@@ -65,14 +68,22 @@ public class SirlQueryManager : MonoBehaviour
 
     // Service responses arrive off the main thread; hand them to Update.
     private JointTrajectoryMsg[] pendingTrajectories;
+    private uint pendingQueryId;
+
+    // The query_id the active Trajectories came from; echoed back in the answer.
+    private uint currentQueryId;
+    private int mockQueryIdCounter;
 
     void Start()
     {
+        if (string.IsNullOrEmpty(sessionId))
+            sessionId = Guid.NewGuid().ToString();
+
         ros = ROSConnection.GetOrCreateInstance();
-        ros.RegisterRosService<GetTrajectoriesRequest, GetTrajectoriesResponse>(similarityServiceName);
-        ros.RegisterRosService<GetTrajectoriesRequest, GetTrajectoriesResponse>(preferenceServiceName);
-        ros.RegisterPublisher<SimilarityQueryResultMsg>(similarityResultTopic);
-        ros.RegisterPublisher<PreferenceQueryResultMsg>(preferenceResultTopic);
+        ros.RegisterRosService<GetSimilarityQueryRequest, GetSimilarityQueryResponse>(similarityServiceName);
+        ros.RegisterRosService<GetPreferenceQueryRequest, GetPreferenceQueryResponse>(preferenceServiceName);
+        ros.RegisterPublisher<SimilarityAnswerMsg>(similarityAnswerTopic);
+        ros.RegisterPublisher<PreferenceAnswerMsg>(preferenceAnswerTopic);
     }
 
     void Update()
@@ -80,8 +91,9 @@ public class SirlQueryManager : MonoBehaviour
         if (pendingTrajectories != null)
         {
             var trajectories = pendingTrajectories;
+            var queryId = pendingQueryId;
             pendingTrajectories = null;
-            OnTrajectoriesReceived(trajectories);
+            OnTrajectoriesReceived(queryId, trajectories);
         }
     }
 
@@ -116,15 +128,25 @@ public class SirlQueryManager : MonoBehaviour
 
         if (mockMode)
         {
+            pendingQueryId = (uint)mockQueryIdCounter++;
             pendingTrajectories = GenerateMockTrajectories(TrajectoryCount);
             return;
         }
 
-        string service = Mode == SirlMode.Similarity ? similarityServiceName : preferenceServiceName;
-        ros.SendServiceMessage<GetTrajectoriesResponse>(
-            service,
-            new GetTrajectoriesRequest((uint)TrajectoryCount),
-            resp => pendingTrajectories = resp?.trajectories);
+        if (Mode == SirlMode.Similarity)
+        {
+            ros.SendServiceMessage<GetSimilarityQueryResponse>(
+                similarityServiceName,
+                new GetSimilarityQueryRequest(sessionId),
+                resp => { pendingQueryId = resp?.query_id ?? 0; pendingTrajectories = resp?.trajectories; });
+        }
+        else
+        {
+            ros.SendServiceMessage<GetPreferenceQueryResponse>(
+                preferenceServiceName,
+                new GetPreferenceQueryRequest(sessionId),
+                resp => { pendingQueryId = resp?.query_id ?? 0; pendingTrajectories = resp?.trajectories; });
+        }
     }
 
     public void ReplayOne(int index)
@@ -194,24 +216,26 @@ public class SirlQueryManager : MonoBehaviour
         if (Mode == SirlMode.Similarity)
         {
             var ordered = selection.OrderBy(i => i).ToList();
-            var msg = new SimilarityQueryResultMsg(Trajectories, ordered[0], ordered[1]);
-            ros.Publish(similarityResultTopic, msg);
-            Debug.Log($"[SirlQueryManager] Published similarity result on {similarityResultTopic}: " +
-                      $"most similar pair = ({ordered[0]}, {ordered[1]}) of {Trajectories.Length} trajectories.");
+            var pair = new byte[] { (byte)ordered[0], (byte)ordered[1] };
+            var msg = new SimilarityAnswerMsg(currentQueryId, pair, sessionId);
+            ros.Publish(similarityAnswerTopic, msg);
+            Debug.Log($"[SirlQueryManager] Published similarity answer on {similarityAnswerTopic}: " +
+                      $"query_id={currentQueryId} most similar pair = ({ordered[0]}, {ordered[1]}) of {Trajectories.Length} trajectories.");
         }
         else
         {
-            var msg = new PreferenceQueryResultMsg(Trajectories, selection[0]);
-            ros.Publish(preferenceResultTopic, msg);
-            Debug.Log($"[SirlQueryManager] Published preference result on {preferenceResultTopic}: " +
-                      $"preferred = {selection[0]} of {Trajectories.Length} trajectories.");
+            byte preferred = (byte)selection[0];
+            var msg = new PreferenceAnswerMsg(currentQueryId, preferred, sessionId);
+            ros.Publish(preferenceAnswerTopic, msg);
+            Debug.Log($"[SirlQueryManager] Published preference answer on {preferenceAnswerTopic}: " +
+                      $"query_id={currentQueryId} preferred = {selection[0]} of {Trajectories.Length} trajectories.");
         }
 
         State = SirlState.Published;
         StateChanged?.Invoke();
     }
 
-    private void OnTrajectoriesReceived(JointTrajectoryMsg[] trajectories)
+    private void OnTrajectoriesReceived(uint queryId, JointTrajectoryMsg[] trajectories)
     {
         if (trajectories == null || trajectories.Length == 0)
         {
@@ -224,6 +248,7 @@ public class SirlQueryManager : MonoBehaviour
         if (trajectories.Length != TrajectoryCount)
             Debug.LogWarning($"[SirlQueryManager] Expected {TrajectoryCount} trajectories, got {trajectories.Length}.");
 
+        currentQueryId = queryId;
         Trajectories = trajectories;
         ghosts = ghostSpawner.Spawn(trajectories.Length, ghostColors);
 
