@@ -454,19 +454,19 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: xrviz::InterludeInstructionsDisplay
   uiDocument: {fileID: 890748240}
-  instructionsText: 'You are about to start Task 2.
+  instructionsText: 'You are about to start the Motion Manipulation task.
 
 
-    You will be placed in several
-    scenes. In each, there will be a robot trajectory playing that places the robot
-    in an undesired portion of the environment indicated using a red box. Create
-    obstacles in the scene using the Scene Menu to prevent the robot from entering
-    these undesired regions.
+    You
+    will be placed in several scenes. In each, there will be a robot trajectory playing
+    that places the robot in an undesired portion of the environment indicated using
+    a red box. Create obstacles in the scene using the Scene Menu to prevent the
+    robot from entering these undesired regions.
 
 
-    Press ''B'' on the Right Hand Controller to advance
-    to the first scene. Press ''B'' again when finished with each scene to advance
-    to the next.'
+    Press ''B'' on the Right Hand
+    Controller to advance to the first scene. Press ''B'' again when finished with
+    each scene to advance to the next.'
 --- !u!4 &890748242
 Transform:
   m_ObjectHideFlags: 0

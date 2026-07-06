@@ -319,18 +319,19 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: xrviz::InterludeInstructionsDisplay
   uiDocument: {fileID: 406845584}
-  instructionsText: 'You are about to start Task 1.
+  instructionsText: 'You are about to start the Object Shielding task.
 
 
-    You will be placed in several
-    scenes. In each, use the Scene Menu connected to the Left Hand Controller to
-    cover objects near the robot with shapes. This indicates to the motion planner
-    that there are obstacles in those locations.
+    You
+    will be placed in several scenes. In each, use the Scene Menu connected to the
+    Left Hand Controller to cover objects near the robot with shapes as close as
+    possible in size to the objects. This indicates to the motion planner that there
+    are obstacles in those locations.
 
 
-    Press ''B'' on the Right Hand
-    Controller to advance to the first scene. Press ''B'' again when finished with
-    each scene to advance to the next.'
+    Press ''B'' on the Right Hand Controller
+    to advance to the first scene. Press ''B'' again when finished with each scene
+    to advance to the next.'
 --- !u!4 &406845583
 Transform:
   m_ObjectHideFlags: 0

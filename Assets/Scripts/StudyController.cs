@@ -47,6 +47,7 @@ public class StudyController : MonoBehaviour
         DontDestroyOnLoad(gameObject);
 
         _tasks = new List<TaskConfig> { _task1, _task2, _task3 };
+        ShuffleInPlace(_tasks);
         _shuffledSequences = new List<List<string>>();
         foreach (TaskConfig task in _tasks)
         {
@@ -74,14 +75,19 @@ public class StudyController : MonoBehaviour
         LoadCurrentInterlude();
     }
 
+    private static void ShuffleInPlace<T>(List<T> list)
+    {
+        for (int i = list.Count - 1; i > 0; i--)
+        {
+            int j = Random.Range(0, i + 1);
+            (list[i], list[j]) = (list[j], list[i]);
+        }
+    }
+
     private static List<string> ShuffleWithoutReplacement(List<string> pool, int n)
     {
         List<string> shuffled = new List<string>(pool);
-        for (int i = shuffled.Count - 1; i > 0; i--)
-        {
-            int j = Random.Range(0, i + 1);
-            (shuffled[i], shuffled[j]) = (shuffled[j], shuffled[i]);
-        }
+        ShuffleInPlace(shuffled);
 
         if (n > shuffled.Count)
         {
