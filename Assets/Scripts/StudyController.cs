@@ -1,7 +1,9 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
+using RosMessageTypes.StudyInterfaces;
 
 public class StudyController : MonoBehaviour
 {
@@ -21,6 +23,10 @@ public class StudyController : MonoBehaviour
     [Header("Start Scene")]
     [Tooltip("Optional pause before auto-advancing from StartScene into Task1's interlude.")]
     [SerializeField] private float _startSceneAutoAdvanceDelay = 0f;
+
+    [Header("ROS Study Plan")]
+    [Tooltip("How long to wait for a /study/plan message before falling back to local random generation (e.g. when running standalone without ROS).")]
+    [SerializeField] private float _rosPlanTimeoutSeconds = 3f;
 
     [Header("Task Configuration")]
     [SerializeField] private TaskConfig _task1 = new TaskConfig();
@@ -47,12 +53,6 @@ public class StudyController : MonoBehaviour
         DontDestroyOnLoad(gameObject);
 
         _tasks = new List<TaskConfig> { _task1, _task2, _task3 };
-        ShuffleInPlace(_tasks);
-        _shuffledSequences = new List<List<string>>();
-        foreach (TaskConfig task in _tasks)
-        {
-            _shuffledSequences.Add(ShuffleWithoutReplacement(task.scenePool, task.numScenesToPlay));
-        }
 
         if (_advanceAction != null)
         {
@@ -64,6 +64,54 @@ public class StudyController : MonoBehaviour
             Debug.LogError("StudyController: Advance action is not assigned.");
         }
 
+        StudyPlanReceiver.WaitForPlanOrTimeout(this, _rosPlanTimeoutSeconds);
+    }
+
+    // Builds _shuffledSequences from a StudyPlan received over ROS (/study/plan), so the
+    // VR and RViz2 sessions for a given participant see the same task/scene order. Reorders
+    // _tasks to match the plan's task order and skips ShuffleWithoutReplacement entirely,
+    // since the ROS-supplied scene order is already final.
+    public void ApplyExternalPlan(StudyPlanMsg plan)
+    {
+        List<TaskConfig> orderedTasks = new List<TaskConfig>();
+        List<List<string>> sequences = new List<List<string>>();
+
+        foreach (TaskPlanMsg taskPlan in plan.tasks)
+        {
+            TaskConfig matching = _tasks.FirstOrDefault(t => t.interludeSceneName == taskPlan.interlude_scene);
+            if (matching == null)
+            {
+                Debug.LogError($"StudyController: received plan references unknown interlude scene '{taskPlan.interlude_scene}'; ignoring this task entry.");
+                continue;
+            }
+            orderedTasks.Add(matching);
+            sequences.Add(taskPlan.scene_names.ToList());
+        }
+
+        _tasks = orderedTasks;
+        _shuffledSequences = sequences;
+        Debug.Log($"StudyController: applied external study plan for participant '{plan.participant_id}' ({_tasks.Count} tasks).");
+
+        FinishInitialization();
+    }
+
+    // Local random generation, unchanged from the original behavior -- used as a fallback
+    // when no /study/plan message arrives in time (e.g. running standalone without ROS).
+    public void ApplyLocalFallbackPlan()
+    {
+        ShuffleInPlace(_tasks);
+        _shuffledSequences = new List<List<string>>();
+        foreach (TaskConfig task in _tasks)
+        {
+            _shuffledSequences.Add(ShuffleWithoutReplacement(task.scenePool, task.numScenesToPlay));
+        }
+        Debug.Log("StudyController: applied locally-generated fallback study plan.");
+
+        FinishInitialization();
+    }
+
+    private void FinishInitialization()
+    {
         Invoke(nameof(BeginStudy), _startSceneAutoAdvanceDelay);
     }
 
