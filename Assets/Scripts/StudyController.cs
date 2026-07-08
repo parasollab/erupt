@@ -21,8 +21,12 @@ public class StudyController : MonoBehaviour
     [SerializeField] private InputActionReference _advanceAction;
 
     [Header("Start Scene")]
-    [Tooltip("Optional pause before auto-advancing from StartScene into Task1's interlude.")]
+    [Tooltip("Optional pause before auto-advancing from StartScene into the tutorial (or the first task's interlude, if no tutorial scene is set).")]
     [SerializeField] private float _startSceneAutoAdvanceDelay = 0f;
+
+    [Header("Tutorial")]
+    [Tooltip("Scene shown once, before the first task's interlude, to walk participants through the controls. Leave blank to skip straight into the study.")]
+    [SerializeField] private string _tutorialSceneName = "Tutorial";
 
     [Header("ROS Study Plan")]
     [Tooltip("How long to wait for a /study/plan message before falling back to local random generation (e.g. when running standalone without ROS).")]
@@ -39,7 +43,7 @@ public class StudyController : MonoBehaviour
     // scene loads.
     private List<TaskConfig> _tasks;
     private List<List<string>> _shuffledSequences;
-    private int _taskIndex = -1;       // -1 = still in StartScene, before Task1's interlude
+    private int _taskIndex = -1;       // -2 = on the tutorial scene; -1 = still in StartScene; 0+ = index into _tasks
     private int _sceneIndexInTask = -1; // -1 = currently on the current task's interlude
 
     private void Awake()
@@ -118,6 +122,22 @@ public class StudyController : MonoBehaviour
     // Leaves StartScene automatically once settled, instead of waiting for a button press.
     private void BeginStudy()
     {
+        if (!string.IsNullOrEmpty(_tutorialSceneName))
+        {
+            _taskIndex = -2;
+            SceneManager.LoadScene(_tutorialSceneName);
+            return;
+        }
+
+        _taskIndex = 0;
+        _sceneIndexInTask = -1;
+        LoadCurrentInterlude();
+    }
+
+    // Called by the tutorial scene once the participant has stepped through every control,
+    // to hand off into the study proper. Mirrors what BeginStudy() does when no tutorial is configured.
+    public void FinishTutorial()
+    {
         _taskIndex = 0;
         _sceneIndexInTask = -1;
         LoadCurrentInterlude();
@@ -148,6 +168,13 @@ public class StudyController : MonoBehaviour
 
     private void OnAdvancePressed(InputAction.CallbackContext context)
     {
+        if (_taskIndex == -2)
+        {
+            // On the tutorial scene - TutorialStepDisplay owns this button press locally
+            // and calls FinishTutorial() itself once the participant is done.
+            return;
+        }
+
         if (_shuffledSequences == null || _taskIndex < 0)
         {
             // Still settling in StartScene (auto-advance hasn't fired yet) - ignore.
