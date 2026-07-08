@@ -39,6 +39,9 @@ public static class StudySceneExporter
     // drags onto the collision location in Task3. Add more names here if others turn up.
     private static readonly string[] ExcludedObjectNames = { "EndEffectorHandle", "IndicatorSphere" };
 
+    // Shared .mtl filename written once per scene directory, referenced by every object's .obj.
+    private const string MtlFileName = "materials.mtl";
+
     [System.Serializable]
     private class Vec3
     {
@@ -286,6 +289,7 @@ public static class StudySceneExporter
         }
 
         HashSet<string> usedNames = new HashSet<string>();
+        MaterialExporter materialExporter = new MaterialExporter(sceneDir);
 
         foreach (GameObject go in Object.FindObjectsByType<GameObject>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
         {
@@ -299,7 +303,16 @@ public static class StudySceneExporter
             string objectName = MakeUniqueName(go.name, usedNames);
             string meshFileName = objectName + ".obj";
 
-            WriteObj(Path.Combine(sceneDir, meshFileName), meshFilter.sharedMesh);
+            Material[] materials = meshRenderer.sharedMaterials;
+            Mesh mesh = meshFilter.sharedMesh;
+            string[] materialNamesBySubmesh = new string[mesh.subMeshCount];
+            for (int sub = 0; sub < mesh.subMeshCount; sub++)
+            {
+                Material material = materials.Length > 0 ? materials[Mathf.Min(sub, materials.Length - 1)] : null;
+                materialNamesBySubmesh[sub] = materialExporter.GetOrAddMaterial(material);
+            }
+
+            WriteObj(Path.Combine(sceneDir, meshFileName), mesh, MtlFileName, materialNamesBySubmesh);
 
             (Vec3 position, Quat orientation) = ComputeRosPose(go.transform.position, go.transform.rotation, robotRoot);
             Vector3 scaleUnity = go.transform.lossyScale;
@@ -313,9 +326,13 @@ public static class StudySceneExporter
                 // Same Y/Z axis swap as position/mesh vertices -- no existing
                 // RosUnityConversion helper for scale, so applied by hand here.
                 scale = new Vec3(scaleUnity.x, scaleUnity.z, scaleUnity.y),
+                // Kept as a fallback/tint alongside the real per-material .mtl+texture data
+                // below, for markers that can't or don't use mesh_use_embedded_materials.
                 color = GetObjectColor(meshRenderer),
             });
         }
+
+        materialExporter.WriteMtlFile(MtlFileName);
 
         File.WriteAllText($"{sceneDir}/manifest.json", JsonUtility.ToJson(manifest, true));
         Debug.Log($"StudySceneExporter: exported {manifest.objects.Count} object(s) from '{sceneName}' " +
@@ -365,6 +382,141 @@ public static class StudySceneExporter
         return new ColorInfo(c.r, c.g, c.b, c.a);
     }
 
+    // Per-scene material/texture dedup + .mtl accumulation, so identical materials shared
+    // across many objects (common with these asset-pack scenes) only get one newmtl block
+    // and one copied texture file, not one per object.
+    private class MaterialExporter
+    {
+        private const string FallbackMaterialName = "NoMaterial";
+        private static readonly string[] RecognizedImageExtensions = { ".png", ".jpg", ".jpeg", ".tga", ".bmp" };
+
+        private readonly string _sceneDir;
+        private readonly Dictionary<Material, string> _materialNames = new Dictionary<Material, string>();
+        private readonly HashSet<string> _usedMaterialNames = new HashSet<string>();
+        private readonly HashSet<string> _usedTextureFileNames = new HashSet<string>();
+        private readonly Dictionary<string, string> _copiedTexturesByKey = new Dictionary<string, string>();
+        private readonly StringBuilder _mtl = new StringBuilder();
+        private bool _hasFallback;
+
+        public MaterialExporter(string sceneDir) { _sceneDir = sceneDir; }
+
+        public string GetOrAddMaterial(Material material)
+        {
+            if (material == null) return GetOrAddFallback();
+            if (_materialNames.TryGetValue(material, out string existing)) return existing;
+
+            string name = MakeUnique(material.name, "Material", _usedMaterialNames);
+            _materialNames[material] = name;
+
+            Color c = material.HasProperty("_BaseColor") ? material.GetColor("_BaseColor") : material.color;
+            string texFileName = ExportTexture(material);
+
+            _mtl.AppendLine($"newmtl {name}");
+            _mtl.AppendLine($"Kd {c.r} {c.g} {c.b}");
+            _mtl.AppendLine($"d {c.a}");
+            if (texFileName != null) _mtl.AppendLine($"map_Kd {texFileName}");
+            _mtl.AppendLine();
+
+            return name;
+        }
+
+        private string GetOrAddFallback()
+        {
+            if (!_hasFallback)
+            {
+                _usedMaterialNames.Add(FallbackMaterialName);
+                _mtl.AppendLine($"newmtl {FallbackMaterialName}");
+                _mtl.AppendLine("Kd 0.7 0.7 0.7");
+                _mtl.AppendLine("d 1");
+                _mtl.AppendLine();
+                _hasFallback = true;
+            }
+            return FallbackMaterialName;
+        }
+
+        // Prefers copying the material's source texture file directly (works regardless of
+        // the texture's "Read/Write Enabled" import setting, since it reads the original file
+        // bytes off disk rather than going through Unity's texture API) over re-encoding pixel
+        // data, which is only attempted as a fallback for non-asset-backed textures.
+        private string ExportTexture(Material material)
+        {
+            Texture texture = material.HasProperty("_BaseMap") ? material.GetTexture("_BaseMap") : material.mainTexture;
+            if (texture == null) return null;
+
+            string assetPath = AssetDatabase.GetAssetPath(texture);
+            if (!string.IsNullOrEmpty(assetPath))
+            {
+                if (_copiedTexturesByKey.TryGetValue(assetPath, out string cachedByPath)) return cachedByPath;
+
+                string ext = Path.GetExtension(assetPath).ToLowerInvariant();
+                if (RecognizedImageExtensions.Contains(ext))
+                {
+                    string fileName = MakeUnique(Path.GetFileNameWithoutExtension(assetPath), "Texture", _usedTextureFileNames, ext);
+                    File.Copy(assetPath, Path.Combine(_sceneDir, fileName), overwrite: true);
+                    _copiedTexturesByKey[assetPath] = fileName;
+                    return fileName;
+                }
+                Debug.LogWarning($"StudySceneExporter: texture asset '{assetPath}' has an unrecognized " +
+                                  $"extension '{ext}'; falling back to pixel re-encode.");
+            }
+
+            if (!(texture is Texture2D tex2D)) return null;
+
+            string cacheKey = "instance:" + texture.GetInstanceID();
+            if (_copiedTexturesByKey.TryGetValue(cacheKey, out string cachedByInstance)) return cachedByInstance;
+
+            try
+            {
+                Texture2D readable = MakeReadableCopy(tex2D);
+                byte[] png = ImageConversion.EncodeToPNG(readable);
+                Object.DestroyImmediate(readable);
+                string fileName = MakeUnique(tex2D.name, "Texture", _usedTextureFileNames, ".png");
+                File.WriteAllBytes(Path.Combine(_sceneDir, fileName), png);
+                _copiedTexturesByKey[cacheKey] = fileName;
+                return fileName;
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"StudySceneExporter: failed to export texture '{texture.name}': {e.Message}");
+                return null;
+            }
+        }
+
+        private static Texture2D MakeReadableCopy(Texture2D source)
+        {
+            RenderTexture rt = RenderTexture.GetTemporary(source.width, source.height, 0, RenderTextureFormat.ARGB32);
+            RenderTexture previous = RenderTexture.active;
+            Graphics.Blit(source, rt);
+            RenderTexture.active = rt;
+            Texture2D readable = new Texture2D(source.width, source.height, TextureFormat.RGBA32, false);
+            readable.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
+            readable.Apply();
+            RenderTexture.active = previous;
+            RenderTexture.ReleaseTemporary(rt);
+            return readable;
+        }
+
+        private static string MakeUnique(string rawName, string fallbackBaseName, HashSet<string> usedNames, string suffix = "")
+        {
+            string sanitized = string.Concat((rawName ?? fallbackBaseName).Select(c => char.IsLetterOrDigit(c) || c == '_' || c == '-' ? c : '_'));
+            if (sanitized.Length == 0) sanitized = fallbackBaseName;
+
+            string candidate = sanitized + suffix;
+            int i = 1;
+            while (!usedNames.Add(candidate))
+            {
+                candidate = $"{sanitized}_{i}{suffix}";
+                i++;
+            }
+            return candidate;
+        }
+
+        public void WriteMtlFile(string mtlFileName)
+        {
+            File.WriteAllText(Path.Combine(_sceneDir, mtlFileName), _mtl.ToString());
+        }
+    }
+
     private static string MakeUniqueName(string rawName, HashSet<string> usedNames)
     {
         string sanitized = string.Concat(rawName.Select(c => char.IsLetterOrDigit(c) || c == '_' || c == '-' ? c : '_'));
@@ -390,7 +542,7 @@ public static class StudySceneExporter
     // UnityMeshToRosMesh). Triangle winding is reversed to compensate for the parity
     // flip that axis swap introduces, mirroring CollisionObjectsListenerSimple.BuildMesh
     // -- skipping this step would make every exported face render inside-out in RViz.
-    private static void WriteObj(string path, Mesh mesh)
+    private static void WriteObj(string path, Mesh mesh, string mtlFileName, string[] materialNamesBySubmesh)
     {
         Vector3[] verts = mesh.vertices;
         Vector3[] normals = mesh.normals;
@@ -407,6 +559,7 @@ public static class StudySceneExporter
 
         StringBuilder sb = new StringBuilder();
         sb.AppendLine($"# exported by StudySceneExporter from mesh '{mesh.name}'");
+        sb.AppendLine($"mtllib {mtlFileName}");
 
         foreach (Vector3 v in verts)
         {
@@ -429,6 +582,11 @@ public static class StudySceneExporter
 
         for (int sub = 0; sub < mesh.subMeshCount; sub++)
         {
+            if (sub < materialNamesBySubmesh.Length)
+            {
+                sb.AppendLine($"usemtl {materialNamesBySubmesh[sub]}");
+            }
+
             int[] tris = mesh.GetTriangles(sub);
             for (int i = 0; i + 2 < tris.Length; i += 3)
             {
