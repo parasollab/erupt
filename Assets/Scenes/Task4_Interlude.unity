@@ -665,18 +665,20 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: xrviz::InterludeInstructionsDisplay
   uiDocument: {fileID: 1567376382}
-  instructionsText: 'You are about to start the Collision Identification task.
+  instructionsText: 'You are about to start the Path Planning task.
 
 
-    You
-    will be placed in several scenes. There will be a robot trajectory playing in
-    each that collides with an object in the environment. Move the red sphere to
-    cover the place in the scene where the collision occurs.
+    You will
+    be placed in several scenes. In each, you must plan a path for the robot. Place
+    the robot''s start position such that the end effector (wrist) is within the
+    green region. Place the robot''s goal position such that the end effector (wrist)
+    is within the orange region. Then, send a planning request using the Planning
+    Request Menu. Once inspecting the path, check the box to indicate it is collision-free.
 
 
-    Press ''B'' on
-    the Right Hand Controller to advance to the first scene. Press ''B'' again when
-    finished with each scene to advance to the next.'
+    Press
+    ''B'' on the Right Hand Controller to advance to the first scene. Press ''B''
+    again when finished with each scene to advance to the next.'
 --- !u!4 &1567376384
 Transform:
   m_ObjectHideFlags: 0
