@@ -150,7 +150,7 @@ public static class StudySceneExporter
                    "Copy the output into erupt_ws/src/study_scene_assets/trajectories/.");
     }
 
-    // Reads _task1/_task2/_task3's scenePool (private SerializeField lists) off the
+    // Reads _task1/_task2/_task3/_task4's scenePool (private SerializeField lists) off the
     // StudyController component on StartScene, so the exporter always matches whatever
     // is actually configured rather than assuming the Task{N}_{Factory|Kitchen}{1-5}
     // naming convention holds for every scene on disk.
@@ -175,7 +175,7 @@ public static class StudySceneExporter
         else
         {
             SerializedObject so = new SerializedObject(controller);
-            foreach (string taskField in new[] { "_task1", "_task2", "_task3" })
+            foreach (string taskField in new[] { "_task1", "_task2", "_task3", "_task4" })
             {
                 SerializedProperty pool = so.FindProperty(taskField + ".scenePool");
                 if (pool == null) continue;
