@@ -53682,6 +53682,9 @@ MonoBehaviour:
   startGhostColor: {r: 0, g: 1, b: 0, a: 0.5}
   goalGhostColor: {r: 1, g: 0.5, b: 0, a: 0.5}
   realRobot: {fileID: 1618078477}
+  ghostControlPanelPrefab: {fileID: 100000, guid: 773add1d90d0a498b84e95915cf756d5, type: 3}
+  controlPanelLocalOffset: {x: 0, y: 0.5, z: 0}
+  ghostSelectionRadius: 0.35
 --- !u!4 &1184726768
 Transform:
   m_ObjectHideFlags: 0
