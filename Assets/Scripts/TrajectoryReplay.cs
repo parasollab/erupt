@@ -10,6 +10,17 @@ public class TrajectoryReplay : MonoBehaviour
     [SerializeField] private SpawnGhosts ghostSpawner;
     [SerializeField] private Color replayGhostColor = new Color(0f, 0.5f, 1f, 0.5f);
 
+    public const float MinPlaybackSpeed = 0.1f;
+    public const float MaxPlaybackSpeed = 3f;
+
+    [SerializeField, Range(MinPlaybackSpeed, MaxPlaybackSpeed)] private float playbackSpeed = 1f;
+
+    public float PlaybackSpeed
+    {
+        get => playbackSpeed;
+        set => playbackSpeed = Mathf.Clamp(value, MinPlaybackSpeed, MaxPlaybackSpeed);
+    }
+
     private bool isReplaying = false;
     private Coroutine replayRoutine;
     private bool hasFinishedOneLoop = false;
@@ -23,6 +34,7 @@ public class TrajectoryReplay : MonoBehaviour
     {
         if (ghostSpawner == null)
             ghostSpawner = GetComponent<SpawnGhosts>();
+        ghostSpawner?.RegisterReplayController(this);
     }
 
     public void StartReplay(JointTrajectoryMsg trajectory)
@@ -47,17 +59,24 @@ public class TrajectoryReplay : MonoBehaviour
     {
         if (!isReplaying && replayRoutine == null) return;
         isReplaying = false;
+        ghostSpawner?.SetReplayActive(this, false);
     }
 
     private void OnDisable()
     {
         isReplaying = false;
+        ghostSpawner?.SetReplayActive(this, false);
         if (replayRoutine != null)
         {
             StopCoroutine(replayRoutine);
             replayRoutine = null;
         }
         DestroyReplayGhost();
+    }
+
+    private void OnDestroy()
+    {
+        ghostSpawner?.UnregisterReplayController(this);
     }
 
     private IEnumerator RestartRoutine(JointTrajectoryMsg newTrajectory)
@@ -86,6 +105,7 @@ public class TrajectoryReplay : MonoBehaviour
         }
 
         isReplaying = true;
+        ghostSpawner.SetReplayActive(this, true);
 
         try
         {
@@ -101,6 +121,7 @@ public class TrajectoryReplay : MonoBehaviour
             DestroyReplayGhost();
             replayRoutine = null;
             isReplaying = false;
+            ghostSpawner.SetReplayActive(this, false);
         }
     }
 
@@ -109,7 +130,9 @@ public class TrajectoryReplay : MonoBehaviour
     // drive the ghost directly and leave the real robot free for the user to grab and replan.
     private bool SpawnReplayGhost()
     {
-        replayGhost = ghostSpawner.SpawnGhost("ReplayGhost", replayGhostColor);
+        // The replay source remains on the selectable for identification/debugging; all panels control
+        // replay through SpawnGhosts' shared controller registration.
+        replayGhost = ghostSpawner.SpawnGhost("ReplayGhost", replayGhostColor, this);
         if (replayGhost == null)
         {
             Debug.LogError("[TrajectoryReplay] Failed to spawn replay ghost.");
@@ -136,7 +159,10 @@ public class TrajectoryReplay : MonoBehaviour
     private void DestroyReplayGhost()
     {
         if (replayGhost != null)
+        {
+            ghostSpawner?.DetachPanelBeforeDestroy(replayGhost);
             Destroy(replayGhost);
+        }
         replayGhost = null;
         ghostJointsByRosName = null;
     }
@@ -188,7 +214,7 @@ public class TrajectoryReplay : MonoBehaviour
 
         while (elapsed < duration && isReplaying)
         {
-            elapsed += Time.deltaTime;
+            elapsed += Time.deltaTime * playbackSpeed;
             float t = Mathf.Clamp01(elapsed / duration);
             for (int j = 0; j < names.Length; j++)
                 lerped[j] = from[j] + (to[j] - from[j]) * t;

@@ -16,6 +16,7 @@ public class Quest3RobotInteractionController : MonoBehaviour
     private object activeDragInteractor;
     private float dragDistance;
     private Vector3 dragOffset;
+    private GhostControlPanel draggedPanel;
 
     public Transform Handle => handle;
 
@@ -45,6 +46,19 @@ public class Quest3RobotInteractionController : MonoBehaviour
 
     public void SelectFromHit(RaycastHit hit)
     {
+        // The shared control panel is parented under whichever ghost currently owns it, so a hit
+        // on the panel would otherwise also resolve to that ghost's GhostSelectable via the parent
+        // lookup below. Exclude it so poking or grabbing any part of the panel cannot close it.
+        var ghostSelectable = hit.transform.GetComponentInParent<GhostSelectable>();
+        if (ghostSelectable != null && GetPanelFromHit(hit) != null)
+            ghostSelectable = null;
+
+        if (ghostSelectable != null)
+        {
+            ghostSelectable.OnSelected();
+            return;
+        }
+
         if (handle != null && (hit.transform == handle || hit.transform.IsChildOf(handle)))
         {
             ClearSelection();
@@ -66,7 +80,25 @@ public class Quest3RobotInteractionController : MonoBehaviour
 
     public bool TryBeginHandleDrag(object interactor, Ray ray, RaycastHit hit)
     {
-        if (ikController == null || handle == null || interactor == null)
+        if (interactor == null)
+        {
+            return false;
+        }
+
+        // Ghost control panels take priority: dragging one to reposition it shouldn't also
+        // try to drag the IK handle underneath it.
+        GhostControlPanel panel = GetPanelFromHit(hit);
+        if (panel != null)
+        {
+            activeDragInteractor = interactor;
+            draggedPanel = panel;
+            dragDistance = hit.distance;
+            dragOffset = panel.ShellPosition - ray.GetPoint(dragDistance);
+            panel.BeginDrag();
+            return true;
+        }
+
+        if (ikController == null || handle == null)
         {
             return false;
         }
@@ -88,12 +120,24 @@ public class Quest3RobotInteractionController : MonoBehaviour
 
     public void UpdateHandleDrag(object interactor, Ray ray)
     {
-        if (activeDragInteractor != interactor || ikController == null || handle == null)
+        if (activeDragInteractor != interactor)
         {
             return;
         }
 
         Vector3 target = ray.GetPoint(dragDistance) + dragOffset;
+
+        if (draggedPanel != null)
+        {
+            draggedPanel.UpdateDrag(target);
+            return;
+        }
+
+        if (ikController == null || handle == null)
+        {
+            return;
+        }
+
         handle.position = target;
         ikController.SolveToTarget(target);
     }
@@ -106,6 +150,14 @@ public class Quest3RobotInteractionController : MonoBehaviour
         }
 
         activeDragInteractor = null;
+
+        if (draggedPanel != null)
+        {
+            draggedPanel.EndDrag();
+            draggedPanel = null;
+            return;
+        }
+
         ikController.EndInteraction();
         if (endEffector != null && handle != null)
         {
@@ -113,6 +165,15 @@ public class Quest3RobotInteractionController : MonoBehaviour
         }
 
         SetHandleActive(false);
+    }
+
+    // The panel's grabbable BoxCollider lives on the shell root while the GhostControlPanel
+    // component lives on its child UIDocument object, so a raycast hit can land on either.
+    private static GhostControlPanel GetPanelFromHit(RaycastHit hit)
+    {
+        if (hit.transform == null) return null;
+        return hit.transform.GetComponentInChildren<GhostControlPanel>()
+            ?? hit.transform.GetComponentInParent<GhostControlPanel>();
     }
 
     public void JogSelectedJoint(float deltaRadians)
