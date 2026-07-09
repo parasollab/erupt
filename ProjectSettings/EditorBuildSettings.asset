@@ -135,6 +135,15 @@ EditorBuildSettings:
     path: Assets/Scenes/Task3_Kitchen5.unity
     guid: 2a85060ab61984a768c6f5a50ec36748
   - enabled: 1
+    path: Assets/Scenes/Task4_Interlude.unity
+    guid: efd01d7e2d6d44a9884d9fbf850decac
+  - enabled: 1
+    path: Assets/Scenes/Task4_Factory1.unity
+    guid: 6d2a202879304439da53362796fddf64
+  - enabled: 1
+    path: Assets/Scenes/Task4_Factory2.unity
+    guid: 9e413da1a963842229d8d1c35ac2f6b7
+  - enabled: 1
     path: Assets/Scenes/StudyComplete.unity
     guid: 1e0b1ed55ff747b695d1743f0b6fd493
   - enabled: 0

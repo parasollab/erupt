@@ -36,6 +36,7 @@ public class StudyController : MonoBehaviour
     [SerializeField] private TaskConfig _task1 = new TaskConfig();
     [SerializeField] private TaskConfig _task2 = new TaskConfig();
     [SerializeField] private TaskConfig _task3 = new TaskConfig();
+    [SerializeField] private TaskConfig _task4 = new TaskConfig();
 
     // Runtime state. We track progress with explicit indices rather than
     // inferring it from the active scene name, since these indices live on
@@ -56,7 +57,7 @@ public class StudyController : MonoBehaviour
         Instance = this;
         DontDestroyOnLoad(gameObject);
 
-        _tasks = new List<TaskConfig> { _task1, _task2, _task3 };
+        _tasks = new List<TaskConfig> { _task1, _task2, _task3, _task4 };
 
         if (_advanceAction != null)
         {

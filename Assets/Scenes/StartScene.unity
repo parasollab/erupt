@@ -151,6 +151,7 @@ MonoBehaviour:
   _advanceAction: {fileID: -6469114226445947990, guid: c348712bda248c246b8c49b3db54643f, type: 3}
   _startSceneAutoAdvanceDelay: 0
   _tutorialSceneName: Tutorial
+  _rosPlanTimeoutSeconds: 3
   _task1:
     interludeSceneName: Task1_Interlude
     scenePool:
@@ -192,6 +193,12 @@ MonoBehaviour:
     - Task3_Kitchen3
     - Task3_Kitchen4
     - Task3_Kitchen5
+    numScenesToPlay: 5
+  _task4:
+    interludeSceneName: Task4_Interlude
+    scenePool:
+    - Task4_Factory1
+    - Task4_Factory2
     numScenesToPlay: 5
 --- !u!4 &224257073
 Transform:

@@ -5031,6 +5031,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: xrviz::TrajectoryReplay
   ikController: {fileID: 1897186339}
+  ghostSpawner: {fileID: 0}
+  replayGhostColor: {r: 0, g: 0.5, b: 1, a: 0.5}
 --- !u!4 &2066554330
 Transform:
   m_ObjectHideFlags: 0
