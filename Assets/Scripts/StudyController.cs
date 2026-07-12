@@ -9,6 +9,13 @@ public class StudyController : MonoBehaviour
 {
     public static StudyController Instance { get; private set; }
 
+    // Set from the received /study/plan message; "unknown" when running standalone with a
+    // locally-generated fallback plan (no ROS participant identity to attach to it).
+    public string ParticipantId { get; private set; } = "unknown";
+
+    public int TaskIndex => _taskIndex;
+    public int SceneIndexInTask => _sceneIndexInTask;
+
     [System.Serializable]
     public class TaskConfig
     {
@@ -95,6 +102,7 @@ public class StudyController : MonoBehaviour
 
         _tasks = orderedTasks;
         _shuffledSequences = sequences;
+        ParticipantId = plan.participant_id;
         Debug.Log($"StudyController: applied external study plan for participant '{plan.participant_id}' ({_tasks.Count} tasks).");
 
         FinishInitialization();
