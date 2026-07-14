@@ -2,6 +2,11 @@ using UnityEngine;
 
 public class Quest3RobotInteractionController : MonoBehaviour
 {
+    // Fixed id -- EndEffectorHandle is a single static part of the Robot IK Manager prefab
+    // present in every scene, not a spawned/duplicated object, same convention as
+    // IndicatorSphereController's default "indicator_sphere" id.
+    private const string EndEffectorHandleObjectId = "end_effector_handle";
+
     [SerializeField] private DirectArticulationIKController ikController;
     [SerializeField] private Transform endEffector;
     [SerializeField] private Transform handle;
@@ -115,6 +120,7 @@ public class Quest3RobotInteractionController : MonoBehaviour
         ikController.BeginInteraction();
         SetHandleActive(true);
         ClearSelection();
+        ObjectMetricsLogger.Instance?.LogEvent("grab_start", EndEffectorHandleObjectId);
         return true;
     }
 
@@ -161,6 +167,10 @@ public class Quest3RobotInteractionController : MonoBehaviour
         ikController.EndInteraction();
         if (endEffector != null && handle != null)
         {
+            // Log before snapping the handle marker back to endEffector -- they should already
+            // coincide (IK solves toward the drag target continuously), but endEffector is the
+            // real robot pose, so that's the one worth logging.
+            ObjectMetricsLogger.Instance?.LogEvent("grab_end", EndEffectorHandleObjectId, endEffector.position, endEffector.rotation);
             handle.position = endEffector.position;
         }
 
@@ -176,17 +186,49 @@ public class Quest3RobotInteractionController : MonoBehaviour
             ?? hit.transform.GetComponentInParent<GhostControlPanel>();
     }
 
+    // JogSelectedJoint is called every frame regardless of thumbstick position (with
+    // deltaRadians == 0 while centered/idle -- see Quest3ControllerRayInteractor.Update), so the
+    // moving/idle transition can be detected entirely in here: log "grab_end" the frame jogging
+    // stops rather than needing every-frame logging while the joystick is held.
+    private bool isJoggingSelectedJoint = false;
+
     public void JogSelectedJoint(float deltaRadians)
     {
-        if (selectedJoint == null || ikController == null || Mathf.Approximately(deltaRadians, 0f))
+        if (selectedJoint == null || ikController == null)
         {
             return;
         }
+
+        if (Mathf.Approximately(deltaRadians, 0f))
+        {
+            if (isJoggingSelectedJoint)
+            {
+                LogJointJogEnd();
+            }
+            return;
+        }
+
+        isJoggingSelectedJoint = true;
 
         ikController.BeginInteraction();
         ikController.NudgeJoint(selectedJoint, deltaRadians);
         ikController.EndInteraction();
     }
+
+    private void LogJointJogEnd()
+    {
+        isJoggingSelectedJoint = false;
+        if (selectedJoint == null)
+        {
+            return;
+        }
+
+        float angleRad = selectedJoint.jointPosition[0];
+        ObjectMetricsLogger.Instance?.LogEvent("grab_end", JointObjectId(selectedJoint),
+            selectedJoint.transform.position, selectedJoint.transform.rotation, $"angle_rad:{angleRad:F4}");
+    }
+
+    private static string JointObjectId(ArticulationBody joint) => $"joint_{joint.name}";
 
     private void SelectJoint(ArticulationBody joint)
     {
@@ -206,10 +248,20 @@ public class Quest3RobotInteractionController : MonoBehaviour
             originalColors[i] = GetColor(mat);
             SetColor(mat, selectedJointColor);
         }
+
+        ObjectMetricsLogger.Instance?.LogEvent("grab_start", JointObjectId(joint));
     }
 
     private void ClearSelection()
     {
+        // Flush a jog session that was still in progress when selection changed (e.g. the
+        // participant let go of the trigger or grabbed something else mid-jog), so grab_start
+        // never goes without a matching grab_end.
+        if (isJoggingSelectedJoint)
+        {
+            LogJointJogEnd();
+        }
+
         if (selectedRenderers != null && originalColors != null)
         {
             int count = Mathf.Min(selectedRenderers.Length, originalColors.Length);

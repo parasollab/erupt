@@ -46,8 +46,10 @@ public class MouseRobotRayInteractor : MonoBehaviour
             float direction = 0f;
             if (Input.GetKey(KeyCode.RightArrow)) direction += 1f;
             if (Input.GetKey(KeyCode.LeftArrow)) direction -= 1f;
-            if (direction != 0f)
-                robotInteraction.JogSelectedJoint(direction * jointJogRadiansPerSecond * Time.deltaTime);
+            // Called every frame (even at direction == 0) so JogSelectedJoint can detect the
+            // moving-to-idle transition itself and log grab_end -- see Quest3ControllerRayInteractor
+            // for the same pattern.
+            robotInteraction.JogSelectedJoint(direction * jointJogRadiansPerSecond * Time.deltaTime);
         }
     }
 }

@@ -13,6 +13,12 @@ using System;
 
 public class MoveItPlanningRequestMenuUI : MonoBehaviour
 {
+    // Synthetic object_id tying together set_start_state/set_goal_state/send_planning_request/
+    // planning_request_result events in the ObjectEvent log -- there's no spawned GameObject
+    // behind these, just logical actions on this menu, same convention as CertifyPathMenuController's
+    // "path_certification".
+    private const string PlanningRequestObjectId = "planning_request";
+
     [Header("Robot")]
     [SerializeField] private DirectArticulationIKController ikController;
     [SerializeField] private string jointStateTopic = "/joint_states";
@@ -452,6 +458,8 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
     private void OnSetStartStateClicked()
     {
+        ObjectMetricsLogger.Instance?.LogEvent("set_start_state", PlanningRequestObjectId);
+
         if (!startSet)
         {
             ghostSpawner.SpawnStartGhost();
@@ -477,6 +485,8 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
     private void OnSetGoalStateClicked()
     {
+        ObjectMetricsLogger.Instance?.LogEvent("set_goal_state", PlanningRequestObjectId);
+
         if (!goalSet)
         {
             ghostSpawner.SpawnGoalGhost();
@@ -502,6 +512,8 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
     public void SendPlanningRequest()
     {
+        ObjectMetricsLogger.Instance?.LogEvent("send_planning_request", PlanningRequestObjectId);
+
         if (!isConnected)
         {
             Debug.LogWarning("MoveItPlanningRequestMenuUI: ROS 2 connection not available.");
@@ -725,6 +737,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         if (motionPlanResponse.error_code.val == 1) // SUCCESS
         {
             Debug.Log($"MoveItPlanningRequestMenuUI: Planning successful! Planning time: {motionPlanResponse.planning_time}s");
+            ObjectMetricsLogger.Instance?.LogEvent("planning_request_result", PlanningRequestObjectId, details: "success");
 
             // Handle the planned trajectory
             if (motionPlanResponse.trajectory?.joint_trajectory != null)
@@ -747,6 +760,8 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
             executeTrajectoryButton.SetEnabled(false);
 
             Debug.LogError($"MoveItPlanningRequestMenuUI: Planning failed with error code: {motionPlanResponse.error_code.val} - {motionPlanResponse.error_code.message}");
+            ObjectMetricsLogger.Instance?.LogEvent("planning_request_result", PlanningRequestObjectId,
+                details: $"failure:{motionPlanResponse.error_code.val}:{motionPlanResponse.error_code.message}");
         }
     }
 
