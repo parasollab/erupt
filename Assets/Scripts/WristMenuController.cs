@@ -158,9 +158,11 @@ public class WristMenuController : MonoBehaviour
         slider.style.paddingRight = 10;
 
         float prevValue = 100f;
-        float dragStartValue = 100f;
-        int activePointerId = -1;
+        bool gestureActive = false;
+        float gestureStartValue = 100f;
+        IVisualElementScheduledItem gestureEndCheck = null;
         const float minScale = 0.01f;
+        const long gestureEndDebounceMs = 200;
 
         void ResetToCenterDeferred()
         {
@@ -169,6 +171,33 @@ public class WristMenuController : MonoBehaviour
                 slider.SetValueWithoutNotify(100f);
                 prevValue = 100f;
             }).ExecuteLater(0);
+        }
+
+        // Logs the resize once the gesture is considered finished (see the debounce comment
+        // below), then recenters the slider for the next nudge.
+        void FinishGesture()
+        {
+            gestureActive = false;
+
+            float totalDeltaPercent = (slider.value - gestureStartValue) / 100f;
+            if (!Mathf.Approximately(totalDeltaPercent, 0f))
+            {
+                GameObject selected = selectionManager.SelectedObject;
+                CollisionObjectPublisher publisher = selected != null ? selected.GetComponent<CollisionObjectPublisher>() : null;
+                if (publisher != null)
+                {
+                    string sign = totalDeltaPercent >= 0 ? "+" : "";
+                    ObjectMetricsLogger.Instance?.LogEvent("edit_operation", publisher.objectId,
+                        details: $"resize:{shape}:{label}:{sign}{totalDeltaPercent:F3}");
+                }
+                else
+                {
+                    Debug.LogWarning($"WristMenuController: resize on '{(selected != null ? selected.name : "null")}' " +
+                        "not logged -- no CollisionObjectPublisher component (only wrist-menu-spawned shapes have one).");
+                }
+            }
+
+            ResetToCenterDeferred();
         }
 
         Vector3 MakeDelta(string shapeName, string axisLabel, float delta)
@@ -195,18 +224,25 @@ public class WristMenuController : MonoBehaviour
             }
         }
 
-        slider.RegisterCallback<PointerDownEvent>(evt =>
-        {
-            activePointerId = evt.pointerId;
-            prevValue = slider.value;
-            dragStartValue = slider.value;
-            slider.CapturePointer(activePointerId);
-        });
-
+        // Gesture start/end is detected purely from ValueChanged plus a debounce timer, not from
+        // Pointer{Down,Up,Cancel}Events -- confirmed via on-device logcat that the XR poke input
+        // bridge drives ValueChanged continuously and reliably during a drag, but never sends a
+        // terminating PointerUp (even registered on the capture/TrickleDown phase, which does fix
+        // PointerDown -- the thumb still swallows Up somewhere in the XR->UI Toolkit pipeline).
         slider.RegisterValueChangedCallback(evt =>
         {
             var selected = selectionManager.SelectedObject;
             if (selected == null) { prevValue = evt.newValue; return; }
+
+            if (!gestureActive)
+            {
+                gestureActive = true;
+                gestureStartValue = prevValue;
+            }
+
+            gestureEndCheck?.Pause();
+            gestureEndCheck = slider.schedule.Execute(FinishGesture);
+            gestureEndCheck.ExecuteLater(gestureEndDebounceMs);
 
             float delta = (evt.newValue - prevValue) / 100f;
             prevValue = evt.newValue;
@@ -240,40 +276,6 @@ public class WristMenuController : MonoBehaviour
                 s.z = Mathf.Max(minScale, s.z);
                 selected.transform.localScale = s;
             }
-        });
-
-        slider.RegisterCallback<PointerUpEvent>(evt =>
-        {
-            if (evt.pointerId == activePointerId)
-            {
-                float totalDeltaPercent = (slider.value - dragStartValue) / 100f;
-                if (!Mathf.Approximately(totalDeltaPercent, 0f))
-                {
-                    GameObject selected = selectionManager.SelectedObject;
-                    CollisionObjectPublisher publisher = selected != null ? selected.GetComponent<CollisionObjectPublisher>() : null;
-                    if (publisher != null)
-                    {
-                        string sign = totalDeltaPercent >= 0 ? "+" : "";
-                        ObjectMetricsLogger.Instance?.LogEvent("edit_operation", publisher.objectId,
-                            details: $"resize:{shape}:{label}:{sign}{totalDeltaPercent:F3}");
-                    }
-                }
-
-                ResetToCenterDeferred();
-                slider.ReleasePointer(activePointerId);
-                activePointerId = -1;
-            }
-        });
-        slider.RegisterCallback<PointerCancelEvent>(_ =>
-        {
-            ResetToCenterDeferred();
-            activePointerId = -1;
-        });
-        slider.RegisterCallback<PointerCaptureOutEvent>(_ =>
-        {
-            // Safety: if capture is lost, still recenter
-            ResetToCenterDeferred();
-            activePointerId = -1;
         });
 
         container.Add(toggle);
@@ -845,6 +847,11 @@ public class WristMenuController : MonoBehaviour
             if (publisher != null)
             {
                 ObjectMetricsLogger.Instance?.LogEvent("edit_operation", publisher.objectId, details: "snap");
+            }
+            else
+            {
+                Debug.LogWarning($"WristMenuController: snap on '{selected.name}' not logged -- " +
+                    "no CollisionObjectPublisher component (only wrist-menu-spawned shapes have one).");
             }
             return;
         }
