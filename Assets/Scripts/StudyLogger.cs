@@ -35,6 +35,12 @@ public class StudyLogger : MonoBehaviour
     private void Awake()
     {
         ros = ROSConnection.GetOrCreateInstance();
+        // StudyEventMsg's own [RuntimeInitializeOnLoadMethod] Register() defaults to
+        // AfterSceneLoad, which runs after this (BeforeSceneLoad); calling it explicitly here
+        // guarantees MessageRegistry knows its RosMessageName before RegisterPublisher below
+        // resolves it -- otherwise the resolved name is silently empty and never gets fixed up,
+        // and the ROS-TCP-Endpoint server rejects the registration.
+        StudyEventMsg.Register();
         ros.RegisterPublisher<StudyEventMsg>(Topic);
         SceneManager.sceneLoaded += OnSceneLoaded;
         Application.quitting += OnQuitting;

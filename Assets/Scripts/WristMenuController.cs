@@ -158,6 +158,7 @@ public class WristMenuController : MonoBehaviour
         slider.style.paddingRight = 10;
 
         float prevValue = 100f;
+        float dragStartValue = 100f;
         int activePointerId = -1;
         const float minScale = 0.01f;
 
@@ -198,6 +199,7 @@ public class WristMenuController : MonoBehaviour
         {
             activePointerId = evt.pointerId;
             prevValue = slider.value;
+            dragStartValue = slider.value;
             slider.CapturePointer(activePointerId);
         });
 
@@ -244,6 +246,19 @@ public class WristMenuController : MonoBehaviour
         {
             if (evt.pointerId == activePointerId)
             {
+                float totalDeltaPercent = (slider.value - dragStartValue) / 100f;
+                if (!Mathf.Approximately(totalDeltaPercent, 0f))
+                {
+                    GameObject selected = selectionManager.SelectedObject;
+                    CollisionObjectPublisher publisher = selected != null ? selected.GetComponent<CollisionObjectPublisher>() : null;
+                    if (publisher != null)
+                    {
+                        string sign = totalDeltaPercent >= 0 ? "+" : "";
+                        ObjectMetricsLogger.Instance?.LogEvent("edit_operation", publisher.objectId,
+                            details: $"resize:{shape}:{label}:{sign}{totalDeltaPercent:F3}");
+                    }
+                }
+
                 ResetToCenterDeferred();
                 slider.ReleasePointer(activePointerId);
                 activePointerId = -1;
@@ -825,6 +840,12 @@ public class WristMenuController : MonoBehaviour
             if (lockPose != null) lockPose.SyncInitialRotation();
 
             Debug.Log($"WristMenuController: Snapped '{selected.name}' to '{h.collider.name}' normal={h.normal}");
+
+            CollisionObjectPublisher publisher = selected.GetComponent<CollisionObjectPublisher>();
+            if (publisher != null)
+            {
+                ObjectMetricsLogger.Instance?.LogEvent("edit_operation", publisher.objectId, details: "snap");
+            }
             return;
         }
 

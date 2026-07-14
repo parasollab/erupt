@@ -4658,6 +4658,37 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1826193476
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1826193477}
+  m_Layer: 0
+  m_Name: BaseTransform
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1826193477
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1826193476}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0.7071068, z: -0, w: 0.7071068}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 4530284861057829793}
+  m_LocalEulerAnglesHint: {x: 0, y: -90, z: 0}
 --- !u!114 &1897186338 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 8298115101934582173, guid: 5a898bca8115f465ba729909cf9fa37f, type: 3}
@@ -5360,6 +5391,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: xrviz::TrajectoryReplay
   ikController: {fileID: 1897186339}
+  ghostSpawner: {fileID: 0}
+  replayGhostColor: {r: 0, g: 0.5, b: 1, a: 0.5}
+  playbackSpeed: 1
 --- !u!4 &2066554330
 Transform:
   m_ObjectHideFlags: 0
@@ -5906,7 +5940,10 @@ PrefabInstance:
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
-    m_AddedGameObjects: []
+    m_AddedGameObjects:
+    - targetCorrespondingSourceObject: {fileID: 5410201463809928479, guid: 792b9a32fef2641c3be1678d4de8461c, type: 3}
+      insertIndex: 0
+      addedObject: {fileID: 1826193477}
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 792b9a32fef2641c3be1678d4de8461c, type: 3}
 --- !u!4 &4530284861057829792 stripped

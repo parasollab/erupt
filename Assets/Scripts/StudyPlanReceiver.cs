@@ -13,6 +13,11 @@ public static class StudyPlanReceiver
         bool received = false;
 
         ROSConnection ros = ROSConnection.GetOrCreateInstance();
+        // StudyPlanMsg's own Register() defaults to RuntimeInitializeLoadType.AfterSceneLoad,
+        // which runs after StudyController.Awake() (this call happens in StartScene's Awake
+        // phase). Without this, MessageRegistry doesn't know StudyPlanMsg's RosMessageName yet,
+        // so Subscribe below resolves an empty name that's never corrected afterward.
+        StudyPlanMsg.Register();
         ros.Subscribe<StudyPlanMsg>("/study/plan", msg =>
         {
             if (received) return;

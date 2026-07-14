@@ -78,12 +78,26 @@ public class SelectableGrabController : MonoBehaviour
     {
         isGrabbed = true;
         UpdateGrabState();
+
+        CollisionObjectPublisher publisher = GetComponent<CollisionObjectPublisher>();
+        if (publisher != null)
+        {
+            ObjectMetricsLogger.Instance?.LogEvent("grab_start", publisher.objectId);
+        }
     }
 
     void OnGrabExited(SelectExitEventArgs args)
     {
         isGrabbed = false;
         UpdateGrabState();
+
+        CollisionObjectPublisher publisher = GetComponent<CollisionObjectPublisher>();
+        if (publisher != null)
+        {
+            Vector3 relPos = publisher.GetRelativePosition(transform.position);
+            Quaternion relRot = publisher.GetRelativeRotation(transform.rotation);
+            ObjectMetricsLogger.Instance?.LogEvent("grab_end", publisher.objectId, relPos, relRot);
+        }
     }
 
     void OnObjectSelected(GameObject selectedObject)
