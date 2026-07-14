@@ -673,12 +673,13 @@ MonoBehaviour:
     the robot''s start position such that the end effector (wrist) is within the
     green region. Place the robot''s goal position such that the end effector (wrist)
     is within the orange region. Then, send a planning request using the Planning
-    Request Menu. Once inspecting the path, check the box to indicate it is collision-free.
+    Request Menu. Once inspecting the path, press the menu button to indicate it
+    is collision-free.
 
 
-    Press
-    ''B'' on the Right Hand Controller to advance to the first scene. Press ''B''
-    again when finished with each scene to advance to the next.'
+    Press ''B'' on the Right Hand Controller to advance
+    to the first scene. Press ''B'' again when finished with each scene to advance
+    to the next.'
 --- !u!4 &1567376384
 Transform:
   m_ObjectHideFlags: 0

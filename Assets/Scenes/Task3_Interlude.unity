@@ -670,13 +670,14 @@ MonoBehaviour:
 
     You
     will be placed in several scenes. There will be a robot trajectory playing in
-    each that collides with an object in the environment. Move the red sphere to
-    cover the place in the scene where the collision occurs.
+    each that collides with an object in the environment. After identifying where
+    the collision occurs, press the menu button to spawn a red indicator sphere.
+    Move the red sphere to cover the place in the scene where the collision occurs.
 
 
-    Press ''B'' on
-    the Right Hand Controller to advance to the first scene. Press ''B'' again when
-    finished with each scene to advance to the next.'
+    Press
+    ''B'' on the Right Hand Controller to advance to the first scene. Press ''B''
+    again when finished with each scene to advance to the next.'
 --- !u!4 &1567376384
 Transform:
   m_ObjectHideFlags: 0
