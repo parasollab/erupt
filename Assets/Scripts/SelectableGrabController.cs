@@ -94,9 +94,8 @@ public class SelectableGrabController : MonoBehaviour
         CollisionObjectPublisher publisher = GetComponent<CollisionObjectPublisher>();
         if (publisher != null)
         {
-            Vector3 relPos = publisher.GetRelativePosition(transform.position);
-            Quaternion relRot = publisher.GetRelativeRotation(transform.rotation);
-            ObjectMetricsLogger.Instance?.LogEvent("grab_end", publisher.objectId, relPos, relRot);
+            // ObjectMetricsLogger makes this relative to the robot base transform itself.
+            ObjectMetricsLogger.Instance?.LogEvent("grab_end", publisher.objectId, transform.position, transform.rotation);
         }
     }
 

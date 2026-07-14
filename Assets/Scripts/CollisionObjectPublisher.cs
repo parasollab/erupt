@@ -162,7 +162,7 @@ public class CollisionObjectPublisher : MonoBehaviour
         Debug.Log("=== End Status ===");
     }
 
-    public Vector3 GetRelativePosition(Vector3 position)
+    Vector3 GetRelativePosition(Vector3 position)
     {
         if (worldOrigin != null)
         {
@@ -171,7 +171,7 @@ public class CollisionObjectPublisher : MonoBehaviour
         return position;
     }
 
-    public Quaternion GetRelativeRotation(Quaternion rotation)
+    Quaternion GetRelativeRotation(Quaternion rotation)
     {
         if (worldOrigin != null)
         {

@@ -42,21 +42,47 @@ public class ObjectMetricsLogger : MonoBehaviour
         ros.RegisterPublisher<ObjectEventMsg>(Topic);
     }
 
-    public void LogEvent(string eventType, string objectId, Vector3? relativePos = null, Quaternion? relativeRot = null, string details = "")
+    // worldPos/worldRot are in world space; they're made relative to the robot's base
+    // ("BaseTransform", present in every task scene) before being converted to ROS coordinates.
+    public void LogEvent(string eventType, string objectId, Vector3? worldPos = null, Quaternion? worldRot = null, string details = "")
     {
         string participantId = StudyController.Instance != null ? StudyController.Instance.ParticipantId : "unknown";
         int taskIndex = StudyController.Instance != null ? StudyController.Instance.TaskIndex : -1;
         int sceneIndex = StudyController.Instance != null ? StudyController.Instance.SceneIndexInTask : -1;
         string sceneName = SceneManager.GetActiveScene().name;
 
-        PoseMsg pose = new PoseMsg(
-            relativePos.HasValue ? RosUnityConversion.UnityToRosPosition(relativePos.Value) : new PointMsg(0, 0, 0),
-            relativeRot.HasValue ? RosUnityConversion.UnityToRosQuaternion(relativeRot.Value) : new QuaternionMsg(0, 0, 0, 1));
+        PoseMsg pose;
+        if (worldPos.HasValue && worldRot.HasValue)
+        {
+            Transform robotBase = FindRobotBaseTransform();
+            Vector3 relPos = worldPos.Value;
+            Quaternion relRot = worldRot.Value;
+            if (robotBase != null)
+            {
+                relPos = robotBase.InverseTransformPoint(worldPos.Value);
+                relRot = Quaternion.Inverse(robotBase.rotation) * worldRot.Value;
+            }
+            else
+            {
+                Debug.LogWarning($"ObjectMetricsLogger: no 'BaseTransform' found in scene '{sceneName}' -- logging '{objectId}' pose relative to world instead of the robot base.");
+            }
+            pose = new PoseMsg(RosUnityConversion.UnityToRosPosition(relPos), RosUnityConversion.UnityToRosQuaternion(relRot));
+        }
+        else
+        {
+            pose = new PoseMsg(new PointMsg(0, 0, 0), new QuaternionMsg(0, 0, 0, 1));
+        }
 
         ObjectEventMsg msg = new ObjectEventMsg(
             participantId, eventType, objectId, sceneName, taskIndex, sceneIndex, pose, details ?? "", NowStamp());
         ros.Publish(Topic, msg);
         Debug.Log($"ObjectMetricsLogger: [{eventType}] object={objectId} details={details}");
+    }
+
+    private static Transform FindRobotBaseTransform()
+    {
+        GameObject go = GameObject.Find("BaseTransform");
+        return go != null ? go.transform : null;
     }
 
     private static TimeMsg NowStamp()
