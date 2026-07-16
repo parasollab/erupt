@@ -78,12 +78,25 @@ public class SelectableGrabController : MonoBehaviour
     {
         isGrabbed = true;
         UpdateGrabState();
+
+        CollisionObjectPublisher publisher = GetComponent<CollisionObjectPublisher>();
+        if (publisher != null)
+        {
+            ObjectMetricsLogger.Instance?.LogEvent("grab_start", publisher.objectId);
+        }
     }
 
     void OnGrabExited(SelectExitEventArgs args)
     {
         isGrabbed = false;
         UpdateGrabState();
+
+        CollisionObjectPublisher publisher = GetComponent<CollisionObjectPublisher>();
+        if (publisher != null)
+        {
+            // ObjectMetricsLogger makes this relative to the robot base transform itself.
+            ObjectMetricsLogger.Instance?.LogEvent("grab_end", publisher.objectId, transform.position, transform.rotation);
+        }
     }
 
     void OnObjectSelected(GameObject selectedObject)

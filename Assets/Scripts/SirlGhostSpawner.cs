@@ -6,20 +6,25 @@ public class SirlGhost
 {
     public GameObject Root;
     public DirectArticulationIKController Ik;
-    public TrajectoryReplay Replay;
+    public SirlTrajectoryPlayer Replay;
     public Color Color;
 
+    // Toggles the robot body only; the end effector path line (drawn by SirlTrajectoryPlayer)
+    // stays visible so trajectories remain comparable even while a single one is isolated.
     public void SetVisible(bool visible)
     {
         if (Root == null) return;
         foreach (var renderer in Root.GetComponentsInChildren<Renderer>(true))
+        {
+            if (renderer is LineRenderer) continue;
             renderer.enabled = visible;
+        }
     }
 }
 
 // Spawns N translucent robot copies with bases at the reference robot's pose.
 // Unlike SpawnGhosts, the copies keep their Urdf* components so a
-// DirectArticulationIKController + TrajectoryReplay can animate them.
+// DirectArticulationIKController + SirlTrajectoryPlayer can animate them.
 public class SirlGhostSpawner : MonoBehaviour
 {
     public GameObject robotPrefab;
@@ -94,8 +99,8 @@ public class SirlGhostSpawner : MonoBehaviour
             Debug.LogWarning($"[SirlGhostSpawner] End effector '{endEffectorName}' not found on ghost '{ghostName}'.");
         ik.Configure(root.transform, endEffector);
 
-        var replay = root.AddComponent<TrajectoryReplay>();
-        replay.SetIKController(ik);
+        var replay = root.AddComponent<SirlTrajectoryPlayer>();
+        replay.Configure(ik);
 
         return new SirlGhost { Root = root, Ik = ik, Replay = replay, Color = color };
     }

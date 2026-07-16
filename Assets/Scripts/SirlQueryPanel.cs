@@ -95,7 +95,7 @@ public class SirlQueryPanel : MonoBehaviour
         {
             int index = i;
             bool isSelected = manager.Selection.Contains(index);
-            bool isPlaying = index == nowPlayingIndex;
+            bool isPlaying = index == nowPlayingIndex || manager.State == SirlState.Playing;
 
             var row = new VisualElement();
             row.style.flexDirection = FlexDirection.Row;
@@ -156,10 +156,8 @@ public class SirlQueryPanel : MonoBehaviour
                 return $"Idle. Request {manager.TrajectoryCount} trajectories to begin.";
             case SirlState.Requesting:
                 return "Requesting trajectories...";
-            case SirlState.PlayingSequential:
-                string letter = nowPlayingIndex >= 0 && nowPlayingIndex < TrajectoryLetters.Length
-                    ? TrajectoryLetters[nowPlayingIndex] : "?";
-                return nowPlayingIndex >= 0 ? $"Playing trajectory {letter}..." : "Playing trajectories...";
+            case SirlState.Playing:
+                return "Playing all trajectories...";
             case SirlState.AwaitingSelection:
                 return $"{instruction}\nSelected: {manager.Selection.Count}/{manager.RequiredSelectionCount}";
             case SirlState.Published:

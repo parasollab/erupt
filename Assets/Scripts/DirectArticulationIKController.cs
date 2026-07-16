@@ -43,6 +43,7 @@ public class DirectArticulationIKController : MonoBehaviour
 
     public Transform EndEffector => endEffector;
     public IReadOnlyList<string> JointNames => jointNames;
+    public IReadOnlyList<ArticulationBody> Joints => joints;
 
     private void Awake()
     {

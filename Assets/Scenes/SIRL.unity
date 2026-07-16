@@ -1670,7 +1670,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   selectAction: {fileID: 1860165788753593368, guid: c348712bda248c246b8c49b3db54643f, type: 3}
-  rayInteractor: {fileID: 1403120386}
+  rayInteractor: {fileID: 0}
   highlightMaterial: {fileID: 2100000, guid: c2895afaaa851457ba48086242a8499d, type: 2}
 --- !u!4 &667833894
 Transform:
@@ -2174,8 +2174,10 @@ MonoBehaviour:
   selectionManager: {fileID: 667833893}
   collisionObjectsListener: {fileID: 0}
   worldOrigin: {fileID: 0}
+  enableMTC: 0
   pickPlaceRecorder: {fileID: 0}
   mtcDashboardPanel: {fileID: 0}
+  shapeSpawnDistance: 0.75
 --- !u!1001 &735725726
 PrefabInstance:
   m_ObjectHideFlags: 0

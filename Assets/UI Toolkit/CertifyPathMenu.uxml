@@ -1,0 +1,7 @@
+<ui:UXML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" noNamespaceSchemaLocation="../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
+    <ui:VisualElement name="certifyPathMenuPanel" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0.53); padding-bottom: 0; flex-direction: column; flex-shrink: 0; visibility: visible; display: flex; opacity: 1;">
+        <ui:Label text="Path Certification" name="certifyPathMenuLabel" style="-unity-text-align: upper-center; color: rgb(255, 250, 250); -unity-font-style: bold; border-bottom-width: 3px; border-bottom-color: rgb(255, 250, 250); margin-bottom: 10px; font-size: 24px;" />
+        <ui:Label text="Once you have planned a path and visually confirmed it is collision-free, press the button below to certify it." name="certifyPathMenuInstructionsLabel" style="white-space: normal; -unity-text-align: upper-center; color: rgb(230, 230, 230); margin-bottom: 12px; font-size: 16px;" />
+        <ui:Button text="Certify Path Collision-Free" name="certifyPathMenuButton" selectable="false" focusable="false" style="-unity-font-style: bold; margin-top: 0; margin-bottom: 10px;" />
+    </ui:VisualElement>
+</ui:UXML>

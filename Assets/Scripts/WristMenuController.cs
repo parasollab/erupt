@@ -22,11 +22,13 @@ public class WristMenuController : MonoBehaviour
     public CollisionObjectsListenerSimple collisionObjectsListener;
     public GameObject worldOrigin;
 
-    [Header("Pick & Place Recording")]
+    [Header("MTC")]
+    [SerializeField] private bool enableMTC = false;
     [SerializeField] private PickPlaceTaskRecorder pickPlaceRecorder;
-
-    [Header("MTC Dashboard")]
     [SerializeField] private GameObject mtcDashboardPanel;
+
+    [Header("Shape Spawning")]
+    [SerializeField] private float shapeSpawnDistance = 0.75f;
     
     // UI Elements
     private VisualElement root;
@@ -156,8 +158,11 @@ public class WristMenuController : MonoBehaviour
         slider.style.paddingRight = 10;
 
         float prevValue = 100f;
-        int activePointerId = -1;
+        bool gestureActive = false;
+        float gestureStartValue = 100f;
+        IVisualElementScheduledItem gestureEndCheck = null;
         const float minScale = 0.01f;
+        const long gestureEndDebounceMs = 200;
 
         void ResetToCenterDeferred()
         {
@@ -166,6 +171,33 @@ public class WristMenuController : MonoBehaviour
                 slider.SetValueWithoutNotify(100f);
                 prevValue = 100f;
             }).ExecuteLater(0);
+        }
+
+        // Logs the resize once the gesture is considered finished (see the debounce comment
+        // below), then recenters the slider for the next nudge.
+        void FinishGesture()
+        {
+            gestureActive = false;
+
+            float totalDeltaPercent = (slider.value - gestureStartValue) / 100f;
+            if (!Mathf.Approximately(totalDeltaPercent, 0f))
+            {
+                GameObject selected = selectionManager.SelectedObject;
+                CollisionObjectPublisher publisher = selected != null ? selected.GetComponent<CollisionObjectPublisher>() : null;
+                if (publisher != null)
+                {
+                    string sign = totalDeltaPercent >= 0 ? "+" : "";
+                    ObjectMetricsLogger.Instance?.LogEvent("edit_operation", publisher.objectId,
+                        details: $"resize:{shape}:{label}:{sign}{totalDeltaPercent:F3}");
+                }
+                else
+                {
+                    Debug.LogWarning($"WristMenuController: resize on '{(selected != null ? selected.name : "null")}' " +
+                        "not logged -- no CollisionObjectPublisher component (only wrist-menu-spawned shapes have one).");
+                }
+            }
+
+            ResetToCenterDeferred();
         }
 
         Vector3 MakeDelta(string shapeName, string axisLabel, float delta)
@@ -192,17 +224,25 @@ public class WristMenuController : MonoBehaviour
             }
         }
 
-        slider.RegisterCallback<PointerDownEvent>(evt =>
-        {
-            activePointerId = evt.pointerId;
-            prevValue = slider.value;
-            slider.CapturePointer(activePointerId);
-        });
-
+        // Gesture start/end is detected purely from ValueChanged plus a debounce timer, not from
+        // Pointer{Down,Up,Cancel}Events -- confirmed via on-device logcat that the XR poke input
+        // bridge drives ValueChanged continuously and reliably during a drag, but never sends a
+        // terminating PointerUp (even registered on the capture/TrickleDown phase, which does fix
+        // PointerDown -- the thumb still swallows Up somewhere in the XR->UI Toolkit pipeline).
         slider.RegisterValueChangedCallback(evt =>
         {
             var selected = selectionManager.SelectedObject;
             if (selected == null) { prevValue = evt.newValue; return; }
+
+            if (!gestureActive)
+            {
+                gestureActive = true;
+                gestureStartValue = prevValue;
+            }
+
+            gestureEndCheck?.Pause();
+            gestureEndCheck = slider.schedule.Execute(FinishGesture);
+            gestureEndCheck.ExecuteLater(gestureEndDebounceMs);
 
             float delta = (evt.newValue - prevValue) / 100f;
             prevValue = evt.newValue;
@@ -238,27 +278,6 @@ public class WristMenuController : MonoBehaviour
             }
         });
 
-        slider.RegisterCallback<PointerUpEvent>(evt =>
-        {
-            if (evt.pointerId == activePointerId)
-            {
-                ResetToCenterDeferred();
-                slider.ReleasePointer(activePointerId);
-                activePointerId = -1;
-            }
-        });
-        slider.RegisterCallback<PointerCancelEvent>(_ =>
-        {
-            ResetToCenterDeferred();
-            activePointerId = -1;
-        });
-        slider.RegisterCallback<PointerCaptureOutEvent>(_ =>
-        {
-            // Safety: if capture is lost, still recenter
-            ResetToCenterDeferred();
-            activePointerId = -1;
-        });
-
         container.Add(toggle);
         container.Add(slider);
 
@@ -283,6 +302,12 @@ public class WristMenuController : MonoBehaviour
         recordPickPlaceButton = root.Q<Button>("wristMenuRecordPickPlaceButton");
         recordStatusLabel = root.Q<Label>("wristMenuRecordStatusLabel");
         mtcButton = root.Q<Button>("wristMenuMTCButton");
+        if (mtcButton != null)
+            mtcButton.style.display = enableMTC ? DisplayStyle.Flex : DisplayStyle.None;
+        if (recordPickPlaceButton != null)
+            recordPickPlaceButton.style.display = enableMTC ? DisplayStyle.Flex : DisplayStyle.None;
+        if (recordStatusLabel != null)
+            recordStatusLabel.style.display = enableMTC ? DisplayStyle.Flex : DisplayStyle.None;
 
         // Get buttons from add shape panel
         addShapeBackButton = root.Q<Button>("wristMenuAddShapeBackButton");
@@ -324,9 +349,9 @@ public class WristMenuController : MonoBehaviour
         snapSurfaceButton.clicked += OnSnapSurfaceClicked;
         deleteShapeButton.clicked += OnDeleteShapeClicked;
         duplicateShapeButton.clicked += OnDuplicateShapeClicked;
-        if (recordPickPlaceButton != null)
+        if (recordPickPlaceButton != null && enableMTC)
             recordPickPlaceButton.clicked += OnRecordPickPlaceClicked;
-        if (mtcButton != null)
+        if (mtcButton != null && enableMTC)
             mtcButton.clicked += OnMTCClicked;
 
         // Add shape panel buttons
@@ -463,12 +488,12 @@ public class WristMenuController : MonoBehaviour
         }
 
         MeshFilter meshFilter = selectedObject.GetComponent<MeshFilter>();
-        if (meshFilter == null || meshFilter.mesh == null)
+        if (meshFilter == null || meshFilter.sharedMesh == null)
         {
             return;
         }
 
-        string meshName = meshFilter.mesh.name;
+        string meshName = meshFilter.sharedMesh.name;
 
         if (meshName.Contains("Cube"))
         {
@@ -501,12 +526,14 @@ public class WristMenuController : MonoBehaviour
     
     private void OnEditShapeClicked()
     {
-        // TODO: Implement edit functionality
+        if (selectionManager == null || selectionManager.SelectedObject == null)
+        {
+            Debug.LogWarning("WristMenuController: No object selected for editing.");
+            return;
+        }
 
         PopulateEditShapePanel(selectionManager.SelectedObject);
-
         ShowEditShapePanel();
-        Debug.Log("WristMenuController: Edit Shape functionality not yet implemented");
     }
     
     private void OnDeleteShapeClicked()
@@ -636,10 +663,10 @@ public class WristMenuController : MonoBehaviour
     {
         GameObject shape = GameObject.CreatePrimitive(primitiveType);
 
-        // Position 2 m in front of the user
+        // Position in front of the user, within easy reach
         shape.transform.position = Camera.main != null
-            ? Camera.main.transform.position + Camera.main.transform.forward * 2f
-            : Vector3.forward * 2f;
+            ? Camera.main.transform.position + Camera.main.transform.forward * shapeSpawnDistance
+            : Vector3.forward * shapeSpawnDistance;
 
         // Physics
         Rigidbody rb = shape.AddComponent<Rigidbody>();
@@ -655,7 +682,7 @@ public class WristMenuController : MonoBehaviour
         // Controls grabbing based on SelectionManager selection state
         shape.AddComponent<SelectableGrabController>();
 
-        shape.transform.localScale = Vector3.one;
+        shape.transform.localScale = Vector3.one * 0.5f;
         shape.tag = "Selectable";
 
         shape.AddComponent<XRGrabTransformerScaleAxisLock>();
@@ -815,6 +842,17 @@ public class WristMenuController : MonoBehaviour
             if (lockPose != null) lockPose.SyncInitialRotation();
 
             Debug.Log($"WristMenuController: Snapped '{selected.name}' to '{h.collider.name}' normal={h.normal}");
+
+            CollisionObjectPublisher publisher = selected.GetComponent<CollisionObjectPublisher>();
+            if (publisher != null)
+            {
+                ObjectMetricsLogger.Instance?.LogEvent("edit_operation", publisher.objectId, details: "snap");
+            }
+            else
+            {
+                Debug.LogWarning($"WristMenuController: snap on '{selected.name}' not logged -- " +
+                    "no CollisionObjectPublisher component (only wrist-menu-spawned shapes have one).");
+            }
             return;
         }
 

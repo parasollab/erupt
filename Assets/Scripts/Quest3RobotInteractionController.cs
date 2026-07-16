@@ -2,6 +2,11 @@ using UnityEngine;
 
 public class Quest3RobotInteractionController : MonoBehaviour
 {
+    // Fixed id -- EndEffectorHandle is a single static part of the Robot IK Manager prefab
+    // present in every scene, not a spawned/duplicated object, same convention as
+    // IndicatorSphereController's default "indicator_sphere" id.
+    private const string EndEffectorHandleObjectId = "end_effector_handle";
+
     [SerializeField] private DirectArticulationIKController ikController;
     [SerializeField] private Transform endEffector;
     [SerializeField] private Transform handle;
@@ -13,9 +18,10 @@ public class Quest3RobotInteractionController : MonoBehaviour
     private ArticulationBody selectedJoint;
     private Renderer[] selectedRenderers;
     private Color[] originalColors;
-    private Quest3ControllerRayInteractor activeDragInteractor;
+    private object activeDragInteractor;
     private float dragDistance;
     private Vector3 dragOffset;
+    private GhostControlPanel draggedPanel;
 
     public Transform Handle => handle;
 
@@ -45,6 +51,19 @@ public class Quest3RobotInteractionController : MonoBehaviour
 
     public void SelectFromHit(RaycastHit hit)
     {
+        // The shared control panel is parented under whichever ghost currently owns it, so a hit
+        // on the panel would otherwise also resolve to that ghost's GhostSelectable via the parent
+        // lookup below. Exclude it so poking or grabbing any part of the panel cannot close it.
+        var ghostSelectable = hit.transform.GetComponentInParent<GhostSelectable>();
+        if (ghostSelectable != null && GetPanelFromHit(hit) != null)
+            ghostSelectable = null;
+
+        if (ghostSelectable != null)
+        {
+            ghostSelectable.OnSelected();
+            return;
+        }
+
         if (handle != null && (hit.transform == handle || hit.transform.IsChildOf(handle)))
         {
             ClearSelection();
@@ -64,9 +83,27 @@ public class Quest3RobotInteractionController : MonoBehaviour
         }
     }
 
-    public bool TryBeginHandleDrag(Quest3ControllerRayInteractor interactor, Ray ray, RaycastHit hit)
+    public bool TryBeginHandleDrag(object interactor, Ray ray, RaycastHit hit)
     {
-        if (ikController == null || handle == null || interactor == null)
+        if (interactor == null)
+        {
+            return false;
+        }
+
+        // Ghost control panels take priority: dragging one to reposition it shouldn't also
+        // try to drag the IK handle underneath it.
+        GhostControlPanel panel = GetPanelFromHit(hit);
+        if (panel != null)
+        {
+            activeDragInteractor = interactor;
+            draggedPanel = panel;
+            dragDistance = hit.distance;
+            dragOffset = panel.ShellPosition - ray.GetPoint(dragDistance);
+            panel.BeginDrag();
+            return true;
+        }
+
+        if (ikController == null || handle == null)
         {
             return false;
         }
@@ -83,22 +120,35 @@ public class Quest3RobotInteractionController : MonoBehaviour
         ikController.BeginInteraction();
         SetHandleActive(true);
         ClearSelection();
+        ObjectMetricsLogger.Instance?.LogEvent("grab_start", EndEffectorHandleObjectId);
         return true;
     }
 
-    public void UpdateHandleDrag(Quest3ControllerRayInteractor interactor, Ray ray)
+    public void UpdateHandleDrag(object interactor, Ray ray)
     {
-        if (activeDragInteractor != interactor || ikController == null || handle == null)
+        if (activeDragInteractor != interactor)
         {
             return;
         }
 
         Vector3 target = ray.GetPoint(dragDistance) + dragOffset;
+
+        if (draggedPanel != null)
+        {
+            draggedPanel.UpdateDrag(target);
+            return;
+        }
+
+        if (ikController == null || handle == null)
+        {
+            return;
+        }
+
         handle.position = target;
         ikController.SolveToTarget(target);
     }
 
-    public void EndHandleDrag(Quest3ControllerRayInteractor interactor)
+    public void EndHandleDrag(object interactor)
     {
         if (activeDragInteractor != interactor)
         {
@@ -106,26 +156,79 @@ public class Quest3RobotInteractionController : MonoBehaviour
         }
 
         activeDragInteractor = null;
+
+        if (draggedPanel != null)
+        {
+            draggedPanel.EndDrag();
+            draggedPanel = null;
+            return;
+        }
+
         ikController.EndInteraction();
         if (endEffector != null && handle != null)
         {
+            // Log before snapping the handle marker back to endEffector -- they should already
+            // coincide (IK solves toward the drag target continuously), but endEffector is the
+            // real robot pose, so that's the one worth logging.
+            ObjectMetricsLogger.Instance?.LogEvent("grab_end", EndEffectorHandleObjectId, endEffector.position, endEffector.rotation);
             handle.position = endEffector.position;
         }
 
         SetHandleActive(false);
     }
 
+    // The panel's grabbable BoxCollider lives on the shell root while the GhostControlPanel
+    // component lives on its child UIDocument object, so a raycast hit can land on either.
+    private static GhostControlPanel GetPanelFromHit(RaycastHit hit)
+    {
+        if (hit.transform == null) return null;
+        return hit.transform.GetComponentInChildren<GhostControlPanel>()
+            ?? hit.transform.GetComponentInParent<GhostControlPanel>();
+    }
+
+    // JogSelectedJoint is called every frame regardless of thumbstick position (with
+    // deltaRadians == 0 while centered/idle -- see Quest3ControllerRayInteractor.Update), so the
+    // moving/idle transition can be detected entirely in here: log "grab_end" the frame jogging
+    // stops rather than needing every-frame logging while the joystick is held.
+    private bool isJoggingSelectedJoint = false;
+
     public void JogSelectedJoint(float deltaRadians)
     {
-        if (selectedJoint == null || ikController == null || Mathf.Approximately(deltaRadians, 0f))
+        if (selectedJoint == null || ikController == null)
         {
             return;
         }
+
+        if (Mathf.Approximately(deltaRadians, 0f))
+        {
+            if (isJoggingSelectedJoint)
+            {
+                LogJointJogEnd();
+            }
+            return;
+        }
+
+        isJoggingSelectedJoint = true;
 
         ikController.BeginInteraction();
         ikController.NudgeJoint(selectedJoint, deltaRadians);
         ikController.EndInteraction();
     }
+
+    private void LogJointJogEnd()
+    {
+        isJoggingSelectedJoint = false;
+        if (selectedJoint == null)
+        {
+            return;
+        }
+
+        float angleRad = selectedJoint.jointPosition[0];
+        ObjectMetricsLogger.Instance?.LogEvent("grab_end", JointObjectId(selectedJoint),
+            selectedJoint.transform.position, selectedJoint.transform.rotation, $"angle_rad:{angleRad:F4}");
+    }
+
+    private static string JointObjectId(ArticulationBody joint) => $"joint_{joint.name}";
 
     private void SelectJoint(ArticulationBody joint)
     {
@@ -145,10 +248,20 @@ public class Quest3RobotInteractionController : MonoBehaviour
             originalColors[i] = GetColor(mat);
             SetColor(mat, selectedJointColor);
         }
+
+        ObjectMetricsLogger.Instance?.LogEvent("grab_start", JointObjectId(joint));
     }
 
     private void ClearSelection()
     {
+        // Flush a jog session that was still in progress when selection changed (e.g. the
+        // participant let go of the trigger or grabbed something else mid-jog), so grab_start
+        // never goes without a matching grab_end.
+        if (isJoggingSelectedJoint)
+        {
+            LogJointJogEnd();
+        }
+
         if (selectedRenderers != null && originalColors != null)
         {
             int count = Mathf.Min(selectedRenderers.Length, originalColors.Length);

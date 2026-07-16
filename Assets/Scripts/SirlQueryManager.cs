@@ -11,11 +11,12 @@ using RosMessageTypes.Trajectory;
 
 public enum SirlMode { Similarity, Preference }
 
-public enum SirlState { Idle, Requesting, PlayingSequential, AwaitingSelection, Published }
+public enum SirlState { Idle, Requesting, Playing, AwaitingSelection, Published }
 
 // Drives a SIRL query round: fetch N trajectories (ROS service or mock),
-// play them one-by-one on translucent ghost robots, collect the user's
-// selection from the menu, and publish the result.
+// play them together on translucent ghost robots (each with its own end
+// effector path line), collect the user's selection from the menu, and
+// publish the result.
 public class SirlQueryManager : MonoBehaviour
 {
     [SerializeField] private SirlGhostSpawner ghostSpawner;
@@ -24,7 +25,7 @@ public class SirlQueryManager : MonoBehaviour
     [Tooltip("Generate synthetic trajectories instead of calling the ROS service.")]
     [SerializeField] private bool mockMode = true;
 
-    [Tooltip("Show only the ghost whose trajectory is playing; all ghosts reappear for selection.")]
+    [Tooltip("Hide the other ghost bodies (their path lines stay visible) while replaying a single trajectory via the per-row Replay button; all ghosts reappear afterward.")]
     [SerializeField] private bool hideOthersDuringPlayback = true;
 
     [Header("ROS names (sirl_vr_msgs / query_node.py in Desktop/sirl)")]
@@ -58,7 +59,8 @@ public class SirlQueryManager : MonoBehaviour
 
     // Fired on any state/selection change; the panel re-renders off this.
     public event Action StateChanged;
-    // Ghost index currently playing in the sequential pass, -1 when none.
+    // Ghost index currently isolated by a single-trajectory replay, -1 when none
+    // (all ghosts playing together doesn't single one out; watch State == Playing for that).
     public event Action<int> NowPlaying;
 
     private readonly List<int> selection = new List<int>();
@@ -174,7 +176,7 @@ public class SirlQueryManager : MonoBehaviour
     {
         if (ghosts.Length == 0) return;
         StopSequence();
-        sequenceRoutine = StartCoroutine(SequentialPlaybackRoutine());
+        sequenceRoutine = StartCoroutine(PlayAllRoutine());
     }
 
     public void StopReplays()
@@ -184,7 +186,7 @@ public class SirlQueryManager : MonoBehaviour
             ghost.Replay.StopReplay();
         ShowAll();
         NowPlaying?.Invoke(-1);
-        if (State == SirlState.PlayingSequential)
+        if (State == SirlState.Playing)
         {
             State = SirlState.AwaitingSelection;
             StateChanged?.Invoke();
@@ -252,32 +254,27 @@ public class SirlQueryManager : MonoBehaviour
         Trajectories = trajectories;
         ghosts = ghostSpawner.Spawn(trajectories.Length, ghostColors);
 
-        // Idle ghosts hold their trajectory's start pose.
+        // Draws each ghost's end effector path and leaves it posed at the trajectory's start.
         for (int i = 0; i < ghosts.Length; i++)
-            if (trajectories[i].points != null && trajectories[i].points.Length > 0)
-                ghosts[i].Ik.ApplyJointState(trajectories[i].joint_names, trajectories[i].points[0].positions);
+            ghosts[i].Replay.ShowPath(trajectories[i], ghosts[i].Color);
 
-        sequenceRoutine = StartCoroutine(SequentialPlaybackRoutine());
+        sequenceRoutine = StartCoroutine(PlayAllRoutine());
     }
 
-    private IEnumerator SequentialPlaybackRoutine()
+    // Starts every ghost's trajectory at once so all N can be compared side by side.
+    private IEnumerator PlayAllRoutine()
     {
-        State = SirlState.PlayingSequential;
+        State = SirlState.Playing;
         StateChanged?.Invoke();
 
         yield return StopAllAndWait();
+        ShowAll();
 
         for (int i = 0; i < ghosts.Length; i++)
-        {
-            ShowOnly(i);
-            NowPlaying?.Invoke(i);
             ghosts[i].Replay.StartReplay(Trajectories[i], loop: false);
-            yield return new WaitUntil(() => !ghosts[i].Replay.IsRunning);
-            yield return new WaitForSeconds(0.5f);
-        }
 
-        ShowAll();
-        NowPlaying?.Invoke(-1);
+        yield return new WaitUntil(() => ghosts.All(g => !g.Replay.IsRunning));
+
         sequenceRoutine = null;
         State = SirlState.AwaitingSelection;
         StateChanged?.Invoke();

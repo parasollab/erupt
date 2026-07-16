@@ -73,6 +73,8 @@ public class CollisionObjectPublisher : MonoBehaviour
         lastRotation = transform.rotation;
         lastScale = transform.localScale;
 
+        ObjectMetricsLogger.Instance?.LogEvent("object_created", objectId);
+
         // Log object analysis for debugging
         // AnalyzeObject();
     }
@@ -169,6 +171,15 @@ public class CollisionObjectPublisher : MonoBehaviour
         return position;
     }
 
+    Quaternion GetRelativeRotation(Quaternion rotation)
+    {
+        if (worldOrigin != null)
+        {
+            return Quaternion.Inverse(worldOrigin.transform.rotation) * rotation;
+        }
+        return rotation;
+    }
+
     void PublishCollisionObject()
     {
         bool isMesh = false;
@@ -203,7 +214,7 @@ public class CollisionObjectPublisher : MonoBehaviour
             pose = new PoseMsg
             {
                 position = RosUnityConversion.UnityToRosPosition(relativePosition),
-                orientation = RosUnityConversion.UnityToRosQuaternion(transform.rotation)
+                orientation = RosUnityConversion.UnityToRosQuaternion(GetRelativeRotation(transform.rotation))
             }
         };
 
@@ -364,6 +375,8 @@ public class CollisionObjectPublisher : MonoBehaviour
 
     void OnDestroy()
     {
+        ObjectMetricsLogger.Instance?.LogEvent("object_deleted", objectId);
+
         // Delete the collision object from the planning scene
         if (ros != null)
         {

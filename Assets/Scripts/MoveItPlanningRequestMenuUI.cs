@@ -13,6 +13,12 @@ using System;
 
 public class MoveItPlanningRequestMenuUI : MonoBehaviour
 {
+    // Synthetic object_id tying together set_start_state/set_goal_state/send_planning_request/
+    // planning_request_result events in the ObjectEvent log -- there's no spawned GameObject
+    // behind these, just logical actions on this menu, same convention as CertifyPathMenuController's
+    // "path_certification".
+    private const string PlanningRequestObjectId = "planning_request";
+
     [Header("Robot")]
     [SerializeField] private DirectArticulationIKController ikController;
     [SerializeField] private string jointStateTopic = "/joint_states";
@@ -78,7 +84,8 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     private bool hasStartState = false;
     private bool hasGoalState = false;
     private JointTrajectoryMsg lastPlannedTrajectory;
-    
+    public JointTrajectoryMsg LastPlannedTrajectory => lastPlannedTrajectory != null ? BuildLocalTrajectory(lastPlannedTrajectory) : null;
+
     // Planner querying
     private bool isQueryingPlanners = false;
     private Dictionary<string, string[]> pipelineToPlanners = new Dictionary<string, string[]>();
@@ -451,6 +458,8 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
     private void OnSetStartStateClicked()
     {
+        ObjectMetricsLogger.Instance?.LogEvent("set_start_state", PlanningRequestObjectId);
+
         if (!startSet)
         {
             ghostSpawner.SpawnStartGhost();
@@ -476,6 +485,8 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
     private void OnSetGoalStateClicked()
     {
+        ObjectMetricsLogger.Instance?.LogEvent("set_goal_state", PlanningRequestObjectId);
+
         if (!goalSet)
         {
             ghostSpawner.SpawnGoalGhost();
@@ -501,6 +512,8 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
     public void SendPlanningRequest()
     {
+        ObjectMetricsLogger.Instance?.LogEvent("send_planning_request", PlanningRequestObjectId);
+
         if (!isConnected)
         {
             Debug.LogWarning("MoveItPlanningRequestMenuUI: ROS 2 connection not available.");
@@ -523,6 +536,8 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
         // Disable replay button until we have a new trajectory
         StopPreview();
+        if (trajectoryReplayer != null)
+            trajectoryReplayer.StopReplay();
         stopReplayButton.SetEnabled(false);
         executeTrajectoryButton.SetEnabled(false);
         
@@ -642,12 +657,87 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
     private RobotStateMsg GetGoalRobotState() => GetRobotStateMsgFromController();
 
+    // Populates start/goal state and ghosts from a pre-baked trajectory's first/last waypoint,
+    // instead of the live robot pose — used when a scene auto-plays a trajectory at Start().
+    public void SetStartAndGoalFromTrajectory(TrajectoryData trajectoryData)
+    {
+        if (trajectoryData == null || trajectoryData.waypoints == null || trajectoryData.waypoints.Length == 0)
+        {
+            Debug.LogWarning("MoveItPlanningRequestMenuUI: TrajectoryData has no waypoints.");
+            return;
+        }
+
+        if (ghostSpawner == null || robotController == null)
+        {
+            Debug.LogWarning("MoveItPlanningRequestMenuUI: ghostSpawner or robotController not assigned.");
+            return;
+        }
+
+        string[] names = trajectoryData.jointNames;
+        TrajectoryData.Waypoint first = trajectoryData.waypoints[0];
+        TrajectoryData.Waypoint last = trajectoryData.waypoints[trajectoryData.waypoints.Length - 1];
+
+        if (!startSet)
+        {
+            ghostSpawner.SpawnStartGhostFromPose(robotController, names, first.positions);
+            startSet = true;
+        }
+        else
+        {
+            ghostSpawner.UpdateStartGhostFromPose(robotController, names, first.positions);
+        }
+        currentStartState = BuildRobotStateMsgFromNamedPositions(names, first.positions);
+        hasStartState = true;
+
+        if (!goalSet)
+        {
+            ghostSpawner.SpawnGoalGhostFromPose(robotController, names, last.positions);
+            goalSet = true;
+        }
+        else
+        {
+            ghostSpawner.UpdateGoalGhostFromPose(robotController, names, last.positions);
+        }
+        currentGoalState = BuildRobotStateMsgFromNamedPositions(names, last.positions);
+        hasGoalState = true;
+
+        UpdateButtonStates();
+    }
+
+    private RobotStateMsg BuildRobotStateMsgFromNamedPositions(string[] unityNames, double[] positions)
+    {
+        string[] rosNames = RemapJointNamesToRos(unityNames);
+        double[] zeros = new double[rosNames.Length];
+
+        return new RobotStateMsg
+        {
+            joint_state = new JointStateMsg
+            {
+                header = new HeaderMsg
+                {
+                    frame_id = "base_link",
+                    stamp = new TimeMsg
+                    {
+                        sec = (int)Time.time,
+                        nanosec = (uint)((Time.time - (int)Time.time) * 1e9)
+                    }
+                },
+                name = rosNames,
+                position = positions,
+                velocity = zeros,
+                effort = zeros
+            },
+            multi_dof_joint_state = new MultiDOFJointStateMsg()
+        };
+    }
+
     private void OnMotionPlanResponse(GetMotionPlanResponse response)
     {
         var motionPlanResponse = response.motion_plan_response;
         if (motionPlanResponse.error_code.val == 1) // SUCCESS
         {
             Debug.Log($"MoveItPlanningRequestMenuUI: Planning successful! Planning time: {motionPlanResponse.planning_time}s");
+            ObjectMetricsLogger.Instance?.LogEvent("planning_request_result", PlanningRequestObjectId, details: "success");
 
             // Handle the planned trajectory
             if (motionPlanResponse.trajectory?.joint_trajectory != null)
@@ -670,6 +760,8 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
             executeTrajectoryButton.SetEnabled(false);
 
             Debug.LogError($"MoveItPlanningRequestMenuUI: Planning failed with error code: {motionPlanResponse.error_code.val} - {motionPlanResponse.error_code.message}");
+            ObjectMetricsLogger.Instance?.LogEvent("planning_request_result", PlanningRequestObjectId,
+                details: $"failure:{motionPlanResponse.error_code.val}:{motionPlanResponse.error_code.message}");
         }
     }
 
