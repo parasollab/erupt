@@ -23,12 +23,15 @@ EditorBuildSettings:
   - enabled: 0
     path: Assets/Scenes/Kitchen.unity
     guid: 332a5352bed064330b7ad52128992f65
-  - enabled: 1
+  - enabled: 0
     path: Assets/Scenes/KitchenLoadingSceneFR3.unity
     guid: 9b6ef03e31cc541128e1684e6ef1b663
-  - enabled: 1
+  - enabled: 0
     path: Assets/Scenes/KitchenFR3.unity
     guid: 18c0e714e847d40e0801c1265a0508df
+  - enabled: 1
+    path: Assets/Scenes/Task1_Kitchen1.unity
+    guid: 20ceb4eaaf72942828bbcb0e38ab5c6d
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: c348712bda248c246b8c49b3db54643f, type: 3}
     com.unity.xr.arfoundation.simulation_settings: {fileID: 11400000, guid: e5d25a27610f74c049fefa1b04bb0f96, type: 2}
