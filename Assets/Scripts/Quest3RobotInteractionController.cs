@@ -225,7 +225,7 @@ public class Quest3RobotInteractionController : MonoBehaviour
 
         float angleRad = selectedJoint.jointPosition[0];
         ObjectMetricsLogger.Instance?.LogEvent("grab_end", JointObjectId(selectedJoint),
-            selectedJoint.transform.position, selectedJoint.transform.rotation, $"angle_rad:{angleRad:F4}");
+            selectedJoint.transform.position, selectedJoint.transform.rotation, details: $"angle_rad:{angleRad:F4}");
     }
 
     private static string JointObjectId(ArticulationBody joint) => $"joint_{joint.name}";
