@@ -188,6 +188,7 @@ public class WristMenuController : MonoBehaviour
                 {
                     string sign = totalDeltaPercent >= 0 ? "+" : "";
                     ObjectMetricsLogger.Instance?.LogEvent("edit_operation", publisher.objectId,
+                        scale: selected.transform.localScale,
                         details: $"resize:{shape}:{label}:{sign}{totalDeltaPercent:F3}");
                 }
                 else

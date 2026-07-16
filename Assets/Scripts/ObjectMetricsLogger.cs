@@ -44,7 +44,9 @@ public class ObjectMetricsLogger : MonoBehaviour
 
     // worldPos/worldRot are in world space; they're made relative to the robot's base
     // ("BaseTransform", present in every task scene) before being converted to ROS coordinates.
-    public void LogEvent(string eventType, string objectId, Vector3? worldPos = null, Quaternion? worldRot = null, string details = "")
+    // scale is an unsigned extents vector (e.g. a resized object's new lossyScale), converted with
+    // the same axis order as position (no robot-base relativity applies to scale).
+    public void LogEvent(string eventType, string objectId, Vector3? worldPos = null, Quaternion? worldRot = null, Vector3? scale = null, string details = "")
     {
         string participantId = StudyController.Instance != null ? StudyController.Instance.ParticipantId : "unknown";
         int taskIndex = StudyController.Instance != null ? StudyController.Instance.TaskIndex : -1;
@@ -73,8 +75,12 @@ public class ObjectMetricsLogger : MonoBehaviour
             pose = new PoseMsg(new PointMsg(0, 0, 0), new QuaternionMsg(0, 0, 0, 1));
         }
 
+        Vector3Msg scaleMsg = scale.HasValue
+            ? new Vector3Msg(scale.Value.x, scale.Value.z, scale.Value.y)
+            : new Vector3Msg(0, 0, 0);
+
         ObjectEventMsg msg = new ObjectEventMsg(
-            participantId, eventType, objectId, sceneName, taskIndex, sceneIndex, pose, details ?? "", NowStamp());
+            participantId, eventType, objectId, sceneName, taskIndex, sceneIndex, pose, scaleMsg, details ?? "", NowStamp());
         ros.Publish(Topic, msg);
         Debug.Log($"ObjectMetricsLogger: [{eventType}] object={objectId} details={details}");
     }

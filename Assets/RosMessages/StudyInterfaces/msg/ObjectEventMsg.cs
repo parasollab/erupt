@@ -24,6 +24,8 @@ namespace RosMessageTypes.StudyInterfaces
         public int scene_index;
         //  Populated for grab_end / object_moved; zero/identity otherwise
         public Geometry.PoseMsg pose;
+        //  Populated for resize edit operations; zero otherwise
+        public Geometry.Vector3Msg scale;
         //  Free-form extra info, e.g. "resize:Cube:X:+0.35" or "snap"; empty when unused
         public string details;
         public BuiltinInterfaces.TimeMsg stamp;
@@ -37,11 +39,12 @@ namespace RosMessageTypes.StudyInterfaces
             this.task_index = 0;
             this.scene_index = 0;
             this.pose = new Geometry.PoseMsg();
+            this.scale = new Geometry.Vector3Msg();
             this.details = "";
             this.stamp = new BuiltinInterfaces.TimeMsg();
         }
 
-        public ObjectEventMsg(string participant_id, string event_type, string object_id, string scene_name, int task_index, int scene_index, Geometry.PoseMsg pose, string details, BuiltinInterfaces.TimeMsg stamp)
+        public ObjectEventMsg(string participant_id, string event_type, string object_id, string scene_name, int task_index, int scene_index, Geometry.PoseMsg pose, Geometry.Vector3Msg scale, string details, BuiltinInterfaces.TimeMsg stamp)
         {
             this.participant_id = participant_id;
             this.event_type = event_type;
@@ -50,6 +53,7 @@ namespace RosMessageTypes.StudyInterfaces
             this.task_index = task_index;
             this.scene_index = scene_index;
             this.pose = pose;
+            this.scale = scale;
             this.details = details;
             this.stamp = stamp;
         }
@@ -65,6 +69,7 @@ namespace RosMessageTypes.StudyInterfaces
             deserializer.Read(out this.task_index);
             deserializer.Read(out this.scene_index);
             this.pose = Geometry.PoseMsg.Deserialize(deserializer);
+            this.scale = Geometry.Vector3Msg.Deserialize(deserializer);
             deserializer.Read(out this.details);
             this.stamp = BuiltinInterfaces.TimeMsg.Deserialize(deserializer);
         }
@@ -78,6 +83,7 @@ namespace RosMessageTypes.StudyInterfaces
             serializer.Write(this.task_index);
             serializer.Write(this.scene_index);
             serializer.Write(this.pose);
+            serializer.Write(this.scale);
             serializer.Write(this.details);
             serializer.Write(this.stamp);
         }
@@ -92,6 +98,7 @@ namespace RosMessageTypes.StudyInterfaces
             "\ntask_index: " + task_index.ToString() +
             "\nscene_index: " + scene_index.ToString() +
             "\npose: " + pose.ToString() +
+            "\nscale: " + scale.ToString() +
             "\ndetails: " + details.ToString() +
             "\nstamp: " + stamp.ToString();
         }

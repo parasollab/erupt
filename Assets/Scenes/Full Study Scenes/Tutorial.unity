@@ -680,6 +680,9 @@ MonoBehaviour:
   startGhostColor: {r: 0, g: 1, b: 0, a: 0.5}
   goalGhostColor: {r: 1, g: 0.5, b: 0, a: 0.5}
   realRobot: {fileID: 200033}
+  ghostControlPanelPrefab: {fileID: 0}
+  controlPanelLocalOffset: {x: 0, y: 0.5, z: 0}
+  ghostSelectionRadius: 0.35
 --- !u!114 &100082
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -695,6 +698,7 @@ MonoBehaviour:
   ikController: {fileID: 200042}
   ghostSpawner: {fileID: 0}
   replayGhostColor: {r: 0, g: 0.5, b: 1, a: 0.5}
+  playbackSpeed: 1
 --- !u!4 &100083
 Transform:
   m_ObjectHideFlags: 0
@@ -1080,6 +1084,10 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3282372009203156751, guid: 48516d5ede86a4731b56a6e555864e5b, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7266566166312442614, guid: 48516d5ede86a4731b56a6e555864e5b, type: 3}
+      propertyPath: m_IsActive
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 8156731414746988796, guid: 48516d5ede86a4731b56a6e555864e5b, type: 3}
