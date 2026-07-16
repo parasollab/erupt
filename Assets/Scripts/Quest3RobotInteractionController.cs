@@ -124,6 +124,18 @@ public class Quest3RobotInteractionController : MonoBehaviour
         return true;
     }
 
+    // Lets the thumbstick push/pull the handle's drag distance along the ray while it's held,
+    // mirroring the InteractionAttachController push/pull used for XRI far-grabbed objects.
+    public void AdjustHandleDragDistance(object interactor, float delta, float maxDistance)
+    {
+        if (activeDragInteractor != interactor || draggedPanel != null)
+        {
+            return;
+        }
+
+        dragDistance = Mathf.Clamp(dragDistance + delta, 0.1f, maxDistance);
+    }
+
     public void UpdateHandleDrag(object interactor, Ray ray)
     {
         if (activeDragInteractor != interactor)

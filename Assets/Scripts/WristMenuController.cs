@@ -678,6 +678,10 @@ public class WristMenuController : MonoBehaviour
         shape.AddComponent<XRGrabInteractable>();
         var gi = shape.GetComponent<XRGrabInteractable>();
         gi.selectMode = InteractableSelectMode.Single;
+        // Keep the object where it's grabbed instead of snapping it to the controller
+        gi.useDynamicAttach = true;
+        // Don't apply release velocity, object should stop moving as soon as it's let go
+        gi.throwOnDetach = false;
 
         // Controls grabbing based on SelectionManager selection state
         shape.AddComponent<SelectableGrabController>();

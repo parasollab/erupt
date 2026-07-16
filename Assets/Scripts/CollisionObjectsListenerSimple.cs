@@ -109,6 +109,10 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
             // Add XR interaction (will be controlled by SelectableGrabController)
             child.AddComponent<XRGrabInteractable>();
             child.GetComponent<XRGrabInteractable>().selectMode = InteractableSelectMode.Single;
+            // Keep the object where it's grabbed instead of snapping it to the controller
+            child.GetComponent<XRGrabInteractable>().useDynamicAttach = true;
+            // Don't apply release velocity, object should stop moving as soon as it's let go
+            child.GetComponent<XRGrabInteractable>().throwOnDetach = false;
 
             // Add component to control grabbing based on selection state
             child.AddComponent<SelectableGrabController>();
@@ -194,6 +198,10 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
 
                 // Add XR interaction (will be controlled by SelectableGrabController)
                 child.AddComponent<XRGrabInteractable>();
+                // Keep the object where it's grabbed instead of snapping it to the controller
+                child.GetComponent<XRGrabInteractable>().useDynamicAttach = true;
+                // Don't apply release velocity, object should stop moving as soon as it's let go
+                child.GetComponent<XRGrabInteractable>().throwOnDetach = false;
                 child.AddComponent<XRGeneralGrabTransformer>();
 
                 // Add component to control grabbing based on selection state
