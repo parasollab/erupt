@@ -57,6 +57,10 @@ public class SirlQueryManager : MonoBehaviour
     public bool SelectionValid => selection.Count == RequiredSelectionCount;
     public JointTrajectoryMsg[] Trajectories { get; private set; } = Array.Empty<JointTrajectoryMsg>();
 
+    // Queries published so far this session, split by mode.
+    public int SimilarityCompletedCount { get; private set; }
+    public int PreferenceCompletedCount { get; private set; }
+
     // Fired on any state/selection change; the panel re-renders off this.
     public event Action StateChanged;
     // Ghost index currently isolated by a single-trajectory replay, -1 when none
@@ -223,6 +227,7 @@ public class SirlQueryManager : MonoBehaviour
             ros.Publish(similarityAnswerTopic, msg);
             Debug.Log($"[SirlQueryManager] Published similarity answer on {similarityAnswerTopic}: " +
                       $"query_id={currentQueryId} most similar pair = ({ordered[0]}, {ordered[1]}) of {Trajectories.Length} trajectories.");
+            SimilarityCompletedCount++;
         }
         else
         {
@@ -231,6 +236,7 @@ public class SirlQueryManager : MonoBehaviour
             ros.Publish(preferenceAnswerTopic, msg);
             Debug.Log($"[SirlQueryManager] Published preference answer on {preferenceAnswerTopic}: " +
                       $"query_id={currentQueryId} preferred = {selection[0]} of {Trajectories.Length} trajectories.");
+            PreferenceCompletedCount++;
         }
 
         State = SirlState.Published;

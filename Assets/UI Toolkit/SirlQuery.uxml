@@ -1,6 +1,7 @@
 <ui:UXML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" noNamespaceSchemaLocation="../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
     <ui:VisualElement style="flex-grow: 1; background-color: rgb(142, 142, 142);">
         <ui:Label text="SIRL Query" name="sirlTitleLabel" style="-unity-text-align: upper-center; -unity-font-style: bold; font-size: 20px; border-bottom-width: 3px; border-bottom-color: rgb(0, 0, 0);" />
+        <ui:Label text="Completed — Similarity: 0  Preference: 0" name="sirlQueryCountLabel" style="-unity-text-align: upper-center; font-size: 11px; color: rgb(210, 210, 210); padding-bottom: 4px;" />
         <ui:Button text="Mode: Similarity" name="sirlModeButton" style="-unity-font-style: bold;" />
         <ui:Button text="Request Trajectories" name="sirlRequestButton" style="-unity-font-style: bold;" />
         <ui:Label text="Trajectories" name="sirlListHeaderLabel" style="-unity-font-style: bold; padding-top: 6px;" />

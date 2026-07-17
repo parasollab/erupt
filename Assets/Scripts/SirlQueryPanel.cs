@@ -17,6 +17,7 @@ public class SirlQueryPanel : MonoBehaviour
     private Button stopButton;
     private Button confirmButton;
     private Label statusLabel;
+    private Label queryCountLabel;
 
     private int nowPlayingIndex = -1;
 
@@ -35,6 +36,7 @@ public class SirlQueryPanel : MonoBehaviour
         stopButton = root.Q<Button>("sirlStopButton");
         confirmButton = root.Q<Button>("sirlConfirmButton");
         statusLabel = root.Q<Label>("sirlStatusLabel");
+        queryCountLabel = root.Q<Label>("sirlQueryCountLabel");
 
         modeButton.clicked += OnModeClicked;
         requestButton.clicked += () => manager?.RequestTrajectories();
@@ -77,6 +79,7 @@ public class SirlQueryPanel : MonoBehaviour
 
         modeButton.text = $"Mode: {manager.Mode}";
         confirmButton.SetEnabled(manager.SelectionValid && manager.State == SirlState.AwaitingSelection);
+        queryCountLabel.text = $"Completed — Similarity: {manager.SimilarityCompletedCount}  Preference: {manager.PreferenceCompletedCount}";
 
         bool haveTrajectories = manager.Trajectories.Length > 0;
         playAllButton.SetEnabled(haveTrajectories);
