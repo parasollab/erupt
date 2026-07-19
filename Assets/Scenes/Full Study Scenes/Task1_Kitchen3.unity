@@ -5565,6 +5565,79 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 5a898bca8115f465ba729909cf9fa37f, type: 3}
+--- !u!1 &1770000001
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1770000003}
+  - component: {fileID: 1770000002}
+  - component: {fileID: 1770000004}
+  m_Layer: 0
+  m_Name: Task Reminder Panel
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1770000002
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1770000001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ac1cd7625ed394cdd858107a9dad5093, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: xrviz::InterludeInstructionsDisplay
+  uiDocument: {fileID: 1770000004}
+  instructionsText: 'Use the Scene Menu connected to the Left Hand Controller to cover objects near the robot with shapes as close as possible in size to the objects. This indicates to the motion planner that there are obstacles in those locations.
+
+
+    Press ''B'' on the Right Hand Controller when finished with this scene to advance to the next.'
+--- !u!4 &1770000003
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1770000001}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -3, y: 4.94, z: 5.2}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1770000004
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1770000001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 19102, guid: 0000000000000000e000000000000000, type: 0}
+  m_Name:
+  m_EditorClassIdentifier:
+  m_PanelSettings: {fileID: 11400000, guid: 5923bb6b6ca8945e6b866a3b76b45d47, type: 2}
+  m_ParentUI: {fileID: 0}
+  sourceAsset: {fileID: 9197481963319205126, guid: 2163a32cf30448a8bc20ce7fddec7d98, type: 3}
+  m_SortingOrder: 0
+  m_Position: 0
+  m_WorldSpaceSizeMode: 1
+  m_WorldSpaceWidth: 600
+  m_WorldSpaceHeight: 500
+  m_PivotReferenceSize: 0
+  m_Pivot: 1
+  m_WorldSpaceCollider: {fileID: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -5610,3 +5683,4 @@ SceneRoots:
   - {fileID: 319647682}
   - {fileID: 365873013}
   - {fileID: 779763287}
+  - {fileID: 1770000003}
