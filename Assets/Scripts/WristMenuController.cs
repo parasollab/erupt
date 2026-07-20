@@ -681,6 +681,10 @@ public class WristMenuController : MonoBehaviour
         gi.selectMode = InteractableSelectMode.Single;
         // Keep the object where it's grabbed instead of snapping it to the controller
         gi.useDynamicAttach = true;
+        // Don't match the ray hit point's position for the attach anchor — keep it at the
+        // object's own pivot so joystick rotation spins the object about its own center
+        // instead of orbiting around wherever the ray happened to hit its surface.
+        gi.matchAttachPosition = false;
         // Don't apply release velocity, object should stop moving as soon as it's let go
         gi.throwOnDetach = false;
 
@@ -692,6 +696,10 @@ public class WristMenuController : MonoBehaviour
 
         shape.AddComponent<XRGrabTransformerScaleAxisLock>();
         shape.AddComponent<XRGrabTransformerLockPose>();
+        // Don't freeze rotation by default — joystick manipulation should be able to spin
+        // the object about its own center. SnapSelectedToSurface() still re-syncs this via
+        // SyncInitialRotation() in case freezePose is turned back on elsewhere.
+        shape.GetComponent<XRGrabTransformerLockPose>().freezePose = false;
 
         shape.AddComponent<XRGeneralGrabTransformer>();
         shape.GetComponent<XRGeneralGrabTransformer>().allowTwoHandedScaling = false;

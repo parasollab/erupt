@@ -111,6 +111,10 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
             child.GetComponent<XRGrabInteractable>().selectMode = InteractableSelectMode.Single;
             // Keep the object where it's grabbed instead of snapping it to the controller
             child.GetComponent<XRGrabInteractable>().useDynamicAttach = true;
+            // Don't match the ray hit point's position for the attach anchor — keep it at the
+            // object's own pivot so joystick rotation spins the object about its own center
+            // instead of orbiting around wherever the ray happened to hit its surface.
+            child.GetComponent<XRGrabInteractable>().matchAttachPosition = false;
             // Don't apply release velocity, object should stop moving as soon as it's let go
             child.GetComponent<XRGrabInteractable>().throwOnDetach = false;
 
@@ -122,6 +126,9 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
 
             child.AddComponent<XRGrabTransformerScaleAxisLock>();
             child.AddComponent<XRGrabTransformerLockPose>();
+            // Don't freeze rotation by default — joystick manipulation should be able to
+            // spin the object about its own center instead of being locked in place.
+            child.GetComponent<XRGrabTransformerLockPose>().freezePose = false;
 
             // Add an XR General Grab Transformer
             child.AddComponent<XRGeneralGrabTransformer>();
