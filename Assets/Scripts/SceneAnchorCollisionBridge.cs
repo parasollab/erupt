@@ -92,7 +92,7 @@ public class SceneAnchorCollisionBridge : MonoBehaviour
         Debug.Log("[SceneAnchorCollisionBridge] Start() — build is current.");
 
         _ros = ROSConnection.GetOrCreateInstance();
-        _ros.RegisterPublisher<CollisionObjectMsg>("/collision_object");
+        _ros.RegisterPublisher<CollisionObjectMsg>("/collision_object", CollisionObjectPublisher.CollisionObjectQueueSize);
 
         var tmp = GameObject.CreatePrimitive(PrimitiveType.Cube);
         _cubeMesh = tmp.GetComponent<MeshFilter>().sharedMesh;
