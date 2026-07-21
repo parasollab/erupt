@@ -78,13 +78,14 @@ public class SirlQueryPanel : MonoBehaviour
         if (root == null || manager == null) return;
 
         modeButton.text = $"Mode: {manager.Mode}";
+        modeButton.SetEnabled(manager.CanRequest);
         confirmButton.SetEnabled(manager.SelectionValid && manager.State == SirlState.AwaitingSelection);
         queryCountLabel.text = $"Completed — Similarity: {manager.SimilarityCompletedCount}  Preference: {manager.PreferenceCompletedCount}";
 
         bool haveTrajectories = manager.Trajectories.Length > 0;
         playAllButton.SetEnabled(haveTrajectories);
         stopButton.SetEnabled(haveTrajectories);
-        requestButton.SetEnabled(manager.State != SirlState.Requesting);
+        requestButton.SetEnabled(manager.CanRequest);
 
         RebuildTrajectoryRows();
         statusLabel.text = StatusText();

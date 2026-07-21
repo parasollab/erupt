@@ -55,6 +55,9 @@ public class SirlQueryManager : MonoBehaviour
     public IReadOnlyList<Color> Colors => ghostColors;
     public IReadOnlyCollection<int> Selection => selection;
     public bool SelectionValid => selection.Count == RequiredSelectionCount;
+    // A new set may only be requested once the current query's answer has been
+    // published (or no query is active yet).
+    public bool CanRequest => State == SirlState.Idle || State == SirlState.Published;
     public JointTrajectoryMsg[] Trajectories { get; private set; } = Array.Empty<JointTrajectoryMsg>();
 
     // Queries published so far this session, split by mode.
@@ -106,6 +109,13 @@ public class SirlQueryManager : MonoBehaviour
     public void SetMode(SirlMode mode)
     {
         if (Mode == mode) return;
+        // Switching modes discards the active query, which would sidestep the
+        // publish-before-requesting rule.
+        if (!CanRequest)
+        {
+            Debug.LogWarning($"[SirlQueryManager] Cannot switch mode in state {State}; publish the current selection first.");
+            return;
+        }
         Mode = mode;
         ResetQuery();
     }
@@ -123,7 +133,11 @@ public class SirlQueryManager : MonoBehaviour
 
     public void RequestTrajectories()
     {
-        if (State == SirlState.Requesting) return;
+        if (!CanRequest)
+        {
+            Debug.LogWarning($"[SirlQueryManager] Cannot request new trajectories in state {State}; publish the current selection first.");
+            return;
+        }
 
         StopSequence();
         ghostSpawner.Clear();
