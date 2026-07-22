@@ -11,6 +11,10 @@ using UnityEngine.SceneManagement;
 // This bakes the components into the .unity files (run once from the menu, commit the
 // result) rather than attaching them at runtime.
 //
+// Also covers the Task2 scenes, where only the surface assembly the robot sits on
+// (Kitchen_Set03 in the kitchens, Workbench_Combined_low_1 in the factories) becomes
+// collision objects -- the rest of the environment stays out of the planning scene.
+//
 // Every publisher gets the robot's BaseTransform child as its worldOrigin, so published
 // poses are expressed relative to the robot base rather than Unity-world-absolute
 // (frameId stays "world", matching the hand-placed publishers in Old Scenes/Kitchen).
@@ -25,6 +29,14 @@ public static class Task4CollisionObjectSetup
     // Child of the robot used as every publisher's worldOrigin, so published poses are
     // expressed relative to the robot base rather than Unity-world-absolute.
     private const string BaseTransformName = "BaseTransform";
+
+    // In the Task2 scenes only the assembly the robot sits on becomes collision objects:
+    // the kitchen counter/stove set in the kitchen scenes, the workbench in the factory
+    // ones. Each Task2 scene contains exactly one of these.
+    private static readonly string[] Task2SurfaceRootNames =
+    {
+        "Kitchen_Set03", "Workbench_Combined_low_1",
+    };
 
     // Mesh-bearing objects that must NOT become collision objects:
     //  - GoalRegion/StartRegion: task waypoint markers the end effector must enter; making
@@ -62,14 +74,19 @@ public static class Task4CollisionObjectSetup
             && AssetDatabase.GetAssetPath(mesh) == BuiltinResourcesPath;
     }
 
-    [MenuItem("Study/Collision Objects/Add To All Task4 Scenes")]
-    public static void AddToAllTask4Scenes()
+    // Interlude is a between-task rest scene with no robot task; always skipped.
+    private static List<string> FindStudyScenes(string pattern)
     {
-        List<string> scenePaths = Directory.GetFiles(StudyScenesFolder, "Task4_*.unity")
-            // Interlude is a between-task rest scene with no robot task; skip it.
+        return Directory.GetFiles(StudyScenesFolder, pattern)
             .Where(p => !Path.GetFileNameWithoutExtension(p).Contains("Interlude"))
             .OrderBy(p => p)
             .ToList();
+    }
+
+    [MenuItem("Study/Collision Objects/Add To All Task4 Scenes")]
+    public static void AddToAllTask4Scenes()
+    {
+        List<string> scenePaths = FindStudyScenes("Task4_*.unity");
 
         if (scenePaths.Count == 0)
         {
@@ -92,6 +109,86 @@ public static class Task4CollisionObjectSetup
         }
     }
 
+    // Task2 gets publishers only for the surface assembly the robot sits on (see
+    // Task2SurfaceRootNames): every mesh-bearing object under that root, configured the
+    // same way Task4 configures those same objects. Everything else in the scene stays
+    // out of the planning scene.
+    [MenuItem("Study/Collision Objects/Add Surface To All Task2 Scenes")]
+    public static void AddSurfaceToAllTask2Scenes()
+    {
+        List<string> scenePaths = FindStudyScenes("Task2_*.unity");
+        if (scenePaths.Count == 0)
+        {
+            Debug.LogError($"Task4CollisionObjectSetup: no Task2_*.unity scenes found in {StudyScenesFolder}.");
+            return;
+        }
+
+        string originalScenePath = EditorSceneManager.GetActiveScene().path;
+        int totalAdded = 0;
+        try
+        {
+            for (int i = 0; i < scenePaths.Count; i++)
+            {
+                EditorUtility.DisplayProgressBar("Adding surface collision object publishers",
+                    Path.GetFileNameWithoutExtension(scenePaths[i]), (float)i / scenePaths.Count);
+
+                Scene scene = EditorSceneManager.OpenScene(scenePaths[i], OpenSceneMode.Single);
+
+                GameObject robotRootGO = GameObject.Find(RobotRootName);
+                GameObject worldOriginGO = FindBaseTransform(robotRootGO != null ? robotRootGO.transform : null);
+                if (worldOriginGO == null)
+                {
+                    Debug.LogError($"Task4CollisionObjectSetup: no '{BaseTransformName}' found in '{scene.name}' -- " +
+                                    "skipping this scene so publishers don't get baked with a wrong (null) worldOrigin.");
+                    continue;
+                }
+
+                GameObject surfaceRoot = Task2SurfaceRootNames
+                    .Select(GameObject.Find)
+                    .FirstOrDefault(go => go != null);
+                if (surfaceRoot == null)
+                {
+                    Debug.LogWarning($"Task4CollisionObjectSetup: none of [{string.Join(", ", Task2SurfaceRootNames)}] " +
+                                      $"found in '{scene.name}' -- skipping this scene.");
+                    continue;
+                }
+
+                HashSet<string> usedIds = new HashSet<string>(
+                    Object.FindObjectsByType<CollisionObjectPublisher>(FindObjectsInactive.Include, FindObjectsSortMode.None)
+                        .Select(p => p.objectId));
+
+                int added = 0, skippedExisting = 0;
+                List<string> addedNames = new List<string>();
+                foreach (Transform child in surfaceRoot.GetComponentsInChildren<Transform>(true))
+                {
+                    if (!child.gameObject.activeInHierarchy) continue;
+                    switch (TryAddPublisher(child.gameObject, worldOriginGO, scene.name, usedIds, addedNames))
+                    {
+                        case AddResult.Added: added++; break;
+                        case AddResult.SkippedExisting: skippedExisting++; break;
+                    }
+                }
+
+                totalAdded += added;
+                if (added > 0)
+                {
+                    EditorSceneManager.MarkSceneDirty(scene);
+                    EditorSceneManager.SaveScene(scene);
+                }
+                Debug.Log($"Task4CollisionObjectSetup: '{scene.name}' ('{surfaceRoot.name}') -- added {added}, " +
+                           $"skipped {skippedExisting} already-configured. Added: {string.Join(", ", addedNames)}");
+            }
+        }
+        finally
+        {
+            EditorUtility.ClearProgressBar();
+            ReopenOriginalScene(originalScenePath);
+        }
+
+        Debug.Log($"Task4CollisionObjectSetup: done -- added {totalAdded} surface publisher(s) " +
+                   $"across {scenePaths.Count} Task2 scene(s).");
+    }
+
     // Non-readable meshes publish as EMPTY collision objects: Unity returns a zero-length
     // vertex array for them (even in the editor -- see StudySceneExporter's matching warning),
     // so CollisionObjectPublisher's createReadableMeshCopy fallback copies nothing and MoveIt
@@ -101,10 +198,7 @@ public static class Task4CollisionObjectSetup
     [MenuItem("Study/Collision Objects/Enable Read-Write On Publisher Meshes")]
     public static void EnableReadWriteOnPublisherMeshes()
     {
-        List<string> scenePaths = Directory.GetFiles(StudyScenesFolder, "Task4_*.unity")
-            .Where(p => !Path.GetFileNameWithoutExtension(p).Contains("Interlude"))
-            .OrderBy(p => p)
-            .ToList();
+        List<string> scenePaths = FindStudyScenes("Task4_*.unity");
 
         string originalScenePath = EditorSceneManager.GetActiveScene().path;
         HashSet<string> fixedPaths = new HashSet<string>();
@@ -162,11 +256,17 @@ public static class Task4CollisionObjectSetup
     [MenuItem("Study/Collision Objects/Remove From All Task4 Scenes")]
     public static void RemoveFromAllTask4Scenes()
     {
-        List<string> scenePaths = Directory.GetFiles(StudyScenesFolder, "Task4_*.unity")
-            .Where(p => !Path.GetFileNameWithoutExtension(p).Contains("Interlude"))
-            .OrderBy(p => p)
-            .ToList();
+        RemoveAllPublishersFromScenes(FindStudyScenes("Task4_*.unity"));
+    }
 
+    [MenuItem("Study/Collision Objects/Remove From All Task2 Scenes")]
+    public static void RemoveFromAllTask2Scenes()
+    {
+        RemoveAllPublishersFromScenes(FindStudyScenes("Task2_*.unity"));
+    }
+
+    private static void RemoveAllPublishersFromScenes(List<string> scenePaths)
+    {
         string originalScenePath = EditorSceneManager.GetActiveScene().path;
         try
         {
@@ -259,48 +359,58 @@ public static class Task4CollisionObjectSetup
             if (go.layer == 5) continue; // UI layer
             if (IsExcluded(go, excludedRoots)) continue;
 
-            MeshFilter meshFilter = go.GetComponent<MeshFilter>();
-            MeshRenderer meshRenderer = go.GetComponent<MeshRenderer>();
-            if (meshFilter == null || meshRenderer == null || meshFilter.sharedMesh == null) continue;
-
-            // World-space TextMeshPro labels render via MeshFilter+MeshRenderer too; they're
-            // not environment geometry. Matched by type name to avoid a TMPro assembly reference.
-            if (go.GetComponents<Component>().Any(c => c != null && c.GetType().Name.Contains("TextMeshPro"))) continue;
-            if (go.GetComponentInParent<Canvas>() != null) continue;
-
-            if (go.GetComponent<CollisionObjectPublisher>() != null)
+            switch (TryAddPublisher(go, worldOriginGO, scene.name, usedIds, addedNames))
             {
-                skippedExisting++;
-                continue;
+                case AddResult.Added: added++; break;
+                case AddResult.SkippedExisting: skippedExisting++; break;
             }
-
-            Mesh mesh = meshFilter.sharedMesh;
-            bool isPrimitive = IsBuiltinPrimitive(mesh);
-
-            CollisionObjectPublisher publisher = Undo.AddComponent<CollisionObjectPublisher>(go);
-            publisher.objectId = MakeUniqueId(go.name, usedIds);
-            publisher.frameId = "world";
-            publisher.isMesh = !isPrimitive;
-            publisher.autoDetectMeshType = false;
-            // Fallback for FBX meshes without Read/Write enabled; works in-editor but not in
-            // player builds, hence the warning below to fix the import setting instead.
-            publisher.createReadableMeshCopy = !isPrimitive && !mesh.isReadable;
-            publisher.publishRateHz = 1f;
-            publisher.worldOrigin = worldOriginGO;
-
-            if (!isPrimitive && !mesh.isReadable)
-            {
-                Debug.LogWarning($"Task4CollisionObjectSetup: mesh '{mesh.name}' on '{go.name}' in '{scene.name}' " +
-                                  "is not readable -- enable 'Read/Write Enabled' in its import settings so it can " +
-                                  "publish in headset builds (createReadableMeshCopy only works in the editor).");
-            }
-            addedNames.Add($"{publisher.objectId}{(publisher.isMesh ? " (mesh)" : " (primitive)")}");
-            added++;
         }
 
         Debug.Log($"Task4CollisionObjectSetup: '{scene.name}' -- added {added}, " +
                    $"skipped {skippedExisting} already-configured. Added: {string.Join(", ", addedNames)}");
         return added;
+    }
+
+    private enum AddResult { Added, SkippedExisting, NotEligible }
+
+    // Adds a configured CollisionObjectPublisher to go if it is publishable environment
+    // geometry (has a mesh, isn't a text label, doesn't already have a publisher).
+    private static AddResult TryAddPublisher(GameObject go, GameObject worldOriginGO, string sceneName,
+        HashSet<string> usedIds, List<string> addedNames)
+    {
+        MeshFilter meshFilter = go.GetComponent<MeshFilter>();
+        MeshRenderer meshRenderer = go.GetComponent<MeshRenderer>();
+        if (meshFilter == null || meshRenderer == null || meshFilter.sharedMesh == null) return AddResult.NotEligible;
+
+        // World-space TextMeshPro labels render via MeshFilter+MeshRenderer too; they're
+        // not environment geometry. Matched by type name to avoid a TMPro assembly reference.
+        if (go.GetComponents<Component>().Any(c => c != null && c.GetType().Name.Contains("TextMeshPro"))) return AddResult.NotEligible;
+        if (go.GetComponentInParent<Canvas>() != null) return AddResult.NotEligible;
+
+        if (go.GetComponent<CollisionObjectPublisher>() != null) return AddResult.SkippedExisting;
+
+        Mesh mesh = meshFilter.sharedMesh;
+        bool isPrimitive = IsBuiltinPrimitive(mesh);
+
+        CollisionObjectPublisher publisher = Undo.AddComponent<CollisionObjectPublisher>(go);
+        publisher.objectId = MakeUniqueId(go.name, usedIds);
+        publisher.frameId = "world";
+        publisher.isMesh = !isPrimitive;
+        publisher.autoDetectMeshType = false;
+        // Fallback for FBX meshes without Read/Write enabled; works in-editor but not in
+        // player builds, hence the warning below to fix the import setting instead.
+        publisher.createReadableMeshCopy = !isPrimitive && !mesh.isReadable;
+        publisher.publishRateHz = 1f;
+        publisher.worldOrigin = worldOriginGO;
+
+        if (!isPrimitive && !mesh.isReadable)
+        {
+            Debug.LogWarning($"Task4CollisionObjectSetup: mesh '{mesh.name}' on '{go.name}' in '{sceneName}' " +
+                              "is not readable -- enable 'Read/Write Enabled' in its import settings so it can " +
+                              "publish in headset builds (createReadableMeshCopy only works in the editor).");
+        }
+        addedNames.Add($"{publisher.objectId}{(publisher.isMesh ? " (mesh)" : " (primitive)")}");
+        return AddResult.Added;
     }
 
     // Re-evaluates isMesh on every baked publisher with the strict built-in check above, for
@@ -309,10 +419,7 @@ public static class Task4CollisionObjectSetup
     [MenuItem("Study/Collision Objects/Fix Primitive Misdetections")]
     public static void FixPrimitiveMisdetections()
     {
-        List<string> scenePaths = Directory.GetFiles(StudyScenesFolder, "Task4_*.unity")
-            .Where(p => !Path.GetFileNameWithoutExtension(p).Contains("Interlude"))
-            .OrderBy(p => p)
-            .ToList();
+        List<string> scenePaths = FindStudyScenes("Task4_*.unity");
 
         string originalScenePath = EditorSceneManager.GetActiveScene().path;
         int totalFixed = 0;
@@ -370,10 +477,7 @@ public static class Task4CollisionObjectSetup
     [MenuItem("Study/Collision Objects/Remove Publishers From Excluded Objects")]
     public static void RemovePublishersFromExcludedObjects()
     {
-        List<string> scenePaths = Directory.GetFiles(StudyScenesFolder, "Task4_*.unity")
-            .Where(p => !Path.GetFileNameWithoutExtension(p).Contains("Interlude"))
-            .OrderBy(p => p)
-            .ToList();
+        List<string> scenePaths = FindStudyScenes("Task4_*.unity");
 
         string originalScenePath = EditorSceneManager.GetActiveScene().path;
         try
