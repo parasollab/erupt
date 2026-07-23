@@ -23,6 +23,9 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     [SerializeField] private DirectArticulationIKController ikController;
     [SerializeField] private string jointStateTopic = "/joint_states";
     [SerializeField] private string executeTrajectoryTopic = "/joint_trajectory_controller/joint_trajectory";
+    // Successful plans are republished here for the ROS-side planned_path_logger; a service
+    // response is only visible to this client, so nothing else could record the path.
+    [SerializeField] private string plannedPathTopic = "/study/planned_paths";
 
     [Header("UI Toolkit")]
     [SerializeField] private UIDocument uiDocument;
@@ -369,6 +372,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         isConnected = true;
 
         ros.RegisterPublisher<JointTrajectoryMsg>(executeTrajectoryTopic);
+        ros.RegisterPublisher<JointTrajectoryMsg>(plannedPathTopic);
 
         ros.Subscribe<JointStateMsg>(jointStateTopic, MirrorJointStates);
 
@@ -744,6 +748,12 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
             {
                 lastPlannedTrajectory = motionPlanResponse.trajectory.joint_trajectory;
                 Debug.Log($"MoveItPlanningRequestMenuUI: Trajectory has {lastPlannedTrajectory.points.Length} waypoints");
+
+                // Raw trajectory (original ROS joint names), not the remapped local copy.
+                if (lastPlannedTrajectory.points.Length > 0)
+                {
+                    ros.Publish(plannedPathTopic, lastPlannedTrajectory);
+                }
 
                 planningResultLabel.text = $"Planning successful! Time: {motionPlanResponse.planning_time}s, Waypoints: {lastPlannedTrajectory.points.Length}";
 

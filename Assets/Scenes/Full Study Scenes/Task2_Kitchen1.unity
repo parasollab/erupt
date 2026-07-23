@@ -271,10 +271,7 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents:
-    - targetCorrespondingSourceObject: {fileID: 3731865409109120876, guid: 46fae3e1bd65645b4835315513e75b34, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 0}
+    m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 46fae3e1bd65645b4835315513e75b34, type: 3}
 --- !u!1 &67261677
 GameObject:
@@ -1595,10 +1592,7 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 3338805069719217018, guid: 48516d5ede86a4731b56a6e555864e5b, type: 3}
       insertIndex: -1
       addedObject: {fileID: 67261678}
-    m_AddedComponents:
-    - targetCorrespondingSourceObject: {fileID: 1375403636790619792, guid: 48516d5ede86a4731b56a6e555864e5b, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 0}
+    m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 48516d5ede86a4731b56a6e555864e5b, type: 3}
 --- !u!4 &562435141 stripped
 Transform:
@@ -3928,9 +3922,15 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: -3307331953686544228, guid: 5099dddb40b52074cb04d0a234f5ba48, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1593033017}
+    - targetCorrespondingSourceObject: {fileID: -3307331953686544228, guid: 5099dddb40b52074cb04d0a234f5ba48, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1593033019}
     - targetCorrespondingSourceObject: {fileID: -9213493672928465697, guid: 5099dddb40b52074cb04d0a234f5ba48, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1593033016}
+    - targetCorrespondingSourceObject: {fileID: -9213493672928465697, guid: 5099dddb40b52074cb04d0a234f5ba48, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1593033018}
   m_SourcePrefab: {fileID: 100100000, guid: 5099dddb40b52074cb04d0a234f5ba48, type: 3}
 --- !u!1 &1593033014 stripped
 GameObject:
@@ -3984,6 +3984,50 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 1.090022, y: 0.9926404, z: 1.2121631}
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &1593033018
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1593033014}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 49ed6e2d397b24ea19ec447ea267cf4e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: xrviz::CollisionObjectPublisher
+  objectId: unity_Kitchen_Cupboard
+  frameId: world
+  isMesh: 1
+  autoDetectMeshType: 0
+  createReadableMeshCopy: 0
+  publishRateHz: 1
+  trackLatency: 0
+  pausePublishing: 0
+  worldOrigin: {fileID: 1053846959}
+  hasBeenPublished: 0
+--- !u!114 &1593033019
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1593033015}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 49ed6e2d397b24ea19ec447ea267cf4e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: xrviz::CollisionObjectPublisher
+  objectId: unity_Gas_Stove
+  frameId: world
+  isMesh: 1
+  autoDetectMeshType: 0
+  createReadableMeshCopy: 0
+  publishRateHz: 1
+  trackLatency: 0
+  pausePublishing: 0
+  worldOrigin: {fileID: 1053846959}
+  hasBeenPublished: 0
 --- !u!1001 &1652132004
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -4375,11 +4419,12 @@ MonoBehaviour:
   instructionsText: 'There is a robot trajectory playing that places the robot in
     an undesired portion of the environment indicated using a red box. Create obstacles
     in the scene using the Scene Menu to prevent the robot from entering these undesired
-    regions.
+    regions. Then, replan the path using the "Send Request" button on the Planning
+    Request Menu.
 
 
-    Press ''B'' on the Right Hand Controller when finished with this
-    scene to advance to the next.'
+    Press ''B'' on the Right Hand Controller when finished with
+    this scene to advance to the next.'
 --- !u!4 &1770000003
 Transform:
   m_ObjectHideFlags: 0
@@ -4707,10 +4752,7 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents:
-    - targetCorrespondingSourceObject: {fileID: 200020, guid: 773add1d90d0a498b84e95915cf756d5, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 0}
+    m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 773add1d90d0a498b84e95915cf756d5, type: 3}
 --- !u!1001 &1954102491
 PrefabInstance:

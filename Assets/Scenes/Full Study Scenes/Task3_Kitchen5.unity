@@ -3122,7 +3122,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: xrviz::TrajectoryAutoPlayer
   trajectoryReplayer: {fileID: 2066554329}
-  trajectoryData: {fileID: 11400000, guid: f9cab77fb1baa4e9aa281a8a466fd90b, type: 2}
+  trajectoryData: {fileID: 11400000, guid: a5b25c8611e334ee89ae51cdeb6e00f6, type: 2}
   startDelay: 0
   moveItMenu: {fileID: 561852349}
 --- !u!4 &1116207465
