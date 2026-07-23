@@ -1741,15 +1741,15 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: -8679921383154817045, guid: edbfcd6bdacd84002993ae885f9d1126, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 0.95000005
+      value: 0.964
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: edbfcd6bdacd84002993ae885f9d1126, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0.35
+      value: 0.305
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: edbfcd6bdacd84002993ae885f9d1126, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 10.8
+      value: 10.616
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: edbfcd6bdacd84002993ae885f9d1126, type: 3}
       propertyPath: m_LocalRotation.w
@@ -3122,7 +3122,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: xrviz::TrajectoryAutoPlayer
   trajectoryReplayer: {fileID: 2066554329}
-  trajectoryData: {fileID: 11400000, guid: 40fcb587b345545eb9ec6fe5f80092b2, type: 2}
+  trajectoryData: {fileID: 11400000, guid: f9cab77fb1baa4e9aa281a8a466fd90b, type: 2}
   startDelay: 0
   moveItMenu: {fileID: 561852349}
 --- !u!4 &1116207465
