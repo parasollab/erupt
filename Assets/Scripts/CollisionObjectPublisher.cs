@@ -850,11 +850,9 @@ public class CollisionObjectPublisher : MonoBehaviour
     private TimeMsg GetRosTimestamp()
     {
         long ticks = DateTimeOffset.UtcNow.UtcTicks - DateTimeOffset.UnixEpoch.UtcTicks;
-        return new TimeMsg
-        {
-            sec = (int)(ticks / TimeSpan.TicksPerSecond),
-            nanosec = (uint)((ticks % TimeSpan.TicksPerSecond) * 100L) // 1 tick = 100 ns
-        };
+        return RosMessageCompatibility.CreateTime(
+            ticks / TimeSpan.TicksPerSecond,
+            (uint)((ticks % TimeSpan.TicksPerSecond) * 100L)); // 1 tick = 100 ns
     }
 
     bool IsKnownUnityPrimitive(string meshName)

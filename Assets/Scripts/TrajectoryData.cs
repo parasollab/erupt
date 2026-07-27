@@ -30,7 +30,7 @@ public class TrajectoryData : ScriptableObject
                 velocities = new double[0],
                 accelerations = new double[0],
                 effort = new double[0],
-                time_from_start = new DurationMsg { sec = sec, nanosec = nanosec }
+                time_from_start = RosMessageCompatibility.CreateDuration(sec, nanosec)
             };
         }
         return new JointTrajectoryMsg { joint_names = jointNames, points = points };

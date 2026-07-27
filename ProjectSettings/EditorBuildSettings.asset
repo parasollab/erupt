@@ -290,9 +290,9 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/Full Study Scenes/Task3_Kitchen4.unity
     guid: 1b9341c563be746f384f8f83c8a34089
-  - enabled: 0
+  - enabled: 1
     path: Assets/Scenes/Full Study Scenes/Task3_Kitchen5.unity
-    guid: 07a1e9efad7cf4bdc859021d96fca9cd
+    guid: cae2236a8ce7f4d1cb0a3adb06a8742c
   - enabled: 1
     path: Assets/Scenes/Full Study Scenes/Task4_Factory1.unity
     guid: 5139916b6e5e84be680aa707f64aafb9
@@ -325,7 +325,7 @@ EditorBuildSettings:
     guid: ff93ca5d4282d45e9b21b2bbeac4dc90
   - enabled: 1
     path: Assets/Scenes/Full Study Scenes/Task4_Kitchen5.unity
-    guid: 457bcbd11c4ab46ecb3a099c6db23bd3
+    guid: 25170da33917a436080c1809ce9fbcbb
   - enabled: 1
     path: Assets/Scenes/Full Study Scenes/Tutorial.unity
     guid: 80bc0699081604a3eb505e0c516ab6c5

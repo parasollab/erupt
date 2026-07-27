@@ -409,10 +409,8 @@ public class SceneAnchorCollisionBridge : MonoBehaviour
     static TimeMsg RosTimestamp()
     {
         long ticks = DateTimeOffset.UtcNow.UtcTicks - DateTimeOffset.UnixEpoch.UtcTicks;
-        return new TimeMsg
-        {
-            sec = (int)(ticks / TimeSpan.TicksPerSecond),
-            nanosec = (uint)((ticks % TimeSpan.TicksPerSecond) * 100L)
-        };
+        return RosMessageCompatibility.CreateTime(
+            ticks / TimeSpan.TicksPerSecond,
+            (uint)((ticks % TimeSpan.TicksPerSecond) * 100L));
     }
 }

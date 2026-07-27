@@ -642,11 +642,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
                 header = new HeaderMsg
                 {
                     frame_id = "base_link",
-                    stamp = new TimeMsg
-                    {
-                        sec = (int)Time.time,
-                        nanosec = (uint)((Time.time - (int)Time.time) * 1e9)
-                    }
+                    stamp = RosMessageCompatibility.CreateTime(Time.time)
                 },
                 name = names,
                 position = positions,
@@ -720,11 +716,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
                 header = new HeaderMsg
                 {
                     frame_id = "base_link",
-                    stamp = new TimeMsg
-                    {
-                        sec = (int)Time.time,
-                        nanosec = (uint)((Time.time - (int)Time.time) * 1e9)
-                    }
+                    stamp = RosMessageCompatibility.CreateTime(Time.time)
                 },
                 name = rosNames,
                 position = positions,

@@ -138,7 +138,7 @@ public class PickPlaceTaskRecorder : MonoBehaviour
         var msg = new PickPlaceTaskMsg(
             objectId,
             new PoseStampedMsg(
-                new HeaderMsg(new TimeMsg(), "world"),
+                RosMessageCompatibility.CreateHeader("world"),
                 new PoseMsg(rosPos, rosRot)
             )
         );
