@@ -763,6 +763,7 @@ MonoBehaviour:
   robotInteraction: {fileID: 200041}
   rayLength: 6
   jointJogRadiansPerSecond: 0.8
+  handlePushPullMetersPerSecond: 1.5
   thumbstickDeadzone: 0.18
   raycastLayers:
     serializedVersion: 2
@@ -1084,6 +1085,10 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3282372009203156751, guid: 48516d5ede86a4731b56a6e555864e5b, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6997610759342248352, guid: 48516d5ede86a4731b56a6e555864e5b, type: 3}
+      propertyPath: m_IsActive
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7266566166312442614, guid: 48516d5ede86a4731b56a6e555864e5b, type: 3}
