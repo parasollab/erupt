@@ -2767,13 +2767,43 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: edbfcd6bdacd84002993ae885f9d1126, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1051551764}
   m_SourcePrefab: {fileID: 100100000, guid: edbfcd6bdacd84002993ae885f9d1126, type: 3}
 --- !u!4 &1051551762 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: edbfcd6bdacd84002993ae885f9d1126, type: 3}
   m_PrefabInstance: {fileID: 1051551761}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &1051551763 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: edbfcd6bdacd84002993ae885f9d1126, type: 3}
+  m_PrefabInstance: {fileID: 1051551761}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1051551764
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1051551763}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 49ed6e2d397b24ea19ec447ea267cf4e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: xrviz::CollisionObjectPublisher
+  objectId: unity_Lights
+  frameId: world
+  isMesh: 1
+  autoDetectMeshType: 0
+  createReadableMeshCopy: 0
+  publishRateHz: 1
+  trackLatency: 0
+  pausePublishing: 0
+  worldOrigin: {fileID: 1236863394}
+  hasBeenPublished: 0
 --- !u!1001 &1077138973
 PrefabInstance:
   m_ObjectHideFlags: 0

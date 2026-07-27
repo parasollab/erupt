@@ -30,12 +30,12 @@ public static class Task4CollisionObjectSetup
     // expressed relative to the robot base rather than Unity-world-absolute.
     private const string BaseTransformName = "BaseTransform";
 
-    // In the Task2 scenes only the assembly the robot sits on becomes collision objects:
-    // the kitchen counter/stove set in the kitchen scenes, the workbench in the factory
-    // ones. Each Task2 scene contains exactly one of these.
+    // In the Task2 scenes only these assemblies become collision objects: the counter/stove
+    // set plus the ceiling lights in the kitchen scenes, the workbench in the factory ones.
+    // A scene gets publishers for every root on this list that it contains.
     private static readonly string[] Task2SurfaceRootNames =
     {
-        "Kitchen_Set03", "Workbench_Combined_low_1",
+        "Kitchen_Set03", "Workbench_Combined_low_1", "Lights",
     };
 
     // Mesh-bearing objects that must NOT become collision objects:
@@ -143,10 +143,11 @@ public static class Task4CollisionObjectSetup
                     continue;
                 }
 
-                GameObject surfaceRoot = Task2SurfaceRootNames
+                List<GameObject> surfaceRoots = Task2SurfaceRootNames
                     .Select(GameObject.Find)
-                    .FirstOrDefault(go => go != null);
-                if (surfaceRoot == null)
+                    .Where(go => go != null)
+                    .ToList();
+                if (surfaceRoots.Count == 0)
                 {
                     Debug.LogWarning($"Task4CollisionObjectSetup: none of [{string.Join(", ", Task2SurfaceRootNames)}] " +
                                       $"found in '{scene.name}' -- skipping this scene.");
@@ -159,13 +160,16 @@ public static class Task4CollisionObjectSetup
 
                 int added = 0, skippedExisting = 0;
                 List<string> addedNames = new List<string>();
-                foreach (Transform child in surfaceRoot.GetComponentsInChildren<Transform>(true))
+                foreach (GameObject surfaceRoot in surfaceRoots)
                 {
-                    if (!child.gameObject.activeInHierarchy) continue;
-                    switch (TryAddPublisher(child.gameObject, worldOriginGO, scene.name, usedIds, addedNames))
+                    foreach (Transform child in surfaceRoot.GetComponentsInChildren<Transform>(true))
                     {
-                        case AddResult.Added: added++; break;
-                        case AddResult.SkippedExisting: skippedExisting++; break;
+                        if (!child.gameObject.activeInHierarchy) continue;
+                        switch (TryAddPublisher(child.gameObject, worldOriginGO, scene.name, usedIds, addedNames))
+                        {
+                            case AddResult.Added: added++; break;
+                            case AddResult.SkippedExisting: skippedExisting++; break;
+                        }
                     }
                 }
 
@@ -175,7 +179,8 @@ public static class Task4CollisionObjectSetup
                     EditorSceneManager.MarkSceneDirty(scene);
                     EditorSceneManager.SaveScene(scene);
                 }
-                Debug.Log($"Task4CollisionObjectSetup: '{scene.name}' ('{surfaceRoot.name}') -- added {added}, " +
+                string rootNames = string.Join(", ", surfaceRoots.Select(go => go.name));
+                Debug.Log($"Task4CollisionObjectSetup: '{scene.name}' ({rootNames}) -- added {added}, " +
                            $"skipped {skippedExisting} already-configured. Added: {string.Join(", ", addedNames)}");
             }
         }
