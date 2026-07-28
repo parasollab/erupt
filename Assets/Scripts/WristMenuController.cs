@@ -58,6 +58,7 @@ public class WristMenuController : MonoBehaviour
     
     // State
     private bool isMenuVisible = false;
+    public bool IsMenuVisible => isMenuVisible;
     
     private void OnEnable()
     {

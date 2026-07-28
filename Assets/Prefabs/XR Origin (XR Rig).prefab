@@ -3278,6 +3278,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 3927579247218649798, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
       insertIndex: -1
       addedObject: {fileID: 3006219390251926832}
+    - targetCorrespondingSourceObject: {fileID: 3927579247218649798, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 6133124521792037761}
   m_SourcePrefab: {fileID: 100100000, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
 --- !u!1 &1375403636790619792 stripped
 GameObject:
@@ -3304,6 +3307,30 @@ MonoBehaviour:
   worldOrigin: {fileID: 0}
   pickPlaceRecorder: {fileID: 0}
   mtcDashboardPanel: {fileID: 0}
+--- !u!114 &6133124521792037761
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1375403636790619792}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 313b245af96b47739b14c148521b280d, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: xrviz::WristPalmMenuGesture
+  wristMenu: {fileID: 3006219390251926832}
+  headCamera: {fileID: 0}
+  menuHand: 0
+  palmNormalAxis: 3
+  requireOpenPalm: 0
+  gazeAngleDegrees: 28
+  palmFacingDotThreshold: 0.65
+  showHoldSeconds: 0.35
+  hideHoldSeconds: 0.2
+  closeWhenGestureEnds: 1
+  onlyCloseIfOpenedByGesture: 1
+  debugLogs: 0
 --- !u!114 &4517080356610878557 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 1961351108226525195, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}

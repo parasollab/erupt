@@ -282,7 +282,7 @@ MonoBehaviour:
   m_Name: VisionOS
   m_EditorClassIdentifier: Unity.XR.OpenXR::UnityEngine.XR.OpenXR.OpenXRSettings
   features:
-  - {fileID: 6355063703054869712}
+  - {fileID: -8254812388224071950}
   m_renderMode: 1
   m_latencyOptimization: 0
   m_autoColorSubmissionMode: 1
