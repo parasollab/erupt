@@ -2,7 +2,7 @@ using UnityEngine;
 
 public class MouseRobotRayInteractor : MonoBehaviour
 {
-    [SerializeField] private Quest3RobotInteractionController robotInteraction;
+    [SerializeField] private RobotInteractionController robotInteraction;
     [SerializeField] private Camera rayCamera;
     [SerializeField] private float rayLength = 6f;
     [SerializeField] private LayerMask raycastLayers = ~0;

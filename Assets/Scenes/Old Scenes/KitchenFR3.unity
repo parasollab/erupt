@@ -148,6 +148,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b7423a6ca712b4980a60990061e6c544, type: 3}
   m_Name: 
   m_EditorClassIdentifier: xrviz::MTCDataManager
+  topicPrefix: erupt_pick_place
 --- !u!4 &244453
 Transform:
   m_ObjectHideFlags: 0
@@ -13825,7 +13826,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &2102471246
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -13833,7 +13834,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2102471245}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7e933e81d3c20c74ea6fdc708a67e3a5, type: 3}
   m_Name: 

@@ -5,7 +5,7 @@ using UnityEngine.XR;
 public class Quest3ControllerRayInteractor : MonoBehaviour
 {
     [SerializeField] private XRNode controllerNode = XRNode.RightHand;
-    [SerializeField] private Quest3RobotInteractionController robotInteraction;
+    [SerializeField] private RobotInteractionController robotInteraction;
     [SerializeField] private float rayLength = 6f;
     [SerializeField] private float jointJogRadiansPerSecond = 0.8f;
     [SerializeField] private float handlePushPullMetersPerSecond = 1.5f;
@@ -30,7 +30,7 @@ public class Quest3ControllerRayInteractor : MonoBehaviour
         return hasCurrentHit;
     }
 
-    public void Configure(XRNode node, Quest3RobotInteractionController interactionController)
+    public void Configure(XRNode node, RobotInteractionController interactionController)
     {
         controllerNode = node;
         robotInteraction = interactionController;
@@ -45,11 +45,23 @@ public class Quest3ControllerRayInteractor : MonoBehaviour
 
     private void OnEnable()
     {
+        if (!ShouldRunForCurrentPlatform())
+        {
+            if (lineRenderer != null)
+                lineRenderer.enabled = false;
+
+            enabled = false;
+            return;
+        }
+
         RefreshDevice();
     }
 
     private void Update()
     {
+        if (!ShouldRunForCurrentPlatform())
+            return;
+
         if (!device.isValid)
         {
             RefreshDevice();
@@ -147,6 +159,15 @@ public class Quest3ControllerRayInteractor : MonoBehaviour
         }
         lineRenderer.startColor = idleRayColor;
         lineRenderer.endColor = idleRayColor;
+    }
+
+    private static bool ShouldRunForCurrentPlatform()
+    {
+#if ERUPT_USE_META_XR && UNITY_ANDROID && !UNITY_VISIONOS
+        return true;
+#else
+        return false;
+#endif
     }
 
     private void UpdateLine(Ray ray, float distance, bool hasHit)
