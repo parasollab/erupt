@@ -852,7 +852,11 @@ public class CollisionObjectPublisher : MonoBehaviour
         long ticks = DateTimeOffset.UtcNow.UtcTicks - DateTimeOffset.UnixEpoch.UtcTicks;
         return new TimeMsg
         {
+#if ROS2
             sec = (int)(ticks / TimeSpan.TicksPerSecond),
+#else
+            sec = (uint)(ticks / TimeSpan.TicksPerSecond),
+#endif
             nanosec = (uint)((ticks % TimeSpan.TicksPerSecond) * 100L) // 1 tick = 100 ns
         };
     }
