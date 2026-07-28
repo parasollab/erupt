@@ -37,7 +37,16 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     [SerializeField] private int defaultNumPlanningAttempts = 10;
     [SerializeField] private float defaultAllowedPlanningTime = 5.0f;
     [SerializeField] private double goalTolerance = 0.01;
-    
+
+    // Per-scene study restrictions, overridden on the prefab instance by
+    // PlanningMenuRestrictionsSetup (Study/Planning Menu menu): Task2/3 lock the preset
+    // start/goal states, Task3 additionally has no planning in its task.
+    [Header("Study Restrictions")]
+    [Tooltip("Allow the Set Start/Goal State buttons. Off in Task2/3 scenes so participants can't change the preset states.")]
+    [SerializeField] private bool allowStartGoalEditing = true;
+    [Tooltip("Allow the Plan button. Off in Task3 scenes, where planning is not part of the task.")]
+    [SerializeField] private bool allowPlanning = true;
+
     [Header("ROS 2 Topics")]
     [SerializeField] private string motionPlanServiceName = "/plan_kinematic_path";
     [SerializeField] private string displayTrajectoryTopic = "";
@@ -209,6 +218,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
         stopReplayButton.SetEnabled(false);
         executeTrajectoryButton.SetEnabled(false);
+        planningRequestButton.SetEnabled(allowPlanning);
 
         // Update button states
         UpdateButtonStates();
@@ -462,6 +472,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
     private void OnSetStartStateClicked()
     {
+        if (!allowStartGoalEditing) return;
         ObjectMetricsLogger.Instance?.LogEvent("set_start_state", PlanningRequestObjectId);
 
         if (!startSet)
@@ -489,6 +500,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
     private void OnSetGoalStateClicked()
     {
+        if (!allowStartGoalEditing) return;
         ObjectMetricsLogger.Instance?.LogEvent("set_goal_state", PlanningRequestObjectId);
 
         if (!goalSet)
@@ -516,6 +528,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
     public void SendPlanningRequest()
     {
+        if (!allowPlanning) return;
         ObjectMetricsLogger.Instance?.LogEvent("send_planning_request", PlanningRequestObjectId);
 
         if (!isConnected)
@@ -842,8 +855,8 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         setGoalStateButton.text = hasGoalState ? "Goal State ✓" : "Set Goal State";
 
         // You could also change button colors or enable/disable them
-        setStartStateButton.SetEnabled(true);
-        setGoalStateButton.SetEnabled(true);
+        setStartStateButton.SetEnabled(allowStartGoalEditing);
+        setGoalStateButton.SetEnabled(allowStartGoalEditing);
     }
 
     public void ResetPlanningState()

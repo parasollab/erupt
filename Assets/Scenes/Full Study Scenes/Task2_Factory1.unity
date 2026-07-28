@@ -1202,6 +1202,10 @@ PrefabInstance:
       propertyPath: unityJointNamePrefix
       value: 
       objectReference: {fileID: 0}
+    - target: {fileID: 4209543171811604821, guid: 46fae3e1bd65645b4835315513e75b34, type: 3}
+      propertyPath: allowStartGoalEditing
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 4470603741166058692, guid: 46fae3e1bd65645b4835315513e75b34, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0.143
