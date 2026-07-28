@@ -7,6 +7,8 @@ TagManager:
   - Selectable
   - robot
   - SnapSurface
+  - robotPart
+  - Environment
   layers:
   - Default
   - TransparentFX
