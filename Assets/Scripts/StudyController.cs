@@ -35,6 +35,10 @@ public class StudyController : MonoBehaviour
     [Tooltip("Scene shown once, before the first task's interlude, to walk participants through the controls. Leave blank to skip straight into the study.")]
     [SerializeField] private string _tutorialSceneName = "Tutorial";
 
+    [Header("Survey")]
+    [Tooltip("Scene shown after the last scene of every task, stepping the participant through the post-task survey questions. Leave blank to skip straight to the next task's interlude.")]
+    [SerializeField] private string _surveySceneName = "Survey";
+
     [Header("ROS Study Plan")]
     [Tooltip("How long to wait for a /study/plan message before falling back to local random generation (e.g. when running standalone without ROS).")]
     [SerializeField] private float _rosPlanTimeoutSeconds = 3f;
@@ -53,6 +57,7 @@ public class StudyController : MonoBehaviour
     private List<List<string>> _shuffledSequences;
     private int _taskIndex = -1;       // -2 = on the tutorial scene; -1 = still in StartScene; 0+ = index into _tasks
     private int _sceneIndexInTask = -1; // -1 = currently on the current task's interlude
+    private bool _inSurvey;            // on the Survey scene after the current task's last scene
 
     private void Awake()
     {
@@ -184,6 +189,13 @@ public class StudyController : MonoBehaviour
             return;
         }
 
+        if (_inSurvey)
+        {
+            // On the survey scene - SurveyStepDisplay owns this button press locally
+            // and calls FinishSurvey() itself once the participant is done.
+            return;
+        }
+
         if (_shuffledSequences == null || _taskIndex < 0)
         {
             // Still settling in StartScene (auto-advance hasn't fired yet) - ignore.
@@ -198,7 +210,7 @@ public class StudyController : MonoBehaviour
             return;
         }
 
-        // On a task scene: advance to the next one, or roll over to the next task.
+        // On a task scene: advance to the next one, or roll over into the post-task survey.
         _sceneIndexInTask++;
         if (_sceneIndexInTask < _shuffledSequences[_taskIndex].Count)
         {
@@ -206,6 +218,26 @@ public class StudyController : MonoBehaviour
             return;
         }
 
+        if (!string.IsNullOrEmpty(_surveySceneName))
+        {
+            _inSurvey = true;
+            SceneManager.LoadScene(_surveySceneName);
+            return;
+        }
+
+        AdvanceToNextTask();
+    }
+
+    // Called by the survey scene once the participant has stepped through every question,
+    // to move on to the next task's interlude (or the completion scene after the last task).
+    public void FinishSurvey()
+    {
+        _inSurvey = false;
+        AdvanceToNextTask();
+    }
+
+    private void AdvanceToNextTask()
+    {
         _taskIndex++;
         _sceneIndexInTask = -1;
         if (_taskIndex < _tasks.Count)

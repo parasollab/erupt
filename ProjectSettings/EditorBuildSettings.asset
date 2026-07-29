@@ -329,6 +329,9 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/Full Study Scenes/Tutorial.unity
     guid: 80bc0699081604a3eb505e0c516ab6c5
+  - enabled: 1
+    path: Assets/Scenes/Full Study Scenes/Survey.unity
+    guid: 338982d6c49d4a64a60f9a94a0b5f73b
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: c348712bda248c246b8c49b3db54643f, type: 3}
     com.unity.xr.arfoundation.simulation_settings: {fileID: 11400000, guid: e5d25a27610f74c049fefa1b04bb0f96, type: 2}
