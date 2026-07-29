@@ -29,22 +29,22 @@ public class SurveyStepDisplay : MonoBehaviour
             "You have finished all the scenes for this task. Now, you will be shown a series of questions. Please tell the study administrator that you are about to begin the survey and then verbally tell them your answer to the following questions.\n\nPress the 'B' button to advance to the first question."),
         new Step(
             "Mental Demand",
-            "How much mental and perceptual activity was required (e.g. thinking, deciding, calculating, remembering, looking, searching, etc.)? Was the task easy or demanding, simple or complex, exacting or forgiving?\n\nPlease rate on a scale from 0 (Low) to 100 (High).\n\nPlease verbally tell the study administrator your answer. Then, press 'B' to advance to the next question."),
+            "How much mental and perceptual activity was required (e.g. thinking, deciding, calculating, remembering, looking, searching, etc.)? Was the task easy or demanding, simple or complex, exacting or forgiving?\n\nPlease rate on a scale from 0 (Low) to 100 (High) in an increment of 5.\n\nPlease verbally tell the study administrator your answer. Then, press 'B' to advance to the next question."),
         new Step(
             "Physical Demand",
-            "How much physical activity was required (e.g., pushing, pulling, turning, controlling, activating, etc.)? Was the task easy or demanding, slow or brisk, slack or strenuous, restful or laborious?\n\nPlease rate on a scale from 0 (Low) to 100 (High).\n\nPlease verbally tell the study administrator your answer. Then, press 'B' to advance to the next question."),
+            "How much physical activity was required (e.g., pushing, pulling, turning, controlling, activating, etc.)? Was the task easy or demanding, slow or brisk, slack or strenuous, restful or laborious?\n\nPlease rate on a scale from 0 (Low) to 100 (High) in an increment of 5.\n\nPlease verbally tell the study administrator your answer. Then, press 'B' to advance to the next question."),
         new Step(
             "Temporal Demand",
-            "How much time pressure did you feel due to the rate or pace at which the tasks or task elements occurred? Was the pace slow and leisurely or rapid and frantic?\n\nPlease rate on a scale from 0 (Low) to 100 (High).\n\nPlease verbally tell the study administrator your answer. Then, press 'B' to advance to the next question."),
+            "How much time pressure did you feel due to the rate or pace at which the tasks or task elements occurred? Was the pace slow and leisurely or rapid and frantic?\n\nPlease rate on a scale from 0 (Low) to 100 (High) in an increment of 5.\n\nPlease verbally tell the study administrator your answer. Then, press 'B' to advance to the next question."),
         new Step(
             "Performance",
-            "How successful do you think you were in accomplishing the goals of the task set by the experimenter (or yourself)? How satisfied were you with your performance in accomplishing these goals?\n\nPlease rate on a scale from 0 (Good) to 100 (Poor).\n\nPlease verbally tell the study administrator your answer. Then, press 'B' to advance to the next question."),
+            "How successful do you think you were in accomplishing the goals of the task set by the experimenter (or yourself)? How satisfied were you with your performance in accomplishing these goals?\n\nPlease rate on a scale from 0 (Poor) to 100 (Good) in an increment of 5.\n\nPlease verbally tell the study administrator your answer. Then, press 'B' to advance to the next question."),
         new Step(
             "Effort",
-            "How hard did you have to work (mentally and physically) to accomplish your level of performance?\n\nPlease rate on a scale from 0 (Low) to 100 (High).\n\nPlease verbally tell the study administrator your answer. Then, press 'B' to advance to the next question."),
+            "How hard did you have to work (mentally and physically) to accomplish your level of performance?\n\nPlease rate on a scale from 0 (Low) to 100 (High) in an increment of 5.\n\nPlease verbally tell the study administrator your answer. Then, press 'B' to advance to the next question."),
         new Step(
             "Frustration Level",
-            "How insecure, discouraged, irritated, stressed and annoyed versus secure, gratified, content, relaxed and complacent did you feel during the task?\n\nPlease rate on a scale from 0 (Low) to 100 (High).\n\nPlease verbally tell the study administrator your answer. Then, press 'B' to continue the study.")
+            "How insecure, discouraged, irritated, stressed and annoyed versus secure, gratified, content, relaxed and complacent did you feel during the task?\n\nPlease rate on a scale from 0 (Low) to 100 (High) in an increment of 5.\n\nPlease verbally tell the study administrator your answer. Then, press 'B' to continue the study.")
     };
 
     [SerializeField] private UIDocument uiDocument;
