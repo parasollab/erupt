@@ -2,6 +2,8 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.XR.Hands;
 
+[AddComponentMenu("ERUPT/VisionOS/Wrist Palm Menu Gesture")]
+[RequireComponent(typeof(WristMenuController))]
 [DisallowMultipleComponent]
 public sealed class WristPalmMenuGesture : MonoBehaviour
 {
@@ -29,11 +31,14 @@ public sealed class WristPalmMenuGesture : MonoBehaviour
     [SerializeField]
     [Tooltip("Only this hand can reveal the wrist menu. Leave as Left for now; switch to Right later if needed.")]
     private TrackedHand menuHand = TrackedHand.Left;
+    [SerializeField]
+    [Tooltip("Prefer joint positions over provider-specific palm rotation axes when checking whether the palm faces the headset.")]
+    private bool derivePalmNormalFromJoints = true;
     [SerializeField] private PalmNormalAxis palmNormalAxis = PalmNormalAxis.NegativeY;
     [SerializeField] private bool requireOpenPalm = false;
 
     [Header("Gesture")]
-    [SerializeField, Range(5f, 60f)] private float gazeAngleDegrees = 28f;
+    [SerializeField, Range(5f, 75f)] private float gazeAngleDegrees = 55f;
     [SerializeField, Range(0f, 1f)] private float palmFacingDotThreshold = 0.65f;
     [SerializeField, Min(0f)] private float showHoldSeconds = 0.35f;
     [SerializeField, Min(0f)] private float hideHoldSeconds = 0.2f;
@@ -48,6 +53,11 @@ public sealed class WristPalmMenuGesture : MonoBehaviour
     private float missTimer;
 
     private static readonly List<XRHandSubsystem> Subsystems = new();
+
+    public void SetDebugLogs(bool enabled)
+    {
+        debugLogs = enabled;
+    }
 
     private void Awake()
     {
@@ -178,7 +188,7 @@ public sealed class WristPalmMenuGesture : MonoBehaviour
         float gazeDot = Vector3.Dot(cameraTransform.forward, cameraToPalmDirection);
         float minGazeDot = Mathf.Cos(gazeAngleDegrees * Mathf.Deg2Rad);
 
-        Vector3 palmNormal = GetPalmNormal(palmPose.rotation);
+        Vector3 palmNormal = GetPalmNormal(xrHand, palmPose);
         Vector3 palmToCameraDirection = -cameraToPalmDirection;
         float palmFacingDot = Vector3.Dot(palmNormal, palmToCameraDirection);
 
@@ -196,7 +206,38 @@ public sealed class WristPalmMenuGesture : MonoBehaviour
         return isMatch;
     }
 
-    private Vector3 GetPalmNormal(Quaternion palmRotation)
+    private Vector3 GetPalmNormal(XRHand xrHand, Pose palmPose)
+    {
+        if (derivePalmNormalFromJoints && TryGetJointPlanePalmNormal(xrHand, palmPose.position, out Vector3 jointPlaneNormal))
+            return jointPlaneNormal;
+
+        return GetPalmNormalFromPoseAxis(palmPose.rotation);
+    }
+
+    private bool TryGetJointPlanePalmNormal(XRHand xrHand, Vector3 palmPosition, out Vector3 palmNormal)
+    {
+        palmNormal = Vector3.zero;
+
+        if (!(xrHand.GetJoint(XRHandJointID.IndexProximal).TryGetPose(out Pose indexPose) &&
+              xrHand.GetJoint(XRHandJointID.LittleProximal).TryGetPose(out Pose littlePose)))
+        {
+            return false;
+        }
+
+        Vector3 palmToIndex = indexPose.position - palmPosition;
+        Vector3 palmToLittle = littlePose.position - palmPosition;
+        palmNormal = menuHand == TrackedHand.Left
+            ? Vector3.Cross(palmToLittle, palmToIndex)
+            : Vector3.Cross(palmToIndex, palmToLittle);
+
+        if (palmNormal.sqrMagnitude <= Mathf.Epsilon)
+            return false;
+
+        palmNormal.Normalize();
+        return true;
+    }
+
+    private Vector3 GetPalmNormalFromPoseAxis(Quaternion palmRotation)
     {
         return palmNormalAxis switch
         {

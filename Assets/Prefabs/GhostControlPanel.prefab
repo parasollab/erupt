@@ -63,13 +63,12 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 200022}
-  - component: {fileID: 200024}
   - component: {fileID: 200026}
   - component: {fileID: 200028}
   - component: {fileID: 200030}
   - component: {fileID: 200032}
   m_Layer: 5
-  m_Name: XRI UIDocument
+  m_Name: Ghost Control Panel UI
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -90,29 +89,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 200002}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &200024
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 200020}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 19102, guid: 0000000000000000e000000000000000, type: 0}
-  m_Name:
-  m_EditorClassIdentifier:
-  m_PanelSettings: {fileID: 11400000, guid: e7496767898f08e45b3e15f384905b23, type: 2}
-  m_ParentUI: {fileID: 0}
-  sourceAsset: {fileID: 9197481963319205126, guid: b4f39628956b3426eaab96f53519f20a, type: 3}
-  m_SortingOrder: 0
-  m_Position: 0
-  m_WorldSpaceSizeMode: 1
-  m_WorldSpaceWidth: 240
-  m_WorldSpaceHeight: 140
-  m_PivotReferenceSize: 0
-  m_Pivot: 1
-  m_WorldSpaceCollider: {fileID: 0}
 --- !u!114 &200026
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -240,4 +216,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 25e35a991262149518d89bdbffb7b1fb, type: 3}
   m_Name:
   m_EditorClassIdentifier:
-  uiDocument: {fileID: 200024}
+  uiDocument: {fileID: 0}

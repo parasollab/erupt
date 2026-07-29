@@ -5,6 +5,10 @@ using UnityEngine.XR.Interaction.Toolkit.Interactables;
 using UnityEngine.XR.Interaction.Toolkit.UI;
 using System.Collections.Generic;
 
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
+
 
 namespace LudicWorlds
 {
@@ -45,7 +49,7 @@ namespace LudicWorlds
 
         void Start()
         {
-            _cameraTransform = Camera.main.transform;
+            _cameraTransform = Camera.main?.transform;
         }
 
         void OnDestroy()
@@ -122,11 +126,32 @@ namespace LudicWorlds
             grab.selectEntered.AddListener(_ => _billboardEnabled = false);
             grab.selectExited.AddListener(_ => _billboardEnabled = true);
 
-            // Replace the standard GraphicRaycaster with the XR-aware one so the
-            // controller ray can drive the ScrollRect via the thumbstick scroll axis.
             var standardRaycaster = GetComponent<GraphicRaycaster>();
-            if (standardRaycaster != null) Destroy(standardRaycaster);
-            gameObject.AddComponent<TrackedDeviceGraphicRaycaster>();
+            if (ShouldUsePolySpatialCanvasRaycaster())
+            {
+                if (standardRaycaster == null)
+                    gameObject.AddComponent<GraphicRaycaster>();
+                foreach (var trackedRaycaster in GetComponents<TrackedDeviceGraphicRaycaster>())
+                    trackedRaycaster.enabled = false;
+            }
+            else
+            {
+                // Replace the standard GraphicRaycaster with the XR-aware one so the
+                // controller ray can drive the ScrollRect via the thumbstick scroll axis.
+                if (standardRaycaster != null) Destroy(standardRaycaster);
+                gameObject.AddComponent<TrackedDeviceGraphicRaycaster>();
+            }
+        }
+
+        private static bool ShouldUsePolySpatialCanvasRaycaster()
+        {
+#if UNITY_EDITOR
+            return EditorUserBuildSettings.activeBuildTarget.ToString() == "VisionOS";
+#elif UNITY_VISIONOS
+            return true;
+#else
+            return false;
+#endif
         }
 
         void OnMessageReceived(string message, string stackTrace, LogType type)

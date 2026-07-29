@@ -14,12 +14,29 @@ public class CertifyPathMenuController : MonoBehaviour
     [SerializeField] private UIDocument uiDocument;
 
     private Button certifyButton;
+    private UnityEngine.UI.Button uguiCertifyButton;
+    private UnityEngine.UI.Text uguiCertifyButtonText;
+    private Canvas uguiCanvas;
+    private GameObject uguiRoot;
     private bool hasCertified = false;
+    private bool useUGUIRuntimeMenu;
 
     private void OnEnable()
     {
         if (uiDocument == null)
             uiDocument = GetComponent<UIDocument>();
+
+        useUGUIRuntimeMenu = VisionOSSampleControlsUI.ShouldUseRuntimeUGUI() || uiDocument == null;
+        if (useUGUIRuntimeMenu)
+        {
+            if (uiDocument != null)
+                uiDocument.enabled = false;
+
+            EnsureUGUIMenu();
+            hasCertified = false;
+            UpdateButtonLabel();
+            return;
+        }
 
         VisualElement root = uiDocument?.rootVisualElement;
         if (root == null)
@@ -44,6 +61,36 @@ public class CertifyPathMenuController : MonoBehaviour
     {
         if (certifyButton != null)
             certifyButton.clicked -= OnCertifyClicked;
+        if (uguiCertifyButton != null)
+            uguiCertifyButton.onClick.RemoveListener(OnCertifyClicked);
+    }
+
+    private void EnsureUGUIMenu()
+    {
+        uguiCanvas = VisionOSSampleControlsUI.EnsureCanvas(
+            transform,
+            "VisionOS Certify Path Menu Canvas",
+            new Vector2(1050f, 300f),
+            new Vector2(1.05f, 0.3f),
+            new Vector3(0f, -0.1f, 0f),
+            sortingOrder: 130);
+
+        uguiRoot = uguiCanvas.gameObject;
+        VisionOSSampleControlsUI.ClearChildren(uguiRoot.transform);
+
+        var panel = VisionOSSampleControlsUI.CreateVerticalPanel(
+            uguiRoot.transform,
+            "Certify Path Menu Panel",
+            new Vector2(1050f, 300f));
+
+        uguiCertifyButton = VisionOSSampleControlsUI.CreateButton(
+            panel.transform,
+            ButtonLabel,
+            OnCertifyClicked,
+            950f,
+            100f,
+            35);
+        uguiCertifyButtonText = uguiCertifyButton.GetComponentInChildren<UnityEngine.UI.Text>();
     }
 
     private void OnCertifyClicked()
@@ -57,6 +104,10 @@ public class CertifyPathMenuController : MonoBehaviour
 
     private void UpdateButtonLabel()
     {
-        certifyButton.text = hasCertified ? ButtonLabel + " ✓" : ButtonLabel;
+        string label = hasCertified ? ButtonLabel + " ✓" : ButtonLabel;
+        if (certifyButton != null)
+            certifyButton.text = label;
+        if (uguiCertifyButtonText != null)
+            uguiCertifyButtonText.text = label;
     }
 }

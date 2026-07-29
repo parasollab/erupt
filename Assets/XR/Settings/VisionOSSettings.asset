@@ -13,8 +13,10 @@ MonoBehaviour:
   m_Name: VisionOSSettings
   m_EditorClassIdentifier: Unity.XR.VisionOS.Editor::UnityEditor.XR.VisionOS.VisionOSSettings
   m_AppMode: 1
-  m_HandsTrackingUsageDescription: Erupt uses hand tracking for spatial robot selection and manipulation.
-  m_WorldSensingUsageDescription: Erupt uses world sensing to place and interact with robot tasks in your space.
+  m_HandsTrackingUsageDescription: Erupt uses hand tracking for spatial robot selection
+    and manipulation.
+  m_WorldSensingUsageDescription: Erupt uses world sensing to place and interact
+    with robot tasks in your space.
   m_RuntimeSettings: {fileID: 11400000, guid: db3b8c48c548a4923b6d09b98052d95b, type: 2}
   m_UpperLimbVisibility: 0
   m_HighQualityRecordingMode: 0

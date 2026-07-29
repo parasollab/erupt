@@ -9,6 +9,10 @@ using UnityEngine.SceneManagement;
 using UnityEditor;
 #endif
 
+#if POLYSPATIAL_1_1_OR_NEWER
+using Unity.PolySpatial.Internals;
+#endif
+
 #if UNITY_VISIONOS || UNITY_EDITOR
 using UnityEngine.XR.VisionOS;
 using UnityEngine.XR.VisionOS.InputDevices;
@@ -25,6 +29,7 @@ public sealed class VisionOSInteractionBootstrap : MonoBehaviour
     const string PolySpatialLayerName = "PolySpatial";
 
     static VisionOSInteractionBootstrap s_Instance;
+    static readonly List<GameObject> s_PendingRuntimeTargets = new();
 
     [SerializeField]
     bool m_EnableMouseFallback = true;
@@ -67,6 +72,21 @@ public sealed class VisionOSInteractionBootstrap : MonoBehaviour
     [SerializeField]
     float m_JointJogRadiansPerMeter = 2f;
 
+    public static void RegisterRuntimeTarget(GameObject target)
+    {
+        if (!ShouldInstallForCurrentPlatform() || target == null)
+            return;
+
+        if (s_Instance == null)
+        {
+            if (!s_PendingRuntimeTargets.Contains(target))
+                s_PendingRuntimeTargets.Add(target);
+            return;
+        }
+
+        s_Instance.RegisterTarget(target);
+    }
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     static void Install()
     {
@@ -103,6 +123,7 @@ public sealed class VisionOSInteractionBootstrap : MonoBehaviour
             m_InteractionMask = 1 << m_PolySpatialLayer;
 
         CreatePointerActions();
+        FlushPendingRuntimeTargets();
         SceneManager.sceneLoaded += OnSceneLoaded;
     }
 
@@ -110,6 +131,7 @@ public sealed class VisionOSInteractionBootstrap : MonoBehaviour
     {
         yield return null;
         RefreshSceneTargets();
+        FlushPendingRuntimeTargets();
     }
 
     void OnDestroy()
@@ -137,6 +159,18 @@ public sealed class VisionOSInteractionBootstrap : MonoBehaviour
     {
         yield return null;
         RefreshSceneTargets();
+        FlushPendingRuntimeTargets();
+    }
+
+    void FlushPendingRuntimeTargets()
+    {
+        for (var i = s_PendingRuntimeTargets.Count - 1; i >= 0; i--)
+        {
+            var target = s_PendingRuntimeTargets[i];
+            s_PendingRuntimeTargets.RemoveAt(i);
+            if (target != null)
+                RegisterTarget(target);
+        }
     }
 
     void CreatePointerActions()
@@ -230,9 +264,65 @@ public sealed class VisionOSInteractionBootstrap : MonoBehaviour
 
         foreach (var pair in targetBounds)
         {
-            if (ShouldCreateProxyFor(pair.Key, pair.Value))
-                CreateProxyCollider(pair.Key, pair.Value);
+            RegisterTarget(pair.Key, pair.Value);
         }
+    }
+
+    void RegisterTarget(GameObject target)
+    {
+        if (!TryGetTargetBounds(target, out var bounds))
+            return;
+
+        RegisterTarget(target, bounds);
+    }
+
+    void RegisterTarget(GameObject target, Bounds worldBounds)
+    {
+        if (m_PolySpatialLayer < 0 || !ShouldCreateProxyFor(target, worldBounds))
+            return;
+
+        CreateProxyCollider(target, worldBounds);
+    }
+
+    static bool TryGetTargetBounds(GameObject target, out Bounds bounds)
+    {
+        bounds = default;
+        if (target == null)
+            return false;
+
+        bool hasBounds = false;
+        foreach (var renderer in target.GetComponentsInChildren<Renderer>(false))
+        {
+            if (renderer == null || !renderer.enabled)
+                continue;
+
+            if (hasBounds)
+                bounds.Encapsulate(renderer.bounds);
+            else
+            {
+                bounds = renderer.bounds;
+                hasBounds = true;
+            }
+        }
+
+        if (hasBounds)
+            return true;
+
+        foreach (var collider in target.GetComponentsInChildren<Collider>(false))
+        {
+            if (collider == null || !collider.enabled)
+                continue;
+
+            if (hasBounds)
+                bounds.Encapsulate(collider.bounds);
+            else
+            {
+                bounds = collider.bounds;
+                hasBounds = true;
+            }
+        }
+
+        return hasBounds;
     }
 
     static GameObject ResolveMovableTarget(GameObject source)

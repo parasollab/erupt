@@ -4,6 +4,10 @@ using UnityEngine.InputSystem;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
 using UnityEngine.XR.Interaction.Toolkit.Transformers;
 
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
+
 public class WristMenuController : MonoBehaviour
 {
     [Header("UI Toolkit")]
@@ -11,6 +15,17 @@ public class WristMenuController : MonoBehaviour
     
     [Header("Input Actions")]
     public InputActionAsset inputActions;
+
+    [Header("VisionOS Palm Menu Gesture")]
+    [SerializeField] private bool enablePalmMenuGesture = true;
+    [SerializeField] private bool palmMenuDebugLogs = false;
+
+    [Header("VisionOS Runtime Menu Layout")]
+    [SerializeField] private Vector2 visionOSWristMenuSizeMeters = new Vector2(1.05f, 0.8f);
+    [SerializeField] private Vector3 visionOSWristMenuOffsetMeters = new Vector3(0f, -0.18f, 0f);
+    [SerializeField] private Vector3 visionOSGrabHandleSizeMeters = new Vector3(0.9f, 0.07f, 0.025f);
+    [SerializeField] private Vector3 visionOSGrabHandleOffsetMeters = new Vector3(0f, 0.28f, -0.02f);
+    [SerializeField] private Color visionOSGrabHandleColor = new Color(0.18f, 0.62f, 0.82f, 0.95f);
     
     [Header("Materials")]
     public Material litMaterial;
@@ -52,6 +67,19 @@ public class WristMenuController : MonoBehaviour
     private Button recordPickPlaceButton;
     private Label recordStatusLabel;
     private Button mtcButton;
+
+    // Runtime uGUI fallback used for PolySpatial/visionOS. UI Toolkit world-space panels are not
+    // rendered reliably in RealityKit immersion, while world-space Canvas is the supported path.
+    private Canvas uguiCanvas;
+    private GameObject uguiRoot;
+    private GameObject uguiGrabHandle;
+    private GameObject uguiOptionsPanel;
+    private GameObject uguiAddShapePanel;
+    private GameObject uguiEditShapePanel;
+    private RectTransform uguiEditSliderPanel;
+    private UnityEngine.UI.Text uguiRecordButtonText;
+    private UnityEngine.UI.Text uguiRecordStatusLabel;
+    private bool useUGUIRuntimeMenu;
     
     // Input Actions
     private InputAction menuAction;
@@ -64,20 +92,45 @@ public class WristMenuController : MonoBehaviour
     {
         if (uiDocument == null)
             uiDocument = GetComponent<UIDocument>();
-            
-        root = uiDocument?.rootVisualElement;
-        if (root == null)
+
+        useUGUIRuntimeMenu = ShouldUseUGUIRuntimeMenu() || uiDocument == null;
+
+        if (useUGUIRuntimeMenu)
         {
-            Debug.LogError("WristMenuController: No UIDocument/rootVisualElement found.");
-            return;
+            if (uiDocument != null)
+                uiDocument.enabled = false;
+
+            EnsureUGUIWristMenu();
         }
-        
-        InitializeUIElements();
-        SetupEventHandlers();
+        else
+        {
+            root = uiDocument?.rootVisualElement;
+            if (root == null)
+            {
+                Debug.LogError("WristMenuController: No UIDocument/rootVisualElement found.");
+                return;
+            }
+
+            InitializeUIElements();
+            SetupEventHandlers();
+        }
+
         SetupInputActions();
+        EnsurePalmMenuGesture();
         
         // Initially hide the menu
         SetMenuVisibility(false);
+    }
+
+    private static bool ShouldUseUGUIRuntimeMenu()
+    {
+#if UNITY_EDITOR
+        return EditorUserBuildSettings.activeBuildTarget.ToString() == "VisionOS";
+#elif UNITY_VISIONOS
+        return true;
+#else
+        return false;
+#endif
     }
     
     public VisualElement CreateToggleStack(string shape, string label)
@@ -285,6 +338,350 @@ public class WristMenuController : MonoBehaviour
 
         return container;
     }
+
+    private void EnsureUGUIWristMenu()
+    {
+        if (uguiRoot != null)
+            return;
+
+        uguiCanvas = VisionOSSampleControlsUI.EnsureCanvas(
+            transform,
+            "VisionOS Wrist Menu Canvas",
+            new Vector2(1050f, 800f),
+            visionOSWristMenuSizeMeters,
+            visionOSWristMenuOffsetMeters,
+            sortingOrder: 150);
+        EnsureVisionOSGrabHandle();
+
+        if (uguiCanvas.worldCamera == null && Camera.main != null)
+            uguiCanvas.worldCamera = Camera.main;
+
+        uguiRoot = uguiCanvas.gameObject;
+        VisionOSSampleControlsUI.ClearChildren(uguiRoot.transform);
+
+        uguiOptionsPanel = CreateUGUIPanel("Options");
+        CreateUGUIButton(uguiOptionsPanel.transform, "Add Shape", OnAddShapeClicked);
+        CreateUGUIButton(uguiOptionsPanel.transform, "Edit Shape", OnEditShapeClicked);
+        CreateUGUIButton(uguiOptionsPanel.transform, "Snap Surface", OnSnapSurfaceClicked);
+        CreateUGUIButton(uguiOptionsPanel.transform, "Duplicate Shape", OnDuplicateShapeClicked);
+        CreateUGUIButton(uguiOptionsPanel.transform, "Delete Shape", OnDeleteShapeClicked);
+        if (enableMTC)
+        {
+            var recordButton = CreateUGUIButton(uguiOptionsPanel.transform, "Record Pick & Place", OnRecordPickPlaceClicked);
+            uguiRecordButtonText = recordButton.GetComponentInChildren<UnityEngine.UI.Text>();
+            uguiRecordStatusLabel = CreateUGUIText(uguiOptionsPanel.transform, "Idle", 18, TextAnchor.MiddleCenter);
+            CreateUGUIButton(uguiOptionsPanel.transform, "MTC", OnMTCClicked);
+        }
+
+        uguiAddShapePanel = CreateUGUIPanel("Add Shape");
+        CreateUGUIButton(uguiAddShapePanel.transform, "Back", OnAddShapeBackClicked);
+        CreateUGUIButton(uguiAddShapePanel.transform, "Cube", OnAddCubeClicked);
+        CreateUGUIButton(uguiAddShapePanel.transform, "Sphere", OnAddSphereClicked);
+        CreateUGUIButton(uguiAddShapePanel.transform, "Cylinder", OnAddCylinderClicked);
+
+        uguiEditShapePanel = CreateUGUIPanel("Edit Shape");
+        CreateUGUIButton(uguiEditShapePanel.transform, "Back", OnEditShapeBackClicked);
+        var sliderContainer = new GameObject("Sliders");
+        sliderContainer.transform.SetParent(uguiEditShapePanel.transform, false);
+        uguiEditSliderPanel = sliderContainer.AddComponent<RectTransform>();
+        var layout = sliderContainer.AddComponent<UnityEngine.UI.VerticalLayoutGroup>();
+        layout.childAlignment = TextAnchor.UpperCenter;
+        layout.childControlWidth = true;
+        layout.childForceExpandWidth = true;
+        layout.spacing = 8f;
+
+        ShowOptionsPanel();
+        Debug.Log("WristMenuController: Created visionOS uGUI wrist menu.");
+    }
+
+    private Canvas FindDirectChildCanvas(string canvasName)
+    {
+        Transform child = transform.Find(canvasName);
+        return child != null ? child.GetComponent<Canvas>() : null;
+    }
+
+    private void EnsureVisionOSGrabHandle()
+    {
+        const string handleName = "VisionOS Grab Handle";
+
+        Transform handleTransform = transform.Find(handleName);
+        GameObject handleObject;
+        if (handleTransform == null)
+        {
+            handleObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            handleObject.name = handleName;
+            handleObject.transform.SetParent(transform, false);
+
+            var primitiveCollider = handleObject.GetComponent<Collider>();
+            if (primitiveCollider != null)
+            {
+                if (Application.isPlaying)
+                    Destroy(primitiveCollider);
+                else
+                    DestroyImmediate(primitiveCollider);
+            }
+        }
+        else
+        {
+            handleObject = handleTransform.gameObject;
+        }
+
+        Vector3 localOffset = MetersToLocal(visionOSGrabHandleOffsetMeters);
+        Vector3 localSize = MetersToLocal(visionOSGrabHandleSizeMeters);
+        handleObject.transform.localPosition = localOffset;
+        handleObject.transform.localRotation = Quaternion.identity;
+        handleObject.transform.localScale = localSize;
+        uguiGrabHandle = handleObject;
+
+        var renderer = handleObject.GetComponent<MeshRenderer>();
+        if (renderer != null)
+        {
+            renderer.enabled = true;
+            renderer.sharedMaterial = CreateVisionOSHandleMaterial();
+        }
+
+        var grabCollider = GetComponent<BoxCollider>();
+        if (grabCollider != null)
+        {
+            grabCollider.center = localOffset;
+            grabCollider.size = localSize;
+        }
+    }
+
+    private Vector3 MetersToLocal(Vector3 meters)
+    {
+        return meters / VisionOSSampleControlsUI.GetUniformScale(transform.lossyScale);
+    }
+
+    private Material CreateVisionOSHandleMaterial()
+    {
+        Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+        if (shader == null)
+            shader = Shader.Find("Standard");
+
+        var material = new Material(shader);
+        material.name = "VisionOS Grab Handle Material";
+        material.color = visionOSGrabHandleColor;
+        return material;
+    }
+
+    private GameObject CreateUGUIPanel(string panelName)
+    {
+        var panel = VisionOSSampleControlsUI.CreateVerticalPanel(
+            uguiRoot.transform,
+            "Wrist " + panelName + " Panel",
+            new Vector2(1050f, 800f));
+        CreateUGUIText(panel.transform, panelName, 50, TextAnchor.MiddleCenter);
+        return panel;
+    }
+
+    private UnityEngine.UI.Button CreateUGUIButton(Transform parent, string label, UnityEngine.Events.UnityAction onClick)
+    {
+        return VisionOSSampleControlsUI.CreateButton(parent, label, onClick, 950f, 100f, 35);
+    }
+
+    private UnityEngine.UI.Text CreateUGUIText(Transform parent, string text, int fontSize, TextAnchor alignment)
+    {
+        return VisionOSSampleControlsUI.CreateText(parent, text, fontSize, alignment, VisionOSSampleControlsUI.TextColor);
+    }
+
+    private static Font GetBuiltinFont()
+    {
+        return VisionOSSampleControlsUI.GetBuiltinFont();
+    }
+
+    private void AddUGUIBackground(GameObject target, Color color)
+    {
+        VisionOSSampleControlsUI.AddImage(target, color, raycastTarget: true);
+    }
+
+    private void PopulateUGUIEditShapePanel(GameObject selectedObject, string meshName)
+    {
+        ClearUGUIEditSliderPanel();
+
+        if (meshName.Contains("Cube"))
+        {
+            CreateUGUIScaleRow("Cube", "X");
+            CreateUGUIScaleRow("Cube", "Y");
+            CreateUGUIScaleRow("Cube", "Z");
+        }
+        else if (meshName.Contains("Sphere"))
+        {
+            CreateUGUIScaleRow("Sphere", "Radius");
+        }
+        else if (meshName.Contains("Cylinder"))
+        {
+            CreateUGUIScaleRow("Cylinder", "Height");
+            CreateUGUIScaleRow("Cylinder", "Radius");
+        }
+        else if (meshName.Contains("Mesh"))
+        {
+            CreateUGUIScaleRow("Mesh", "Scale");
+        }
+    }
+
+    private void CreateUGUIScaleRow(string shape, string label)
+    {
+        if (uguiEditSliderPanel == null)
+            return;
+
+        var row = new GameObject("Scale " + label);
+        row.transform.SetParent(uguiEditSliderPanel, false);
+        var rowRect = row.AddComponent<RectTransform>();
+        rowRect.sizeDelta = new Vector2(950f, 100f);
+
+        var rowLayout = row.AddComponent<UnityEngine.UI.HorizontalLayoutGroup>();
+        rowLayout.childAlignment = TextAnchor.MiddleCenter;
+        rowLayout.childControlHeight = true;
+        rowLayout.childControlWidth = false;
+        rowLayout.childForceExpandWidth = false;
+        rowLayout.spacing = 25f;
+
+        var toggleObject = new GameObject("Scale " + label + " Toggle");
+        toggleObject.transform.SetParent(row.transform, false);
+        var toggleRect = toggleObject.AddComponent<RectTransform>();
+        toggleRect.sizeDelta = new Vector2(220f, 80f);
+        var toggleBackground = toggleObject.AddComponent<UnityEngine.UI.Image>();
+        toggleBackground.color = Color.white;
+        var toggle = toggleObject.AddComponent<UnityEngine.UI.Toggle>();
+        toggle.targetGraphic = toggleBackground;
+        toggle.isOn = true;
+        toggle.onValueChanged.AddListener(value => SetScaleAxisEnabled(shape, label, value));
+        CreateUGUIText(toggleObject.transform, label, 35, TextAnchor.MiddleCenter).raycastTarget = false;
+
+        var sliderObject = new GameObject("Scale " + label + " Slider");
+        sliderObject.transform.SetParent(row.transform, false);
+        var sliderRect = sliderObject.AddComponent<RectTransform>();
+        sliderRect.sizeDelta = new Vector2(680f, 80f);
+        var layoutElement = sliderObject.AddComponent<UnityEngine.UI.LayoutElement>();
+        layoutElement.preferredWidth = 680f;
+        layoutElement.minHeight = 80f;
+
+        var slider = sliderObject.AddComponent<UnityEngine.UI.Slider>();
+        slider.minValue = 0f;
+        slider.maxValue = 200f;
+        slider.value = 100f;
+
+        var background = new GameObject("Background");
+        background.transform.SetParent(sliderObject.transform, false);
+        var backgroundRect = background.AddComponent<RectTransform>();
+        backgroundRect.anchorMin = new Vector2(0f, 0.4f);
+        backgroundRect.anchorMax = new Vector2(1f, 0.6f);
+        backgroundRect.offsetMin = Vector2.zero;
+        backgroundRect.offsetMax = Vector2.zero;
+        background.AddComponent<UnityEngine.UI.Image>().color = new Color(0.78f, 0.78f, 0.78f, 1f);
+
+        var fill = new GameObject("Fill");
+        fill.transform.SetParent(background.transform, false);
+        var fillRect = fill.AddComponent<RectTransform>();
+        fillRect.anchorMin = Vector2.zero;
+        fillRect.anchorMax = Vector2.one;
+        fillRect.offsetMin = Vector2.zero;
+        fillRect.offsetMax = Vector2.zero;
+        fill.AddComponent<UnityEngine.UI.Image>().color = new Color(0.2f, 0.62f, 0.82f, 1f);
+
+        var handle = new GameObject("Handle");
+        handle.transform.SetParent(sliderObject.transform, false);
+        var handleRect = handle.AddComponent<RectTransform>();
+        handleRect.sizeDelta = new Vector2(40f, 70f);
+        handle.AddComponent<UnityEngine.UI.Image>().color = VisionOSSampleControlsUI.TextColor;
+
+        slider.fillRect = fillRect;
+        slider.handleRect = handleRect;
+        slider.targetGraphic = handle.GetComponent<UnityEngine.UI.Image>();
+
+        float previousValue = 100f;
+        slider.onValueChanged.AddListener(value =>
+        {
+            float delta = (value - previousValue) / 100f;
+            previousValue = value;
+            if (!Mathf.Approximately(delta, 0f))
+                ApplyScaleDelta(selectionManager?.SelectedObject, shape, label, delta);
+        });
+    }
+
+    private void SetScaleAxisEnabled(string shape, string label, bool enabled)
+    {
+        var selected = selectionManager?.SelectedObject;
+        if (selected == null)
+            return;
+
+        var axisLock = selected.GetComponent<XRGrabTransformerScaleAxisLock>();
+        if (axisLock == null)
+            return;
+
+        if (shape.Contains("Cube"))
+        {
+            if (label == "X") axisLock.freezeXScale = !enabled;
+            else if (label == "Y") axisLock.freezeYScale = !enabled;
+            else if (label == "Z") axisLock.freezeZScale = !enabled;
+        }
+        else
+        {
+            axisLock.freezeXScale = !enabled;
+            axisLock.freezeYScale = !enabled;
+            axisLock.freezeZScale = !enabled;
+        }
+    }
+
+    private void ApplyScaleDelta(GameObject selected, string shape, string label, float delta)
+    {
+        if (selected == null)
+            return;
+
+        Vector3 d = MakeScaleDelta(shape, label, delta);
+
+        var axisLock = selected.GetComponent<XRGrabTransformerScaleAxisLock>();
+        if (axisLock != null)
+        {
+            if (axisLock.freezeXScale) d.x = 0f;
+            if (axisLock.freezeYScale) d.y = 0f;
+            if (axisLock.freezeZScale) d.z = 0f;
+        }
+
+        var grab = selected.GetComponent<XRGrabInteractable>();
+        var uiScaleTransformer = selected.GetComponent<XRUIScaleTransformer>();
+        if (grab != null && grab.isSelected && uiScaleTransformer != null)
+        {
+            uiScaleTransformer.queuedDelta += d;
+            return;
+        }
+
+        const float minScale = 0.01f;
+        Vector3 scale = selected.transform.localScale + d;
+        scale.x = Mathf.Max(minScale, scale.x);
+        scale.y = Mathf.Max(minScale, scale.y);
+        scale.z = Mathf.Max(minScale, scale.z);
+        selected.transform.localScale = scale;
+    }
+
+    private Vector3 MakeScaleDelta(string shapeName, string axisLabel, float delta)
+    {
+        if (shapeName.Contains("Cube"))
+        {
+            if (axisLabel == "X") return new Vector3(delta, 0f, 0f);
+            if (axisLabel == "Y") return new Vector3(0f, delta, 0f);
+            if (axisLabel == "Z") return new Vector3(0f, 0f, delta);
+            return Vector3.zero;
+        }
+
+        if (shapeName.Contains("Cylinder"))
+        {
+            if (axisLabel == "Height") return new Vector3(0f, delta, 0f);
+            if (axisLabel == "Radius") return new Vector3(delta, 0f, delta);
+        }
+
+        return new Vector3(delta, delta, delta);
+    }
+
+    private void ClearUGUIEditSliderPanel()
+    {
+        if (uguiEditSliderPanel == null)
+            return;
+
+        for (int i = uguiEditSliderPanel.childCount - 1; i >= 0; i--)
+            Destroy(uguiEditSliderPanel.GetChild(i).gameObject);
+    }
     
     private void InitializeUIElements()
     {
@@ -390,6 +787,18 @@ public class WristMenuController : MonoBehaviour
     {
         ToggleMenu();
     }
+
+    private void EnsurePalmMenuGesture()
+    {
+        if (!enablePalmMenuGesture)
+            return;
+
+        var gesture = GetComponent<WristPalmMenuGesture>();
+        if (gesture == null)
+            gesture = gameObject.AddComponent<WristPalmMenuGesture>();
+
+        gesture.SetDebugLogs(palmMenuDebugLogs);
+    }
     
     public void ToggleMenu()
     {
@@ -400,15 +809,22 @@ public class WristMenuController : MonoBehaviour
     {
         isMenuVisible = visible;
 
+        if (uguiRoot != null)
+            uguiRoot.SetActive(visible);
+        if (uguiGrabHandle != null)
+            uguiGrabHandle.SetActive(visible);
+
         if (root != null)
         {
-            wristMenuMainPanel.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
- 
-            Collider collider = GetComponent<Collider>();
-            if (collider != null)
-            {
-                collider.enabled = visible;
-            }
+            if (wristMenuMainPanel != null)
+                wristMenuMainPanel.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
+
+        }
+
+        Collider collider = GetComponent<Collider>();
+        if (collider != null)
+        {
+            collider.enabled = visible;
         }
         
         Debug.Log($"WristMenuController: Menu visibility set to {visible}");
@@ -422,17 +838,26 @@ public class WristMenuController : MonoBehaviour
             wristMenuOptionsPanel.SetEnabled(true);
         }
 
+        if (uguiOptionsPanel != null)
+            uguiOptionsPanel.SetActive(true);
+
         if (wristMenuAddShapePanel != null)
         {
             wristMenuAddShapePanel.style.display = DisplayStyle.None;
             wristMenuAddShapePanel.SetEnabled(false);
         }
+
+        if (uguiAddShapePanel != null)
+            uguiAddShapePanel.SetActive(false);
         
         if (wristMenuEditShapePanel != null)
         {
             wristMenuEditShapePanel.style.display = DisplayStyle.None;
             wristMenuEditShapePanel.SetEnabled(false);
         }
+
+        if (uguiEditShapePanel != null)
+            uguiEditShapePanel.SetActive(false);
     }
     
     private void ShowAddShapePanel()
@@ -443,11 +868,17 @@ public class WristMenuController : MonoBehaviour
             wristMenuOptionsPanel.SetEnabled(false);
         }
 
+        if (uguiOptionsPanel != null)
+            uguiOptionsPanel.SetActive(false);
+
         if (wristMenuAddShapePanel != null)
         {
             wristMenuAddShapePanel.style.display = DisplayStyle.Flex;
             wristMenuAddShapePanel.SetEnabled(true);
         }
+
+        if (uguiAddShapePanel != null)
+            uguiAddShapePanel.SetActive(true);
     }
 
     private void ShowEditShapePanel()
@@ -458,11 +889,17 @@ public class WristMenuController : MonoBehaviour
             wristMenuOptionsPanel.SetEnabled(false);
         }
 
+        if (uguiOptionsPanel != null)
+            uguiOptionsPanel.SetActive(false);
+
         if (wristMenuEditShapePanel != null)
         {
             wristMenuEditShapePanel.style.display = DisplayStyle.Flex;
             wristMenuEditShapePanel.SetEnabled(true);
         }
+
+        if (uguiEditShapePanel != null)
+            uguiEditShapePanel.SetActive(true);
     }
 
     // Event Handlers
@@ -474,14 +911,16 @@ public class WristMenuController : MonoBehaviour
 
     private void PopulateEditShapePanel(GameObject selectedObject)
     {
-        if (wristMenuEditSliderPanel == null)
+        if (wristMenuEditSliderPanel == null && uguiEditSliderPanel == null)
         {
             Debug.LogWarning("WristMenuController: Edit slider panel not found.");
             return;
         }
 
         // Clear existing elements
-        wristMenuEditSliderPanel.Clear();
+        if (wristMenuEditSliderPanel != null)
+            wristMenuEditSliderPanel.Clear();
+        ClearUGUIEditSliderPanel();
 
         if (selectedObject == null)
         {
@@ -500,25 +939,41 @@ public class WristMenuController : MonoBehaviour
         if (meshName.Contains("Cube"))
         {
             Debug.Log("WristMenuController: Populating edit panel for Cube");
-            wristMenuEditSliderPanel.Add(CreateToggleStack("Cube", "X"));
-            wristMenuEditSliderPanel.Add(CreateToggleStack("Cube", "Y"));
-            wristMenuEditSliderPanel.Add(CreateToggleStack("Cube", "Z"));
+            if (wristMenuEditSliderPanel != null)
+            {
+                wristMenuEditSliderPanel.Add(CreateToggleStack("Cube", "X"));
+                wristMenuEditSliderPanel.Add(CreateToggleStack("Cube", "Y"));
+                wristMenuEditSliderPanel.Add(CreateToggleStack("Cube", "Z"));
+            }
+            if (uguiEditSliderPanel != null)
+                PopulateUGUIEditShapePanel(selectedObject, meshName);
         }
         else if (meshName.Contains("Sphere"))
         {
             Debug.Log("WristMenuController: Populating edit panel for Sphere");
-            wristMenuEditSliderPanel.Add(CreateToggleStack("Sphere", "Radius"));
+            if (wristMenuEditSliderPanel != null)
+                wristMenuEditSliderPanel.Add(CreateToggleStack("Sphere", "Radius"));
+            if (uguiEditSliderPanel != null)
+                PopulateUGUIEditShapePanel(selectedObject, meshName);
         }
         else if (meshName.Contains("Cylinder"))
         {
             Debug.Log("WristMenuController: Populating edit panel for Cylinder");
-            wristMenuEditSliderPanel.Add(CreateToggleStack("Cylinder", "Height"));
-            wristMenuEditSliderPanel.Add(CreateToggleStack("Cylinder", "Radius"));
+            if (wristMenuEditSliderPanel != null)
+            {
+                wristMenuEditSliderPanel.Add(CreateToggleStack("Cylinder", "Height"));
+                wristMenuEditSliderPanel.Add(CreateToggleStack("Cylinder", "Radius"));
+            }
+            if (uguiEditSliderPanel != null)
+                PopulateUGUIEditShapePanel(selectedObject, meshName);
         }
         else if (meshName.Contains("Mesh"))
         {
             Debug.Log("WristMenuController: Populating edit panel for Mesh");
-            wristMenuEditSliderPanel.Add(CreateToggleStack("Mesh", "Scale"));
+            if (wristMenuEditSliderPanel != null)
+                wristMenuEditSliderPanel.Add(CreateToggleStack("Mesh", "Scale"));
+            if (uguiEditSliderPanel != null)
+                PopulateUGUIEditShapePanel(selectedObject, meshName);
         }
         else
         {
@@ -637,7 +1092,9 @@ public class WristMenuController : MonoBehaviour
     private void OnEditShapeBackClicked()
     {
         // Clear elements added to edit shape when shown
-        wristMenuEditSliderPanel.Clear();
+        if (wristMenuEditSliderPanel != null)
+            wristMenuEditSliderPanel.Clear();
+        ClearUGUIEditSliderPanel();
         ShowOptionsPanel();
         Debug.Log("WristMenuController: Back to options panel");
     }
@@ -787,8 +1244,15 @@ public class WristMenuController : MonoBehaviour
                 recordPickPlaceButton.text = "Recording...";
                 recordPickPlaceButton.style.color = new UnityEngine.UIElements.StyleColor(UnityEngine.Color.yellow);
             }
+            if (uguiRecordButtonText != null)
+            {
+                uguiRecordButtonText.text = "Recording...";
+                uguiRecordButtonText.color = Color.yellow;
+            }
             if (recordStatusLabel != null)
                 recordStatusLabel.text = "Waiting for grab...";
+            if (uguiRecordStatusLabel != null)
+                uguiRecordStatusLabel.text = "Waiting for grab...";
         }
         else
         {
@@ -801,6 +1265,8 @@ public class WristMenuController : MonoBehaviour
     {
         if (recordStatusLabel != null)
             recordStatusLabel.text = $"Sent: {objectId}";
+        if (uguiRecordStatusLabel != null)
+            uguiRecordStatusLabel.text = $"Sent: {objectId}";
         ResetRecordUI(resetLabel: false);
     }
 
@@ -811,8 +1277,15 @@ public class WristMenuController : MonoBehaviour
             recordPickPlaceButton.text = "Record Pick & Place";
             recordPickPlaceButton.style.color = new UnityEngine.UIElements.StyleColor(StyleKeyword.Null);
         }
+        if (uguiRecordButtonText != null)
+        {
+            uguiRecordButtonText.text = "Record Pick & Place";
+            uguiRecordButtonText.color = Color.white;
+        }
         if (resetLabel && recordStatusLabel != null)
             recordStatusLabel.text = "Idle";
+        if (resetLabel && uguiRecordStatusLabel != null)
+            uguiRecordStatusLabel.text = "Idle";
     }
 
     private void OnSnapSurfaceClicked()

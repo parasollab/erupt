@@ -147,6 +147,7 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
             child.GetComponent<XRGrabInteractable>().AddMultipleGrabTransformer(child.GetComponent<XRGrabTransformerLockPose>());
 
             child.GetComponent<XRGrabInteractable>().AddMultipleGrabTransformer(child.GetComponent<XRUIScaleTransformer>());
+            VisionOSInteractionBootstrap.RegisterRuntimeTarget(child);
 
             // Ensure collider is enabled (should already be there from CreatePrimitive)
             Collider collider = child.GetComponent<Collider>();
@@ -213,6 +214,7 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
 
                 // Add component to control grabbing based on selection state
                 child.AddComponent<SelectableGrabController>();
+                VisionOSInteractionBootstrap.RegisterRuntimeTarget(child);
 
                 // Add CollisionObjectPublisher to automatically publish to ROS
                 CollisionObjectPublisher publisher = child.AddComponent<CollisionObjectPublisher>();

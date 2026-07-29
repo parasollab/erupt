@@ -15,12 +15,26 @@ public class IndicatorMenuController : MonoBehaviour
     [SerializeField] private float shapeSpawnDistance = 0.75f;
 
     private Button spawnIndicatorButton;
+    private UnityEngine.UI.Button uguiSpawnIndicatorButton;
+    private Canvas uguiCanvas;
+    private GameObject uguiRoot;
     private GameObject spawnedIndicatorSphere;
+    private bool useUGUIRuntimeMenu;
 
     private void OnEnable()
     {
         if (uiDocument == null)
             uiDocument = GetComponent<UIDocument>();
+
+        useUGUIRuntimeMenu = VisionOSSampleControlsUI.ShouldUseRuntimeUGUI() || uiDocument == null;
+        if (useUGUIRuntimeMenu)
+        {
+            if (uiDocument != null)
+                uiDocument.enabled = false;
+
+            EnsureUGUIMenu();
+            return;
+        }
 
         VisualElement root = uiDocument?.rootVisualElement;
         if (root == null)
@@ -43,6 +57,35 @@ public class IndicatorMenuController : MonoBehaviour
     {
         if (spawnIndicatorButton != null)
             spawnIndicatorButton.clicked -= OnSpawnIndicatorClicked;
+        if (uguiSpawnIndicatorButton != null)
+            uguiSpawnIndicatorButton.onClick.RemoveListener(OnSpawnIndicatorClicked);
+    }
+
+    private void EnsureUGUIMenu()
+    {
+        uguiCanvas = VisionOSSampleControlsUI.EnsureCanvas(
+            transform,
+            "VisionOS Indicator Menu Canvas",
+            new Vector2(1050f, 300f),
+            new Vector2(1.05f, 0.3f),
+            new Vector3(0f, -0.1f, 0f),
+            sortingOrder: 130);
+
+        uguiRoot = uguiCanvas.gameObject;
+        VisionOSSampleControlsUI.ClearChildren(uguiRoot.transform);
+
+        var panel = VisionOSSampleControlsUI.CreateVerticalPanel(
+            uguiRoot.transform,
+            "Indicator Menu Panel",
+            new Vector2(1050f, 300f));
+
+        uguiSpawnIndicatorButton = VisionOSSampleControlsUI.CreateButton(
+            panel.transform,
+            "Get Indicator Sphere",
+            OnSpawnIndicatorClicked,
+            950f,
+            100f,
+            35);
     }
 
     private void OnSpawnIndicatorClicked()

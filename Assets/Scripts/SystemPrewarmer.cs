@@ -3,6 +3,7 @@ using Unity.Robotics.ROSTCPConnector;
 using RosMessageTypes.Moveit;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
 using System.Collections;
+using UnityEngine.SceneManagement;
 
 /// <summary>
 /// Pre-warms systems that cause lag when first objects are created.
@@ -14,6 +15,7 @@ public class SystemPrewarmer : MonoBehaviour
     [Header("Pre-warming Settings")]
     [Tooltip("Delay before starting pre-warming to avoid interfering with scene startup")]
     public float prewarmDelay = 2f;
+    public bool loadSceneAfterPrewarm = true;
     public string mainSceneName = "MainScene";
     
     private void Start()
@@ -39,8 +41,11 @@ public class SystemPrewarmer : MonoBehaviour
 
         // Debug.Log("SystemPrewarmer: System pre-warming completed!");
 
-        // Spawn the MainScene
-        UnityEngine.SceneManagement.SceneManager.LoadScene(mainSceneName);
+        if (loadSceneAfterPrewarm && !string.IsNullOrWhiteSpace(mainSceneName) &&
+            SceneManager.GetActiveScene().name != mainSceneName)
+        {
+            SceneManager.LoadScene(mainSceneName);
+        }
     }
     
     private void PrewarmROSConnection()
@@ -77,7 +82,7 @@ public class SystemPrewarmer : MonoBehaviour
         // Clean up the temporary object
         if (tempPrimitive != null)
         {
-            DestroyImmediate(tempPrimitive);
+            Destroy(tempPrimitive);
         }
         
         // Debug.Log("SystemPrewarmer: Primitive creation systems pre-warmed");

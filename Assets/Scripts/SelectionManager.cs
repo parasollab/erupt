@@ -16,6 +16,7 @@ public class SelectionManager : MonoBehaviour
     public Material highlightMaterial;
     private Material originalMaterial;
     private Renderer selectedRenderer;
+    private System.Action<InputAction.CallbackContext> selectPerformedHandler;
 
     public GameObject SelectedObject { get; private set; }
     
@@ -36,11 +37,20 @@ public class SelectionManager : MonoBehaviour
     {
         if (rayInteractor == null)
         {
-            Debug.LogError("Ray Interactor is not assigned in SelectionManager.");
-            return;
+            Debug.LogWarning("SelectionManager: Quest ray interactor is not assigned; spatial pointer selection may still be provided by VisionOSInteractionBootstrap.");
         }
 
-        selectAction.action.performed += ctx => TrySelect();
+        if (selectAction != null && selectAction.action != null)
+        {
+            selectPerformedHandler = _ => TrySelect();
+            selectAction.action.performed += selectPerformedHandler;
+        }
+    }
+
+    private void OnDestroy()
+    {
+        if (selectAction != null && selectAction.action != null && selectPerformedHandler != null)
+            selectAction.action.performed -= selectPerformedHandler;
     }
 
     void TrySelect()
@@ -110,6 +120,12 @@ public class SelectionManager : MonoBehaviour
 
     public void SetSelectedObject(GameObject newSelection)
     {
+        if (newSelection == null)
+        {
+            ClearSelection();
+            return;
+        }
+
         if (SelectedObject == newSelection)
             return;
 

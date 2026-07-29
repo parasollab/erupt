@@ -26,6 +26,7 @@ public class SelectableGrabController : MonoBehaviour
 
         grabInteractable.selectEntered.AddListener(OnGrabEntered);
         grabInteractable.selectExited.AddListener(OnGrabExited);
+        VisionOSInteractionBootstrap.RegisterRuntimeTarget(gameObject);
 
         // Subscribe to selection events
         if (SelectionManager.Instance != null)

@@ -48,6 +48,8 @@ public class TutorialStepDisplay : MonoBehaviour
 
     private Label stepCounterLabel;
     private Label bodyLabel;
+    private UnityEngine.UI.Text uguiStepCounterLabel;
+    private UnityEngine.UI.Text uguiBodyLabel;
     private int stepIndex;
 
     private void OnEnable()
@@ -55,9 +57,19 @@ public class TutorialStepDisplay : MonoBehaviour
         if (uiDocument == null)
             uiDocument = GetComponent<UIDocument>();
 
-        VisualElement root = uiDocument?.rootVisualElement;
-        stepCounterLabel = root?.Q<Label>("stepCounterLabel");
-        bodyLabel = root?.Q<Label>("instructionsLabel");
+        if (VisionOSSampleControlsUI.ShouldUseRuntimeUGUI() || uiDocument == null)
+        {
+            if (uiDocument != null)
+                uiDocument.enabled = false;
+
+            EnsureUGUITutorialPanel();
+        }
+        else
+        {
+            VisualElement root = uiDocument?.rootVisualElement;
+            stepCounterLabel = root?.Q<Label>("stepCounterLabel");
+            bodyLabel = root?.Q<Label>("instructionsLabel");
+        }
 
         stepIndex = 0;
         ShowCurrentStep();
@@ -100,10 +112,15 @@ public class TutorialStepDisplay : MonoBehaviour
     private void ShowCurrentStep()
     {
         Step step = Steps[stepIndex];
+        string counterText = $"Step {stepIndex + 1} of {Steps.Length} — {step.Heading}";
         if (stepCounterLabel != null)
-            stepCounterLabel.text = $"Step {stepIndex + 1} of {Steps.Length} — {step.Heading}";
+            stepCounterLabel.text = counterText;
         if (bodyLabel != null)
             bodyLabel.text = step.Body;
+        if (uguiStepCounterLabel != null)
+            uguiStepCounterLabel.text = counterText;
+        if (uguiBodyLabel != null)
+            uguiBodyLabel.text = step.Body;
     }
 
     private void OnDisable()
@@ -112,5 +129,38 @@ public class TutorialStepDisplay : MonoBehaviour
         {
             advanceAction.action.performed -= OnAdvancePressed;
         }
+    }
+
+    private void EnsureUGUITutorialPanel()
+    {
+        Canvas canvas = VisionOSSampleControlsUI.EnsureCanvas(
+            transform,
+            "VisionOS Tutorial Instructions Canvas",
+            new Vector2(1050f, 800f),
+            new Vector2(1.05f, 0.8f),
+            new Vector3(0f, -0.1f, 0f),
+            sortingOrder: 120);
+
+        VisionOSSampleControlsUI.ClearChildren(canvas.transform);
+        var panel = VisionOSSampleControlsUI.CreateVerticalPanel(
+            canvas.transform,
+            "Tutorial Instructions Panel",
+            new Vector2(1050f, 800f));
+
+        uguiStepCounterLabel = VisionOSSampleControlsUI.CreateText(
+            panel.transform,
+            "",
+            45,
+            TextAnchor.MiddleLeft,
+            VisionOSSampleControlsUI.TextColor,
+            100f);
+
+        uguiBodyLabel = VisionOSSampleControlsUI.CreateText(
+            panel.transform,
+            "",
+            32,
+            TextAnchor.UpperLeft,
+            VisionOSSampleControlsUI.TextColor,
+            570f);
     }
 }

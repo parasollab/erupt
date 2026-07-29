@@ -11,6 +11,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System;
 
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
+
 public class MoveItPlanningRequestMenuUI : MonoBehaviour
 {
     // Synthetic object_id tying together set_start_state/set_goal_state/send_planning_request/
@@ -29,6 +33,13 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
     [Header("UI Toolkit")]
     [SerializeField] private UIDocument uiDocument;
+
+    [Header("VisionOS Runtime Menu Layout")]
+    [SerializeField] private Vector2 visionOSPlanningMenuSizeMeters = new Vector2(1.05f, 1.25f);
+    [SerializeField] private Vector3 visionOSPlanningMenuOffsetMeters = new Vector3(0f, -0.22f, 0f);
+    [SerializeField] private Vector3 visionOSGrabHandleSizeMeters = new Vector3(0.9f, 0.07f, 0.025f);
+    [SerializeField] private Vector3 visionOSGrabHandleOffsetMeters = new Vector3(0f, 0.45f, -0.02f);
+    [SerializeField] private Color visionOSGrabHandleColor = new Color(0.18f, 0.62f, 0.82f, 0.95f);
     
     [Header("MoveIt2 Configuration")]
     [SerializeField] private string planningGroupName = "ur_manipulator";
@@ -74,6 +85,29 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     private Button mirrorButton;
     private bool isMirroring = false;
     private bool isReplaying = false;
+
+    // Runtime uGUI fallback for PolySpatial/visionOS. World-space Canvas is rendered in
+    // RealityKit immersion; UIDocument/UI Toolkit panels are not a reliable visible surface there.
+    private Canvas uguiCanvas;
+    private GameObject uguiRoot;
+    private UnityEngine.UI.Text uguiPlanningResultLabel;
+    private UnityEngine.UI.Text uguiSetStartStateButtonText;
+    private UnityEngine.UI.Text uguiSetGoalStateButtonText;
+    private UnityEngine.UI.Text uguiStopReplayButtonText;
+    private UnityEngine.UI.Text uguiMirrorButtonText;
+    private UnityEngine.UI.Button uguiStopReplayButton;
+    private UnityEngine.UI.Button uguiExecuteTrajectoryButton;
+    private UnityEngine.UI.Text uguiPipelineValueLabel;
+    private UnityEngine.UI.Text uguiPlannerValueLabel;
+    private UnityEngine.UI.Text uguiNumPlanningAttemptsLabel;
+    private UnityEngine.UI.Text uguiAllowedPlanningTimeLabel;
+    private readonly List<string> uguiPipelineChoices = new List<string>();
+    private readonly List<string> uguiPlannerChoices = new List<string>();
+    private string uguiSelectedPlanner = "";
+    private int uguiNumPlanningAttempts;
+    private float uguiAllowedPlanningTime;
+    private readonly Queue<Action> pendingUIActions = new Queue<Action>();
+    private bool useUGUIRuntimeMenu;
 
     // ROS Connection
     private ROSConnection ros;
@@ -139,21 +173,45 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         if (uiDocument == null)
             uiDocument = GetComponent<UIDocument>();
 
-        root = uiDocument?.rootVisualElement;
-        if (root == null)
+        useUGUIRuntimeMenu = ShouldUseUGUIRuntimeMenu() || uiDocument == null;
+
+        if (useUGUIRuntimeMenu)
         {
-            Debug.LogError("MoveItPlanningRequestMenuUI: No UIDocument/rootVisualElement found.");
-            return;
+            if (uiDocument != null)
+                uiDocument.enabled = false;
+
+            EnsureUGUIPlanningMenu();
+        }
+        else
+        {
+            root = uiDocument?.rootVisualElement;
+            if (root == null)
+            {
+                Debug.LogError("MoveItPlanningRequestMenuUI: No UIDocument/rootVisualElement found.");
+                return;
+            }
+
+            InitializeUIElements();
+            SetupEventHandlers();
         }
 
         robotController = ikController;
 
-        InitializeUIElements();
-        SetupEventHandlers();
         InitializeROSConnection();
 
         // Start planner querying immediately
         StartPlannerQuerying();
+    }
+
+    private static bool ShouldUseUGUIRuntimeMenu()
+    {
+#if UNITY_EDITOR
+        return EditorUserBuildSettings.activeBuildTarget.ToString() == "VisionOS";
+#elif UNITY_VISIONOS
+        return true;
+#else
+        return false;
+#endif
     }
 
     private void StartPlannerQuerying()
@@ -242,22 +300,389 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         executeTrajectoryButton.clicked += ExectuteTrajectory;
     }
 
+    private void EnsureUGUIPlanningMenu()
+    {
+        if (uguiRoot != null)
+            return;
+
+        uguiCanvas = VisionOSSampleControlsUI.EnsureCanvas(
+            transform,
+            "VisionOS Planning Request Canvas",
+            new Vector2(1050f, 1250f),
+            visionOSPlanningMenuSizeMeters,
+            visionOSPlanningMenuOffsetMeters,
+            sortingOrder: 140);
+        EnsureVisionOSGrabHandle();
+
+        if (uguiCanvas.worldCamera == null && Camera.main != null)
+            uguiCanvas.worldCamera = Camera.main;
+
+        uguiRoot = uguiCanvas.gameObject;
+        VisionOSSampleControlsUI.ClearChildren(uguiRoot.transform);
+
+        var panel = VisionOSSampleControlsUI.CreateVerticalPanel(
+            uguiRoot.transform,
+            "Planning Request Panel",
+            new Vector2(1050f, 1250f));
+
+        CreateUGUIText(panel.transform, "Planning Request", 50, TextAnchor.MiddleCenter);
+
+        var startButton = CreateUGUIButton(panel.transform, "Set Start State", OnSetStartStateClicked);
+        uguiSetStartStateButtonText = startButton.GetComponentInChildren<UnityEngine.UI.Text>();
+
+        var goalButton = CreateUGUIButton(panel.transform, "Set Goal State", OnSetGoalStateClicked);
+        uguiSetGoalStateButtonText = goalButton.GetComponentInChildren<UnityEngine.UI.Text>();
+
+        var mirrorButtonUGUI = CreateUGUIButton(panel.transform, "Mirror Joint States", ToggleMirroring);
+        uguiMirrorButtonText = mirrorButtonUGUI.GetComponentInChildren<UnityEngine.UI.Text>();
+
+        uguiNumPlanningAttempts = defaultNumPlanningAttempts;
+        uguiAllowedPlanningTime = defaultAllowedPlanningTime;
+        CreateUGUICycleRow(panel.transform, "Pipeline", () => CyclePipeline(-1), () => CyclePipeline(1), out uguiPipelineValueLabel);
+        CreateUGUICycleRow(panel.transform, "Planner", () => CyclePlanner(-1), () => CyclePlanner(1), out uguiPlannerValueLabel);
+        CreateUGUIStepperRow(panel.transform, "Attempts", () => StepPlanningAttempts(-1), () => StepPlanningAttempts(1), out uguiNumPlanningAttemptsLabel);
+        CreateUGUIStepperRow(panel.transform, "Allowed Time", () => StepAllowedPlanningTime(-0.5f), () => StepAllowedPlanningTime(0.5f), out uguiAllowedPlanningTimeLabel);
+        UpdateUGUIPlanningOptionLabels();
+
+        CreateUGUIButton(panel.transform, "Send Planning Request", SendPlanningRequest);
+
+        uguiStopReplayButton = CreateUGUIButton(panel.transform, "Start Replay", () =>
+        {
+            if (isReplaying)
+                StopPreview();
+            else
+                PreviewTrajectory(lastPlannedTrajectory);
+        });
+        uguiStopReplayButtonText = uguiStopReplayButton.GetComponentInChildren<UnityEngine.UI.Text>();
+
+        uguiExecuteTrajectoryButton = CreateUGUIButton(panel.transform, "Execute Trajectory", ExectuteTrajectory);
+
+        uguiPlanningResultLabel = CreateUGUIText(panel.transform, "", 35, TextAnchor.MiddleCenter);
+        SetButtonInteractable(uguiStopReplayButton, false);
+        SetButtonInteractable(uguiExecuteTrajectoryButton, false);
+
+        UpdateButtonStates();
+        Debug.Log("MoveItPlanningRequestMenuUI: Created visionOS uGUI planning request menu.");
+    }
+
+    private Canvas FindDirectChildCanvas(string canvasName)
+    {
+        Transform child = transform.Find(canvasName);
+        return child != null ? child.GetComponent<Canvas>() : null;
+    }
+
+    private void EnsureVisionOSGrabHandle()
+    {
+        const string handleName = "VisionOS Grab Handle";
+
+        Transform handleTransform = transform.Find(handleName);
+        GameObject handleObject;
+        if (handleTransform == null)
+        {
+            handleObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            handleObject.name = handleName;
+            handleObject.transform.SetParent(transform, false);
+
+            var primitiveCollider = handleObject.GetComponent<Collider>();
+            if (primitiveCollider != null)
+            {
+                if (Application.isPlaying)
+                    Destroy(primitiveCollider);
+                else
+                    DestroyImmediate(primitiveCollider);
+            }
+        }
+        else
+        {
+            handleObject = handleTransform.gameObject;
+        }
+
+        Vector3 localOffset = MetersToLocal(visionOSGrabHandleOffsetMeters);
+        Vector3 localSize = MetersToLocal(visionOSGrabHandleSizeMeters);
+        handleObject.transform.localPosition = localOffset;
+        handleObject.transform.localRotation = Quaternion.identity;
+        handleObject.transform.localScale = localSize;
+
+        var renderer = handleObject.GetComponent<MeshRenderer>();
+        if (renderer != null)
+        {
+            renderer.enabled = true;
+            renderer.sharedMaterial = CreateVisionOSHandleMaterial();
+        }
+
+        var grabCollider = GetComponent<BoxCollider>();
+        if (grabCollider != null)
+        {
+            grabCollider.center = localOffset;
+            grabCollider.size = localSize;
+        }
+    }
+
+    private Vector3 MetersToLocal(Vector3 meters)
+    {
+        float parentUniformScale = GetParentUniformScale();
+        return meters / parentUniformScale;
+    }
+
+    private float MetersToLocalScale(float meters)
+    {
+        return meters / GetParentUniformScale();
+    }
+
+    private float GetParentUniformScale()
+    {
+        return VisionOSSampleControlsUI.GetUniformScale(transform.lossyScale);
+    }
+
+    private Material CreateVisionOSHandleMaterial()
+    {
+        Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+        if (shader == null)
+            shader = Shader.Find("Standard");
+
+        var material = new Material(shader);
+        material.name = "VisionOS Grab Handle Material";
+        material.color = visionOSGrabHandleColor;
+        return material;
+    }
+
+    private UnityEngine.UI.Button CreateUGUIButton(Transform parent, string label, UnityEngine.Events.UnityAction onClick)
+    {
+        return VisionOSSampleControlsUI.CreateButton(parent, label, onClick, 950f, 100f, 35);
+    }
+
+    private void CreateUGUICycleRow(
+        Transform parent,
+        string label,
+        UnityEngine.Events.UnityAction previous,
+        UnityEngine.Events.UnityAction next,
+        out UnityEngine.UI.Text valueText)
+    {
+        var row = CreateUGUIRow(parent, label);
+        VisionOSSampleControlsUI.CreateButton(row.transform, "<", previous, 90f, 80f, 35);
+        valueText = CreateUGUIText(row.transform, "", 31, TextAnchor.MiddleCenter);
+        var valueLayout = valueText.gameObject.GetComponent<UnityEngine.UI.LayoutElement>();
+        valueLayout.preferredWidth = 360f;
+        valueLayout.minHeight = 80f;
+        VisionOSSampleControlsUI.CreateButton(row.transform, ">", next, 90f, 80f, 35);
+    }
+
+    private void CreateUGUIStepperRow(
+        Transform parent,
+        string label,
+        UnityEngine.Events.UnityAction decrease,
+        UnityEngine.Events.UnityAction increase,
+        out UnityEngine.UI.Text valueText)
+    {
+        var row = CreateUGUIRow(parent, label);
+        VisionOSSampleControlsUI.CreateButton(row.transform, "-", decrease, 90f, 80f, 35);
+        valueText = CreateUGUIText(row.transform, "", 31, TextAnchor.MiddleCenter);
+        var valueLayout = valueText.gameObject.GetComponent<UnityEngine.UI.LayoutElement>();
+        valueLayout.preferredWidth = 360f;
+        valueLayout.minHeight = 80f;
+        VisionOSSampleControlsUI.CreateButton(row.transform, "+", increase, 90f, 80f, 35);
+    }
+
+    private GameObject CreateUGUIRow(Transform parent, string label)
+    {
+        var row = new GameObject(label + " Row");
+        row.transform.SetParent(parent, false);
+        var rect = row.AddComponent<RectTransform>();
+        rect.sizeDelta = new Vector2(950f, 100f);
+
+        var layout = row.AddComponent<UnityEngine.UI.HorizontalLayoutGroup>();
+        layout.childAlignment = TextAnchor.MiddleCenter;
+        layout.childControlHeight = true;
+        layout.childControlWidth = false;
+        layout.childForceExpandWidth = false;
+        layout.spacing = 12f;
+
+        var labelText = CreateUGUIText(row.transform, label, 35, TextAnchor.MiddleLeft);
+        var labelLayout = labelText.gameObject.GetComponent<UnityEngine.UI.LayoutElement>();
+        labelLayout.preferredWidth = 300f;
+        labelLayout.minHeight = 100f;
+
+        return row;
+    }
+
+    private UnityEngine.UI.Text CreateUGUIText(Transform parent, string text, int fontSize, TextAnchor alignment)
+    {
+        return VisionOSSampleControlsUI.CreateText(parent, text, fontSize, alignment, VisionOSSampleControlsUI.TextColor);
+    }
+
+    private static Font GetBuiltinFont()
+    {
+        return VisionOSSampleControlsUI.GetBuiltinFont();
+    }
+
+    private void AddUGUIBackground(GameObject target, Color color)
+    {
+        VisionOSSampleControlsUI.AddImage(target, color, raycastTarget: true);
+    }
+
+    private void SetPipelineChoices(List<string> choices, string selected)
+    {
+        if (plannerPipelineDropdown != null)
+        {
+            plannerPipelineDropdown.choices = choices;
+            plannerPipelineDropdown.SetValueWithoutNotify(selected);
+        }
+
+        uguiPipelineChoices.Clear();
+        uguiPipelineChoices.AddRange(choices);
+        if (!string.IsNullOrEmpty(selected))
+            planningPipelineId = selected;
+        UpdateUGUIPlanningOptionLabels();
+    }
+
+    private void SetPlannerChoices(List<string> choices, string selected)
+    {
+        if (plannerDropdown != null)
+        {
+            plannerDropdown.choices = choices;
+            plannerDropdown.SetValueWithoutNotify(selected);
+        }
+
+        uguiPlannerChoices.Clear();
+        uguiPlannerChoices.AddRange(choices);
+        uguiSelectedPlanner = selected ?? "";
+        UpdateUGUIPlanningOptionLabels();
+    }
+
+    private void CyclePipeline(int direction)
+    {
+        if (uguiPipelineChoices.Count == 0)
+            return;
+
+        int index = uguiPipelineChoices.IndexOf(planningPipelineId);
+        if (index < 0)
+            index = 0;
+        index = (index + direction + uguiPipelineChoices.Count) % uguiPipelineChoices.Count;
+        HandlePipelineSelection(uguiPipelineChoices[index]);
+    }
+
+    private void CyclePlanner(int direction)
+    {
+        if (uguiPlannerChoices.Count == 0)
+            return;
+
+        int index = uguiPlannerChoices.IndexOf(uguiSelectedPlanner);
+        if (index < 0)
+            index = 0;
+        index = (index + direction + uguiPlannerChoices.Count) % uguiPlannerChoices.Count;
+        uguiSelectedPlanner = uguiPlannerChoices[index];
+        UpdateUGUIPlanningOptionLabels();
+    }
+
+    private void StepPlanningAttempts(int delta)
+    {
+        uguiNumPlanningAttempts = Mathf.Clamp(uguiNumPlanningAttempts + delta, 1, 100);
+        UpdateUGUIPlanningOptionLabels();
+    }
+
+    private void StepAllowedPlanningTime(float delta)
+    {
+        uguiAllowedPlanningTime = Mathf.Clamp(uguiAllowedPlanningTime + delta, 0.1f, 120f);
+        UpdateUGUIPlanningOptionLabels();
+    }
+
+    private void UpdateUGUIPlanningOptionLabels()
+    {
+        if (uguiPipelineValueLabel != null)
+            uguiPipelineValueLabel.text = string.IsNullOrEmpty(planningPipelineId) ? "No pipeline" : planningPipelineId;
+        if (uguiPlannerValueLabel != null)
+            uguiPlannerValueLabel.text = string.IsNullOrEmpty(uguiSelectedPlanner) ? "No planner" : uguiSelectedPlanner;
+        if (uguiNumPlanningAttemptsLabel != null)
+            uguiNumPlanningAttemptsLabel.text = uguiNumPlanningAttempts.ToString();
+        if (uguiAllowedPlanningTimeLabel != null)
+            uguiAllowedPlanningTimeLabel.text = $"{uguiAllowedPlanningTime:0.0}s";
+    }
+
+
+    private string GetSelectedPlanner()
+    {
+        if (plannerDropdown != null)
+            return plannerDropdown.value;
+
+        return uguiSelectedPlanner;
+    }
+
+    private int GetNumPlanningAttempts()
+    {
+        if (numPlanningAttemptsField != null)
+            return numPlanningAttemptsField.value;
+
+        if (uguiNumPlanningAttemptsLabel != null)
+            return Mathf.Max(1, uguiNumPlanningAttempts);
+
+        return defaultNumPlanningAttempts;
+    }
+
+    private float GetAllowedPlanningTime()
+    {
+        if (allowedPlanningTimeField != null)
+            return allowedPlanningTimeField.value;
+
+        if (uguiAllowedPlanningTimeLabel != null)
+            return Mathf.Max(0.1f, uguiAllowedPlanningTime);
+
+        return defaultAllowedPlanningTime;
+    }
+
+    private void SetPlanningResultText(string text)
+    {
+        if (planningResultLabel != null)
+            planningResultLabel.text = text;
+        if (uguiPlanningResultLabel != null)
+            uguiPlanningResultLabel.text = text;
+    }
+
+    private void SetButtonInteractable(UnityEngine.UI.Button button, bool interactable)
+    {
+        if (button != null)
+            button.interactable = interactable;
+    }
+
+    private void SetStopReplayEnabled(bool enabled)
+    {
+        if (stopReplayButton != null)
+            stopReplayButton.SetEnabled(enabled);
+        SetButtonInteractable(uguiStopReplayButton, enabled);
+    }
+
+    private void SetExecuteTrajectoryEnabled(bool enabled)
+    {
+        if (executeTrajectoryButton != null)
+            executeTrajectoryButton.SetEnabled(enabled);
+        SetButtonInteractable(uguiExecuteTrajectoryButton, enabled);
+    }
+
+    private void SetStopReplayText(string text)
+    {
+        if (stopReplayButton != null)
+            stopReplayButton.text = text;
+        if (uguiStopReplayButtonText != null)
+            uguiStopReplayButtonText.text = text;
+    }
+
     private void OnPipelineSelectionChanged(ChangeEvent<string> evt)
     {
-        string selectedPipeline = evt.newValue;
+        HandlePipelineSelection(evt.newValue);
+    }
+
+    private void HandlePipelineSelection(string selectedPipeline)
+    {
         planningPipelineId = selectedPipeline;
 
         if (pipelineToPlanners.TryGetValue(selectedPipeline, out var planners))
         {
-            plannerDropdown.choices = planners.ToList();
             var pick = planners.Contains(defaultPlannerId) ? defaultPlannerId :
                        planners.Length > 0 ? planners[0] : "";
-            plannerDropdown.SetValueWithoutNotify(pick);
+            SetPlannerChoices(planners.ToList(), pick);
         }
         else
         {
-            plannerDropdown.choices = new List<string>();
-            plannerDropdown.SetValueWithoutNotify("");
+            SetPlannerChoices(new List<string>(), "");
         }
     }
 
@@ -287,13 +712,36 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     }
 
     // Call this whenever you update UI from a callback/thread.
+    private void Update()
+    {
+        while (true)
+        {
+            Action action = null;
+            lock (pendingUIActions)
+            {
+                if (pendingUIActions.Count > 0)
+                    action = pendingUIActions.Dequeue();
+            }
+
+            if (action == null)
+                break;
+
+            action();
+        }
+    }
+
     void UI(Action a)
     {
         // Ensure we run on the UI panel's schedule (main thread, next frame)
         if (root != null)
+        {
             root.schedule.Execute(() => a()).ExecuteLater(0);
+        }
         else
-            a();
+        {
+            lock (pendingUIActions)
+                pendingUIActions.Enqueue(a);
+        }
     }
 
     private void OnPlannerQueryResponse(QueryPlannerInterfacesResponse resp)
@@ -329,30 +777,26 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
             // 1) Update pipeline dropdown
             var discoveredPipelines = pipelineToPlanners.Keys.ToList();
 
-            plannerPipelineDropdown.choices = discoveredPipelines;
-
             // Pick a valid pipeline
             string chosenPipeline = planningPipelineId;
             if (!discoveredPipelines.Contains(chosenPipeline))
                 chosenPipeline = discoveredPipelines.Count > 0 ? discoveredPipelines[0] : "";
 
             // IMPORTANT: Set without notify, then manually update planners
-            plannerPipelineDropdown.SetValueWithoutNotify(chosenPipeline);
+            SetPipelineChoices(discoveredPipelines, chosenPipeline);
             planningPipelineId = chosenPipeline;
 
             // 2) Update planner dropdown for the selected pipeline
             if (!string.IsNullOrEmpty(chosenPipeline) && pipelineToPlanners.TryGetValue(chosenPipeline, out var planners))
             {
-                plannerDropdown.choices = planners.ToList();
                 // If your default isn't in the list, pick the first one
                 var chosenPlanner = planners.Contains(defaultPlannerId) ? defaultPlannerId :
                                     planners.Length > 0 ? planners[0] : "";
-                plannerDropdown.SetValueWithoutNotify(chosenPlanner);
+                SetPlannerChoices(planners.ToList(), chosenPlanner);
             }
             else
             {
-                plannerDropdown.choices = new List<string>();
-                plannerDropdown.SetValueWithoutNotify("");
+                SetPlannerChoices(new List<string>(), "");
             }
         });
     }
@@ -454,7 +898,11 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     private void ToggleMirroring()
     {
         isMirroring = !isMirroring;
-        mirrorButton.text = isMirroring ? "Stop Mirroring" : "Mirror Joint States";
+        string text = isMirroring ? "Stop Mirroring" : "Mirror Joint States";
+        if (mirrorButton != null)
+            mirrorButton.text = text;
+        if (uguiMirrorButtonText != null)
+            uguiMirrorButtonText.text = text;
         Debug.Log($"MoveItPlanningRequestMenuUI: Mirroring {(isMirroring ? "enabled" : "disabled")}.");
         if (isMirroring && robotController != null)
             robotController.LogJointDriveLimits();
@@ -531,7 +979,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         }
         
         // Get the selected planner from the dropdown
-        string selectedPlanner = plannerDropdown.value;
+        string selectedPlanner = GetSelectedPlanner();
         if (autoQueryPlanners && string.IsNullOrEmpty(selectedPlanner))
         {
             Debug.LogWarning("MoveItPlanningRequestMenuUI: No planner selected.");
@@ -542,8 +990,8 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         StopPreview();
         if (trajectoryReplayer != null)
             trajectoryReplayer.StopReplay();
-        stopReplayButton.SetEnabled(false);
-        executeTrajectoryButton.SetEnabled(false);
+        SetStopReplayEnabled(false);
+        SetExecuteTrajectoryEnabled(false);
         
         var planningRequest = CreateMotionPlanRequest();
         GetMotionPlanRequest motionPlanRequest = new GetMotionPlanRequest(planningRequest);
@@ -566,10 +1014,10 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
             trajectory_constraints = new TrajectoryConstraintsMsg(),
             reference_trajectories = new GenericTrajectoryMsg[0],
             pipeline_id = planningPipelineId,
-            planner_id = plannerDropdown.value, // Use the selected planner from dropdown
+            planner_id = GetSelectedPlanner(),
             group_name = planningGroupName,
-            num_planning_attempts = numPlanningAttemptsField.value,
-            allowed_planning_time = allowedPlanningTimeField.value,
+            num_planning_attempts = GetNumPlanningAttempts(),
+            allowed_planning_time = GetAllowedPlanningTime(),
             max_velocity_scaling_factor = 1.0,
             max_acceleration_scaling_factor = 1.0,
             cartesian_speed_limited_link = "",
@@ -747,19 +1195,19 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
                     ros.Publish(plannedPathTopic, lastPlannedTrajectory);
                 }
 
-                planningResultLabel.text = $"Planning successful! Time: {motionPlanResponse.planning_time}s, Waypoints: {lastPlannedTrajectory.points.Length}";
+                SetPlanningResultText($"Planning successful! Time: {motionPlanResponse.planning_time}s, Waypoints: {lastPlannedTrajectory.points.Length}");
 
                 // You can execute the trajectory here or store it for later execution
                 PreviewTrajectory(lastPlannedTrajectory);
-                executeTrajectoryButton.SetEnabled(true);
+                SetExecuteTrajectoryEnabled(true);
             }
         }
         else
         {
-            planningResultLabel.text = $"Planning failed with error: {motionPlanResponse.error_code.val} {motionPlanResponse.error_code.message}";
+            SetPlanningResultText($"Planning failed with error: {motionPlanResponse.error_code.val} {motionPlanResponse.error_code.message}");
             lastPlannedTrajectory = null;
-            stopReplayButton.SetEnabled(false);
-            executeTrajectoryButton.SetEnabled(false);
+            SetStopReplayEnabled(false);
+            SetExecuteTrajectoryEnabled(false);
 
             Debug.LogError($"MoveItPlanningRequestMenuUI: Planning failed with error code: {motionPlanResponse.error_code.val} - {motionPlanResponse.error_code.message}");
             ObjectMetricsLogger.Instance?.LogEvent("planning_request_result", PlanningRequestObjectId,
@@ -771,9 +1219,9 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     {
         if (trajectoryReplayer != null)
         {
-            stopReplayButton.SetEnabled(true);
+            SetStopReplayEnabled(true);
             isReplaying = true;
-            stopReplayButton.text = "Stop Replay";
+            SetStopReplayText("Stop Replay");
             // Remap joint names from ROS convention (panda_) to Unity convention (fr3_)
             // so ApplyJointState can find joints in the dictionary.
             trajectoryReplayer.StartReplay(BuildLocalTrajectory(trajectory));
@@ -800,7 +1248,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         {
             trajectoryReplayer.StopReplay();
             isReplaying = false;
-            stopReplayButton.text = "Start Replay";
+            SetStopReplayText("Start Replay");
         }
     }
 
@@ -830,12 +1278,22 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     private void UpdateButtonStates()
     {
         // Update button visual states based on current planning state
-        setStartStateButton.text = hasStartState ? "Start State ✓" : "Set Start State";
-        setGoalStateButton.text = hasGoalState ? "Goal State ✓" : "Set Goal State";
+        string startText = hasStartState ? "Start State ✓" : "Set Start State";
+        string goalText = hasGoalState ? "Goal State ✓" : "Set Goal State";
+        if (setStartStateButton != null)
+            setStartStateButton.text = startText;
+        if (setGoalStateButton != null)
+            setGoalStateButton.text = goalText;
+        if (uguiSetStartStateButtonText != null)
+            uguiSetStartStateButtonText.text = startText;
+        if (uguiSetGoalStateButtonText != null)
+            uguiSetGoalStateButtonText.text = goalText;
 
         // You could also change button colors or enable/disable them
-        setStartStateButton.SetEnabled(true);
-        setGoalStateButton.SetEnabled(true);
+        if (setStartStateButton != null)
+            setStartStateButton.SetEnabled(true);
+        if (setGoalStateButton != null)
+            setGoalStateButton.SetEnabled(true);
     }
 
     public void ResetPlanningState()
@@ -855,6 +1313,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     public void SetPlanningPipeline(string pipelineId)
     {
         planningPipelineId = pipelineId;
+        UpdateUGUIPlanningOptionLabels();
     }
 
     private void OnDisable()

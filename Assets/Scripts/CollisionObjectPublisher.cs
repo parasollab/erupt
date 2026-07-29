@@ -27,6 +27,7 @@ public class CollisionObjectPublisher : MonoBehaviour
     public float publishRateHz = 1f;
     public bool trackLatency = false;
     public bool pausePublishing = false;
+    public bool debugLogs = false;
     public GameObject worldOrigin; // Optional world origin for relative positioning
 
     private ROSConnection ros;
@@ -53,7 +54,8 @@ public class CollisionObjectPublisher : MonoBehaviour
         try
         {
             ros.RegisterPublisher<CollisionObjectMsg>("/collision_object", CollisionObjectQueueSize);
-            Debug.Log($"[{gameObject.name}] Registered /collision_object publisher");
+            if (debugLogs)
+                Debug.Log($"[{gameObject.name}] Registered /collision_object publisher");
         }
         catch (System.Exception e)
         {
@@ -97,7 +99,8 @@ public class CollisionObjectPublisher : MonoBehaviour
         bool shouldPublish = !hasBeenPublished || HasTransformChanged();
         if (shouldPublish)
         {
-            Debug.Log($"Publishing collision object '{objectId}' (pos={transform.position}, rot={transform.rotation.eulerAngles}, scale={transform.localScale})");
+            if (debugLogs)
+                Debug.Log($"Publishing collision object '{objectId}' (pos={transform.position}, rot={transform.rotation.eulerAngles}, scale={transform.localScale})");
 
             PublishCollisionObject();
             UpdateLastTransform();
@@ -416,6 +419,12 @@ public class CollisionObjectPublisher : MonoBehaviour
             }
             readableMeshCopy = null;
         }
+    }
+
+    void OnApplicationPause(bool paused)
+    {
+        if (!paused)
+            ForceRepublish();
     }
 
     static MeshMsg UnityMeshToRosMesh(Mesh unityMesh, Transform transform = null)

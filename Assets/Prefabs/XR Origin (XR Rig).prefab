@@ -1378,7 +1378,6 @@ GameObject:
   m_Component:
   - component: {fileID: 1130782838425001876}
   - component: {fileID: 3049301953835444000}
-  - component: {fileID: 2213541282049964781}
   - component: {fileID: 6083994858675626396}
   m_Layer: 3
   m_Name: MenuLabel
@@ -1430,34 +1429,6 @@ Canvas:
   m_SortingLayerID: 0
   m_SortingOrder: 0
   m_TargetDisplay: 0
---- !u!114 &2213541282049964781
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8072720995305792975}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ee10491ef6d5d1d49a270cf6b09bdc19, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Oculus.VR::OVROverlayCanvas
-  _mipmapMode: 1
-  _dynamicResolution: 0
-  _redrawResolutionThreshold: 2147483647
-  rectTransform: {fileID: 1130782838425001876}
-  maxTextureSize: 2048
-  manualRedraw: 1
-  renderInterval: 1
-  renderIntervalFrameOffset: 0
-  superSample: 0
-  layer: 5
-  opacity: 1
-  shape: 0
-  curveRadius: 1
-  overlapMask: 0
-  compositionMode: 2
-  _overlayEnabled: 1
 --- !u!114 &6083994858675626396
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2785,7 +2756,7 @@ PrefabInstance:
     - target: {fileID: 863512645795027999, guid: bb91fcbcb3cc896468b372b1c762bfab, type: 3}
       propertyPath: m_Renderer
       value: 
-      objectReference: {fileID: 7968044300571213852}
+      objectReference: {fileID: 0}
     - target: {fileID: 5964744442239762404, guid: bb91fcbcb3cc896468b372b1c762bfab, type: 3}
       propertyPath: m_InteractorSource
       value: 
@@ -2793,7 +2764,7 @@ PrefabInstance:
     - target: {fileID: 6212858538863823644, guid: bb91fcbcb3cc896468b372b1c762bfab, type: 3}
       propertyPath: m_Renderer
       value: 
-      objectReference: {fileID: 7968044300571213852}
+      objectReference: {fileID: 0}
     - target: {fileID: 6707959385038857591, guid: bb91fcbcb3cc896468b372b1c762bfab, type: 3}
       propertyPath: m_InteractorSource
       value: 
@@ -2924,7 +2895,8 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.y
       value: -10
       objectReference: {fileID: 0}
-    m_RemovedComponents: []
+    m_RemovedComponents:
+    - {fileID: 7163876590946616089, guid: 27024f5809f4a4347b9cd7f26a1bdf93, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects:
     - targetCorrespondingSourceObject: {fileID: 780270278251679399, guid: 27024f5809f4a4347b9cd7f26a1bdf93, type: 3}
@@ -2948,11 +2920,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0924bcaa9eb50df458a783ae0e2b59f5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
---- !u!137 &7968044300571213852 stripped
-SkinnedMeshRenderer:
-  m_CorrespondingSourceObject: {fileID: 7163876590946616089, guid: 27024f5809f4a4347b9cd7f26a1bdf93, type: 3}
-  m_PrefabInstance: {fileID: 1008557683290374917}
-  m_PrefabAsset: {fileID: 0}
 --- !u!4 &9178516613588776390 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 8259524632637961923, guid: 27024f5809f4a4347b9cd7f26a1bdf93, type: 3}
@@ -3175,14 +3142,6 @@ PrefabInstance:
       propertyPath: m_FirstSelectEntered.m_PersistentCalls.m_Calls.Array.data[0].m_Arguments.m_ObjectArgumentAssemblyTypeName
       value: UnityEngine.Object, UnityEngine
       objectReference: {fileID: 0}
-    - target: {fileID: 1961351108226525195, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
-      propertyPath: sourceAsset
-      value: 
-      objectReference: {fileID: 9197481963319205126, guid: d0dd15c746b586c13bd18dafa7a4ba3e, type: 3}
-    - target: {fileID: 1961351108226525195, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
-      propertyPath: m_PanelSettings
-      value: 
-      objectReference: {fileID: 11400000, guid: 38d87c83d2e662dedbd70229f2ccaf12, type: 2}
     - target: {fileID: 2376129274388650917, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
       propertyPath: m_Enabled
       value: 0
@@ -3299,8 +3258,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 750f95e9f8fdbdc5c992c498b07017b8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: xrviz::WristMenuController
-  uiDocument: {fileID: 4517080356610878557}
+  uiDocument: {fileID: 0}
   inputActions: {fileID: -944628639613478452, guid: c348712bda248c246b8c49b3db54643f, type: 3}
+  enablePalmMenuGesture: 1
+  palmMenuDebugLogs: 0
   litMaterial: {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
   selectionManager: {fileID: 0}
   collisionObjectsListener: {fileID: 0}
@@ -3322,26 +3283,16 @@ MonoBehaviour:
   wristMenu: {fileID: 3006219390251926832}
   headCamera: {fileID: 0}
   menuHand: 0
+  derivePalmNormalFromJoints: 1
   palmNormalAxis: 3
   requireOpenPalm: 0
-  gazeAngleDegrees: 28
+  gazeAngleDegrees: 55
   palmFacingDotThreshold: 0.65
   showHoldSeconds: 0.35
   hideHoldSeconds: 0.2
   closeWhenGestureEnds: 1
   onlyCloseIfOpenedByGesture: 1
   debugLogs: 0
---- !u!114 &4517080356610878557 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 1961351108226525195, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
-  m_PrefabInstance: {fileID: 2708909498588103766}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1375403636790619792}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 19102, guid: 0000000000000000e000000000000000, type: 0}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!114 &5026672159489249859 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 6941640649715570197, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
@@ -3451,7 +3402,7 @@ PrefabInstance:
     - target: {fileID: 863512645795027999, guid: bb91fcbcb3cc896468b372b1c762bfab, type: 3}
       propertyPath: m_Renderer
       value: 
-      objectReference: {fileID: 1839739465168544751}
+      objectReference: {fileID: 0}
     - target: {fileID: 5964744442239762404, guid: bb91fcbcb3cc896468b372b1c762bfab, type: 3}
       propertyPath: m_InteractorSource
       value: 
@@ -3459,7 +3410,7 @@ PrefabInstance:
     - target: {fileID: 6212858538863823644, guid: bb91fcbcb3cc896468b372b1c762bfab, type: 3}
       propertyPath: m_Renderer
       value: 
-      objectReference: {fileID: 1839739465168544751}
+      objectReference: {fileID: 0}
     - target: {fileID: 6707959385038857591, guid: bb91fcbcb3cc896468b372b1c762bfab, type: 3}
       propertyPath: m_InteractorSource
       value: 
@@ -3971,7 +3922,8 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.y
       value: 10
       objectReference: {fileID: 0}
-    m_RemovedComponents: []
+    m_RemovedComponents:
+    - {fileID: 7163876590946616089, guid: 27024f5809f4a4347b9cd7f26a1bdf93, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects:
     - targetCorrespondingSourceObject: {fileID: 780270278251679399, guid: 27024f5809f4a4347b9cd7f26a1bdf93, type: 3}
@@ -3982,11 +3934,6 @@ PrefabInstance:
 --- !u!4 &611534494948005429 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 8259524632637961923, guid: 27024f5809f4a4347b9cd7f26a1bdf93, type: 3}
-  m_PrefabInstance: {fileID: 8854959253119525110}
-  m_PrefabAsset: {fileID: 0}
---- !u!137 &1839739465168544751 stripped
-SkinnedMeshRenderer:
-  m_CorrespondingSourceObject: {fileID: 7163876590946616089, guid: 27024f5809f4a4347b9cd7f26a1bdf93, type: 3}
   m_PrefabInstance: {fileID: 8854959253119525110}
   m_PrefabAsset: {fileID: 0}
 --- !u!114 &6588498475838877671 stripped

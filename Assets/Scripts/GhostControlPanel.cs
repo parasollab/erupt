@@ -22,6 +22,12 @@ public class GhostControlPanel : MonoBehaviour
     private Toggle hideStartToggle;
     private Toggle hideGoalToggle;
 
+    private Canvas uguiCanvas;
+    private UnityEngine.UI.Slider uguiSpeedSlider;
+    private UnityEngine.UI.Text uguiSpeedLabel;
+    private UnityEngine.UI.Toggle uguiHideStartToggle;
+    private UnityEngine.UI.Toggle uguiHideGoalToggle;
+
     private SpawnGhosts spawner;
 
     private bool hasInitialized;
@@ -29,6 +35,7 @@ public class GhostControlPanel : MonoBehaviour
     private Transform cameraTransform;
     private bool billboardEnabled = true;
     private bool isGrabbed;
+    private bool useUGUIRuntimeMenu;
 
     // The shell is this object's parent: the BoxCollider-only root object that
     // Instantiate(prefab) actually returns. SpawnGhosts reparents it onto whichever ghost is
@@ -55,6 +62,16 @@ public class GhostControlPanel : MonoBehaviour
     {
         if (uiDocument == null)
             uiDocument = GetComponent<UIDocument>();
+
+        useUGUIRuntimeMenu = VisionOSSampleControlsUI.ShouldUseRuntimeUGUI() || uiDocument == null;
+        if (useUGUIRuntimeMenu)
+        {
+            if (uiDocument != null)
+                uiDocument.enabled = false;
+
+            BindUGUI();
+            return;
+        }
 
         VisualElement root = uiDocument.rootVisualElement;
         if (root == null) return;
@@ -90,6 +107,52 @@ public class GhostControlPanel : MonoBehaviour
     private void OnSpeedSliderChanged(ChangeEvent<float> evt)
     {
         spawner?.SetReplaySpeed(evt.newValue);
+    }
+
+    private void BindUGUI()
+    {
+        uguiCanvas = VisionOSSampleControlsUI.EnsureCanvas(
+            transform,
+            "VisionOS Ghost Control Canvas",
+            new Vector2(1050f, 550f),
+            new Vector2(1.05f, 0.55f),
+            new Vector3(0f, -0.08f, 0f),
+            sortingOrder: 135);
+
+        VisionOSSampleControlsUI.ClearChildren(uguiCanvas.transform);
+        var panel = VisionOSSampleControlsUI.CreateVerticalPanel(
+            uguiCanvas.transform,
+            "Ghost Control Panel",
+            new Vector2(1050f, 550f));
+
+        VisionOSSampleControlsUI.CreateText(panel.transform, "Ghost Controls", 50, TextAnchor.MiddleCenter, VisionOSSampleControlsUI.TextColor, 100f);
+
+        uguiHideStartToggle = VisionOSSampleControlsUI.CreateToggle(
+            panel.transform,
+            "Start Ghost",
+            spawner == null || !spawner.StartGhostHidden,
+            value => spawner?.SetStartGhostHidden(!value));
+
+        uguiHideGoalToggle = VisionOSSampleControlsUI.CreateToggle(
+            panel.transform,
+            "Goal Ghost",
+            spawner == null || !spawner.GoalGhostHidden,
+            value => spawner?.SetGoalGhostHidden(!value));
+
+        uguiSpeedLabel = VisionOSSampleControlsUI.CreateText(
+            panel.transform,
+            "x1.0",
+            35,
+            TextAnchor.MiddleCenter,
+            VisionOSSampleControlsUI.TextColor,
+            100f);
+
+        uguiSpeedSlider = VisionOSSampleControlsUI.CreateSlider(
+            panel.transform,
+            TrajectoryReplay.MinPlaybackSpeed,
+            TrajectoryReplay.MaxPlaybackSpeed,
+            spawner != null ? spawner.ReplaySpeed : 1f,
+            value => spawner?.SetReplaySpeed(value));
     }
 
     public void Init(SpawnGhosts owningSpawner)
@@ -158,14 +221,25 @@ public class GhostControlPanel : MonoBehaviour
 
         hideStartToggle?.SetValueWithoutNotify(spawner.StartGhostHidden);
         hideGoalToggle?.SetValueWithoutNotify(spawner.GoalGhostHidden);
+        SetUGUIToggleState(uguiHideStartToggle, "Start Ghost", !spawner.StartGhostHidden);
+        SetUGUIToggleState(uguiHideGoalToggle, "Goal Ghost", !spawner.GoalGhostHidden);
 
         if (speedControlGroup != null)
             speedControlGroup.style.display = DisplayStyle.Flex;
-        if (speedSlider == null) return;
-        speedSlider.lowValue = TrajectoryReplay.MinPlaybackSpeed;
-        speedSlider.highValue = TrajectoryReplay.MaxPlaybackSpeed;
-        speedSlider.SetEnabled(spawner.ReplayActive);
-        speedSlider.SetValueWithoutNotify(spawner.ReplaySpeed);
+        if (speedSlider != null)
+        {
+            speedSlider.lowValue = TrajectoryReplay.MinPlaybackSpeed;
+            speedSlider.highValue = TrajectoryReplay.MaxPlaybackSpeed;
+            speedSlider.SetEnabled(spawner.ReplayActive);
+            speedSlider.SetValueWithoutNotify(spawner.ReplaySpeed);
+        }
+        if (uguiSpeedSlider != null)
+        {
+            uguiSpeedSlider.minValue = TrajectoryReplay.MinPlaybackSpeed;
+            uguiSpeedSlider.maxValue = TrajectoryReplay.MaxPlaybackSpeed;
+            uguiSpeedSlider.interactable = spawner.ReplayActive;
+            uguiSpeedSlider.SetValueWithoutNotify(spawner.ReplaySpeed);
+        }
         UpdateLabel(spawner.ReplaySpeed);
     }
 
@@ -173,5 +247,18 @@ public class GhostControlPanel : MonoBehaviour
     {
         if (speedLabel != null)
             speedLabel.text = $"x{value:0.0}";
+        if (uguiSpeedLabel != null)
+            uguiSpeedLabel.text = $"x{value:0.0}";
+    }
+
+    private void SetUGUIToggleState(UnityEngine.UI.Toggle toggle, string label, bool isVisible)
+    {
+        if (toggle == null)
+            return;
+
+        toggle.SetIsOnWithoutNotify(isVisible);
+        var text = toggle.GetComponentInChildren<UnityEngine.UI.Text>();
+        if (text != null)
+            text.text = $"{(isVisible ? "Disable" : "Enable")} {label}";
     }
 }

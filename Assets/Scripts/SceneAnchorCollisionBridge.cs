@@ -74,6 +74,9 @@ public class SceneAnchorCollisionBridge : MonoBehaviour
              "If null, Unity world space is used directly.")]
     public GameObject worldOrigin;
 
+    [Tooltip("Log average FPS from this bridge every two seconds.")]
+    public bool logFps = false;
+
     private ROSConnection _ros;
     private Mesh _cubeMesh;
     private readonly List<string> _publishedIds = new();
@@ -129,6 +132,9 @@ public class SceneAnchorCollisionBridge : MonoBehaviour
 
     void Update()
     {
+        if (!logFps)
+            return;
+
         _fpsAccum += 1f / Time.smoothDeltaTime;
         _fpsSamples++;
         _fpsTimer += Time.deltaTime;
@@ -159,6 +165,12 @@ public class SceneAnchorCollisionBridge : MonoBehaviour
                 operation = CollisionObjectMsg.REMOVE
             });
         }
+    }
+
+    void OnApplicationPause(bool paused)
+    {
+        if (!paused)
+            RepublishAll();
     }
 
     SurfaceProviderMode ResolveProviderMode()
@@ -501,6 +513,9 @@ public class SceneAnchorCollisionBridge : MonoBehaviour
 
     public void RepublishAll()
     {
+        if (_ros == null)
+            return;
+
         foreach (var id in _publishedIds)
         {
             _ros.Publish("/collision_object", new CollisionObjectMsg
