@@ -82,18 +82,24 @@ public class TutorialStepDisplay : MonoBehaviour
             return;
         }
 
-        if (advanceAction != null)
-        {
-            advanceAction.action.performed -= OnAdvancePressed;
-        }
-
         if (StudyController.Instance != null)
         {
-            StudyController.Instance.FinishTutorial();
+            if (!StudyController.Instance.FinishTutorial())
+            {
+                stepIndex = Steps.Length - 1;
+                return;
+            }
         }
         else
         {
             Debug.LogError("TutorialStepDisplay: No StudyController found to finish the tutorial.");
+            stepIndex = Steps.Length - 1;
+            return;
+        }
+
+        if (advanceAction != null)
+        {
+            advanceAction.action.performed -= OnAdvancePressed;
         }
     }
 

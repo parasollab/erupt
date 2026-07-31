@@ -16,6 +16,15 @@ public class SpawnHuman : MonoBehaviour
     {
         yield return null;
 
+        // Content scenes no longer own an XR Origin after the persistent-bootstrap
+        // migration. Legacy scenes can still provide the serialized fallback.
+        xrOrigin = PersistentXRInfrastructure.ResolveXROrigin(xrOrigin);
+        if (xrOrigin == null)
+        {
+            Debug.LogError("SpawnHuman: no persistent XROrigin is available.");
+            yield break;
+        }
+
         if (!s_TrackingHasSettled)
         {
             // On Quest, tracking initializes in two stages:

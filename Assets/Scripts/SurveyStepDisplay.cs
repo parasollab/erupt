@@ -92,18 +92,24 @@ public class SurveyStepDisplay : MonoBehaviour
             return;
         }
 
-        if (advanceAction != null)
-        {
-            advanceAction.action.performed -= OnAdvancePressed;
-        }
-
         if (StudyController.Instance != null)
         {
-            StudyController.Instance.FinishSurvey();
+            if (!StudyController.Instance.FinishSurvey())
+            {
+                stepIndex = Steps.Length - 1;
+                return;
+            }
         }
         else
         {
             Debug.LogError("SurveyStepDisplay: No StudyController found to finish the survey.");
+            stepIndex = Steps.Length - 1;
+            return;
+        }
+
+        if (advanceAction != null)
+        {
+            advanceAction.action.performed -= OnAdvancePressed;
         }
     }
 

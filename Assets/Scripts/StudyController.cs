@@ -1,9 +1,11 @@
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 using RosMessageTypes.StudyInterfaces;
+using Stopwatch = System.Diagnostics.Stopwatch;
 
 public class StudyController : MonoBehaviour
 {
@@ -39,6 +41,20 @@ public class StudyController : MonoBehaviour
     [Tooltip("Scene shown after the last scene of every task, stepping the participant through the post-task survey questions. Leave blank to skip straight to the next task's interlude.")]
     [SerializeField] private string _surveySceneName = "Survey";
 
+    [Header("Scene Transitions")]
+    [Tooltip("Minimum time to keep the current scene active while the next scene loads in the background before activating it.")]
+    [SerializeField] private float _minimumSceneTransitionDelaySeconds = 2f;
+    [Tooltip("Extra time to wait after a preloaded scene reaches Unity's ready-to-activate point before activating it.")]
+    [SerializeField] private float _preloadedSceneReadySettleSeconds = 1f;
+    [Tooltip("How long to keep the loading overlay visible after the new scene activates, giving SpawnHuman and XR tracking a frame to settle.")]
+    [SerializeField] private float _loadingOverlayPostActivationDelaySeconds = 0.5f;
+    [Tooltip("Rendered frames to wait after showing the loading overlay before starting expensive scene load or activation work.")]
+    [SerializeField] private int _loadingOverlayWarmupFrames = 3;
+    [Tooltip("If enabled, starts loading the next scene while the participant is still in the current scene. Background integration is capped by Application.backgroundLoadingPriority.")]
+    [SerializeField] private bool _preloadScenesDuringCurrentScene = true;
+    [Tooltip("Maximum main-thread time spent disabling roots from the outgoing content scene in one frame.")]
+    [SerializeField, Min(0.1f)] private float _sceneRetirementFrameBudgetMilliseconds = 1.5f;
+
     [Header("ROS Study Plan")]
     [Tooltip("How long to wait for a /study/plan message before falling back to local random generation (e.g. when running standalone without ROS).")]
     [SerializeField] private float _rosPlanTimeoutSeconds = 3f;
@@ -58,6 +74,16 @@ public class StudyController : MonoBehaviour
     private int _taskIndex = -1;       // -2 = on the tutorial scene; -1 = still in StartScene; 0+ = index into _tasks
     private int _sceneIndexInTask = -1; // -1 = currently on the current task's interlude
     private bool _inSurvey;            // on the Survey scene after the current task's last scene
+    private bool _isSceneTransitionInProgress;
+    private AsyncOperation _preloadedSceneOperation;
+    private string _preloadedSceneName;
+    private bool _isPreloadedSceneReady;
+    private float _preloadedSceneReadyTime = -1f;
+    private Coroutine _preloadCoroutine;
+    private ThreadPriority _previousBackgroundLoadingPriority;
+    private bool _isBackgroundLoadingPriorityOverridden;
+    private Scene _bootstrapScene;
+    private Scene _currentContentScene;
 
     private void Awake()
     {
@@ -67,6 +93,7 @@ public class StudyController : MonoBehaviour
             return;
         }
         Instance = this;
+        _bootstrapScene = SceneManager.GetActiveScene();
         DontDestroyOnLoad(gameObject);
 
         _tasks = new List<TaskConfig> { _task1, _task2, _task3, _task4 };
@@ -130,6 +157,7 @@ public class StudyController : MonoBehaviour
 
     private void FinishInitialization()
     {
+        BeginScenePreloadIfEnabled(GetFirstSceneName());
         Invoke(nameof(BeginStudy), _startSceneAutoAdvanceDelay);
     }
 
@@ -139,7 +167,7 @@ public class StudyController : MonoBehaviour
         if (!string.IsNullOrEmpty(_tutorialSceneName))
         {
             _taskIndex = -2;
-            SceneManager.LoadScene(_tutorialSceneName);
+            LoadSceneWhenReady(_tutorialSceneName);
             return;
         }
 
@@ -150,11 +178,17 @@ public class StudyController : MonoBehaviour
 
     // Called by the tutorial scene once the participant has stepped through every control,
     // to hand off into the study proper. Mirrors what BeginStudy() does when no tutorial is configured.
-    public void FinishTutorial()
+    public bool FinishTutorial()
     {
+        if (!TryCommitSceneTransition(GetTaskInterludeOrCompletion(0)))
+        {
+            return false;
+        }
+
         _taskIndex = 0;
         _sceneIndexInTask = -1;
         LoadCurrentInterlude();
+        return true;
     }
 
     private static void ShuffleInPlace<T>(List<T> list)
@@ -202,6 +236,17 @@ public class StudyController : MonoBehaviour
             return;
         }
 
+        if (_isSceneTransitionInProgress)
+        {
+            return;
+        }
+
+        string nextSceneName = GetAdvanceTargetSceneName();
+        if (!TryCommitSceneTransition(nextSceneName))
+        {
+            return;
+        }
+
         // On the current task's interlude: move into its first task scene.
         if (_sceneIndexInTask == -1)
         {
@@ -221,7 +266,7 @@ public class StudyController : MonoBehaviour
         if (!string.IsNullOrEmpty(_surveySceneName))
         {
             _inSurvey = true;
-            SceneManager.LoadScene(_surveySceneName);
+            LoadSceneWhenReady(_surveySceneName);
             return;
         }
 
@@ -230,10 +275,16 @@ public class StudyController : MonoBehaviour
 
     // Called by the survey scene once the participant has stepped through every question,
     // to move on to the next task's interlude (or the completion scene after the last task).
-    public void FinishSurvey()
+    public bool FinishSurvey()
     {
+        if (!TryCommitSceneTransition(GetTaskInterludeOrCompletion(_taskIndex + 1)))
+        {
+            return false;
+        }
+
         _inSurvey = false;
         AdvanceToNextTask();
+        return true;
     }
 
     private void AdvanceToNextTask()
@@ -252,12 +303,12 @@ public class StudyController : MonoBehaviour
 
     private void LoadCurrentInterlude()
     {
-        SceneManager.LoadScene(_tasks[_taskIndex].interludeSceneName);
+        LoadSceneWhenReady(_tasks[_taskIndex].interludeSceneName);
     }
 
     private void LoadCurrentTaskScene()
     {
-        SceneManager.LoadScene(_shuffledSequences[_taskIndex][_sceneIndexInTask]);
+        LoadSceneWhenReady(_shuffledSequences[_taskIndex][_sceneIndexInTask]);
     }
 
     private void LoadCompletion()
@@ -267,11 +318,402 @@ public class StudyController : MonoBehaviour
         {
             _advanceAction.action.performed -= OnAdvancePressed;
         }
-        SceneManager.LoadScene("StudyComplete");
+        LoadSceneWhenReady("StudyComplete");
+    }
+
+    private void LoadSceneWhenReady(string sceneName)
+    {
+        if (_isSceneTransitionInProgress)
+        {
+            Debug.LogWarning($"StudyController: already loading a scene, ignoring request to load '{sceneName}'.");
+            return;
+        }
+
+        if (_preloadedSceneOperation != null && _preloadedSceneName == sceneName)
+        {
+            StartCoroutine(ActivatePreloadedSceneCoroutine(sceneName));
+            return;
+        }
+
+        StartCoroutine(LoadSceneWithoutPreloadCoroutine(sceneName));
+    }
+
+    private IEnumerator ActivatePreloadedSceneCoroutine(string sceneName)
+    {
+        _isSceneTransitionInProgress = true;
+        SceneTransitionOverlay.Show();
+        yield return WaitForLoadingOverlayWarmup();
+        float activationTime = Time.unscaledTime + Mathf.Max(0f, _minimumSceneTransitionDelaySeconds);
+
+        while (!CanActivatePreloadedScene(sceneName) || Time.unscaledTime < activationTime)
+        {
+            yield return null;
+        }
+
+        AsyncOperation operation = _preloadedSceneOperation;
+        _preloadedSceneOperation = null;
+        _preloadedSceneName = null;
+        _isPreloadedSceneReady = false;
+        _preloadedSceneReadyTime = -1f;
+        _preloadCoroutine = null;
+
+        operation.allowSceneActivation = true;
+        yield return CompleteAdditiveSceneTransition(sceneName, operation);
+    }
+
+    private IEnumerator LoadSceneWithoutPreloadCoroutine(string sceneName)
+    {
+        _isSceneTransitionInProgress = true;
+        SceneTransitionOverlay.Show();
+        yield return WaitForLoadingOverlayWarmup();
+        float transitionStartTime = Time.unscaledTime;
+        LowerBackgroundLoadingPriority();
+
+        AsyncOperation loadOperation = SceneManager.LoadSceneAsync(sceneName, LoadSceneMode.Additive);
+        if (loadOperation == null)
+        {
+            Debug.LogError($"StudyController: failed to start async load for scene '{sceneName}'.");
+            RestoreBackgroundLoadingPriority();
+            SceneTransitionOverlay.Hide();
+            _isSceneTransitionInProgress = false;
+            yield break;
+        }
+
+        loadOperation.allowSceneActivation = false;
+
+        while (loadOperation.progress < 0.9f)
+        {
+            yield return null;
+        }
+
+        float activationTime = transitionStartTime + Mathf.Max(0f, _minimumSceneTransitionDelaySeconds);
+        while (Time.unscaledTime < activationTime)
+        {
+            yield return null;
+        }
+
+        yield return null;
+        RestoreBackgroundLoadingPriority();
+        loadOperation.allowSceneActivation = true;
+
+        yield return CompleteAdditiveSceneTransition(sceneName, loadOperation);
+    }
+
+    private void BeginScenePreloadIfEnabled(string sceneName)
+    {
+        if (_preloadScenesDuringCurrentScene)
+        {
+            BeginScenePreload(sceneName);
+        }
+    }
+
+    private void BeginScenePreload(string sceneName)
+    {
+        if (string.IsNullOrEmpty(sceneName) || _isSceneTransitionInProgress)
+        {
+            return;
+        }
+
+        if (_preloadedSceneOperation != null || _preloadCoroutine != null)
+        {
+            if (_preloadedSceneName != sceneName)
+            {
+                Debug.LogWarning($"StudyController: '{_preloadedSceneName}' is already preloading; cannot also preload '{sceneName}'.");
+            }
+            return;
+        }
+
+        _preloadCoroutine = StartCoroutine(PreloadSceneCoroutine(sceneName));
+    }
+
+    private IEnumerator PreloadSceneCoroutine(string sceneName)
+    {
+        _preloadedSceneName = sceneName;
+        _isPreloadedSceneReady = false;
+
+        LowerBackgroundLoadingPriority();
+
+        AsyncOperation loadOperation = SceneManager.LoadSceneAsync(sceneName, LoadSceneMode.Additive);
+        if (loadOperation == null)
+        {
+            Debug.LogError($"StudyController: failed to start async preload for scene '{sceneName}'.");
+            RestoreBackgroundLoadingPriority();
+            ClearPreloadState();
+            yield break;
+        }
+
+        _preloadedSceneOperation = loadOperation;
+        loadOperation.allowSceneActivation = false;
+
+        while (loadOperation.progress < 0.9f)
+        {
+            yield return null;
+        }
+
+        RestoreBackgroundLoadingPriority();
+        _isPreloadedSceneReady = true;
+        _preloadedSceneReadyTime = Time.unscaledTime;
+    }
+
+    private IEnumerator CompleteAdditiveSceneTransition(string sceneName, AsyncOperation loadOperation)
+    {
+        while (!loadOperation.isDone)
+        {
+            yield return null;
+        }
+
+        Scene incomingScene = FindNewestLoadedScene(sceneName);
+        if (!incomingScene.IsValid() || !incomingScene.isLoaded)
+        {
+            UnityEngine.Debug.LogError($"StudyController: additive load completed but scene '{sceneName}' was not found.");
+            SceneTransitionOverlay.Hide();
+            _isSceneTransitionInProgress = false;
+            yield break;
+        }
+
+        Scene outgoingScene = _currentContentScene;
+        SceneManager.SetActiveScene(incomingScene);
+        _currentContentScene = incomingScene;
+
+        // PersistentXRInfrastructure disables the incoming scene's duplicate XR/platform
+        // roots from its sceneLoaded callback before the next frame is rendered. Retire the
+        // remaining outgoing content incrementally so OnDisable work is spread across frames.
+        if (outgoingScene.IsValid() && outgoingScene.isLoaded &&
+            outgoingScene != incomingScene && outgoingScene != _bootstrapScene)
+        {
+            yield return RetireSceneIncrementally(outgoingScene);
+        }
+
+        yield return new WaitForSecondsRealtime(Mathf.Max(0f, _loadingOverlayPostActivationDelaySeconds));
+        SceneTransitionOverlay.Hide();
+
+        _isSceneTransitionInProgress = false;
+        BeginScenePreloadIfEnabled(GetUpcomingSceneName());
+    }
+
+    private Scene FindNewestLoadedScene(string sceneName)
+    {
+        for (int i = SceneManager.sceneCount - 1; i >= 0; i--)
+        {
+            Scene scene = SceneManager.GetSceneAt(i);
+            if (scene.isLoaded && scene.name == sceneName && scene != _currentContentScene)
+            {
+                return scene;
+            }
+        }
+
+        return default;
+    }
+
+    private IEnumerator RetireSceneIncrementally(Scene scene)
+    {
+        GameObject[] roots = scene.GetRootGameObjects();
+        float budgetMilliseconds = Mathf.Max(0.1f, _sceneRetirementFrameBudgetMilliseconds);
+        Stopwatch stopwatch = Stopwatch.StartNew();
+
+        for (int i = 0; i < roots.Length; i++)
+        {
+            GameObject root = roots[i];
+            if (root != null && root.activeSelf)
+            {
+                root.SetActive(false);
+            }
+
+            if (stopwatch.Elapsed.TotalMilliseconds >= budgetMilliseconds)
+            {
+                stopwatch.Restart();
+                yield return null;
+            }
+        }
+
+        AsyncOperation unloadOperation = SceneManager.UnloadSceneAsync(scene);
+        if (unloadOperation == null)
+        {
+            UnityEngine.Debug.LogWarning($"StudyController: failed to begin unloading scene '{scene.name}'.");
+            yield break;
+        }
+
+        while (!unloadOperation.isDone)
+        {
+            yield return null;
+        }
+    }
+
+    private void LowerBackgroundLoadingPriority()
+    {
+        if (_isBackgroundLoadingPriorityOverridden)
+        {
+            return;
+        }
+
+        _previousBackgroundLoadingPriority = Application.backgroundLoadingPriority;
+        Application.backgroundLoadingPriority = ThreadPriority.Low;
+        _isBackgroundLoadingPriorityOverridden = true;
+    }
+
+    private void RestoreBackgroundLoadingPriority()
+    {
+        if (!_isBackgroundLoadingPriorityOverridden)
+        {
+            return;
+        }
+
+        Application.backgroundLoadingPriority = _previousBackgroundLoadingPriority;
+        _isBackgroundLoadingPriorityOverridden = false;
+    }
+
+    private void ClearPreloadState()
+    {
+        _preloadedSceneOperation = null;
+        _preloadedSceneName = null;
+        _isPreloadedSceneReady = false;
+        _preloadedSceneReadyTime = -1f;
+        _preloadCoroutine = null;
+    }
+
+    private bool TryCommitSceneTransition(string sceneName)
+    {
+        if (string.IsNullOrEmpty(sceneName))
+        {
+            return false;
+        }
+
+        if (_isSceneTransitionInProgress)
+        {
+            return false;
+        }
+
+        if (_preloadedSceneOperation != null && _preloadedSceneName != sceneName)
+        {
+            Debug.LogWarning($"StudyController: '{_preloadedSceneName}' is already preloading; cannot transition to '{sceneName}' yet.");
+            return false;
+        }
+
+        SceneTransitionOverlay.Show();
+        return true;
+    }
+
+    private IEnumerator WaitForLoadingOverlayWarmup()
+    {
+        int framesToWait = Mathf.Max(5, _loadingOverlayWarmupFrames);
+        for (int i = 0; i < framesToWait; i++)
+        {
+            yield return null;
+        }
+    }
+
+    private bool CanActivatePreloadedScene(string sceneName)
+    {
+        if (_preloadedSceneOperation == null || _preloadedSceneName != sceneName || !_isPreloadedSceneReady)
+        {
+            return false;
+        }
+
+        float settledAt = _preloadedSceneReadyTime + Mathf.Max(0f, _preloadedSceneReadySettleSeconds);
+        return Time.unscaledTime >= settledAt;
+    }
+
+    private string GetAdvanceTargetSceneName()
+    {
+        if (_shuffledSequences == null || _taskIndex < 0 || _taskIndex >= _shuffledSequences.Count)
+        {
+            return null;
+        }
+
+        if (_sceneIndexInTask == -1)
+        {
+            return _shuffledSequences[_taskIndex].Count > 0 ? _shuffledSequences[_taskIndex][0] : null;
+        }
+
+        int nextSceneIndex = _sceneIndexInTask + 1;
+        if (nextSceneIndex < _shuffledSequences[_taskIndex].Count)
+        {
+            return _shuffledSequences[_taskIndex][nextSceneIndex];
+        }
+
+        if (!string.IsNullOrEmpty(_surveySceneName))
+        {
+            return _surveySceneName;
+        }
+
+        return GetTaskInterludeOrCompletion(_taskIndex + 1);
+    }
+
+    private string GetFirstSceneName()
+    {
+        if (!string.IsNullOrEmpty(_tutorialSceneName))
+        {
+            return _tutorialSceneName;
+        }
+
+        if (_tasks != null && _tasks.Count > 0)
+        {
+            return _tasks[0].interludeSceneName;
+        }
+
+        return null;
+    }
+
+    private string GetUpcomingSceneName()
+    {
+        if (_tasks == null || _tasks.Count == 0)
+        {
+            return null;
+        }
+
+        if (_taskIndex == -2)
+        {
+            return _tasks[0].interludeSceneName;
+        }
+
+        if (_inSurvey)
+        {
+            return GetTaskInterludeOrCompletion(_taskIndex + 1);
+        }
+
+        if (_shuffledSequences == null || _taskIndex < 0)
+        {
+            return GetFirstSceneName();
+        }
+
+        if (_taskIndex >= _shuffledSequences.Count)
+        {
+            return null;
+        }
+
+        if (_sceneIndexInTask == -1)
+        {
+            return _shuffledSequences[_taskIndex].Count > 0 ? _shuffledSequences[_taskIndex][0] : null;
+        }
+
+        int nextSceneIndex = _sceneIndexInTask + 1;
+        if (nextSceneIndex < _shuffledSequences[_taskIndex].Count)
+        {
+            return _shuffledSequences[_taskIndex][nextSceneIndex];
+        }
+
+        if (!string.IsNullOrEmpty(_surveySceneName))
+        {
+            return _surveySceneName;
+        }
+
+        return GetTaskInterludeOrCompletion(_taskIndex + 1);
+    }
+
+    private string GetTaskInterludeOrCompletion(int taskIndex)
+    {
+        if (taskIndex < _tasks.Count)
+        {
+            return _tasks[taskIndex].interludeSceneName;
+        }
+
+        return "StudyComplete";
     }
 
     private void OnDestroy()
     {
+        RestoreBackgroundLoadingPriority();
+
         if (_advanceAction != null)
         {
             _advanceAction.action.performed -= OnAdvancePressed;
