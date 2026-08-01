@@ -1012,6 +1012,15 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
+                },
+                {
+                    "name": "ResetToSpawn",
+                    "type": "Button",
+                    "id": "86d4ce3e-9b8e-4c7d-83f3-4eb36d912f3c",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -1419,6 +1428,39 @@
                     "processors": "",
                     "groups": "",
                     "action": "ResetScene",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "b4480652-ac3f-4b52-8d52-107fb340fafc",
+                    "path": "<OculusTouchController>{LeftHand}/secondaryButton",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "ResetToSpawn",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "73ae251c-34cc-4636-8d9d-f4b6d17cf38e",
+                    "path": "<QuestTouchPlusController>{LeftHand}/secondaryButton",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "ResetToSpawn",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "7f53e71f-b1ef-4f2a-a104-0c9df0dbc802",
+                    "path": "<Keyboard>/y",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "ResetToSpawn",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }
@@ -2231,6 +2273,15 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
+                },
+                {
+                    "name": "GoBackStudy",
+                    "type": "Button",
+                    "id": "9542e82f-4294-4754-98ea-5ede1dc88161",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -2566,12 +2617,23 @@
                 },
                 {
                     "name": "",
+                    "id": "13c6e44b-630a-41d9-b2d5-06a95f2550d5",
+                    "path": "<Keyboard>/f",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "ToggleFPS",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "d49ac197-4b6f-445e-807f-381486ae60b6",
                     "path": "<OculusTouchController>{RightHand}/primaryButton",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
-                    "action": "ToggleFPS",
+                    "action": "GoBackStudy",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
@@ -2582,7 +2644,7 @@
                     "interactions": "",
                     "processors": "",
                     "groups": "",
-                    "action": "ToggleFPS",
+                    "action": "GoBackStudy",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
@@ -2616,6 +2678,17 @@
                     "processors": "",
                     "groups": "",
                     "action": "AdvanceStudy",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "e5bb47f3-b8f2-410a-b810-df59016c302b",
+                    "path": "<Keyboard>/backspace",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "GoBackStudy",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

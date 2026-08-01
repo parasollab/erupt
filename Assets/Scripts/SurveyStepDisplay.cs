@@ -26,29 +26,34 @@ public class SurveyStepDisplay : MonoBehaviour
     {
         new Step(
             "Survey",
-            "You have finished all the scenes for this task. Now, you will be shown a series of questions. Please tell the study administrator that you are about to begin the survey and then verbally tell them your answer to the following questions.\n\nPress the 'B' button to advance to the first question."),
+            "You have finished all the scenes for this task. Now, you will be shown a series of questions. Please tell the study administrator that you are about to begin the survey and then verbally tell them your answer to the following questions.\n\nPress the 'B' button to advance to the first question, or 'A' to return to the previous scene if needed."),
         new Step(
             "Mental Demand",
-            "How much mental and perceptual activity was required (e.g. thinking, deciding, calculating, remembering, looking, searching, etc.)? Was the task easy or demanding, simple or complex, exacting or forgiving?\n\nPlease rate on a scale from 0 (Low) to 100 (High) in an increment of 5.\n\nPlease verbally tell the study administrator your answer. Then, press 'B' to advance to the next question."),
+            "How much mental and perceptual activity was required (e.g. thinking, deciding, calculating, remembering, looking, searching, etc.)? Was the task easy or demanding, simple or complex, exacting or forgiving?\n\nPlease rate on a scale from 0 (Low) to 100 (High) in an increment of 5.\n\nPlease verbally tell the study administrator your answer. Then, press 'B' to advance to the next question, or 'A' to go back to the previous question."),
         new Step(
             "Physical Demand",
-            "How much physical activity was required (e.g., pushing, pulling, turning, controlling, activating, etc.)? Was the task easy or demanding, slow or brisk, slack or strenuous, restful or laborious?\n\nPlease rate on a scale from 0 (Low) to 100 (High) in an increment of 5.\n\nPlease verbally tell the study administrator your answer. Then, press 'B' to advance to the next question."),
+            "How much physical activity was required (e.g., pushing, pulling, turning, controlling, activating, etc.)? Was the task easy or demanding, slow or brisk, slack or strenuous, restful or laborious?\n\nPlease rate on a scale from 0 (Low) to 100 (High) in an increment of 5.\n\nPlease verbally tell the study administrator your answer. Then, press 'B' to advance to the next question, or 'A' to go back to the previous question."),
         new Step(
             "Temporal Demand",
-            "How much time pressure did you feel due to the rate or pace at which the tasks or task elements occurred? Was the pace slow and leisurely or rapid and frantic?\n\nPlease rate on a scale from 0 (Low) to 100 (High) in an increment of 5.\n\nPlease verbally tell the study administrator your answer. Then, press 'B' to advance to the next question."),
+            "How much time pressure did you feel due to the rate or pace at which the tasks or task elements occurred? Was the pace slow and leisurely or rapid and frantic?\n\nPlease rate on a scale from 0 (Low) to 100 (High) in an increment of 5.\n\nPlease verbally tell the study administrator your answer. Then, press 'B' to advance to the next question, or 'A' to go back to the previous question."),
         new Step(
             "Performance",
-            "How successful do you think you were in accomplishing the goals of the task set by the experimenter (or yourself)? How satisfied were you with your performance in accomplishing these goals?\n\nPlease rate on a scale from 0 (Poor) to 100 (Good) in an increment of 5.\n\nPlease verbally tell the study administrator your answer. Then, press 'B' to advance to the next question."),
+            "How successful do you think you were in accomplishing the goals of the task set by the experimenter (or yourself)? How satisfied were you with your performance in accomplishing these goals?\n\nPlease rate on a scale from 0 (Poor) to 100 (Good) in an increment of 5.\n\nPlease verbally tell the study administrator your answer. Then, press 'B' to advance to the next question, or 'A' to go back to the previous question."),
         new Step(
             "Effort",
-            "How hard did you have to work (mentally and physically) to accomplish your level of performance?\n\nPlease rate on a scale from 0 (Low) to 100 (High) in an increment of 5.\n\nPlease verbally tell the study administrator your answer. Then, press 'B' to advance to the next question."),
+            "How hard did you have to work (mentally and physically) to accomplish your level of performance?\n\nPlease rate on a scale from 0 (Low) to 100 (High) in an increment of 5.\n\nPlease verbally tell the study administrator your answer. Then, press 'B' to advance to the next question, or 'A' to go back to the previous question."),
         new Step(
             "Frustration Level",
-            "How insecure, discouraged, irritated, stressed and annoyed versus secure, gratified, content, relaxed and complacent did you feel during the task?\n\nPlease rate on a scale from 0 (Low) to 100 (High) in an increment of 5.\n\nPlease verbally tell the study administrator your answer. Then, press 'B' to continue the study.")
+            "How insecure, discouraged, irritated, stressed and annoyed versus secure, gratified, content, relaxed and complacent did you feel during the task?\n\nPlease rate on a scale from 0 (Low) to 100 (High) in an increment of 5.\n\nPlease verbally tell the study administrator your answer. Then, press 'B' to continue the study, or 'A' to go back to the previous question.")
     };
 
     [SerializeField] private UIDocument uiDocument;
     [SerializeField] private InputActionReference advanceAction;
+
+    // Resolved from advanceAction's action map by name rather than serialized, so no scene
+    // rewiring is needed. Steps back a question (A button / backspace); from the intro page
+    // it backs out of the survey entirely, to the task's last scene.
+    private InputAction goBackAction;
 
     private Label titleLabel;
     private Label stepCounterLabel;
@@ -76,6 +81,13 @@ public class SurveyStepDisplay : MonoBehaviour
         {
             advanceAction.action.performed += OnAdvancePressed;
             advanceAction.action.Enable();
+
+            goBackAction = advanceAction.action.actionMap?.FindAction("GoBackStudy");
+            if (goBackAction != null)
+            {
+                goBackAction.performed += OnGoBackPressed;
+                goBackAction.Enable();
+            }
         }
         else
         {
@@ -107,6 +119,22 @@ public class SurveyStepDisplay : MonoBehaviour
         }
     }
 
+    private void OnGoBackPressed(InputAction.CallbackContext context)
+    {
+        if (stepIndex > 0)
+        {
+            stepIndex--;
+            ShowCurrentStep();
+            return;
+        }
+
+        // On the intro page: back out of the survey entirely, to the task's last scene.
+        if (StudyController.Instance != null)
+        {
+            StudyController.Instance.BackOutOfSurvey();
+        }
+    }
+
     private void ShowCurrentStep()
     {
         Step step = Steps[stepIndex];
@@ -126,6 +154,10 @@ public class SurveyStepDisplay : MonoBehaviour
         if (advanceAction != null)
         {
             advanceAction.action.performed -= OnAdvancePressed;
+        }
+        if (goBackAction != null)
+        {
+            goBackAction.performed -= OnGoBackPressed;
         }
     }
 }
