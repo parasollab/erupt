@@ -3,6 +3,8 @@ using System.Linq;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
+using UnityEngine.UIElements;
+using UnityEngine.XR.Interaction.Toolkit.Interactables;
 using RosMessageTypes.StudyInterfaces;
 
 public class StudyController : MonoBehaviour
@@ -27,10 +29,27 @@ public class StudyController : MonoBehaviour
     [Header("Input")]
     [SerializeField] private InputActionReference _advanceAction;
 
-    // Resolved from _advanceAction's action map by name rather than serialized, so no scene
-    // rewiring is needed. Pressing it (the A button / backspace) steps the study backwards
-    // to recover from an accidental advance; a revisited scene reloads from scratch.
-    private InputAction _goBackAction;
+    [Header("Advance Confirmation")]
+    [Tooltip("XRI world-space Grab UI prefab instantiated as the Confirm/Cancel dialog shown before any advancement.")]
+    [SerializeField] private GameObject _confirmDialogTemplate;
+    [Tooltip("UXML rendered inside the confirmation dialog (must contain 'advanceConfirmButton' and 'advanceCancelButton').")]
+    [SerializeField] private VisualTreeAsset _confirmDialogUxml;
+    [Tooltip("World-space panel settings for the confirmation dialog.")]
+    [SerializeField] private PanelSettings _confirmDialogPanelSettings;
+
+    private GameObject _activeConfirmDialog;
+
+    // Panel canvas size in UI Toolkit pixels. At WristUISettings' 100 px/unit and the Grab UI
+    // template's 0.2 root scale, this comes out to a 0.68 m x 0.36 m panel in the world.
+    private const float kConfirmPanelWidthPx = 340f;
+    private const float kConfirmPanelHeightPx = 180f;
+    // How far in front of (and below) the participant's eyes the dialog spawns. If scene
+    // geometry (workbench, counter, robot) is closer than the preferred distance, the dialog
+    // is pulled in front of it, but never nearer than the minimum.
+    private const float kConfirmDialogDistance = 0.9f;
+    private const float kConfirmDialogMinDistance = 0.4f;
+    private const float kConfirmDialogClearance = 0.15f;
+    private const float kConfirmDialogDropBelowEyes = 0.1f;
 
     [Header("Start Scene")]
     [Tooltip("Optional pause before auto-advancing from StartScene into the tutorial (or the first task's interlude, if no tutorial scene is set).")]
@@ -80,17 +99,6 @@ public class StudyController : MonoBehaviour
         {
             _advanceAction.action.performed += OnAdvancePressed;
             _advanceAction.action.Enable();
-
-            _goBackAction = _advanceAction.action.actionMap?.FindAction("GoBackStudy");
-            if (_goBackAction != null)
-            {
-                _goBackAction.performed += OnGoBackPressed;
-                _goBackAction.Enable();
-            }
-            else
-            {
-                Debug.LogError("StudyController: No 'GoBackStudy' action found alongside the advance action.");
-            }
         }
         else
         {
@@ -220,10 +228,16 @@ public class StudyController : MonoBehaviour
 
         if (_taskIndex >= _tasks.Count)
         {
-            // On StudyComplete - only the go-back action does anything here.
+            // On StudyComplete - there is nothing left to advance to.
             return;
         }
 
+        RequestAdvanceConfirmation(PerformAdvance);
+    }
+
+    // The actual advancement, run only once the participant confirms via the dialog.
+    private void PerformAdvance()
+    {
         // On the current task's interlude: move into its first task scene.
         if (_sceneIndexInTask == -1)
         {
@@ -250,84 +264,143 @@ public class StudyController : MonoBehaviour
         AdvanceToNextTask();
     }
 
-    // Steps the study backwards one stop, to recover from an accidental advance. Scene
-    // contents are not preserved: a revisited task scene reloads from scratch, and a
-    // revisited survey restarts at its intro page.
-    private void OnGoBackPressed(InputAction.CallbackContext context)
+    // Shows the Confirm/Cancel dialog and runs onConfirm only if the participant confirms.
+    // TutorialStepDisplay and SurveyStepDisplay route their page turns through here too, so
+    // every advance press in the study goes through the same gate. Falls through to onConfirm
+    // when no StudyController exists (e.g. a scene played directly in the editor).
+    public static void ConfirmAdvance(System.Action onConfirm)
     {
-        if (_taskIndex == -2)
+        if (Instance != null)
         {
-            // On the tutorial scene - TutorialStepDisplay owns this button press locally.
+            Instance.RequestAdvanceConfirmation(onConfirm);
+        }
+        else
+        {
+            Debug.LogWarning("StudyController.ConfirmAdvance: no StudyController instance; advancing without confirmation.");
+            onConfirm();
+        }
+    }
+
+    public void RequestAdvanceConfirmation(System.Action onConfirm)
+    {
+        if (_activeConfirmDialog != null)
+        {
+            // A dialog is already up - repeat advance presses are ignored until it is resolved.
             return;
         }
 
-        if (_inSurvey)
+        if (_confirmDialogTemplate == null || _confirmDialogUxml == null)
         {
-            // On the survey scene - SurveyStepDisplay owns this button press locally and
-            // calls BackOutOfSurvey() itself from the intro page.
+            // Fail open rather than soft-locking the study on a broken reference.
+            Debug.LogWarning("StudyController: confirmation dialog is not configured; advancing without confirmation.");
+            onConfirm();
             return;
         }
 
-        if (_shuffledSequences == null || _taskIndex < 0)
+        // Deliberately not DontDestroyOnLoad: any scene change destroys the dialog, which is
+        // the correct outcome if something else (e.g. /study/go_back) moves the study along.
+        _activeConfirmDialog = Instantiate(_confirmDialogTemplate);
+        UIDocument document = _activeConfirmDialog.GetComponentInChildren<UIDocument>(true);
+        if (document == null)
         {
-            // Still settling in StartScene - ignore.
+            Debug.LogError("StudyController: confirmation dialog template has no UIDocument; advancing without confirmation.");
+            CloseConfirmDialog();
+            onConfirm();
             return;
         }
 
-        // On StudyComplete: return to the last task's survey.
-        if (_taskIndex >= _tasks.Count)
+        document.visualTreeAsset = _confirmDialogUxml;
+        if (_confirmDialogPanelSettings != null)
         {
-            if (string.IsNullOrEmpty(_surveySceneName))
+            document.panelSettings = _confirmDialogPanelSettings;
+        }
+
+        // Shrink the template's 300x400 canvas to fit the dialog content (no dead space), and
+        // re-center the panel on the root: the template offsets the panel quad up and to the
+        // side to float above its grab handle, and its pivot is the panel's top-left corner --
+        // so centering means offsetting by half the size in local units (1 unit = 100 px).
+        document.worldSpaceSize = new Vector2(kConfirmPanelWidthPx, kConfirmPanelHeightPx);
+        document.transform.localPosition = new Vector3(
+            -kConfirmPanelWidthPx / 200f, kConfirmPanelHeightPx / 200f, 0f);
+
+        DisableGrabHandle(_activeConfirmDialog);
+        PositionDialogInFrontOfCamera(_activeConfirmDialog.transform);
+
+        AdvanceConfirmDialogController dialog = document.gameObject.AddComponent<AdvanceConfirmDialogController>();
+        dialog.Confirmed += () =>
+        {
+            ObjectMetricsLogger.Instance?.LogEvent("advance_confirmed", "study_advance");
+            CloseConfirmDialog();
+            onConfirm();
+        };
+        dialog.Cancelled += () =>
+        {
+            ObjectMetricsLogger.Instance?.LogEvent("advance_cancelled", "study_advance");
+            CloseConfirmDialog();
+        };
+
+        ObjectMetricsLogger.Instance?.LogEvent("advance_confirm_shown", "study_advance");
+    }
+
+    private void CloseConfirmDialog()
+    {
+        if (_activeConfirmDialog != null)
+        {
+            Destroy(_activeConfirmDialog);
+            _activeConfirmDialog = null;
+        }
+    }
+
+    // The Grab UI template ships as a grabbable panel; the confirmation dialog should stay
+    // put, so turn off the grab handle (its visual, collider, and interactable) the same way
+    // the certify/indicator menu instances disable theirs.
+    private static void DisableGrabHandle(GameObject dialog)
+    {
+        foreach (SkinnedMeshRenderer handleVisual in dialog.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+        {
+            handleVisual.enabled = false;
+        }
+        XRGrabInteractable grab = dialog.GetComponentInChildren<XRGrabInteractable>(true);
+        if (grab != null)
+        {
+            foreach (Collider grabCollider in grab.GetComponents<Collider>())
             {
-                return;
+                grabCollider.enabled = false;
             }
-            _taskIndex = _tasks.Count - 1;
-            _sceneIndexInTask = _shuffledSequences[_taskIndex].Count;
-            _inSurvey = true;
-            SceneManager.LoadScene(_surveySceneName);
-            return;
+            grab.enabled = false;
         }
+    }
 
-        // On the current task's interlude: return to the previous task's survey (or the
-        // tutorial when this is the first task).
-        if (_sceneIndexInTask == -1)
+    // Same facing convention as Billboard.cs: panel forward aligned with the camera's
+    // (horizontal) forward, placed just below eye height within arm's-reach ray distance.
+    private static void PositionDialogInFrontOfCamera(Transform dialog)
+    {
+        Camera cam = Camera.main;
+        if (cam == null)
         {
-            if (_taskIndex == 0)
-            {
-                if (!string.IsNullOrEmpty(_tutorialSceneName))
-                {
-                    _taskIndex = -2;
-                    SceneManager.LoadScene(_tutorialSceneName);
-                }
-                return;
-            }
-
-            _taskIndex--;
-            if (!string.IsNullOrEmpty(_surveySceneName))
-            {
-                _sceneIndexInTask = _shuffledSequences[_taskIndex].Count;
-                _inSurvey = true;
-                SceneManager.LoadScene(_surveySceneName);
-            }
-            else
-            {
-                _sceneIndexInTask = _shuffledSequences[_taskIndex].Count - 1;
-                LoadCurrentTaskScene();
-            }
             return;
         }
+        Vector3 forward = cam.transform.forward;
+        forward.y = 0f;
+        forward = forward.sqrMagnitude > 0.0001f ? forward.normalized : Vector3.forward;
 
-        // On a task's first scene: back out to its interlude.
-        if (_sceneIndexInTask == 0)
+        // Task scenes put the participant right up against a workbench/counter with the robot
+        // on it; a fixed-distance panel would end up inside that geometry and be depth-culled.
+        // Trigger colliders are ignored so world-space UI panels (all triggers) can't block it.
+        // The grab handle's non-trigger collider is disabled before this runs, so the dialog
+        // can't hit itself either.
+        float distance = kConfirmDialogDistance;
+        if (Physics.Raycast(
+                cam.transform.position, forward, out RaycastHit hit, kConfirmDialogDistance,
+                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
         {
-            _sceneIndexInTask = -1;
-            LoadCurrentInterlude();
-            return;
+            distance = Mathf.Max(hit.distance - kConfirmDialogClearance, kConfirmDialogMinDistance);
         }
 
-        // On any later task scene: reload the previous scene (fresh - no state is kept).
-        _sceneIndexInTask--;
-        LoadCurrentTaskScene();
+        dialog.position = cam.transform.position
+            + forward * distance
+            + Vector3.down * kConfirmDialogDropBelowEyes;
+        dialog.rotation = Quaternion.LookRotation(forward, Vector3.up);
     }
 
     // Called by the survey scene once the participant has stepped through every question,
@@ -336,19 +409,6 @@ public class StudyController : MonoBehaviour
     {
         _inSurvey = false;
         AdvanceToNextTask();
-    }
-
-    // Called by the survey scene when the participant backs out of the survey's intro page,
-    // to return to the current task's last scene (reloaded from scratch).
-    public void BackOutOfSurvey()
-    {
-        if (!_inSurvey)
-        {
-            return;
-        }
-        _inSurvey = false;
-        _sceneIndexInTask = _shuffledSequences[_taskIndex].Count - 1;
-        LoadCurrentTaskScene();
     }
 
     private void AdvanceToNextTask()
@@ -377,9 +437,7 @@ public class StudyController : MonoBehaviour
 
     private void LoadCompletion()
     {
-        // Both actions stay subscribed: OnAdvancePressed ignores presses while complete,
-        // and OnGoBackPressed can still return to the last task's survey in case the
-        // participant skipped there by accident.
+        // The advance action stays subscribed: OnAdvancePressed ignores presses while complete.
         Debug.Log("StudyController: Study complete.");
         SceneManager.LoadScene("StudyComplete");
     }
@@ -389,10 +447,6 @@ public class StudyController : MonoBehaviour
         if (_advanceAction != null)
         {
             _advanceAction.action.performed -= OnAdvancePressed;
-        }
-        if (_goBackAction != null)
-        {
-            _goBackAction.performed -= OnGoBackPressed;
         }
     }
 }
