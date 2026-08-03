@@ -29,6 +29,11 @@ public class StudyController : MonoBehaviour
     [Header("Input")]
     [SerializeField] private InputActionReference _advanceAction;
 
+    // Resolved from _advanceAction's action map by name rather than serialized, so no scene
+    // rewiring is needed. Pressing it (the A button / backspace) steps the study backwards
+    // to recover from an accidental advance; a revisited scene reloads from scratch.
+    private InputAction _goBackAction;
+
     [Header("Start Scene")]
     [Tooltip("Optional pause before auto-advancing from StartScene into the tutorial (or the first task's interlude, if no tutorial scene is set).")]
     [SerializeField] private float _startSceneAutoAdvanceDelay = 0f;
@@ -102,6 +107,17 @@ public class StudyController : MonoBehaviour
         {
             _advanceAction.action.performed += OnAdvancePressed;
             _advanceAction.action.Enable();
+
+            _goBackAction = _advanceAction.action.actionMap?.FindAction("GoBackStudy");
+            if (_goBackAction != null)
+            {
+                _goBackAction.performed += OnGoBackPressed;
+                _goBackAction.Enable();
+            }
+            else
+            {
+                Debug.LogError("StudyController: No 'GoBackStudy' action found alongside the advance action.");
+            }
         }
         else
         {
@@ -273,6 +289,86 @@ public class StudyController : MonoBehaviour
         AdvanceToNextTask();
     }
 
+    // Steps the study backwards one stop, to recover from an accidental advance. Scene
+    // contents are not preserved: a revisited task scene reloads from scratch, and a
+    // revisited survey restarts at its intro page.
+    private void OnGoBackPressed(InputAction.CallbackContext context)
+    {
+        if (_taskIndex == -2)
+        {
+            // On the tutorial scene - TutorialStepDisplay owns this button press locally.
+            return;
+        }
+
+        if (_inSurvey)
+        {
+            // On the survey scene - SurveyStepDisplay owns this button press locally and
+            // calls BackOutOfSurvey() itself from the intro page.
+            return;
+        }
+
+        if (_shuffledSequences == null || _taskIndex < 0)
+        {
+            // Still settling in StartScene - ignore.
+            return;
+        }
+
+        // On StudyComplete: return to the last task's survey.
+        if (_taskIndex >= _tasks.Count)
+        {
+            if (string.IsNullOrEmpty(_surveySceneName))
+            {
+                return;
+            }
+            _taskIndex = _tasks.Count - 1;
+            _sceneIndexInTask = _shuffledSequences[_taskIndex].Count;
+            _inSurvey = true;
+            SceneManager.LoadScene(_surveySceneName);
+            return;
+        }
+
+        // On the current task's interlude: return to the previous task's survey (or the
+        // tutorial when this is the first task).
+        if (_sceneIndexInTask == -1)
+        {
+            if (_taskIndex == 0)
+            {
+                if (!string.IsNullOrEmpty(_tutorialSceneName))
+                {
+                    _taskIndex = -2;
+                    SceneManager.LoadScene(_tutorialSceneName);
+                }
+                return;
+            }
+
+            _taskIndex--;
+            if (!string.IsNullOrEmpty(_surveySceneName))
+            {
+                _sceneIndexInTask = _shuffledSequences[_taskIndex].Count;
+                _inSurvey = true;
+                SceneManager.LoadScene(_surveySceneName);
+            }
+            else
+            {
+                _sceneIndexInTask = _shuffledSequences[_taskIndex].Count - 1;
+                LoadCurrentTaskScene();
+            }
+            return;
+        }
+
+        // On a task's first scene: back out to its interlude.
+        if (_sceneIndexInTask == 0)
+        {
+            _sceneIndexInTask = -1;
+            LoadCurrentInterlude();
+            return;
+        }
+
+        // On any later task scene: reload the previous scene (fresh - no state is kept).
+        _sceneIndexInTask--;
+        LoadCurrentTaskScene();
+    }
+
     // Called by the survey scene once the participant has stepped through every question,
     // to move on to the next task's interlude (or the completion scene after the last task).
     public bool FinishSurvey()
@@ -285,6 +381,19 @@ public class StudyController : MonoBehaviour
         _inSurvey = false;
         AdvanceToNextTask();
         return true;
+    }
+
+    // Called by the survey scene when the participant backs out of the survey's intro page,
+    // to return to the current task's last scene (reloaded from scratch).
+    public void BackOutOfSurvey()
+    {
+        if (!_inSurvey)
+        {
+            return;
+        }
+        _inSurvey = false;
+        _sceneIndexInTask = _shuffledSequences[_taskIndex].Count - 1;
+        LoadCurrentTaskScene();
     }
 
     private void AdvanceToNextTask()
@@ -313,6 +422,9 @@ public class StudyController : MonoBehaviour
 
     private void LoadCompletion()
     {
+        // Both actions stay subscribed: OnAdvancePressed ignores presses while complete,
+        // and OnGoBackPressed can still return to the last task's survey in case the
+        // participant skipped there by accident.
         Debug.Log("StudyController: Study complete.");
         if (_advanceAction != null)
         {
@@ -717,6 +829,10 @@ public class StudyController : MonoBehaviour
         if (_advanceAction != null)
         {
             _advanceAction.action.performed -= OnAdvancePressed;
+        }
+        if (_goBackAction != null)
+        {
+            _goBackAction.performed -= OnGoBackPressed;
         }
     }
 }

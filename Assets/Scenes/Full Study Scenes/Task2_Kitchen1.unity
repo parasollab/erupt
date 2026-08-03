@@ -4514,7 +4514,10 @@ MonoBehaviour:
 
 
     Press ''B'' on the Right Hand Controller when finished with
-    this scene to advance to the next.'
+    this scene to advance to the next.
+
+
+    Press ''A'' on the Right Hand Controller to go back to the previous scene if needed.'
 --- !u!4 &1770000003
 Transform:
   m_ObjectHideFlags: 0

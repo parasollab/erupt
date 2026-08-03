@@ -673,7 +673,10 @@ MonoBehaviour:
 
 
     You may now take off the
-    headset.'
+    headset.
+
+
+    Press ''A'' on the Right Hand Controller to return to the survey if needed.'
 --- !u!4 &1567376384
 Transform:
   m_ObjectHideFlags: 0

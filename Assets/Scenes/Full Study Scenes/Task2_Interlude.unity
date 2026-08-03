@@ -437,7 +437,7 @@ MonoBehaviour:
   m_Position: 0
   m_WorldSpaceSizeMode: 1
   m_WorldSpaceWidth: 600
-  m_WorldSpaceHeight: 500
+  m_WorldSpaceHeight: 600
   m_PivotReferenceSize: 0
   m_Pivot: 1
   m_WorldSpaceCollider: {fileID: 0}
@@ -471,7 +471,8 @@ MonoBehaviour:
 
     Press ''B'' on
     the Right Hand Controller to advance to the first scene. Press ''B'' again when
-    finished with each scene to advance to the next.'
+    finished with each scene to advance to the next. Press ''A'' on the Right Hand
+    Controller to go back if needed.'
 --- !u!4 &890748242
 Transform:
   m_ObjectHideFlags: 0
@@ -481,7 +482,7 @@ Transform:
   m_GameObject: {fileID: 890748239}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -3, y: 4.94, z: 5.2}
+  m_LocalPosition: {x: -3, y: 5.81, z: 5.2}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
