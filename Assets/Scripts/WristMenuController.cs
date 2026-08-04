@@ -28,6 +28,8 @@ public class WristMenuController : MonoBehaviour
     [SerializeField] private GameObject mtcDashboardPanel;
 
     private float shapeSpawnDistance = 1.25f;
+    // Alpha applied to shapes spawned from the wrist menu (1 = opaque, 0 = invisible)
+    private float spawnedShapeAlpha = 0.75f;
     
     // UI Elements
     private VisualElement root;
@@ -681,6 +683,24 @@ public class WristMenuController : MonoBehaviour
         ShowOptionsPanel(); // Return to main menu after adding shape
     }
     
+    // Converts a URP/Lit material instance to alpha-blended transparency at the given
+    // alpha. Mirrors what the URP shader GUI does when Surface Type is set to Transparent.
+    public static void MakeMaterialTransparent(Material mat, float alpha)
+    {
+        mat.SetFloat("_Surface", 1f); // 1 = Transparent
+        mat.SetFloat("_Blend", 0f);   // 0 = Alpha blend
+        mat.SetOverrideTag("RenderType", "Transparent");
+        mat.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+        mat.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+        mat.SetFloat("_ZWrite", 0f);
+        mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+        mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+
+        Color c = mat.color;
+        c.a = alpha;
+        mat.color = c;
+    }
+
     // Shape Creation Methods
     private void AddPrimitiveShape(PrimitiveType primitiveType)
     {
@@ -738,7 +758,13 @@ public class WristMenuController : MonoBehaviour
 
         var meshRenderer = shape.GetComponent<MeshRenderer>();
         if (meshRenderer != null && litMaterial != null)
+        {
+            // .material instantiates a per-renderer copy, so making it transparent here
+            // leaves the shared litMaterial asset (also used by CollisionObjectsListenerSimple
+            // for RViz-synced objects) opaque.
             meshRenderer.material = litMaterial;
+            MakeMaterialTransparent(meshRenderer.material, spawnedShapeAlpha);
+        }
 
         Collider collider = shape.GetComponent<Collider>();
         if (collider != null)

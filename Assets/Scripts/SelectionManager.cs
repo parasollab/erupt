@@ -14,6 +14,9 @@ public class SelectionManager : MonoBehaviour
 
     [Header("Highlighting")]
     public Material highlightMaterial;
+    // Alpha applied to the selection highlight (1 = opaque, 0 = invisible)
+    private float highlightAlpha = 0.75f;
+    private Material transparentHighlightMaterial;
     private Material originalMaterial;
     private Renderer selectedRenderer;
 
@@ -123,7 +126,15 @@ public class SelectionManager : MonoBehaviour
         if (selectedRenderer != null)
         {
             originalMaterial = selectedRenderer.material;
-            selectedRenderer.material = highlightMaterial;
+            // One shared transparent copy of the highlight material, built lazily so the
+            // Teal asset itself stays opaque for its other users and repeated selections
+            // don't each instantiate a new material.
+            if (transparentHighlightMaterial == null && highlightMaterial != null)
+            {
+                transparentHighlightMaterial = new Material(highlightMaterial);
+                WristMenuController.MakeMaterialTransparent(transparentHighlightMaterial, highlightAlpha);
+            }
+            selectedRenderer.material = transparentHighlightMaterial != null ? transparentHighlightMaterial : highlightMaterial;
         }
         
         // Notify listeners that an object was selected
