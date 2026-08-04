@@ -510,6 +510,14 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 1236116081}
     - target: {fileID: 4209543171811604821, guid: 46fae3e1bd65645b4835315513e75b34, type: 3}
+      propertyPath: allowExecution
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4209543171811604821, guid: 46fae3e1bd65645b4835315513e75b34, type: 3}
+      propertyPath: allowMirroring
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4209543171811604821, guid: 46fae3e1bd65645b4835315513e75b34, type: 3}
       propertyPath: rosJointNamePrefix
       value: 
       objectReference: {fileID: 0}
@@ -568,10 +576,7 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents:
-    - targetCorrespondingSourceObject: {fileID: 3731865409109120876, guid: 46fae3e1bd65645b4835315513e75b34, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 0}
+    m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 46fae3e1bd65645b4835315513e75b34, type: 3}
 --- !u!1 &560964692
 GameObject:
@@ -1330,10 +1335,7 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 3338805069719217018, guid: 48516d5ede86a4731b56a6e555864e5b, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1395003099}
-    m_AddedComponents:
-    - targetCorrespondingSourceObject: {fileID: 1375403636790619792, guid: 48516d5ede86a4731b56a6e555864e5b, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 0}
+    m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 48516d5ede86a4731b56a6e555864e5b, type: 3}
 --- !u!4 &953800210 stripped
 Transform:
@@ -3712,7 +3714,8 @@ MonoBehaviour:
     with this scene to advance to the next.
 
 
-    Press ''A'' on the Right Hand Controller to go back to the previous scene if needed.'
+    Press ''A'' on the Right Hand Controller
+    to go back to the previous scene if needed.'
 --- !u!4 &1770000003
 Transform:
   m_ObjectHideFlags: 0

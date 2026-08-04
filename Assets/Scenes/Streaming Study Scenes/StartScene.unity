@@ -759,6 +759,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: xrviz::StudyController
   _advanceAction: {fileID: -6469114226445947990, guid: c348712bda248c246b8c49b3db54643f, type: 3}
+  _confirmDialogTemplate: {fileID: 5481525149749646259, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
+  _confirmDialogUxml: {fileID: 9197481963319205126, guid: 2199545eb44e4bff88d16cc9f3fdf56e, type: 3}
+  _confirmDialogPanelSettings: {fileID: 11400000, guid: 38d87c83d2e662dedbd70229f2ccaf12, type: 2}
   _startSceneAutoAdvanceDelay: 0
   _tutorialSceneName: Tutorial
   _surveySceneName: Survey

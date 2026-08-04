@@ -1027,6 +1027,14 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 4209543171811604821, guid: 46fae3e1bd65645b4835315513e75b34, type: 3}
+      propertyPath: allowExecution
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4209543171811604821, guid: 46fae3e1bd65645b4835315513e75b34, type: 3}
+      propertyPath: allowMirroring
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4209543171811604821, guid: 46fae3e1bd65645b4835315513e75b34, type: 3}
       propertyPath: rosJointNamePrefix
       value: 
       objectReference: {fileID: 0}
@@ -3830,7 +3838,8 @@ MonoBehaviour:
     Controller when finished with this scene to advance to the next.
 
 
-    Press ''A'' on the Right Hand Controller to go back to the previous scene if needed.'
+    Press
+    ''A'' on the Right Hand Controller to go back to the previous scene if needed.'
 --- !u!4 &1770000003
 Transform:
   m_ObjectHideFlags: 0
