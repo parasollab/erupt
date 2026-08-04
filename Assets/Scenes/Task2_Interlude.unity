@@ -436,8 +436,8 @@ MonoBehaviour:
   m_SortingOrder: 0
   m_Position: 0
   m_WorldSpaceSizeMode: 1
-  m_WorldSpaceWidth: 600
-  m_WorldSpaceHeight: 500
+  m_WorldSpaceWidth: 300
+  m_WorldSpaceHeight: 250
   m_PivotReferenceSize: 0
   m_Pivot: 1
   m_WorldSpaceCollider: {fileID: 0}
@@ -461,12 +461,13 @@ MonoBehaviour:
     will be placed in several scenes. In each, there will be a robot trajectory playing
     that places the robot in an undesired portion of the environment indicated using
     a red box. Create obstacles in the scene using the Scene Menu to prevent the
-    robot from entering these undesired regions.
+    robot from entering these undesired regions. Then, replan the path using the
+    "Send Request" button on the Planning Request Menu.
 
 
-    Press ''B'' on the Right Hand
-    Controller to advance to the first scene. Press ''B'' again when finished with
-    each scene to advance to the next.'
+    Press ''B'' on the
+    Right Hand Controller to advance to the first scene. Press ''B'' again when finished
+    with each scene to advance to the next.'
 --- !u!4 &890748242
 Transform:
   m_ObjectHideFlags: 0
@@ -476,7 +477,7 @@ Transform:
   m_GameObject: {fileID: 890748239}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -3, y: 4.94, z: 5.2}
+  m_LocalPosition: {x: -1.5, y: 1.7, z: 2.6}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []

@@ -50,8 +50,9 @@ public class SystemPrewarmer : MonoBehaviour
             // Initialize ROS connection
             ROSConnection ros = ROSConnection.GetOrCreateInstance();
             
-            // Pre-register the publisher that will be used by collision objects
-            ros.RegisterPublisher<CollisionObjectMsg>("/collision_object");
+            // Pre-register the publisher that will be used by collision objects. This usually
+            // runs first, so it must pass the shared queue size -- see its declaration.
+            ros.RegisterPublisher<CollisionObjectMsg>("/collision_object", CollisionObjectPublisher.CollisionObjectQueueSize);
             
             // Debug.Log("SystemPrewarmer: ROS connection pre-warmed");
         }

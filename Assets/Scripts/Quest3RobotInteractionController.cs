@@ -120,8 +120,23 @@ public class Quest3RobotInteractionController : MonoBehaviour
         ikController.BeginInteraction();
         SetHandleActive(true);
         ClearSelection();
+        // Grabbing the EE handle also drops the current shape selection, matching the
+        // trigger-click behavior in SelectionManager.IsDeselectSurface.
+        SelectionManager.Instance?.ClearSelection();
         ObjectMetricsLogger.Instance?.LogEvent("grab_start", EndEffectorHandleObjectId);
         return true;
+    }
+
+    // Lets the thumbstick push/pull the handle's drag distance along the ray while it's held,
+    // mirroring the InteractionAttachController push/pull used for XRI far-grabbed objects.
+    public void AdjustHandleDragDistance(object interactor, float delta, float maxDistance)
+    {
+        if (activeDragInteractor != interactor || draggedPanel != null)
+        {
+            return;
+        }
+
+        dragDistance = Mathf.Clamp(dragDistance + delta, 0.1f, maxDistance);
     }
 
     public void UpdateHandleDrag(object interactor, Ray ray)
@@ -225,7 +240,7 @@ public class Quest3RobotInteractionController : MonoBehaviour
 
         float angleRad = selectedJoint.jointPosition[0];
         ObjectMetricsLogger.Instance?.LogEvent("grab_end", JointObjectId(selectedJoint),
-            selectedJoint.transform.position, selectedJoint.transform.rotation, $"angle_rad:{angleRad:F4}");
+            selectedJoint.transform.position, selectedJoint.transform.rotation, details: $"angle_rad:{angleRad:F4}");
     }
 
     private static string JointObjectId(ArticulationBody joint) => $"joint_{joint.name}";

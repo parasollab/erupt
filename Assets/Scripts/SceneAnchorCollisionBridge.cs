@@ -92,7 +92,7 @@ public class SceneAnchorCollisionBridge : MonoBehaviour
         Debug.Log("[SceneAnchorCollisionBridge] Start() — build is current.");
 
         _ros = ROSConnection.GetOrCreateInstance();
-        _ros.RegisterPublisher<CollisionObjectMsg>("/collision_object");
+        _ros.RegisterPublisher<CollisionObjectMsg>("/collision_object", CollisionObjectPublisher.CollisionObjectQueueSize);
 
         var tmp = GameObject.CreatePrimitive(PrimitiveType.Cube);
         _cubeMesh = tmp.GetComponent<MeshFilter>().sharedMesh;
@@ -411,7 +411,11 @@ public class SceneAnchorCollisionBridge : MonoBehaviour
         long ticks = DateTimeOffset.UtcNow.UtcTicks - DateTimeOffset.UnixEpoch.UtcTicks;
         return new TimeMsg
         {
+#if ROS2
             sec = (int)(ticks / TimeSpan.TicksPerSecond),
+#else
+            sec = (uint)(ticks / TimeSpan.TicksPerSecond),
+#endif
             nanosec = (uint)((ticks % TimeSpan.TicksPerSecond) * 100L)
         };
     }

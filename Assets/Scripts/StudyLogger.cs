@@ -87,7 +87,11 @@ public class StudyLogger : MonoBehaviour
         DateTimeOffset now = DateTimeOffset.UtcNow;
         long totalSec = now.ToUnixTimeSeconds();
         long nanosec = (now.ToUnixTimeMilliseconds() - totalSec * 1000) * 1_000_000;
+#if ROS2
         return new TimeMsg((int)totalSec, (uint)nanosec);
+#else
+        return new TimeMsg((uint)totalSec, (uint)nanosec);
+#endif
     }
 
     private void OnDestroy()
