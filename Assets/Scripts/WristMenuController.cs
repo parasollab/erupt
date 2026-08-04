@@ -163,6 +163,9 @@ public class WristMenuController : MonoBehaviour
         IVisualElementScheduledItem gestureEndCheck = null;
         const float minScale = 0.01f;
         const long gestureEndDebounceMs = 200;
+        // Scale applied per unit of slider travel: full throw from center (100 units) changes
+        // localScale by 100 * scaleSensitivity / 100 on the affected axes.
+        const float scaleSensitivity = 0.5f;
 
         void ResetToCenterDeferred()
         {
@@ -179,7 +182,7 @@ public class WristMenuController : MonoBehaviour
         {
             gestureActive = false;
 
-            float totalDeltaPercent = (slider.value - gestureStartValue) / 100f;
+            float totalDeltaPercent = (slider.value - gestureStartValue) / 100f * scaleSensitivity;
             if (!Mathf.Approximately(totalDeltaPercent, 0f))
             {
                 GameObject selected = selectionManager.SelectedObject;
@@ -251,7 +254,7 @@ public class WristMenuController : MonoBehaviour
             gestureEndCheck = slider.schedule.Execute(FinishGesture);
             gestureEndCheck.ExecuteLater(gestureEndDebounceMs);
 
-            float delta = (evt.newValue - prevValue) / 100f;
+            float delta = (evt.newValue - prevValue) / 100f * scaleSensitivity;
             prevValue = evt.newValue;
             if (Mathf.Approximately(delta, 0f)) return;
 
