@@ -79,7 +79,7 @@ public class WristMenuController : MonoBehaviour
         SetMenuVisibility(false);
     }
     
-    public VisualElement CreateToggleStack(string shape, string label)
+    public VisualElement CreateToggleStack(string shape, string label, bool includeToggle = true)
     {
         // <ui:VisualElement name="toggle-stack" style="flex-direction: column; align-items: stretch;">
         var container = new VisualElement { name = "wristMenuEditScale" + label + "Stack" };
@@ -190,6 +190,10 @@ public class WristMenuController : MonoBehaviour
                     ObjectMetricsLogger.Instance?.LogEvent("edit_operation", publisher.objectId,
                         scale: selected.transform.localScale,
                         details: $"resize:{shape}:{label}:{sign}{totalDeltaPercent:F3}");
+                    // A scale-only change doesn't trip CollisionObjectPublisher's transform
+                    // check, so push the new size to the planning scene explicitly -- otherwise
+                    // MoveIt keeps the old geometry until the object is next moved.
+                    publisher.ForceRepublish();
                 }
                 else
                 {
@@ -208,6 +212,7 @@ public class WristMenuController : MonoBehaviour
                 if (axisLabel == "X") return new Vector3(delta, 0f, 0f);
                 if (axisLabel == "Y") return new Vector3(0f, delta, 0f);
                 if (axisLabel == "Z") return new Vector3(0f, 0f, delta);
+                if (axisLabel == "Uniform") return new Vector3(delta, delta, delta);
                 return Vector3.zero;
             }
             else if (shapeName.Contains("Cylinder"))
@@ -215,6 +220,7 @@ public class WristMenuController : MonoBehaviour
                 // Support your "Height" and "Radius" UI
                 if (axisLabel == "Height") return new Vector3(0f, delta, 0f);
                 if (axisLabel == "Radius") return new Vector3(delta, 0f, delta);
+                if (axisLabel == "Uniform") return new Vector3(delta, delta, delta);
                 // fallback uniform
                 return new Vector3(delta, delta, delta);
             }
@@ -279,7 +285,19 @@ public class WristMenuController : MonoBehaviour
             }
         });
 
-        container.Add(toggle);
+        if (includeToggle)
+        {
+            container.Add(toggle);
+        }
+        else
+        {
+            // A uniform slider has no single axis to lock, so a plain caption stands in for
+            // the axis-lock toggle (per-axis locks still apply in the slider path above).
+            var caption = new Label("Scale " + label + ": ") { name = "wristMenuEditScale" + label + "Label" };
+            caption.style.paddingLeft = 10;
+            caption.style.paddingRight = 10;
+            container.Add(caption);
+        }
         container.Add(slider);
 
         return container;
@@ -502,6 +520,7 @@ public class WristMenuController : MonoBehaviour
             wristMenuEditSliderPanel.Add(CreateToggleStack("Cube", "X"));
             wristMenuEditSliderPanel.Add(CreateToggleStack("Cube", "Y"));
             wristMenuEditSliderPanel.Add(CreateToggleStack("Cube", "Z"));
+            wristMenuEditSliderPanel.Add(CreateToggleStack("Cube", "Uniform", includeToggle: false));
         }
         else if (meshName.Contains("Sphere"))
         {
@@ -513,6 +532,7 @@ public class WristMenuController : MonoBehaviour
             Debug.Log("WristMenuController: Populating edit panel for Cylinder");
             wristMenuEditSliderPanel.Add(CreateToggleStack("Cylinder", "Height"));
             wristMenuEditSliderPanel.Add(CreateToggleStack("Cylinder", "Radius"));
+            wristMenuEditSliderPanel.Add(CreateToggleStack("Cylinder", "Uniform", includeToggle: false));
         }
         else if (meshName.Contains("Mesh"))
         {
