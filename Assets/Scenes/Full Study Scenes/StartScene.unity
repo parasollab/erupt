@@ -154,6 +154,7 @@ MonoBehaviour:
   _confirmDialogPanelSettings: {fileID: 11400000, guid: 38d87c83d2e662dedbd70229f2ccaf12, type: 2}
   _startSceneAutoAdvanceDelay: 0
   _tutorialSceneName: Tutorial
+  _surveySceneName: Survey
   _rosPlanTimeoutSeconds: 30
   _task1:
     interludeSceneName: Task1_Interlude

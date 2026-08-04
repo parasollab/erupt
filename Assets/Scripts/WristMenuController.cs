@@ -27,8 +27,7 @@ public class WristMenuController : MonoBehaviour
     [SerializeField] private PickPlaceTaskRecorder pickPlaceRecorder;
     [SerializeField] private GameObject mtcDashboardPanel;
 
-    [Header("Shape Spawning")]
-    [SerializeField] private float shapeSpawnDistance = 0.75f;
+    private float shapeSpawnDistance = 1.25f;
     
     // UI Elements
     private VisualElement root;
@@ -714,7 +713,7 @@ public class WristMenuController : MonoBehaviour
         // Controls grabbing based on SelectionManager selection state
         shape.AddComponent<SelectableGrabController>();
 
-        shape.transform.localScale = Vector3.one * 0.5f;
+        shape.transform.localScale = Vector3.one * 0.25f;
         shape.tag = "Selectable";
 
         shape.AddComponent<XRGrabTransformerScaleAxisLock>();
