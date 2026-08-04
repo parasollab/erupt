@@ -24,6 +24,8 @@ public class Quest3ControllerRayInteractor : MonoBehaviour
     private RaycastHit currentHit;
     private bool hasCurrentHit;
 
+    public XRNode ControllerNode => controllerNode;
+
     public bool TryGetCurrentHit(out RaycastHit hit)
     {
         hit = currentHit;
@@ -33,8 +35,19 @@ public class Quest3ControllerRayInteractor : MonoBehaviour
     public void Configure(XRNode node, Quest3RobotInteractionController interactionController)
     {
         controllerNode = node;
-        robotInteraction = interactionController;
+        BindRobotInteraction(interactionController);
         RefreshDevice();
+    }
+
+    public void BindRobotInteraction(Quest3RobotInteractionController interactionController)
+    {
+        if (isDraggingHandle && robotInteraction != null && robotInteraction != interactionController)
+        {
+            robotInteraction.EndHandleDrag(this);
+            isDraggingHandle = false;
+        }
+
+        robotInteraction = interactionController;
     }
 
     private void Awake()

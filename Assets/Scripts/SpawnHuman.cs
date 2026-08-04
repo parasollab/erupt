@@ -21,6 +21,15 @@ public class SpawnHuman : MonoBehaviour
 
     IEnumerator Start()
     {
+        // Streaming content scenes deliberately do not contain their own XR Origin. Resolve the
+        // persistent rig before touching it (including while looking up the reset input action).
+        xrOrigin = PersistentXRInfrastructure.ResolveXROrigin(xrOrigin);
+        if (xrOrigin == null)
+        {
+            Debug.LogError("SpawnHuman: no persistent XROrigin is available.");
+            yield break;
+        }
+
         InputActionManager actionManager =
             xrOrigin.GetComponent<InputActionManager>() ?? xrOrigin.GetComponentInChildren<InputActionManager>();
         _resetAction = actionManager != null && actionManager.actionAssets.Count > 0
@@ -37,15 +46,6 @@ public class SpawnHuman : MonoBehaviour
         }
 
         yield return null;
-
-        // Content scenes no longer own an XR Origin after the persistent-bootstrap
-        // migration. Legacy scenes can still provide the serialized fallback.
-        xrOrigin = PersistentXRInfrastructure.ResolveXROrigin(xrOrigin);
-        if (xrOrigin == null)
-        {
-            Debug.LogError("SpawnHuman: no persistent XROrigin is available.");
-            yield break;
-        }
 
         if (!s_TrackingHasSettled)
         {
@@ -73,6 +73,12 @@ public class SpawnHuman : MonoBehaviour
     // facing, camera placed over its position at the participant's current eye height.
     public void MoveToSpawnPoint()
     {
+        if (xrOrigin == null || spawnPoint == null)
+        {
+            Debug.LogError("SpawnHuman: cannot move to spawn because the XR Origin or spawn point is missing.");
+            return;
+        }
+
         xrOrigin.MatchOriginUpCameraForward(spawnPoint.up, spawnPoint.forward);
         Vector3 eyeLevelTarget = spawnPoint.position + Vector3.up * xrOrigin.CameraInOriginSpacePos.y;
         xrOrigin.MoveCameraToWorldLocation(eyeLevelTarget);

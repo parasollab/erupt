@@ -58,6 +58,16 @@ public class WristMenuController : MonoBehaviour
     
     // State
     private bool isMenuVisible = false;
+
+    public void BindSceneDependencies(
+        SelectionManager manager,
+        CollisionObjectsListenerSimple listener,
+        GameObject origin)
+    {
+        selectionManager = manager;
+        collisionObjectsListener = listener;
+        worldOrigin = origin;
+    }
     
     private void OnEnable()
     {

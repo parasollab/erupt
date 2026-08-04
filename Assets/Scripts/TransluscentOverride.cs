@@ -4,6 +4,8 @@ using UnityEngine;
 
 public class TranslucentOverride : MonoBehaviour
 {
+    private const string BuildSafeMaterialResource = "GhostOverlay";
+
     [Header("Overlay Color/Alpha")]
     public Color overlayColor = new Color(0f, 0.6f, 1f, 0.35f); // solid color with translucency
 
@@ -37,12 +39,28 @@ public class TranslucentOverride : MonoBehaviour
             }
             else
             {
-                // Try URP/HDRP/Standard in that order.
-                Shader shader =
-                    Shader.Find("Universal Render Pipeline/Lit") ??
-                    Shader.Find("HDRP/Lit") ??
-                    Shader.Find("Standard");
-                _runtimeMat = new Material(shader);
+                // A serialized material in Resources forces Unity's Android build pipeline to
+                // retain both the shader and its transparent variant. Shader.Find works in the
+                // Editor but can return a stripped shader/variant in a Quest player build.
+                Material buildSafeTemplate = Resources.Load<Material>(BuildSafeMaterialResource);
+                if (buildSafeTemplate != null)
+                {
+                    _runtimeMat = Instantiate(buildSafeTemplate);
+                }
+                else
+                {
+                    Shader shader =
+                        Shader.Find("Universal Render Pipeline/Lit") ??
+                        Shader.Find("HDRP/Lit") ??
+                        Shader.Find("Standard");
+                    if (shader == null)
+                    {
+                        Debug.LogError("TranslucentOverride: no ghost overlay material or compatible shader is available.");
+                        return;
+                    }
+
+                    _runtimeMat = new Material(shader);
+                }
             }
 
             ConfigureAsTransparent(_runtimeMat, overlayColor);
@@ -101,6 +119,7 @@ public class TranslucentOverride : MonoBehaviour
     {
         // URP Lit/Unlit
         mat.SetFloat("_Surface", 1f);                 // Transparent
+        mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
         mat.SetFloat("_AlphaClip", 0f);               // NO cutout
         mat.DisableKeyword("_ALPHATEST_ON");
 
@@ -109,6 +128,8 @@ public class TranslucentOverride : MonoBehaviour
         if (mat.HasProperty("_SrcBlend")) mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
         if (mat.HasProperty("_DstBlend")) mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
         if (mat.HasProperty("_ZWrite"))   mat.SetInt("_ZWrite", 0);
+
+        mat.SetOverrideTag("RenderType", "Transparent");
 
         if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", color);
         if (mat.HasProperty("_BaseColorFactor")) mat.SetColor("_BaseColorFactor", color);

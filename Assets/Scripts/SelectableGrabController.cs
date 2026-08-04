@@ -14,6 +14,7 @@ public class SelectableGrabController : MonoBehaviour
     private XRGrabInteractable grabInteractable;
     private bool isSelected = false;
     private bool isGrabbed = false;
+    private SelectionManager subscribedSelectionManager;
 
     void Start()
     {
@@ -30,8 +31,9 @@ public class SelectableGrabController : MonoBehaviour
         // Subscribe to selection events
         if (SelectionManager.Instance != null)
         {
-            SelectionManager.Instance.OnObjectSelected += OnObjectSelected;
-            SelectionManager.Instance.OnSelectionCleared += OnSelectionCleared;
+            subscribedSelectionManager = SelectionManager.Instance;
+            subscribedSelectionManager.OnObjectSelected += OnObjectSelected;
+            subscribedSelectionManager.OnSelectionCleared += OnSelectionCleared;
         }
 
         // Check if this object is already selected (important for newly created objects)
@@ -62,10 +64,11 @@ public class SelectableGrabController : MonoBehaviour
     void OnDestroy()
     {
         // Unsubscribe from events to prevent memory leaks
-        if (SelectionManager.Instance != null)
+        if (subscribedSelectionManager != null)
         {
-            SelectionManager.Instance.OnObjectSelected -= OnObjectSelected;
-            SelectionManager.Instance.OnSelectionCleared -= OnSelectionCleared;
+            subscribedSelectionManager.OnObjectSelected -= OnObjectSelected;
+            subscribedSelectionManager.OnSelectionCleared -= OnSelectionCleared;
+            subscribedSelectionManager = null;
         }
         if (grabInteractable != null)
         {
