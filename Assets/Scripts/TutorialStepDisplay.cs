@@ -27,6 +27,9 @@ public class TutorialStepDisplay : MonoBehaviour
             "Objects",
             "Point your right controller at the cube and pull the trigger to select it. Then squeeze the grip button — the button under your middle finger, on the side of the controller — on either controller to grab it. Move the controller to move the cube, and release the grip to let go.\n\nPress 'B' on your right controller to advance to the next step, then point at the Confirm button on the panel that appears and pull the trigger."),
         new Step(
+            "Snap to Surface",
+            "Grab the cube and lift it into the air, then release it — it stays where you let go. Point at the cube and pull the trigger to select it, then open your wrist menu and press Snap to Surface. The cube drops straight down onto the surface below it and sits flat.\n\nPress 'B' on your right controller to advance to the next step, then point at the Confirm button on the panel that appears and pull the trigger."),
+        new Step(
             "Wrist Menu (again)",
             "Press the small Menu button on your left controller to open your wrist menu again if it isn't already open. Choose Add Shape, then Cylinder, to spawn a practice cylinder in front of you. Point the right controller at the cylinder and pull the trigger to select it. Press Edit Shape on the wrist menu and edit the scale of each dimension.\n\nPress 'B' on your right controller to advance to the next step, then point at the Confirm button on the panel that appears and pull the trigger."),
         new Step(
