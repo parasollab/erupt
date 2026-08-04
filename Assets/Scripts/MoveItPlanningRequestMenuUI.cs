@@ -46,6 +46,10 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     [SerializeField] private bool allowStartGoalEditing = true;
     [Tooltip("Allow the Plan button. Off in Task3 scenes, where planning is not part of the task.")]
     [SerializeField] private bool allowPlanning = true;
+    [Tooltip("Allow the Execute Trajectory button. Off in all study task scenes -- participants only plan, never drive the real robot.")]
+    [SerializeField] private bool allowExecution = true;
+    [Tooltip("Allow the Mirror Joint States button. Off in all study task scenes. Executing a trajectory still auto-starts mirroring regardless of this flag.")]
+    [SerializeField] private bool allowMirroring = true;
 
     [Header("ROS 2 Topics")]
     [SerializeField] private string motionPlanServiceName = "/plan_kinematic_path";
@@ -224,6 +228,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         stopReplayButton.SetEnabled(false);
         executeTrajectoryButton.SetEnabled(false);
         planningRequestButton.SetEnabled(allowPlanning);
+        mirrorButton.SetEnabled(allowMirroring);
 
         // Update button states
         UpdateButtonStates();
@@ -253,7 +258,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
             }
         };
 
-        mirrorButton.clicked += ToggleMirroring;
+        mirrorButton.clicked += OnMirrorButtonClicked;
         executeTrajectoryButton.clicked += ExectuteTrajectory;
     }
 
@@ -464,6 +469,15 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
                 : unityNames[i];
         }
         return remapped;
+    }
+
+    // Button-click wrapper: the restriction only guards the participant-facing button;
+    // ExectuteTrajectory still calls ToggleMirroring directly so execution can mirror.
+    private void OnMirrorButtonClicked()
+    {
+        if (!allowMirroring)
+            return;
+        ToggleMirroring();
     }
 
     private void ToggleMirroring()
@@ -786,7 +800,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
                 // You can execute the trajectory here or store it for later execution
                 PreviewTrajectory(lastPlannedTrajectory);
-                executeTrajectoryButton.SetEnabled(true);
+                executeTrajectoryButton.SetEnabled(allowExecution);
             }
         }
         else
@@ -841,6 +855,9 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
     private void ExectuteTrajectory()
     {
+        if (!allowExecution)
+            return;
+
         if (!isConnected)
         {
             Debug.LogWarning("MoveItPlanningRequestMenuUI: ROS 2 connection not available.");
