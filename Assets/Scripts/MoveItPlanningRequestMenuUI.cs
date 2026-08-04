@@ -97,6 +97,11 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     private bool hasGoalState = false;
     private JointTrajectoryMsg lastPlannedTrajectory;
     public JointTrajectoryMsg LastPlannedTrajectory => lastPlannedTrajectory != null ? BuildLocalTrajectory(lastPlannedTrajectory) : null;
+    // Read by StudyController's advance gate: true once any plan has succeeded in this scene.
+    // Unlike lastPlannedTrajectory it is never cleared by a later failure -- the component is
+    // scene-local, so a scene load is the per-scene reset.
+    private bool hasPlannedSuccessfully;
+    public bool HasPlannedSuccessfully => hasPlannedSuccessfully;
 
     // Planner querying
     private bool isQueryingPlanners = false;
@@ -763,6 +768,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         {
             Debug.Log($"MoveItPlanningRequestMenuUI: Planning successful! Planning time: {motionPlanResponse.planning_time}s");
             ObjectMetricsLogger.Instance?.LogEvent("planning_request_result", PlanningRequestObjectId, details: "success");
+            hasPlannedSuccessfully = true;
 
             // Handle the planned trajectory
             if (motionPlanResponse.trajectory?.joint_trajectory != null)

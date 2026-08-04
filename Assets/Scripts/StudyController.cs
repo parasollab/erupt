@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
@@ -43,6 +44,8 @@ public class StudyController : MonoBehaviour
     // template's 0.2 root scale, this comes out to a 0.68 m x 0.36 m panel in the world.
     private const float kConfirmPanelWidthPx = 340f;
     private const float kConfirmPanelHeightPx = 180f;
+    // Taller variant for the "Cannot Advance Yet" notice, whose two-bullet messages need room.
+    private const float kBlockedPanelHeightPx = 220f;
     // How far in front of (and below) the participant's eyes the dialog spawns. If scene
     // geometry (workbench, counter, robot) is closer than the preferred distance, the dialog
     // is pulled in front of it, but never nearer than the minimum.
@@ -232,6 +235,12 @@ public class StudyController : MonoBehaviour
             return;
         }
 
+        if (TryGetAdvanceBlockReason(out string blockedMessage, out string blockedDetails))
+        {
+            ShowAdvanceBlockedDialog(blockedMessage, blockedDetails);
+            return;
+        }
+
         RequestAdvanceConfirmation(PerformAdvance);
     }
 
@@ -297,36 +306,14 @@ public class StudyController : MonoBehaviour
             return;
         }
 
-        // Deliberately not DontDestroyOnLoad: any scene change destroys the dialog, which is
-        // the correct outcome if something else (e.g. /study/go_back) moves the study along.
-        _activeConfirmDialog = Instantiate(_confirmDialogTemplate);
-        UIDocument document = _activeConfirmDialog.GetComponentInChildren<UIDocument>(true);
-        if (document == null)
+        AdvanceConfirmDialogController dialog = CreateAdvanceDialog(kConfirmPanelWidthPx, kConfirmPanelHeightPx);
+        if (dialog == null)
         {
-            Debug.LogError("StudyController: confirmation dialog template has no UIDocument; advancing without confirmation.");
-            CloseConfirmDialog();
+            // Fail open: a broken template must not block the study.
             onConfirm();
             return;
         }
 
-        document.visualTreeAsset = _confirmDialogUxml;
-        if (_confirmDialogPanelSettings != null)
-        {
-            document.panelSettings = _confirmDialogPanelSettings;
-        }
-
-        // Shrink the template's 300x400 canvas to fit the dialog content (no dead space), and
-        // re-center the panel on the root: the template offsets the panel quad up and to the
-        // side to float above its grab handle, and its pivot is the panel's top-left corner --
-        // so centering means offsetting by half the size in local units (1 unit = 100 px).
-        document.worldSpaceSize = new Vector2(kConfirmPanelWidthPx, kConfirmPanelHeightPx);
-        document.transform.localPosition = new Vector3(
-            -kConfirmPanelWidthPx / 200f, kConfirmPanelHeightPx / 200f, 0f);
-
-        DisableGrabHandle(_activeConfirmDialog);
-        PositionDialogInFrontOfCamera(_activeConfirmDialog.transform);
-
-        AdvanceConfirmDialogController dialog = document.gameObject.AddComponent<AdvanceConfirmDialogController>();
         dialog.Confirmed += () =>
         {
             ObjectMetricsLogger.Instance?.LogEvent("advance_confirmed", "study_advance");
@@ -342,6 +329,72 @@ public class StudyController : MonoBehaviour
         ObjectMetricsLogger.Instance?.LogEvent("advance_confirm_shown", "study_advance");
     }
 
+    // Instantiates and configures the world-space dialog template at the given canvas size;
+    // returns its controller, or null (dialog cleaned up) if the template is unusable.
+    private AdvanceConfirmDialogController CreateAdvanceDialog(float widthPx, float heightPx)
+    {
+        // Deliberately not DontDestroyOnLoad: any scene change destroys the dialog, which is
+        // the correct outcome if something else (e.g. /study/go_back) moves the study along.
+        _activeConfirmDialog = Instantiate(_confirmDialogTemplate);
+        UIDocument document = _activeConfirmDialog.GetComponentInChildren<UIDocument>(true);
+        if (document == null)
+        {
+            Debug.LogError("StudyController: confirmation dialog template has no UIDocument.");
+            CloseConfirmDialog();
+            return null;
+        }
+
+        document.visualTreeAsset = _confirmDialogUxml;
+        if (_confirmDialogPanelSettings != null)
+        {
+            document.panelSettings = _confirmDialogPanelSettings;
+        }
+
+        // Shrink the template's 300x400 canvas to fit the dialog content (no dead space), and
+        // re-center the panel on the root: the template offsets the panel quad up and to the
+        // side to float above its grab handle, and its pivot is the panel's top-left corner --
+        // so centering means offsetting by half the size in local units (1 unit = 100 px).
+        document.worldSpaceSize = new Vector2(widthPx, heightPx);
+        document.transform.localPosition = new Vector3(-widthPx / 200f, heightPx / 200f, 0f);
+
+        DisableGrabHandle(_activeConfirmDialog);
+        PositionDialogInFrontOfCamera(_activeConfirmDialog.transform);
+
+        return document.gameObject.AddComponent<AdvanceConfirmDialogController>();
+    }
+
+    // Shows a dismissable "Cannot Advance Yet" notice listing what the participant still has
+    // to do in this scene. Always blocks: even when the dialog can't be built, the advance
+    // does not proceed.
+    private void ShowAdvanceBlockedDialog(string message, string logDetails)
+    {
+        if (_activeConfirmDialog != null)
+        {
+            // A dialog is already up - repeat presses are ignored (and not re-logged).
+            return;
+        }
+
+        ObjectMetricsLogger.Instance?.LogEvent("advance_blocked", "study_advance", details: logDetails);
+
+        if (_confirmDialogTemplate == null || _confirmDialogUxml == null)
+        {
+            Debug.LogWarning($"StudyController: advance blocked ({logDetails}) but the dialog is not configured: {message}");
+            return;
+        }
+
+        AdvanceConfirmDialogController dialog = CreateAdvanceDialog(kConfirmPanelWidthPx, kBlockedPanelHeightPx);
+        if (dialog == null)
+        {
+            Debug.LogWarning($"StudyController: advance blocked ({logDetails}): {message}");
+            return;
+        }
+
+        dialog.SetBlockedMode("Cannot Advance Yet", message);
+        // Both events dismiss: OK button (Cancelled) in the headset, Enter/Esc in the editor.
+        dialog.Confirmed += CloseConfirmDialog;
+        dialog.Cancelled += CloseConfirmDialog;
+    }
+
     private void CloseConfirmDialog()
     {
         if (_activeConfirmDialog != null)
@@ -349,6 +402,122 @@ public class StudyController : MonoBehaviour
             Destroy(_activeConfirmDialog);
             _activeConfirmDialog = null;
         }
+    }
+
+    // Wrist-menu shapes get ids like "unity_cube_638...". Scene-baked publishers
+    // ("unity_Kettle_Prefab") and the indicator sphere ("unity_indicator_sphere_...") don't
+    // match, so this counts exactly the participant-created objects. The same task gates
+    // exist in the RViz panel (study_rviz_panel) -- keep the two in sync.
+    private static readonly Regex kUserShapeIdPattern =
+        new Regex(@"^unity_(cube|sphere|cylinder|capsule|plane|mesh)_\d+$", RegexOptions.Compiled);
+
+    // Blocks leaving a task scene until that task's work is done in the current scene:
+    // Task1 = a user-created object exists; Task2 = that plus a successful plan; Task3 = the
+    // indicator sphere was spawned; Task4 = a successful plan plus certification. Fails open
+    // (not blocked) on interludes, unknown scenes, or missing scene components -- a
+    // misconfigured scene must never soft-lock the study.
+    private bool TryGetAdvanceBlockReason(out string message, out string logDetails)
+    {
+        message = null;
+        logDetails = null;
+
+        if (_sceneIndexInTask < 0)
+        {
+            // On the interlude - nothing to gate.
+            return false;
+        }
+
+        // The plan shuffles task order, so _taskIndex is the presentation index; the logical
+        // task comes from the scene name.
+        string sceneName = SceneManager.GetActiveScene().name;
+        List<string> missingCodes = new List<string>();
+        List<string> missingItems = new List<string>();
+
+        if (sceneName.StartsWith("Task1_"))
+        {
+            if (CountUserCreatedObjects() == 0)
+            {
+                missingCodes.Add("user_object");
+                missingItems.Add("You must create at least one shape before advancing. Open the wrist menu and use Add Shape to place an object.");
+            }
+        }
+        else if (sceneName.StartsWith("Task2_"))
+        {
+            if (CountUserCreatedObjects() == 0)
+            {
+                missingCodes.Add("user_object");
+                missingItems.Add("Create at least one shape using the wrist menu's Add Shape button.");
+            }
+            if (!HasSuccessfulPlanInScene())
+            {
+                missingCodes.Add("plan_success");
+                missingItems.Add("Request at least one successful motion plan using the planning menu's Send Request button.");
+            }
+        }
+        else if (sceneName.StartsWith("Task3_"))
+        {
+            if (FindFirstObjectByType<IndicatorSphereController>() == null)
+            {
+                missingCodes.Add("indicator_sphere");
+                missingItems.Add("You must place the indicator sphere before advancing. Press 'Get Indicator Sphere' and place the sphere at the collision location.");
+            }
+        }
+        else if (sceneName.StartsWith("Task4_"))
+        {
+            if (!HasSuccessfulPlanInScene())
+            {
+                missingCodes.Add("plan_success");
+                missingItems.Add("Request at least one successful motion plan using the planning menu's Send Request button.");
+            }
+            CertifyPathMenuController certifyMenu =
+                FindFirstObjectByType<CertifyPathMenuController>(FindObjectsInactive.Include);
+            if (certifyMenu == null)
+            {
+                Debug.LogWarning("StudyController: no CertifyPathMenuController in this Task4 scene; skipping the certification check.");
+            }
+            else if (!certifyMenu.HasCertified)
+            {
+                missingCodes.Add("certification");
+                missingItems.Add("Press 'Certify Path Collision-Free' once you believe the path is safe.");
+            }
+        }
+
+        if (missingCodes.Count == 0)
+        {
+            return false;
+        }
+
+        logDetails = "missing=" + string.Join(",", missingCodes);
+        message = missingItems.Count == 1
+            ? missingItems[0]
+            : "Before advancing:\n• " + string.Join("\n• ", missingItems);
+        return true;
+    }
+
+    private static bool HasSuccessfulPlanInScene()
+    {
+        MoveItPlanningRequestMenuUI planningMenu =
+            FindFirstObjectByType<MoveItPlanningRequestMenuUI>(FindObjectsInactive.Include);
+        if (planningMenu == null)
+        {
+            Debug.LogWarning("StudyController: no MoveItPlanningRequestMenuUI in this scene; skipping the plan-success check.");
+            return true;
+        }
+        return planningMenu.HasPlannedSuccessfully;
+    }
+
+    private static int CountUserCreatedObjects()
+    {
+        int count = 0;
+        foreach (CollisionObjectPublisher publisher in
+            FindObjectsByType<CollisionObjectPublisher>(FindObjectsSortMode.None))
+        {
+            if (publisher.objectId != null && kUserShapeIdPattern.IsMatch(publisher.objectId))
+            {
+                count++;
+            }
+        }
+        return count;
     }
 
     // The Grab UI template ships as a grabbable panel; the confirmation dialog should stay

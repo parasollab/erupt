@@ -41,6 +41,23 @@ public class AdvanceConfirmDialogController : MonoBehaviour
         cancelButton.clicked += OnCancelClicked;
     }
 
+    // Reconfigures the dialog as a requirements-not-met notice: no Confirm choice, just a
+    // single OK button that dismisses (StudyController wires both events to close).
+    public void SetBlockedMode(string title, string body)
+    {
+        VisualElement root = uiDocument?.rootVisualElement;
+        Label titleLabel = root?.Q<Label>("advanceConfirmTitleLabel");
+        Label bodyLabel = root?.Q<Label>("advanceConfirmInstructionsLabel");
+        if (titleLabel != null)
+            titleLabel.text = title;
+        if (bodyLabel != null)
+            bodyLabel.text = body;
+        if (confirmButton != null)
+            confirmButton.style.display = DisplayStyle.None;
+        if (cancelButton != null)
+            cancelButton.text = "OK";
+    }
+
     private void OnDisable()
     {
         if (confirmButton != null)
