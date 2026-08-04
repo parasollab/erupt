@@ -19,6 +19,7 @@ public class SelectionManager : MonoBehaviour
     private Material transparentHighlightMaterial;
     private Material originalMaterial;
     private Renderer selectedRenderer;
+    private MoveItPlanningRequestMenuUI planningMenu;
 
     public GameObject SelectedObject { get; private set; }
     
@@ -59,6 +60,17 @@ public class SelectionManager : MonoBehaviour
 
         GameObject hitObj = hit.collider.gameObject;
 
+        // Clicking the planning request menu, a robot link, or the end-effector handle
+        // drops the current selection outright. This must run before IsHittingWristUI:
+        // its name heuristic ("menu"/"ui"/"wrist") also matches those hierarchies
+        // (MoveItPlanningRequestMenu, XRI UIDocument, wrist_*_link) and would keep the
+        // selection alive instead.
+        if (IsDeselectSurface(hitObj))
+        {
+            ClearSelection();
+            return;
+        }
+
         if (IsHittingWristUI(hitObj))
             return;
 
@@ -76,6 +88,31 @@ public class SelectionManager : MonoBehaviour
 
     bool IsInteractingWithUI()
     {
+        return false;
+    }
+
+    bool IsDeselectSurface(GameObject hitObject)
+    {
+        // Any robot link: URDF-spawned links all carry ArticulationBody in their parent chain.
+        if (hitObject.GetComponentInParent<ArticulationBody>() != null)
+            return true;
+
+        // The end-effector handle (and anything else under the Robot IK Manager).
+        if (hitObject.GetComponentInParent<Quest3RobotInteractionController>() != null)
+            return true;
+
+        // The planning request menu: the UI script sits on the prefab's "XRI UIDocument"
+        // child, so its parent is the prefab root -- covering both the panel collider and
+        // the root grab bar.
+        if (planningMenu == null)
+            planningMenu = FindFirstObjectByType<MoveItPlanningRequestMenuUI>(FindObjectsInactive.Include);
+        if (planningMenu != null)
+        {
+            Transform menuRoot = planningMenu.transform.parent != null ? planningMenu.transform.parent : planningMenu.transform;
+            if (hitObject.transform.IsChildOf(menuRoot))
+                return true;
+        }
+
         return false;
     }
 
