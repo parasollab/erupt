@@ -45,7 +45,7 @@ namespace LudicWorlds
 
         void Start()
         {
-            _cameraTransform = Camera.main.transform;
+            _cameraTransform = Camera.main?.transform;
         }
 
         void OnDestroy()
@@ -140,13 +140,17 @@ namespace LudicWorlds
 
             if (_elapsedTime > 0.5f)
             {
-                _fpsText.text = (Mathf.Round(_sumFps / _fpsSamples)).ToString();
+                if (_fpsSamples > 0)
+                {
+                    _fpsText.text = (Mathf.Round(_sumFps / _fpsSamples)).ToString();
+                }
+
                 _elapsedTime = 0f;
                 _sumFps = 0f;
                 _fpsSamples = 0;
             }
 
-            _sumFps += (1.0f / Time.smoothDeltaTime);
+            _sumFps += (1.0f / Mathf.Max(Time.smoothDeltaTime, 0.0001f));
             _fpsSamples++;
 
             if (_billboardEnabled)

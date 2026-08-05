@@ -356,8 +356,8 @@ public class StudyController : MonoBehaviour
     {
         if (_activeConfirmDialog != null)
         {
-            Debug.Log("StudyController: replacing an existing advance dialog.");
-            CloseConfirmDialog();
+            Debug.Log("StudyController: advance confirmation already shown; ignoring repeat advance request.");
+            return;
         }
 
         if (_confirmDialogTemplate == null || _confirmDialogUxml == null)
@@ -434,7 +434,7 @@ public class StudyController : MonoBehaviour
     {
         if (_activeConfirmDialog != null)
         {
-            CloseConfirmDialog();
+            return;
         }
 
         ObjectMetricsLogger.Instance?.LogEvent("advance_blocked", "study_advance", details: logDetails);
