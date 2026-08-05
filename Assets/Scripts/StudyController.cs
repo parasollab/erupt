@@ -48,13 +48,11 @@ public class StudyController : MonoBehaviour
     private const float kConfirmPanelHeightPx = 180f;
     // Taller variant for the "Cannot Advance Yet" notice, whose two-bullet messages need room.
     private const float kBlockedPanelHeightPx = 220f;
-    // How far in front of (and below) the participant's eyes the dialog spawns. If scene
-    // geometry (workbench, counter, robot) is closer than the preferred distance, the dialog
-    // is pulled in front of it, but never nearer than the minimum.
-    private const float kConfirmDialogDistance = 0.9f;
-    private const float kConfirmDialogMinDistance = 0.4f;
-    private const float kConfirmDialogOccludedMinDistance = 0.05f;
-    private const float kConfirmDialogClearance = 0.15f;
+    // The confirmation panel is kept head-locked like a screen-space overlay. It stays close
+    // enough for reliable XR ray input and is scaled down from its former 0.9 m presentation
+    // so its apparent size remains unchanged.
+    private const float kConfirmDialogReferenceDistance = 0.9f;
+    private const float kConfirmDialogOverlayDistance = 0.55f;
     private const float kConfirmDialogDropBelowEyes = 0.1f;
 
     [Header("Start Scene")]
@@ -420,9 +418,12 @@ public class StudyController : MonoBehaviour
         document.transform.localPosition = new Vector3(-widthPx / 200f, heightPx / 200f, 0f);
 
         DisableGrabHandle(_activeConfirmDialog);
-        PositionDialogInFrontOfCamera(_activeConfirmDialog.transform);
-
         AdvanceConfirmDialogController dialog = document.gameObject.AddComponent<AdvanceConfirmDialogController>();
+        dialog.ConfigureHeadLockedOverlay(
+            _activeConfirmDialog.transform,
+            kConfirmDialogOverlayDistance,
+            kConfirmDialogReferenceDistance,
+            kConfirmDialogDropBelowEyes);
         _activeConfirmDialog.SetActive(true);
         return dialog;
     }
@@ -462,6 +463,7 @@ public class StudyController : MonoBehaviour
     {
         if (_activeConfirmDialog != null)
         {
+            _activeConfirmDialog.SetActive(false);
             Destroy(_activeConfirmDialog);
             _activeConfirmDialog = null;
         }
@@ -584,9 +586,8 @@ public class StudyController : MonoBehaviour
         return count;
     }
 
-    // The Grab UI template ships as a grabbable panel; the confirmation dialog should stay
-    // put, so turn off the grab handle (its visual, collider, and interactable) the same way
-    // the certify/indicator menu instances disable theirs.
+    // The source prefab includes a grab bar, but a screen-locked confirmation prompt should
+    // not move independently of the user's view. Keep only its UI interaction surface active.
     private static void DisableGrabHandle(GameObject dialog)
     {
         foreach (SkinnedMeshRenderer handleVisual in dialog.GetComponentsInChildren<SkinnedMeshRenderer>(true))
@@ -602,40 +603,6 @@ public class StudyController : MonoBehaviour
             }
             grab.enabled = false;
         }
-    }
-
-    // Same facing convention as Billboard.cs: panel forward aligned with the camera's
-    // (horizontal) forward, placed just below eye height within arm's-reach ray distance.
-    private static void PositionDialogInFrontOfCamera(Transform dialog)
-    {
-        Camera cam = Camera.main;
-        if (cam == null)
-        {
-            return;
-        }
-        Vector3 forward = cam.transform.forward;
-        forward.y = 0f;
-        forward = forward.sqrMagnitude > 0.0001f ? forward.normalized : Vector3.forward;
-
-        // Task scenes put the participant right up against a workbench/counter with the robot
-        // on it; a fixed-distance panel would end up inside that geometry and be depth-culled.
-        // Trigger colliders are ignored so world-space UI panels (all triggers) can't block it.
-        // When geometry is closer than the comfortable minimum, prefer a very near dialog over
-        // placing it behind the obstacle.
-        float distance = kConfirmDialogDistance;
-        if (Physics.Raycast(
-                cam.transform.position, forward, out RaycastHit hit, kConfirmDialogDistance,
-                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
-        {
-            distance = hit.distance > kConfirmDialogMinDistance + kConfirmDialogClearance
-                ? Mathf.Max(hit.distance - kConfirmDialogClearance, kConfirmDialogMinDistance)
-                : Mathf.Max(hit.distance - kConfirmDialogClearance, kConfirmDialogOccludedMinDistance);
-        }
-
-        dialog.position = cam.transform.position
-            + forward * distance
-            + Vector3.down * kConfirmDialogDropBelowEyes;
-        dialog.rotation = Quaternion.LookRotation(forward, Vector3.up);
     }
 
     // Called by the survey scene once the participant has stepped through every question,
