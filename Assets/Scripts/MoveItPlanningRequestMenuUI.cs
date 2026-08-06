@@ -1,5 +1,7 @@
 using UnityEngine;
 using UnityEngine.UIElements;
+using UnityEngine.XR.Interaction.Toolkit;
+using UnityEngine.XR.Interaction.Toolkit.Interactables;
 using Unity.Robotics.ROSTCPConnector;
 using RosMessageTypes.Moveit;
 using RosMessageTypes.Geometry;
@@ -137,6 +139,10 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         new Tuple<float, float>(-351f, 351f)   // wrist_3_joint
     };
 
+    // Grab interactable on the prefab root (the capsule move handle), cached for
+    // selection-clearing on grab.
+    private XRGrabInteractable moveGrabInteractable;
+
     private void Awake()
     {
         if (ikController == null)
@@ -154,6 +160,14 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
     private void OnEnable()
     {
+        // Grabbing the menu's move handle (the capsule on the prefab root) drops the
+        // current shape selection, matching the trigger-click behavior in
+        // SelectionManager.IsDeselectSurface.
+        if (moveGrabInteractable == null)
+            moveGrabInteractable = GetComponentInParent<XRGrabInteractable>(true);
+        if (moveGrabInteractable != null)
+            moveGrabInteractable.selectEntered.AddListener(OnMenuGrabbed);
+
         if (uiDocument == null)
             uiDocument = GetComponent<UIDocument>();
 
@@ -970,6 +984,13 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
     private void OnDisable()
     {
+        if (moveGrabInteractable != null)
+            moveGrabInteractable.selectEntered.RemoveListener(OnMenuGrabbed);
+    }
+
+    private void OnMenuGrabbed(SelectEnterEventArgs args)
+    {
+        SelectionManager.Instance?.ClearSelection();
     }
 
     private void OnDestroy()

@@ -27,8 +27,9 @@ public class WristMenuController : MonoBehaviour
     [SerializeField] private PickPlaceTaskRecorder pickPlaceRecorder;
     [SerializeField] private GameObject mtcDashboardPanel;
 
-    [Header("Shape Spawning")]
-    [SerializeField] private float shapeSpawnDistance = 0.75f;
+    private float shapeSpawnDistance = 1.25f;
+    // Alpha applied to shapes spawned from the wrist menu (1 = opaque, 0 = invisible)
+    private float spawnedShapeAlpha = 0.75f;
     
     // UI Elements
     private VisualElement root;
@@ -173,6 +174,9 @@ public class WristMenuController : MonoBehaviour
         IVisualElementScheduledItem gestureEndCheck = null;
         const float minScale = 0.01f;
         const long gestureEndDebounceMs = 200;
+        // Scale applied per unit of slider travel: full throw from center (100 units) changes
+        // localScale by 100 * scaleSensitivity / 100 on the affected axes.
+        const float scaleSensitivity = 0.5f;
 
         void ResetToCenterDeferred()
         {
@@ -189,7 +193,7 @@ public class WristMenuController : MonoBehaviour
         {
             gestureActive = false;
 
-            float totalDeltaPercent = (slider.value - gestureStartValue) / 100f;
+            float totalDeltaPercent = (slider.value - gestureStartValue) / 100f * scaleSensitivity;
             if (!Mathf.Approximately(totalDeltaPercent, 0f))
             {
                 GameObject selected = selectionManager.SelectedObject;
@@ -261,7 +265,7 @@ public class WristMenuController : MonoBehaviour
             gestureEndCheck = slider.schedule.Execute(FinishGesture);
             gestureEndCheck.ExecuteLater(gestureEndDebounceMs);
 
-            float delta = (evt.newValue - prevValue) / 100f;
+            float delta = (evt.newValue - prevValue) / 100f * scaleSensitivity;
             prevValue = evt.newValue;
             if (Mathf.Approximately(delta, 0f)) return;
 
@@ -689,6 +693,24 @@ public class WristMenuController : MonoBehaviour
         ShowOptionsPanel(); // Return to main menu after adding shape
     }
     
+    // Converts a URP/Lit material instance to alpha-blended transparency at the given
+    // alpha. Mirrors what the URP shader GUI does when Surface Type is set to Transparent.
+    public static void MakeMaterialTransparent(Material mat, float alpha)
+    {
+        mat.SetFloat("_Surface", 1f); // 1 = Transparent
+        mat.SetFloat("_Blend", 0f);   // 0 = Alpha blend
+        mat.SetOverrideTag("RenderType", "Transparent");
+        mat.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+        mat.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+        mat.SetFloat("_ZWrite", 0f);
+        mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+        mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+
+        Color c = mat.color;
+        c.a = alpha;
+        mat.color = c;
+    }
+
     // Shape Creation Methods
     private void AddPrimitiveShape(PrimitiveType primitiveType)
     {
@@ -721,7 +743,7 @@ public class WristMenuController : MonoBehaviour
         // Controls grabbing based on SelectionManager selection state
         shape.AddComponent<SelectableGrabController>();
 
-        shape.transform.localScale = Vector3.one * 0.5f;
+        shape.transform.localScale = Vector3.one * 0.25f;
         shape.tag = "Selectable";
 
         shape.AddComponent<XRGrabTransformerScaleAxisLock>();
@@ -746,7 +768,13 @@ public class WristMenuController : MonoBehaviour
 
         var meshRenderer = shape.GetComponent<MeshRenderer>();
         if (meshRenderer != null && litMaterial != null)
+        {
+            // .material instantiates a per-renderer copy, so making it transparent here
+            // leaves the shared litMaterial asset (also used by CollisionObjectsListenerSimple
+            // for RViz-synced objects) opaque.
             meshRenderer.material = litMaterial;
+            MakeMaterialTransparent(meshRenderer.material, spawnedShapeAlpha);
+        }
 
         Collider collider = shape.GetComponent<Collider>();
         if (collider != null)

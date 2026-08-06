@@ -14,9 +14,13 @@ public class SelectionManager : MonoBehaviour
 
     [Header("Highlighting")]
     public Material highlightMaterial;
+    // Alpha applied to the selection highlight (1 = opaque, 0 = invisible)
+    private float highlightAlpha = 0.75f;
+    private Material transparentHighlightMaterial;
     private Material originalMaterial;
     private Renderer selectedRenderer;
     private bool selectActionSubscribed;
+    private MoveItPlanningRequestMenuUI planningMenu;
 
     public GameObject SelectedObject { get; private set; }
     
@@ -101,6 +105,17 @@ public class SelectionManager : MonoBehaviour
 
         GameObject hitObj = hit.collider.gameObject;
 
+        // Clicking the planning request menu, a robot link, or the end-effector handle
+        // drops the current selection outright. This must run before IsHittingWristUI:
+        // its name heuristic ("menu"/"ui"/"wrist") also matches those hierarchies
+        // (MoveItPlanningRequestMenu, XRI UIDocument, wrist_*_link) and would keep the
+        // selection alive instead.
+        if (IsDeselectSurface(hitObj))
+        {
+            ClearSelection();
+            return;
+        }
+
         if (IsHittingWristUI(hitObj))
             return;
 
@@ -132,6 +147,31 @@ public class SelectionManager : MonoBehaviour
 
     bool IsInteractingWithUI()
     {
+        return false;
+    }
+
+    bool IsDeselectSurface(GameObject hitObject)
+    {
+        // Any robot link: URDF-spawned links all carry ArticulationBody in their parent chain.
+        if (hitObject.GetComponentInParent<ArticulationBody>() != null)
+            return true;
+
+        // The end-effector handle (and anything else under the Robot IK Manager).
+        if (hitObject.GetComponentInParent<Quest3RobotInteractionController>() != null)
+            return true;
+
+        // The planning request menu: the UI script sits on the prefab's "XRI UIDocument"
+        // child, so its parent is the prefab root -- covering both the panel collider and
+        // the root grab bar.
+        if (planningMenu == null)
+            planningMenu = FindFirstObjectByType<MoveItPlanningRequestMenuUI>(FindObjectsInactive.Include);
+        if (planningMenu != null)
+        {
+            Transform menuRoot = planningMenu.transform.parent != null ? planningMenu.transform.parent : planningMenu.transform;
+            if (hitObject.transform.IsChildOf(menuRoot))
+                return true;
+        }
+
         return false;
     }
 
@@ -186,7 +226,15 @@ public class SelectionManager : MonoBehaviour
             // selected immediately after spawning. Keep that appearance instead of replacing it
             // with the opaque general-purpose selection highlight.
             if (!IsWristMenuCollisionObject(SelectedObject))
-                selectedRenderer.material = highlightMaterial;
+                // One shared transparent copy of the highlight material, built lazily so the
+            // Teal asset itself stays opaque for its other users and repeated selections
+            // don't each instantiate a new material.
+            if (transparentHighlightMaterial == null && highlightMaterial != null)
+            {
+                transparentHighlightMaterial = new Material(highlightMaterial);
+                WristMenuController.MakeMaterialTransparent(transparentHighlightMaterial, highlightAlpha);
+            }
+            selectedRenderer.material = transparentHighlightMaterial != null ? transparentHighlightMaterial : highlightMaterial;
         }
         
         // Notify listeners that an object was selected

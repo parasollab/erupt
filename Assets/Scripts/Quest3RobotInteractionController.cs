@@ -120,6 +120,9 @@ public class Quest3RobotInteractionController : MonoBehaviour
         ikController.BeginInteraction();
         SetHandleActive(true);
         ClearSelection();
+        // Grabbing the EE handle also drops the current shape selection, matching the
+        // trigger-click behavior in SelectionManager.IsDeselectSurface.
+        SelectionManager.Instance?.ClearSelection();
         ObjectMetricsLogger.Instance?.LogEvent("grab_start", EndEffectorHandleObjectId);
         return true;
     }

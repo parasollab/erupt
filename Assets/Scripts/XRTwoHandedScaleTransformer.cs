@@ -32,6 +32,34 @@ namespace UnityEngine.XR.Interaction.Toolkit.Transformers
         private bool _orientationLocked;
         private Quaternion _lockedOrientation;
 
+        public override void OnGrabCountChanged(
+            UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable grab,
+            Pose targetPose,
+            Vector3 localScale)
+        {
+            base.OnGrabCountChanged(grab, targetPose, localScale);
+
+            if (grab.interactorsSelecting.Count < 2)
+            {
+                // Multiple-grab transformers are not processed after the grab returns to one
+                // hand, so reset here instead of relying on Process to observe that transition.
+                _initialized = false;
+                _orientationLocked = false;
+                return;
+            }
+
+            // Treat the instant the second controller joins as the start of a new gesture.
+            // The object's current size is the fixed baseline, regardless of how close the
+            // controllers happen to be when the user begins scaling again.
+            _lockedOrientation = targetPose.rotation;
+            _orientationLocked = true;
+
+            if (TryGetControllerDistance(grab, out float controllerDistance))
+                CaptureScaleBaseline(controllerDistance, localScale);
+            else
+                _initialized = false;
+        }
+
         public override void Process(
             UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable grab,
             XRInteractionUpdateOrder.UpdatePhase phase,
@@ -63,19 +91,12 @@ namespace UnityEngine.XR.Interaction.Toolkit.Transformers
             // Use controller positions rather than the minimum distance between their rays.
             // Rays normally intersect at the object, making their closest distance approach
             // zero and change discontinuously as they cross, which caused freezes and jumps.
-            Transform tfA = interactors[0].transform;
-            Transform tfB = interactors[1].transform;
-            float currentDistance = Vector3.Distance(tfA.position, tfB.position);
-
-            if (currentDistance < MinUsableControllerDistance)
+            if (!TryGetControllerDistance(grab, out float currentDistance))
                 return;
 
             if (!_initialized)
             {
-                _startControllerDistance = currentDistance;
-                _filteredControllerDistance = currentDistance;
-                _scaleAtTwoHandStart = localScale;
-                _initialized = true;
+                CaptureScaleBaseline(currentDistance, localScale);
                 return;
             }
 
@@ -98,6 +119,31 @@ namespace UnityEngine.XR.Interaction.Toolkit.Transformers
             scaleRatio = Mathf.Max(scaleRatio, minimumRatio);
 
             localScale = _scaleAtTwoHandStart * scaleRatio;
+        }
+
+        private static bool TryGetControllerDistance(
+            UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable grab,
+            out float distance)
+        {
+            var interactors = grab.interactorsSelecting;
+            if (interactors.Count < 2)
+            {
+                distance = 0f;
+                return false;
+            }
+
+            distance = Vector3.Distance(
+                interactors[0].transform.position,
+                interactors[1].transform.position);
+            return distance >= MinUsableControllerDistance;
+        }
+
+        private void CaptureScaleBaseline(float controllerDistance, Vector3 localScale)
+        {
+            _startControllerDistance = controllerDistance;
+            _filteredControllerDistance = controllerDistance;
+            _scaleAtTwoHandStart = localScale;
+            _initialized = true;
         }
 
         private float MinimumRatioForAxis(float startingAxisScale)
