@@ -41,6 +41,7 @@ public class StudyController : MonoBehaviour
     [SerializeField] private PanelSettings _confirmDialogPanelSettings;
 
     private GameObject _activeConfirmDialog;
+    private PanelSettings _confirmDialogRuntimePanelSettings;
 
     // Panel canvas size in UI Toolkit pixels. At WristUISettings' 100 px/unit and the Grab UI
     // template's 0.2 root scale, this comes out to a 0.68 m x 0.36 m panel in the world.
@@ -48,12 +49,15 @@ public class StudyController : MonoBehaviour
     private const float kConfirmPanelHeightPx = 180f;
     // Taller variant for the "Cannot Advance Yet" notice, whose two-bullet messages need room.
     private const float kBlockedPanelHeightPx = 220f;
-    // The confirmation panel is kept head-locked like a screen-space overlay. It stays close
-    // enough for reliable XR ray input and is scaled down from its former 0.9 m presentation
-    // so its apparent size remains unchanged.
-    private const float kConfirmDialogReferenceDistance = 0.9f;
-    private const float kConfirmDialogOverlayDistance = 0.55f;
-    private const float kConfirmDialogDropBelowEyes = 0.1f;
+    // Candidate placement settings for the world-space confirmation panel. Positions are
+    // tested in preference order, beginning directly in front of and slightly below eye level.
+    private const float kConfirmDialogObstacleClearance = 0.08f;
+    private const float kConfirmDialogPanelHalfDepth = 0.04f;
+    private const float kConfirmDialogSightlineEndTolerance = 0.04f;
+    private const float kConfirmDialogSortingOrder = 32767f;
+    private static readonly float[] kConfirmDialogDistances = { 0.9f, 0.7f, 0.5f, 1.1f, 1.3f };
+    private static readonly float[] kConfirmDialogVerticalOffsets = { -0.1f, 0.15f, 0.4f };
+    private static readonly float[] kConfirmDialogYawOffsets = { 0f, -25f, 25f, -50f, 50f, -75f, 75f };
 
     [Header("Start Scene")]
     [Tooltip("Optional pause before auto-advancing from StartScene into the tutorial (or the first task's interlude, if no tutorial scene is set).")]
@@ -354,7 +358,7 @@ public class StudyController : MonoBehaviour
     {
         if (_activeConfirmDialog != null)
         {
-            Debug.Log("StudyController: advance confirmation already shown; ignoring repeat advance request.");
+            RepositionActiveConfirmDialog();
             return;
         }
 
@@ -405,10 +409,23 @@ public class StudyController : MonoBehaviour
         }
 
         document.visualTreeAsset = _confirmDialogUxml;
-        if (_confirmDialogPanelSettings != null)
+        PanelSettings sourcePanelSettings = _confirmDialogPanelSettings != null
+            ? _confirmDialogPanelSettings
+            : document.panelSettings;
+        if (_confirmDialogRuntimePanelSettings == null && sourcePanelSettings != null)
         {
-            document.panelSettings = _confirmDialogPanelSettings;
+            // Use a private settings instance so the confirmation can render last without
+            // changing the wrist menu and every other document that shares the source asset.
+            // Keep it for later dialogs so subsequent openings do not repeat this setup.
+            _confirmDialogRuntimePanelSettings = Instantiate(sourcePanelSettings);
+            _confirmDialogRuntimePanelSettings.name = "Confirmation Dialog Panel Settings (Runtime)";
+            _confirmDialogRuntimePanelSettings.hideFlags = HideFlags.DontSave;
+            _confirmDialogRuntimePanelSettings.sortingOrder = kConfirmDialogSortingOrder;
+            _confirmDialogRuntimePanelSettings.clearDepthStencil = true;
         }
+        if (_confirmDialogRuntimePanelSettings != null)
+            document.panelSettings = _confirmDialogRuntimePanelSettings;
+        document.sortingOrder = kConfirmDialogSortingOrder;
 
         // Shrink the template's 300x400 canvas to fit the dialog content (no dead space), and
         // re-center the panel on the root: the template offsets the panel quad up and to the
@@ -418,12 +435,14 @@ public class StudyController : MonoBehaviour
         document.transform.localPosition = new Vector3(-widthPx / 200f, heightPx / 200f, 0f);
 
         DisableGrabHandle(_activeConfirmDialog);
+        if (!TryPositionDialogInClearSpace(_activeConfirmDialog.transform, widthPx, heightPx))
+        {
+            Debug.LogError("StudyController: no clear, visible position was found for the confirmation dialog.");
+            CloseConfirmDialog();
+            return null;
+        }
+
         AdvanceConfirmDialogController dialog = document.gameObject.AddComponent<AdvanceConfirmDialogController>();
-        dialog.ConfigureHeadLockedOverlay(
-            _activeConfirmDialog.transform,
-            kConfirmDialogOverlayDistance,
-            kConfirmDialogReferenceDistance,
-            kConfirmDialogDropBelowEyes);
         _activeConfirmDialog.SetActive(true);
         return dialog;
     }
@@ -435,6 +454,7 @@ public class StudyController : MonoBehaviour
     {
         if (_activeConfirmDialog != null)
         {
+            RepositionActiveConfirmDialog();
             return;
         }
 
@@ -467,6 +487,42 @@ public class StudyController : MonoBehaviour
             Destroy(_activeConfirmDialog);
             _activeConfirmDialog = null;
         }
+    }
+
+    // A second advance-button press recenters the existing prompt relative to the user's
+    // current view. Temporarily deactivate it so its own panel collider is not mistaken for
+    // an obstacle by the same collision-safe placement checks used when it first opens.
+    private bool RepositionActiveConfirmDialog()
+    {
+        if (_activeConfirmDialog == null)
+            return false;
+
+        UIDocument document = _activeConfirmDialog.GetComponentInChildren<UIDocument>(true);
+        if (document == null)
+        {
+            Debug.LogWarning("StudyController: cannot reposition the confirmation dialog because it has no UIDocument.");
+            return false;
+        }
+
+        bool wasActive = _activeConfirmDialog.activeSelf;
+        if (wasActive)
+            _activeConfirmDialog.SetActive(false);
+
+        Vector2 panelSize = document.worldSpaceSize;
+        bool repositioned = TryPositionDialogInClearSpace(
+            _activeConfirmDialog.transform,
+            panelSize.x,
+            panelSize.y);
+
+        if (wasActive)
+            _activeConfirmDialog.SetActive(true);
+
+        if (repositioned)
+            Debug.Log("StudyController: confirmation dialog moved to the user's current view.");
+        else
+            Debug.LogWarning("StudyController: confirmation dialog kept its previous position because no clear position was found in the current view.");
+
+        return repositioned;
     }
 
     // Wrist-menu shapes get ids like "unity_cube_638...". Scene-baked publishers
@@ -586,8 +642,8 @@ public class StudyController : MonoBehaviour
         return count;
     }
 
-    // The source prefab includes a grab bar, but a screen-locked confirmation prompt should
-    // not move independently of the user's view. Keep only its UI interaction surface active.
+    // The source prefab includes a grab bar, but this confirmation prompt should stay at the
+    // collision-tested position chosen when it opens. Keep only its UI surface interactive.
     private static void DisableGrabHandle(GameObject dialog)
     {
         foreach (SkinnedMeshRenderer handleVisual in dialog.GetComponentsInChildren<SkinnedMeshRenderer>(true))
@@ -603,6 +659,121 @@ public class StudyController : MonoBehaviour
             }
             grab.enabled = false;
         }
+    }
+
+    // Places the old world-space XR dialog at the first candidate that neither overlaps scene
+    // geometry nor has an obstacle between the user's eyes and the panel's center/corners.
+    // The inactive dialog cannot collide with its own prefab colliders during these checks.
+    private static bool TryPositionDialogInClearSpace(Transform dialog, float widthPx, float heightPx)
+    {
+        Camera camera = Camera.main;
+        if (camera == null)
+        {
+            Camera[] cameras = Camera.allCameras;
+            for (int i = 0; i < cameras.Length; i++)
+            {
+                if (cameras[i] != null && cameras[i].isActiveAndEnabled)
+                {
+                    camera = cameras[i];
+                    break;
+                }
+            }
+        }
+
+        if (camera == null)
+        {
+            Debug.LogWarning("StudyController: cannot position the confirmation dialog because no active camera was found.");
+            return false;
+        }
+
+        Vector3 eyePosition = camera.transform.position;
+        Vector3 forward = camera.transform.forward;
+        forward.y = 0f;
+        forward = forward.sqrMagnitude > 0.0001f ? forward.normalized : Vector3.forward;
+
+        Vector3 scale = dialog.lossyScale;
+        Vector3 panelHalfExtents = new Vector3(
+            widthPx / 200f * Mathf.Abs(scale.x) + kConfirmDialogObstacleClearance,
+            heightPx / 200f * Mathf.Abs(scale.y) + kConfirmDialogObstacleClearance,
+            kConfirmDialogPanelHalfDepth + kConfirmDialogObstacleClearance);
+
+        for (int yawIndex = 0; yawIndex < kConfirmDialogYawOffsets.Length; yawIndex++)
+        {
+            Vector3 candidateDirection =
+                Quaternion.AngleAxis(kConfirmDialogYawOffsets[yawIndex], Vector3.up) * forward;
+            Quaternion candidateRotation = Quaternion.LookRotation(candidateDirection, Vector3.up);
+
+            for (int verticalIndex = 0; verticalIndex < kConfirmDialogVerticalOffsets.Length; verticalIndex++)
+            {
+                for (int distanceIndex = 0; distanceIndex < kConfirmDialogDistances.Length; distanceIndex++)
+                {
+                    Vector3 candidatePosition = eyePosition
+                        + candidateDirection * kConfirmDialogDistances[distanceIndex]
+                        + Vector3.up * kConfirmDialogVerticalOffsets[verticalIndex];
+
+                    if (!IsDialogPlacementClear(
+                            eyePosition,
+                            candidatePosition,
+                            candidateRotation,
+                            panelHalfExtents))
+                    {
+                        continue;
+                    }
+
+                    dialog.SetPositionAndRotation(candidatePosition, candidateRotation);
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsDialogPlacementClear(
+        Vector3 eyePosition,
+        Vector3 panelPosition,
+        Quaternion panelRotation,
+        Vector3 panelHalfExtents)
+    {
+        if (Physics.CheckBox(
+                panelPosition,
+                panelHalfExtents,
+                panelRotation,
+                Physics.DefaultRaycastLayers,
+                QueryTriggerInteraction.Ignore))
+        {
+            return false;
+        }
+
+        Vector3 panelRight = panelRotation * Vector3.right;
+        Vector3 panelUp = panelRotation * Vector3.up;
+        float sightlineHalfWidth = panelHalfExtents.x - kConfirmDialogObstacleClearance;
+        float sightlineHalfHeight = panelHalfExtents.y - kConfirmDialogObstacleClearance;
+        return !IsDialogSightlineBlocked(eyePosition, panelPosition)
+            && !IsDialogSightlineBlocked(
+                eyePosition,
+                panelPosition + panelRight * sightlineHalfWidth + panelUp * sightlineHalfHeight)
+            && !IsDialogSightlineBlocked(
+                eyePosition,
+                panelPosition + panelRight * sightlineHalfWidth - panelUp * sightlineHalfHeight)
+            && !IsDialogSightlineBlocked(
+                eyePosition,
+                panelPosition - panelRight * sightlineHalfWidth + panelUp * sightlineHalfHeight)
+            && !IsDialogSightlineBlocked(
+                eyePosition,
+                panelPosition - panelRight * sightlineHalfWidth - panelUp * sightlineHalfHeight);
+    }
+
+    private static bool IsDialogSightlineBlocked(Vector3 eyePosition, Vector3 target)
+    {
+        Vector3 toTarget = target - eyePosition;
+        float sightlineDistance = toTarget.magnitude - kConfirmDialogSightlineEndTolerance;
+        return sightlineDistance > 0f && Physics.Raycast(
+            eyePosition,
+            toTarget.normalized,
+            sightlineDistance,
+            Physics.DefaultRaycastLayers,
+            QueryTriggerInteraction.Ignore);
     }
 
     // Called by the survey scene once the participant has stepped through every question,
@@ -1055,6 +1226,12 @@ public class StudyController : MonoBehaviour
     private void OnDestroy()
     {
         RestoreBackgroundLoadingPriority();
+
+        if (_confirmDialogRuntimePanelSettings != null)
+        {
+            Destroy(_confirmDialogRuntimePanelSettings);
+            _confirmDialogRuntimePanelSettings = null;
+        }
 
         if (_advanceAction != null)
         {
