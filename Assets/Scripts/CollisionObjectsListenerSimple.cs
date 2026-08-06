@@ -108,7 +108,7 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
 
             // Add XR interaction (will be controlled by SelectableGrabController)
             child.AddComponent<XRGrabInteractable>();
-            child.GetComponent<XRGrabInteractable>().selectMode = InteractableSelectMode.Single;
+            child.GetComponent<XRGrabInteractable>().selectMode = InteractableSelectMode.Multiple;
             // Keep the object where it's grabbed instead of snapping it to the controller
             child.GetComponent<XRGrabInteractable>().useDynamicAttach = true;
             // Don't match the ray hit point's position for the attach anchor — keep it at the

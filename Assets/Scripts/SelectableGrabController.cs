@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
 using UnityEngine.XR.Interaction.Toolkit;
+using UnityEngine.XR.Interaction.Toolkit.Interactors;
 using System.Collections;
 
 /// <summary>
@@ -79,11 +80,25 @@ public class SelectableGrabController : MonoBehaviour
 
     void OnGrabEntered(SelectEnterEventArgs args)
     {
+        bool wasGrabbed = isGrabbed;
         isGrabbed = true;
+
+        // NearFarInteractor initially places its far attach anchor at the collider hit point.
+        // These objects intentionally use their center as the dynamic attach point so they
+        // rotate about their own pivot. Align the interactor anchor to that same center before
+        // the first grab update; otherwise every re-grab moves the center to the front surface
+        // hit and makes the object creep closer to the controller.
+        if (args.interactorObject is NearFarInteractor nearFar &&
+            nearFar.interactionAttachController != null &&
+            nearFar.interactionAttachController.hasOffset)
+        {
+            nearFar.interactionAttachController.MoveTo(transform.position);
+        }
+
         UpdateGrabState();
 
         CollisionObjectPublisher publisher = GetComponent<CollisionObjectPublisher>();
-        if (publisher != null)
+        if (!wasGrabbed && publisher != null)
         {
             ObjectMetricsLogger.Instance?.LogEvent("grab_start", publisher.objectId);
         }
@@ -91,11 +106,13 @@ public class SelectableGrabController : MonoBehaviour
 
     void OnGrabExited(SelectExitEventArgs args)
     {
-        isGrabbed = false;
+        // With multi-select enabled, releasing either controller is not necessarily the end
+        // of the grab. Keep the interactable enabled until the last controller lets go.
+        isGrabbed = grabInteractable != null && grabInteractable.isSelected;
         UpdateGrabState();
 
         CollisionObjectPublisher publisher = GetComponent<CollisionObjectPublisher>();
-        if (publisher != null)
+        if (!isGrabbed && publisher != null)
         {
             // ObjectMetricsLogger makes this relative to the robot base transform itself.
             ObjectMetricsLogger.Instance?.LogEvent("grab_end", publisher.objectId, transform.position, transform.rotation);

@@ -704,11 +704,11 @@ public class WristMenuController : MonoBehaviour
         rb.useGravity = false;
         rb.isKinematic = true;
 
-        // XR interaction — Single mode so only the NearFarInteractor (one hand) holds it.
-        // This keeps the InteractionAttachController's thumbstick push/pull working correctly.
+        // Allow a second controller to join the grab so the multiple-grab scale transformer
+        // can run. One-handed push/pull remains available whenever only one hand is attached.
         shape.AddComponent<XRGrabInteractable>();
         var gi = shape.GetComponent<XRGrabInteractable>();
-        gi.selectMode = InteractableSelectMode.Single;
+        gi.selectMode = InteractableSelectMode.Multiple;
         // Keep the object where it's grabbed instead of snapping it to the controller
         gi.useDynamicAttach = true;
         // Don't match the ray hit point's position for the attach anchor — keep it at the
