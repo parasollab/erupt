@@ -109,11 +109,11 @@ public class TranslucentOverride : MonoBehaviour
     private static void ConfigureAsTransparent(Material mat, Color color)
     {
         string name = mat.shader ? mat.shader.name : "";
-        mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent + 50;
+        mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
 
-        // Keep ghosts translucent but obvious in-headset. A 0.5 alpha can be too subtle on
-        // Quest/URP depending on passthrough brightness, lighting, and transparent sorting.
-        color.a = Mathf.Clamp(color.a, 0.65f, 0.85f);
+        // Use a reasonable default alpha if someone passes 0 or 1
+        if (color.a <= 0f) color.a = 0.35f;
+        if (color.a >= 1f) color.a = 0.5f;
 
         bool isUrp = name.Contains("Universal") && name.Contains("Render") && name.Contains("Pipeline");
 
@@ -130,7 +130,6 @@ public class TranslucentOverride : MonoBehaviour
             if (mat.HasProperty("_SrcBlend")) mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
             if (mat.HasProperty("_DstBlend")) mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
             if (mat.HasProperty("_ZWrite")) mat.SetInt("_ZWrite", 0);
-            if (mat.HasProperty("_Cull")) mat.SetInt("_Cull", (int)UnityEngine.Rendering.CullMode.Off);
 
             mat.SetOverrideTag("RenderType", "Transparent");
         }
@@ -141,7 +140,6 @@ public class TranslucentOverride : MonoBehaviour
             if (mat.HasProperty("_BlendMode")) mat.SetFloat("_BlendMode", 0f); // 0 = Alpha
             if (mat.HasProperty("_AlphaCutoffEnable")) mat.SetFloat("_AlphaCutoffEnable", 0f);
             if (mat.HasProperty("_ZWrite")) mat.SetInt("_ZWrite", 0);
-            if (mat.HasProperty("_CullMode")) mat.SetInt("_CullMode", (int)UnityEngine.Rendering.CullMode.Off);
         }
         else
         {
@@ -153,7 +151,6 @@ public class TranslucentOverride : MonoBehaviour
             mat.DisableKeyword("_ALPHATEST_ON");
             mat.EnableKeyword("_ALPHABLEND_ON");
             mat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
-            if (mat.HasProperty("_Cull")) mat.SetInt("_Cull", (int)UnityEngine.Rendering.CullMode.Off);
         }
 
         ApplyOverlayColor(mat, color);
@@ -167,9 +164,8 @@ public class TranslucentOverride : MonoBehaviour
         if (mat.HasProperty("_Color")) mat.SetColor("_Color", color);
         if (mat.HasProperty("_EmissionColor"))
         {
-            Color emission = new Color(color.r, color.g, color.b, 1f) * 1.5f;
-            mat.SetColor("_EmissionColor", emission);
-            mat.EnableKeyword("_EMISSION");
+            mat.SetColor("_EmissionColor", Color.black);
+            mat.DisableKeyword("_EMISSION");
         }
     }
 

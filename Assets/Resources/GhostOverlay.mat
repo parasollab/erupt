@@ -40,7 +40,7 @@ Material:
     - _DstBlend: 10
     - _DstBlendAlpha: 10
     - _Metallic: 0
-    - _Smoothness: 0.25
+    - _Smoothness: 0.5
     - _SrcBlend: 5
     - _SrcBlendAlpha: 1
     - _Surface: 1
