@@ -4,6 +4,7 @@ using UnityEngine.XR.Interaction.Toolkit;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
 using UnityEngine.XR.Interaction.Toolkit.UI;
 using System.Collections.Generic;
+using System.Text;
 
 
 namespace LudicWorlds
@@ -20,8 +21,15 @@ namespace LudicWorlds
         private float   _sumFps;
 
         private Queue<string> _queuedMessages;
+        private static readonly Queue<string> _lines = new Queue<string>();
+        private static int _lineChars;
+        private float _timeSinceFlush;
 
         private const int MAX_LINES = 500;
+        // Legacy UI.Text stops rendering past 65000 verts (~16k glyphs); stay well under.
+        private const int MAX_CHARS = 12000;
+        private const int MAX_LINE_LENGTH = 1000;
+        private const float FLUSH_INTERVAL = 0.25f;
 
         private bool _billboardEnabled = true;
         private Transform _cameraTransform;
@@ -164,14 +172,48 @@ namespace LudicWorlds
                 }
             }
 
-            if (_debugText != null && _queuedMessages.Count > 0)
+            // Flush at a fixed cadence, not per message: per-frame log spam (e.g. an
+            // exception thrown every Update) would otherwise force a full canvas
+            // rebuild every frame and halve the framerate.
+            _timeSinceFlush += Time.deltaTime;
+            if (_debugText != null && _queuedMessages.Count > 0 && _timeSinceFlush >= FLUSH_INTERVAL)
             {
-                while (_queuedMessages.Count > 0)
-                    _debugText.text += _queuedMessages.Dequeue() + "\n";
-
-                TrimText();
-                ScrollToBottom();
+                _timeSinceFlush = 0f;
+                FlushMessages();
             }
+        }
+
+        private void FlushMessages()
+        {
+            while (_queuedMessages.Count > 0)
+            {
+                string msg = _queuedMessages.Dequeue();
+
+                int repeats = 1;
+                while (_queuedMessages.Count > 0 && _queuedMessages.Peek() == msg)
+                {
+                    _queuedMessages.Dequeue();
+                    repeats++;
+                }
+
+                if (msg.Length > MAX_LINE_LENGTH)
+                    msg = msg.Substring(0, MAX_LINE_LENGTH) + "…";
+                if (repeats > 1)
+                    msg += $"  (x{repeats})";
+
+                _lines.Enqueue(msg);
+                _lineChars += msg.Length + 1;
+            }
+
+            while (_lines.Count > 1 && (_lines.Count > MAX_LINES || _lineChars > MAX_CHARS))
+                _lineChars -= _lines.Dequeue().Length + 1;
+
+            var sb = new StringBuilder(_lineChars);
+            foreach (string line in _lines)
+                sb.Append(line).Append('\n');
+            _debugText.text = sb.ToString();
+
+            ScrollToBottom();
         }
 
         private void ScrollToBottom()
@@ -184,6 +226,8 @@ namespace LudicWorlds
 
         public static void Clear()
         {
+            _lines.Clear();
+            _lineChars = 0;
             if (_debugText is null) return;
             _debugText.text = "";
         }
@@ -216,11 +260,5 @@ namespace LudicWorlds
             _statusText.text = message;
         }
 
-        private static void TrimText()
-        {
-            string[] lines = _debugText.text.Split('\n');
-            if (lines.Length > MAX_LINES)
-                _debugText.text = string.Join("\n", lines, lines.Length - MAX_LINES, MAX_LINES);
-        }
     }
 }
