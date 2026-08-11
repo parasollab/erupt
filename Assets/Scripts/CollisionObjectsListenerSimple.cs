@@ -41,6 +41,14 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
         ros.Subscribe<CollisionObjectMsg>(topic, OnCollisionObject);
     }
 
+    void OnDestroy()
+    {
+        // ROSConnection persists across scene loads; without this, the dead listener keeps
+        // receiving messages and throws when instantiating under its destroyed transform.
+        if (ros != null)
+            ros.Unsubscribe<CollisionObjectMsg>(topic, OnCollisionObject);
+    }
+
     void OnCollisionObject(CollisionObjectMsg co)
     {
         if (string.IsNullOrEmpty(co.id))

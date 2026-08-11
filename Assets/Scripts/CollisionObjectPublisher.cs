@@ -29,6 +29,21 @@ public class CollisionObjectPublisher : MonoBehaviour
     public bool pausePublishing = false;
     public GameObject worldOrigin; // Optional world origin for relative positioning
 
+    // Live publishers per objectId. The streaming study flow loads the next scene additively
+    // and retires the old one afterwards, so the outgoing scene's OnDestroy REMOVEs arrive
+    // AFTER the incoming scene's ADDs for the same ids (scenes share environment prefabs and
+    // their ids). A REMOVE is only published when no other live publisher owns the id.
+    private static readonly System.Collections.Generic.Dictionary<string, int> s_LivePublishersById =
+        new System.Collections.Generic.Dictionary<string, int>();
+    private string liveRegistryId = null;
+
+    // Every id this app has ADDed to the planning scene (with its frame), cleared when a
+    // REMOVE for it is published. OnDestroy REMOVEs sent during scene teardown can be lost
+    // (transition races, reconnects); PublishRemovalsForOrphanedIds re-publishes REMOVEs for
+    // any id with no live publisher, from a running scene where delivery is reliable.
+    private static readonly System.Collections.Generic.Dictionary<string, string> s_AddedFrameById =
+        new System.Collections.Generic.Dictionary<string, string>();
+
     private ROSConnection ros;
     private float lastPublishTime = 0f;
     private Vector3 lastPosition;
@@ -48,6 +63,13 @@ public class CollisionObjectPublisher : MonoBehaviour
             Debug.LogError($"Failed to get ROS connection for object '{gameObject.name}'");
             return;
         }
+
+        // Registered in Start (not Awake) so runtime spawners that assign objectId right
+        // after AddComponent are counted under their final id.
+        liveRegistryId = objectId;
+        int liveCount;
+        s_LivePublishersById.TryGetValue(liveRegistryId, out liveCount);
+        s_LivePublishersById[liveRegistryId] = liveCount + 1;
 
         // Register collision object publisher
         try
@@ -87,9 +109,25 @@ public class CollisionObjectPublisher : MonoBehaviour
         // AnalyzeObject();
     }
 
+    // Tracks connection recovery: the connector clears all queued unsent messages on
+    // disconnect, so an ADD queued around a connection drop is lost and never re-sent
+    // (hasBeenPublished stays true). Re-publish after every reconnect.
+    private bool wasConnectionInError = false;
+
     void Update()
     {
         if (pausePublishing) return;
+
+        if (ros != null)
+        {
+            bool hasError = ros.HasConnectionError;
+            if (wasConnectionInError && !hasError)
+            {
+                hasBeenPublished = false;
+                lastPublishTime = 0f;
+            }
+            wasConnectionInError = hasError;
+        }
 
         if (Time.time - lastPublishTime < 1.0f / publishRateHz)
             return;
@@ -282,10 +320,50 @@ public class CollisionObjectPublisher : MonoBehaviour
                 ros.Publish(topicName, msg, false);
             else
                 ros.Publish(topicName, msg);
+            s_AddedFrameById[objectId] = frameId;
         }
         catch (System.Exception e)
         {
             Debug.LogError($"Failed to publish collision object '{objectId}': {e.Message}");
+        }
+    }
+
+    // Publishes REMOVEs for every id that was ADDed at some point but no longer has a live
+    // publisher. Called by StudyController after a scene transition completes, when teardown
+    // REMOVEs (published from OnDestroy mid-transition) may have been lost.
+    public static void PublishRemovalsForOrphanedIds()
+    {
+        System.Collections.Generic.List<string> orphanedIds = null;
+        foreach (System.Collections.Generic.KeyValuePair<string, string> added in s_AddedFrameById)
+        {
+            if (!s_LivePublishersById.ContainsKey(added.Key))
+            {
+                (orphanedIds ??= new System.Collections.Generic.List<string>()).Add(added.Key);
+            }
+        }
+
+        if (orphanedIds == null)
+            return;
+
+        ROSConnection rosConnection = ROSConnection.GetOrCreateInstance();
+        if (rosConnection == null)
+            return;
+        rosConnection.RegisterPublisher<CollisionObjectMsg>("/collision_object", CollisionObjectQueueSize);
+
+        foreach (string id in orphanedIds)
+        {
+            Debug.Log($"[CollisionObjectPublisher] Removing orphaned collision object '{id}' from the planning scene.");
+            rosConnection.Publish("/collision_object", new CollisionObjectMsg
+            {
+                id = id,
+                header = new HeaderMsg
+                {
+                    frame_id = s_AddedFrameById[id],
+                    stamp = GetRosTimestamp()
+                },
+                operation = CollisionObjectMsg.REMOVE
+            });
+            s_AddedFrameById.Remove(id);
         }
     }
 
@@ -387,8 +465,24 @@ public class CollisionObjectPublisher : MonoBehaviour
     {
         ObjectMetricsLogger.Instance?.LogEvent("object_deleted", objectId);
 
-        // Delete the collision object from the planning scene
-        if (ros != null)
+        bool anotherLivePublisherOwnsId = false;
+        if (liveRegistryId != null)
+        {
+            int liveCount;
+            if (s_LivePublishersById.TryGetValue(liveRegistryId, out liveCount))
+            {
+                liveCount--;
+                if (liveCount <= 0)
+                    s_LivePublishersById.Remove(liveRegistryId);
+                else
+                    s_LivePublishersById[liveRegistryId] = liveCount;
+                anotherLivePublisherOwnsId = liveCount > 0;
+            }
+        }
+
+        // Delete the collision object from the planning scene — unless a publisher in the
+        // incoming scene owns the same id, in which case its ADD must survive this REMOVE.
+        if (ros != null && !anotherLivePublisherOwnsId)
         {
             CollisionObjectMsg msg = new CollisionObjectMsg
             {
@@ -402,6 +496,7 @@ public class CollisionObjectPublisher : MonoBehaviour
             };
 
             ros.Publish("/collision_object", msg);
+            s_AddedFrameById.Remove(objectId);
         }
         // Clean up the readable mesh copy to prevent memory leaks
         if (readableMeshCopy != null)
@@ -847,7 +942,7 @@ public class CollisionObjectPublisher : MonoBehaviour
         ros.Publish("/latency_data", new StringMsg($"{operation},{objectId},{rttMs:F3}"));
     }
 
-    private TimeMsg GetRosTimestamp()
+    private static TimeMsg GetRosTimestamp()
     {
         long ticks = DateTimeOffset.UtcNow.UtcTicks - DateTimeOffset.UnixEpoch.UtcTicks;
         return new TimeMsg

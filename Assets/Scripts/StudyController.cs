@@ -997,6 +997,12 @@ public class StudyController : MonoBehaviour
             yield return RetireSceneIncrementally(outgoingScene);
         }
 
+        // The retired scene's publishers sent their planning-scene REMOVEs from OnDestroy,
+        // mid-transition, where they can be lost (reconnects, races with the incoming ADDs).
+        // Now that the unload is complete and live-publisher counts are settled, re-publish
+        // REMOVEs for anything still in the planning scene that no live publisher owns.
+        CollisionObjectPublisher.PublishRemovalsForOrphanedIds();
+
         yield return new WaitForSecondsRealtime(Mathf.Max(0f, _loadingOverlayPostActivationDelaySeconds));
         SceneTransitionOverlay.Hide();
 
