@@ -29,308 +29,149 @@ EditorBuildSettings:
   - enabled: 0
     path: Assets/Scenes/Old Scenes/KitchenFR3.unity
     guid: 18c0e714e847d40e0801c1265a0508df
-  - enabled: 0
-    path: Assets/Scenes/StartScene.unity
-    guid: a38984d3ded1b4467a2fe4cca40336ce
-  - enabled: 0
-    path: Assets/Scenes/Tutorial.unity
-    guid: 6e124b537426480d98d8e64db5c9e513
-  - enabled: 0
-    path: Assets/Scenes/Task1_Interlude.unity
-    guid: d0bb3f1a2b41b4ec9a29a70522c914c1
-  - enabled: 0
-    path: Assets/Scenes/Task1_Factory1.unity
-    guid: 7c48ac3c86f1c44049502262c16f03c9
-  - enabled: 0
-    path: Assets/Scenes/Task1_Factory2.unity
-    guid: fbda8eed62bc94bb1bf9a76773a53908
-  - enabled: 0
-    path: Assets/Scenes/Task1_Factory3.unity
-    guid: cd3e599f2ee7741b39d161004d9d83e8
-  - enabled: 0
-    path: Assets/Scenes/Task1_Factory4.unity
-    guid: ac09fb184304a4cbba271bfd583d4715
-  - enabled: 0
-    path: Assets/Scenes/Task1_Factory5.unity
-    guid: bf8c246261efa4b3bb2ffde2d83425de
-  - enabled: 0
-    path: Assets/Scenes/Task1_Kitchen1.unity
-    guid: 20ceb4eaaf72942828bbcb0e38ab5c6d
-  - enabled: 0
-    path: Assets/Scenes/Task1_Kitchen2.unity
-    guid: 293cac30624454fdb814243813c2f6dc
-  - enabled: 0
-    path: Assets/Scenes/Task1_Kitchen3.unity
-    guid: 6cba5ad97eb2f4f9d9627fd175acc8d6
-  - enabled: 0
-    path: Assets/Scenes/Task1_Kitchen4.unity
-    guid: 2740fc7c7a2354ff0a62fa33b63dcf60
-  - enabled: 0
-    path: Assets/Scenes/Task1_Kitchen5.unity
-    guid: 8f03791fec3ec4a609083e7a2ce631b7
-  - enabled: 0
-    path: Assets/Scenes/Task2_Interlude.unity
-    guid: eb430027bef84ccab88315004b8308d4
-  - enabled: 0
-    path: Assets/Scenes/Task2_Factory1.unity
-    guid: 821a61324ed85443c984aa72faa438e8
-  - enabled: 0
-    path: Assets/Scenes/Task2_Factory2.unity
-    guid: da00f0870631c4780abbb5dad255f010
-  - enabled: 0
-    path: Assets/Scenes/Task2_Factory3.unity
-    guid: ebefca96eef3f45a68d3904f945367dd
-  - enabled: 0
-    path: Assets/Scenes/Task2_Factory4.unity
-    guid: aedba136f37814d6bbfcbc10d6f9447f
-  - enabled: 0
-    path: Assets/Scenes/Task2_Factory5.unity
-    guid: 12f85237fd09541d287936183a9b4796
-  - enabled: 0
-    path: Assets/Scenes/Task2_Kitchen1.unity
-    guid: f442d36e6f7644254b76b2b6464d988e
-  - enabled: 0
-    path: Assets/Scenes/Task2_Kitchen2.unity
-    guid: 72b58d2e526ae4b4b96d1383d0f40b9b
-  - enabled: 0
-    path: Assets/Scenes/Task2_Kitchen3.unity
-    guid: a8779a9d148e54127a70dcd88b36e399
-  - enabled: 0
-    path: Assets/Scenes/Task2_Kitchen4.unity
-    guid: aca21414cae1a4aa69e013b3e1093023
-  - enabled: 0
-    path: Assets/Scenes/Task2_Kitchen5.unity
-    guid: c234719db45f94d988902cd0fd7dceaa
-  - enabled: 0
-    path: Assets/Scenes/Task3_Interlude.unity
-    guid: 3852ccefe06041c8b1b181386f9c6903
-  - enabled: 0
-    path: Assets/Scenes/Task3_Factory1.unity
-    guid: af35ed476fa8644f290feb6dcb54694c
-  - enabled: 0
-    path: Assets/Scenes/Task3_Factory2.unity
-    guid: ca73ba9f049bf408bb810234453c5e2e
-  - enabled: 0
-    path: Assets/Scenes/Task3_Factory3.unity
-    guid: aefa361297881480abad6b15df510501
-  - enabled: 0
-    path: Assets/Scenes/Task3_Factory4.unity
-    guid: d765d9f68ced346d89a677330e17bc60
-  - enabled: 0
-    path: Assets/Scenes/Task3_Factory5.unity
-    guid: df9d8c20285114177b549f5b71f7f60b
-  - enabled: 0
-    path: Assets/Scenes/Task3_Kitchen1.unity
-    guid: 860330dd712334ac0a1c99972382c8b5
-  - enabled: 0
-    path: Assets/Scenes/Task3_Kitchen2.unity
-    guid: 0341acf85ec4d4187bbe924714fe9b51
-  - enabled: 0
-    path: Assets/Scenes/Task3_Kitchen3.unity
-    guid: 8e521508b3de24078a4d06d4afd2ab6b
-  - enabled: 0
-    path: Assets/Scenes/Task3_Kitchen4.unity
-    guid: 428f67fad2e714ac5bd055882c3af45b
-  - enabled: 0
-    path: Assets/Scenes/Task3_Kitchen5.unity
-    guid: 2a85060ab61984a768c6f5a50ec36748
-  - enabled: 0
-    path: Assets/Scenes/Task4_Interlude.unity
-    guid: efd01d7e2d6d44a9884d9fbf850decac
-  - enabled: 0
-    path: Assets/Scenes/Task4_Factory1.unity
-    guid: 6d2a202879304439da53362796fddf64
-  - enabled: 0
-    path: Assets/Scenes/Task4_Factory2.unity
-    guid: 9e413da1a963842229d8d1c35ac2f6b7
-  - enabled: 0
-    path: Assets/Scenes/Task4_Factory3.unity
-    guid: e32720592fc134ee8b0983b8ae5c01f9
-  - enabled: 0
-    path: Assets/Scenes/Task4_Factory4.unity
-    guid: fa8bd0e5fa39e4f40b4050f000167ef7
-  - enabled: 0
-    path: Assets/Scenes/Task4_Factory5.unity
-    guid: 295fdce4ae769404ba638eecb0c74ebb
-  - enabled: 0
-    path: Assets/Scenes/Task4_Kitchen1.unity
-    guid: 65efcdab6979543fb8c5654a2aa7593b
-  - enabled: 0
-    path: Assets/Scenes/Task4_Kitchen2.unity
-    guid: c5d22636df73e4817897ff6fd077b337
-  - enabled: 0
-    path: Assets/Scenes/Task4_Kitchen3.unity
-    guid: d0a48d8d08a5f406eb76caf381f79e26
-  - enabled: 0
-    path: Assets/Scenes/Task4_Kitchen4.unity
-    guid: 76bf913e02be5403586ed5ebc3f82534
-  - enabled: 0
-    path: Assets/Scenes/Task4_Kitchen5.unity
-    guid: e14ba2eaffdd34295a8eac9fbad0cc1c
-  - enabled: 0
-    path: Assets/Scenes/StudyComplete.unity
-    guid: 1e0b1ed55ff747b695d1743f0b6fd493
-  - enabled: 0
-    path: Assets/Scenes/Task3_Placeholder1.unity
-    guid: d730e345407a4817841a7f6b32fc481c
-  - enabled: 0
-    path: Assets/Scenes/Task3_Placeholder2.unity
-    guid: 012b966aa1df4fe7baace12cc4d6420f
-  - enabled: 0
-    path: Assets/Scenes/Task3_Placeholder3.unity
-    guid: 0b3476cb2e6f48a981ed080cb7082fe1
-  - enabled: 0
-    path: Assets/Scenes/Task2_Placeholder1.unity
-    guid: 3364aa58990b480399ddec14763b4fb3
-  - enabled: 0
-    path: Assets/Scenes/Task2_Placeholder2.unity
-    guid: b5a9fa58cfd9406899d31316b1825245
-  - enabled: 0
-    path: Assets/Scenes/Task2_Placeholder3.unity
-    guid: 2bf21ccc4bd54207b2571ee972bd1c26
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/StartScene.unity
+    path: Assets/Scenes/Full Study Scenes/StartScene.unity
     guid: 59e067e38aee44739adb5414561f8379
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/StudyComplete.unity
+    path: Assets/Scenes/Full Study Scenes/StudyComplete.unity
     guid: 04335d4374d8641cb88fd50c51a7cbfd
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task1_Factory1.unity
+    path: Assets/Scenes/Full Study Scenes/Task1_Factory1.unity
     guid: 17f36330c32324c2590d278e9a4b282a
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task1_Factory2.unity
+    path: Assets/Scenes/Full Study Scenes/Task1_Factory2.unity
     guid: 2c1614ad38da142628ec315b832e720f
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task1_Factory3.unity
+    path: Assets/Scenes/Full Study Scenes/Task1_Factory3.unity
     guid: bd35902b4a34f442e93db123b5a69a05
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task1_Factory4.unity
+    path: Assets/Scenes/Full Study Scenes/Task1_Factory4.unity
     guid: b59b0dbb6bb7149fdb8d4fa87edddf6b
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task1_Factory5.unity
+    path: Assets/Scenes/Full Study Scenes/Task1_Factory5.unity
     guid: c34359ce35253453a8dd55bb751fe7ce
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task1_Interlude.unity
+    path: Assets/Scenes/Full Study Scenes/Task1_Interlude.unity
     guid: 65cd8c4451de24e84914f5706989cc1b
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task1_Kitchen1.unity
+    path: Assets/Scenes/Full Study Scenes/Task1_Kitchen1.unity
     guid: d9f6052518c7149fd9b596343ca257ef
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task1_Kitchen2.unity
+    path: Assets/Scenes/Full Study Scenes/Task1_Kitchen2.unity
     guid: b9c37d9fa77e544f78f5b335469e125a
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task1_Kitchen3.unity
+    path: Assets/Scenes/Full Study Scenes/Task1_Kitchen3.unity
     guid: 3926d585f255549bba6a0af9b4d4f1fa
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task1_Kitchen4.unity
+    path: Assets/Scenes/Full Study Scenes/Task1_Kitchen4.unity
     guid: 471f6d55cdbf44f2aba0e751ab381e9f
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task1_Kitchen5.unity
+    path: Assets/Scenes/Full Study Scenes/Task1_Kitchen5.unity
     guid: 6a63ac96d51e54c3bbd1b8f49a83102d
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task2_Factory1.unity
+    path: Assets/Scenes/Full Study Scenes/Task2_Factory1.unity
     guid: 4a693082afa62437db72793ecc87ad36
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task2_Factory2.unity
+    path: Assets/Scenes/Full Study Scenes/Task2_Factory2.unity
     guid: 96bc1463c748d4a4385cb4538ff4cb79
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task2_Factory3.unity
+    path: Assets/Scenes/Full Study Scenes/Task2_Factory3.unity
     guid: 5974b9c2ed9b94146916e85e44327070
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task2_Factory4.unity
+    path: Assets/Scenes/Full Study Scenes/Task2_Factory4.unity
     guid: 188f251a4aac740ecbae796436a7d581
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task2_Factory5.unity
+    path: Assets/Scenes/Full Study Scenes/Task2_Factory5.unity
     guid: 81c8afbd74503404bae1138f8b719e7c
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task2_Interlude.unity
+    path: Assets/Scenes/Full Study Scenes/Task2_Interlude.unity
     guid: 28f5fb1a7b8974f2695151769c7a305e
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task2_Kitchen1.unity
+    path: Assets/Scenes/Full Study Scenes/Task2_Kitchen1.unity
     guid: b6d181aa686eb48a1b1b38a0ce879a36
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task2_Kitchen2.unity
+    path: Assets/Scenes/Full Study Scenes/Task2_Kitchen2.unity
     guid: c652017640b944378b24aa98df6aea34
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task2_Kitchen3.unity
+    path: Assets/Scenes/Full Study Scenes/Task2_Kitchen3.unity
     guid: 1945390cd33d84deab7eb88ed9932759
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task2_Kitchen4.unity
+    path: Assets/Scenes/Full Study Scenes/Task2_Kitchen4.unity
     guid: 3fa59da1b795545238feb0fba3cb4186
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task2_Kitchen5.unity
+    path: Assets/Scenes/Full Study Scenes/Task2_Kitchen5.unity
     guid: f03f3d955f2604ea293dd6c296e730cf
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task3_Factory1.unity
+    path: Assets/Scenes/Full Study Scenes/Task3_Factory1.unity
     guid: 8c3f82517f6c64473a38387304604a70
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task3_Factory2.unity
+    path: Assets/Scenes/Full Study Scenes/Task3_Factory2.unity
     guid: 03db22f98c9d6453a9a6f8324c27a20a
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task3_Factory3.unity
+    path: Assets/Scenes/Full Study Scenes/Task3_Factory3.unity
     guid: e17c83d1a37ad45afbbf3f9ac6088fef
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task3_Factory4.unity
+    path: Assets/Scenes/Full Study Scenes/Task3_Factory4.unity
     guid: 4186991f861b74ccf816ecacd79b95d2
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task3_Factory5.unity
+    path: Assets/Scenes/Full Study Scenes/Task3_Factory5.unity
     guid: c1aaf9436c0a24066a2dc429f45ee7d8
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task3_Interlude.unity
+    path: Assets/Scenes/Full Study Scenes/Task3_Interlude.unity
     guid: 36af41744483246258ccbeae056f6b8a
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task3_Kitchen1.unity
+    path: Assets/Scenes/Full Study Scenes/Task3_Kitchen1.unity
     guid: cb3476178e72741e0a33a2772765f787
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task3_Kitchen2.unity
+    path: Assets/Scenes/Full Study Scenes/Task3_Kitchen2.unity
     guid: 6c4d9bc06a8f54549902f65e4a8ca120
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task3_Kitchen3.unity
+    path: Assets/Scenes/Full Study Scenes/Task3_Kitchen3.unity
     guid: 3d955e40d4c804dd492ba3ee00ee6c06
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task3_Kitchen4.unity
+    path: Assets/Scenes/Full Study Scenes/Task3_Kitchen4.unity
     guid: 5d739199f22084db2a0f986e2eb6fff6
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task3_Kitchen5.unity
+    path: Assets/Scenes/Full Study Scenes/Task3_Kitchen5.unity
     guid: 7f0b9991ab85d4d20b1b21dbf2126461
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task4_Factory1.unity
+    path: Assets/Scenes/Full Study Scenes/Task4_Factory1.unity
     guid: f98481340eb914bf7b7faced18aa010d
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task4_Factory2.unity
+    path: Assets/Scenes/Full Study Scenes/Task4_Factory2.unity
     guid: b47e50439cb4e460281aa0836a6b486a
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task4_Factory3.unity
+    path: Assets/Scenes/Full Study Scenes/Task4_Factory3.unity
     guid: b636f70bdf5214510916abfe02a7ec29
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task4_Factory4.unity
+    path: Assets/Scenes/Full Study Scenes/Task4_Factory4.unity
     guid: d40c17752dc2b4bcf9ef1e515fcce7ae
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task4_Factory5.unity
+    path: Assets/Scenes/Full Study Scenes/Task4_Factory5.unity
     guid: 6aed61c7b7da34b51b75a4707ceb724a
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task4_Interlude.unity
+    path: Assets/Scenes/Full Study Scenes/Task4_Interlude.unity
     guid: af492ac9e156f47c4aca4bfb9c018f8c
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task4_Kitchen1.unity
+    path: Assets/Scenes/Full Study Scenes/Task4_Kitchen1.unity
     guid: 3b49f8cfc2e2d4abdb0c965742053eee
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task4_Kitchen2.unity
+    path: Assets/Scenes/Full Study Scenes/Task4_Kitchen2.unity
     guid: 242ef8fe6f6f1463a8fc8b4f6fa3ec5a
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task4_Kitchen3.unity
+    path: Assets/Scenes/Full Study Scenes/Task4_Kitchen3.unity
     guid: 612a5d94c1652427bb77319ef8c2a91c
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task4_Kitchen4.unity
+    path: Assets/Scenes/Full Study Scenes/Task4_Kitchen4.unity
     guid: 3c7825f9f338f4c3ab725511db49832b
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Task4_Kitchen5.unity
+    path: Assets/Scenes/Full Study Scenes/Task4_Kitchen5.unity
     guid: f269eb87805a848589f09ca738c9ed3e
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Tutorial.unity
+    path: Assets/Scenes/Full Study Scenes/Tutorial.unity
     guid: 92683c4e564694d61a370e90061e09d8
   - enabled: 1
-    path: Assets/Scenes/Streaming Study Scenes/Survey.unity
+    path: Assets/Scenes/Full Study Scenes/Survey.unity
     guid: 105fd88fb36624bef9c7bfdfbd3744d3
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: c348712bda248c246b8c49b3db54643f, type: 3}
