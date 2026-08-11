@@ -981,7 +981,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 37f05467d39244c9f86220913455fc62, type: 2}
+  - {fileID: 2100000, guid: 7fef8d828a7834464a8889b4408ce787, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -1253,7 +1253,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &756134343
 Transform:
   m_ObjectHideFlags: 0
@@ -3114,7 +3114,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 37f05467d39244c9f86220913455fc62, type: 2}
+  - {fileID: 2100000, guid: 7fef8d828a7834464a8889b4408ce787, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -3179,11 +3179,12 @@ MonoBehaviour:
   instructionsText: 'Use the Scene Menu connected to the Left Hand Controller to
     cover the objects on the table with shapes as close as possible in size to the
     objects. This indicates to the motion planner that there are obstacles in those
-    locations.
+    locations. Objects covered in red shapes already have collision objects and do
+    not need to be covered.
 
 
-    Press ''B'' on the Right Hand Controller when finished with
-    this scene to advance to the next.'
+    Press ''B'' on the Right Hand Controller when finished
+    with this scene to advance to the next.'
 --- !u!4 &1770000003
 Transform:
   m_ObjectHideFlags: 0

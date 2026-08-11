@@ -201,18 +201,19 @@ MonoBehaviour:
 
     You
     will be placed in several scenes. In each, use the Scene Menu connected to the
-    Left Hand Controller to cover the objects on the table with shapes
-    as close as possible in size to the objects. This indicates to the motion planner
-    that there are obstacles in those locations.
+    Left Hand Controller to cover the objects on the table with shapes as close as
+    possible in size to the objects. This indicates to the motion planner that there
+    are obstacles in those locations. Objects covered in red shapes already have
+    collision objects and do not need to be covered.
 
 
-    Please tell the study administrator
-    that you are about to start the next task.
+    Please tell the study
+    administrator that you are about to start the next task.
 
 
-    Press ''B'' on the Right Hand
-    Controller to advance to the first scene. Press ''B'' again when finished with
-    each scene to advance to the next.'
+    Press ''B'' on
+    the Right Hand Controller to advance to the first scene. Press ''B'' again when
+    finished with each scene to advance to the next.'
 --- !u!4 &406845583
 Transform:
   m_ObjectHideFlags: 0
