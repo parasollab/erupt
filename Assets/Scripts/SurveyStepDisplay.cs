@@ -54,6 +54,7 @@ public class SurveyStepDisplay : MonoBehaviour
     private Label stepCounterLabel;
     private Label bodyLabel;
     private int stepIndex;
+    private InputAction _backAction;
 
     private void OnEnable()
     {
@@ -81,11 +82,35 @@ public class SurveyStepDisplay : MonoBehaviour
         {
             Debug.LogError("SurveyStepDisplay: Advance action is not assigned.");
         }
+
+        // Resolved from the rig's InputActionManager by name (SpawnHuman's pattern), so no
+        // scene rewiring is needed. Right-controller 'A' returns to the previous question,
+        // unconfirmed — matching the B-button page turns, which are also unconfirmed.
+        _backAction = StudyInputActions.FindStepBack();
+        if (_backAction != null)
+        {
+            _backAction.performed += OnBackPressed;
+            _backAction.Enable();
+        }
+        else
+        {
+            Debug.LogWarning("SurveyStepDisplay: No 'StepBack' action found; back navigation disabled.");
+        }
     }
 
     private void OnAdvancePressed(InputAction.CallbackContext context)
     {
         StudyController.ConfirmAdvance(PerformAdvance);
+    }
+
+    private void OnBackPressed(InputAction.CallbackContext context)
+    {
+        if (stepIndex <= 0)
+            return;
+
+        stepIndex--;
+        ShowCurrentStep();
+        ObjectMetricsLogger.Instance?.LogEvent("step_back", "survey");
     }
 
     // Runs only once the participant confirms the advance via the dialog.
@@ -117,6 +142,10 @@ public class SurveyStepDisplay : MonoBehaviour
         {
             advanceAction.action.performed -= OnAdvancePressed;
         }
+        if (_backAction != null)
+        {
+            _backAction.performed -= OnBackPressed;
+        }
     }
 
     private void ShowCurrentStep()
@@ -130,7 +159,11 @@ public class SurveyStepDisplay : MonoBehaviour
                 : $"Question {stepIndex} of {Steps.Length - 1} — {step.Heading}";
         }
         if (bodyLabel != null)
-            bodyLabel.text = step.Body;
+        {
+            bodyLabel.text = stepIndex > 0
+                ? step.Body + "\n\nPress 'A' on your right controller to return to the previous question."
+                : step.Body;
+        }
     }
 
     private void OnDisable()
@@ -138,6 +171,10 @@ public class SurveyStepDisplay : MonoBehaviour
         if (advanceAction != null)
         {
             advanceAction.action.performed -= OnAdvancePressed;
+        }
+        if (_backAction != null)
+        {
+            _backAction.performed -= OnBackPressed;
         }
     }
 }

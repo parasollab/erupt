@@ -68,6 +68,13 @@ public class WristMenuController : MonoBehaviour
         selectionManager = manager;
         collisionObjectsListener = listener;
         worldOrigin = origin;
+
+        if (worldOrigin == null)
+        {
+            Debug.LogWarning("WristMenuController: no worldOrigin bound for this scene — spawned " +
+                "collision objects will publish absolute Unity coordinates instead of robot-base-relative " +
+                "positions. Add a 'BaseTransform' object under the robot root.");
+        }
     }
     
     private void OnEnable()

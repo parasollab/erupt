@@ -201,7 +201,7 @@ MonoBehaviour:
 
     You
     will be placed in several scenes. In each, use the Scene Menu connected to the
-    Left Hand Controller to cover objects on the table near the robot with shapes
+    Left Hand Controller to cover the objects on the table with shapes
     as close as possible in size to the objects. This indicates to the motion planner
     that there are obstacles in those locations.
 

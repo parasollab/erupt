@@ -125,6 +125,9 @@ public class CollisionObjectPublisher : MonoBehaviour
             {
                 hasBeenPublished = false;
                 lastPublishTime = 0f;
+                // The disconnect also discarded any queued REMOVEs; re-publish removals
+                // for dead ids too (debounced internally — one sweep per recovery).
+                PublishRemovalsForOrphanedIds();
             }
             wasConnectionInError = hasError;
         }
@@ -331,8 +334,15 @@ public class CollisionObjectPublisher : MonoBehaviour
     // Publishes REMOVEs for every id that was ADDed at some point but no longer has a live
     // publisher. Called by StudyController after a scene transition completes, when teardown
     // REMOVEs (published from OnDestroy mid-transition) may have been lost.
+    private static float s_LastOrphanSweepTime = float.NegativeInfinity;
+
     public static void PublishRemovalsForOrphanedIds()
     {
+        // Debounce: every live publisher calls this on reconnect detection in the same frame.
+        if (Time.unscaledTime - s_LastOrphanSweepTime < 0.5f)
+            return;
+        s_LastOrphanSweepTime = Time.unscaledTime;
+
         System.Collections.Generic.List<string> orphanedIds = null;
         foreach (System.Collections.Generic.KeyValuePair<string, string> added in s_AddedFrameById)
         {
@@ -363,7 +373,14 @@ public class CollisionObjectPublisher : MonoBehaviour
                 },
                 operation = CollisionObjectMsg.REMOVE
             });
-            s_AddedFrameById.Remove(id);
+
+            // Stop tracking only when the connection is healthy at queue time — a REMOVE
+            // queued while disconnected is discarded by the connector, so the id must stay
+            // tracked for the next sweep to retry.
+            if (!rosConnection.HasConnectionError)
+            {
+                s_AddedFrameById.Remove(id);
+            }
         }
     }
 
@@ -495,8 +512,10 @@ public class CollisionObjectPublisher : MonoBehaviour
                 operation = CollisionObjectMsg.REMOVE
             };
 
+            // Best-effort only: Publish just queues, and the connector clears its queues on
+            // disconnect. The id deliberately stays in s_AddedFrameById so the post-transition
+            // sweep re-publishes the REMOVE if this one is lost.
             ros.Publish("/collision_object", msg);
-            s_AddedFrameById.Remove(objectId);
         }
         // Clean up the readable mesh copy to prevent memory leaks
         if (readableMeshCopy != null)

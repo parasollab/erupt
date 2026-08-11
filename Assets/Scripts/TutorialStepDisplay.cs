@@ -52,6 +52,7 @@ public class TutorialStepDisplay : MonoBehaviour
     private Label stepCounterLabel;
     private Label bodyLabel;
     private int stepIndex;
+    private InputAction _backAction;
 
     private void OnEnable()
     {
@@ -74,11 +75,35 @@ public class TutorialStepDisplay : MonoBehaviour
         {
             Debug.LogError("TutorialStepDisplay: Advance action is not assigned.");
         }
+
+        // Resolved from the rig's InputActionManager by name (SpawnHuman's pattern), so no
+        // scene rewiring is needed. Right-controller 'A' steps back one page, unconfirmed —
+        // matching the B-button page turns, which are also unconfirmed.
+        _backAction = StudyInputActions.FindStepBack();
+        if (_backAction != null)
+        {
+            _backAction.performed += OnBackPressed;
+            _backAction.Enable();
+        }
+        else
+        {
+            Debug.LogWarning("TutorialStepDisplay: No 'StepBack' action found; back navigation disabled.");
+        }
     }
 
     private void OnAdvancePressed(InputAction.CallbackContext context)
     {
         StudyController.ConfirmAdvance(PerformAdvance);
+    }
+
+    private void OnBackPressed(InputAction.CallbackContext context)
+    {
+        if (stepIndex <= 0)
+            return;
+
+        stepIndex--;
+        ShowCurrentStep();
+        ObjectMetricsLogger.Instance?.LogEvent("step_back", "tutorial");
     }
 
     // Runs only once the participant confirms the advance via the dialog.
@@ -110,6 +135,10 @@ public class TutorialStepDisplay : MonoBehaviour
         {
             advanceAction.action.performed -= OnAdvancePressed;
         }
+        if (_backAction != null)
+        {
+            _backAction.performed -= OnBackPressed;
+        }
     }
 
     private void ShowCurrentStep()
@@ -118,7 +147,11 @@ public class TutorialStepDisplay : MonoBehaviour
         if (stepCounterLabel != null)
             stepCounterLabel.text = $"Step {stepIndex + 1} of {Steps.Length} — {step.Heading}";
         if (bodyLabel != null)
-            bodyLabel.text = step.Body;
+        {
+            bodyLabel.text = stepIndex > 0
+                ? step.Body + "\n\nPress 'A' on your right controller to go back a step."
+                : step.Body;
+        }
     }
 
     private void OnDisable()
@@ -126,6 +159,10 @@ public class TutorialStepDisplay : MonoBehaviour
         if (advanceAction != null)
         {
             advanceAction.action.performed -= OnAdvancePressed;
+        }
+        if (_backAction != null)
+        {
+            _backAction.performed -= OnBackPressed;
         }
     }
 }
