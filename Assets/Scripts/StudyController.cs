@@ -138,7 +138,103 @@ public class StudyController : MonoBehaviour
             Debug.LogError("StudyController: Advance action is not assigned.");
         }
 
+        // Resume first: /study/resume is latched and only ever published by a crash-recovery
+        // (crash:=true) study_controller_node. Subscribing before the plan means the resume
+        // message tends to be delivered before FinishInitialization decides what to preload.
+        StudyResumeReceiver.Listen(this);
         StudyPlanReceiver.WaitForPlanOrTimeout(this, _rosPlanTimeoutSeconds);
+    }
+
+    // Latest crash-recovery stop received on /study/resume; null in normal sessions.
+    private StudyStateMsg _pendingResume;
+
+    public void ApplyResumeState(StudyStateMsg msg)
+    {
+        if (_taskIndex != -1 || _inSurvey)
+        {
+            // The study is already underway (or resumed); latched re-publishes are expected
+            // while the recovery session journals new scenes — ignore them.
+            return;
+        }
+
+        _pendingResume = msg;
+        Debug.Log($"StudyController: crash-recovery resume state received — phase '{msg.phase}', " +
+            $"task {msg.task_index}, scene {msg.scene_index} ('{msg.scene_name}').");
+    }
+
+    // Scene the resume stop maps to, or null when it should fall back to a normal start.
+    private string GetResumeTargetSceneName(StudyStateMsg resume)
+    {
+        switch (resume.phase)
+        {
+            case "interlude":
+                return (resume.task_index >= 0 && resume.task_index < _tasks.Count)
+                    ? _tasks[resume.task_index].interludeSceneName
+                    : null;
+            case "scene":
+                return (_shuffledSequences != null &&
+                        resume.task_index >= 0 && resume.task_index < _shuffledSequences.Count &&
+                        resume.scene_index >= 0 &&
+                        resume.scene_index < _shuffledSequences[resume.task_index].Count)
+                    ? _shuffledSequences[resume.task_index][resume.scene_index]
+                    : null;
+            case "survey":
+                return (resume.task_index >= 0 && resume.task_index < _tasks.Count)
+                    ? _surveySceneName
+                    : null;
+            case "complete":
+                return "StudyComplete";
+            default:
+                // "tutorial" (and anything unrecognized) is just a normal start.
+                return null;
+        }
+    }
+
+    private bool TryResumeFrom(StudyStateMsg resume)
+    {
+        string targetScene = GetResumeTargetSceneName(resume);
+        if (string.IsNullOrEmpty(targetScene))
+        {
+            return false;
+        }
+
+        // A held preload for a different scene would stall any other load, so a resume that
+        // arrived after the preload decision must fall back to the normal start (which the
+        // pending preload matches) rather than deadlock the transition.
+        if (_preloadedSceneOperation != null && _preloadedSceneName != targetScene)
+        {
+            Debug.LogWarning($"StudyController: resume target '{targetScene}' arrived after " +
+                $"'{_preloadedSceneName}' began preloading; starting normally instead.");
+            return false;
+        }
+
+        Debug.Log($"StudyController: resuming study at '{targetScene}' after crash recovery.");
+        switch (resume.phase)
+        {
+            case "interlude":
+                _taskIndex = resume.task_index;
+                _sceneIndexInTask = -1;
+                LoadCurrentInterlude();
+                return true;
+            case "scene":
+                _taskIndex = resume.task_index;
+                _sceneIndexInTask = resume.scene_index;
+                LoadCurrentTaskScene();
+                return true;
+            case "survey":
+                _taskIndex = resume.task_index;
+                _sceneIndexInTask = _shuffledSequences[_taskIndex].Count;
+                _inSurvey = true;
+                LoadSceneWhenReady(_surveySceneName);
+                return true;
+            case "complete":
+                _taskIndex = _tasks.Count;
+                _sceneIndexInTask = -1;
+                LoadCompletion();
+                return true;
+            default:
+                return false;
+        }
     }
 
     // Builds _shuffledSequences from a StudyPlan received over ROS (/study/plan), so the
@@ -187,13 +283,21 @@ public class StudyController : MonoBehaviour
 
     private void FinishInitialization()
     {
-        BeginScenePreloadIfEnabled(GetFirstSceneName());
+        // In a crash-recovery session the resume stop, not the study's first scene, is what
+        // should warm up — a held preload for the wrong scene would block the resume load.
+        string resumeTarget = _pendingResume != null ? GetResumeTargetSceneName(_pendingResume) : null;
+        BeginScenePreloadIfEnabled(resumeTarget ?? GetFirstSceneName());
         Invoke(nameof(BeginStudy), _startSceneAutoAdvanceDelay);
     }
 
     // Leaves StartScene automatically once settled, instead of waiting for a button press.
     private void BeginStudy()
     {
+        if (_pendingResume != null && TryResumeFrom(_pendingResume))
+        {
+            return;
+        }
+
         if (!string.IsNullOrEmpty(_tutorialSceneName))
         {
             _taskIndex = -2;
