@@ -44,6 +44,51 @@ public class CollisionObjectPublisher : MonoBehaviour
     private static readonly System.Collections.Generic.Dictionary<string, string> s_AddedFrameById =
         new System.Collections.Generic.Dictionary<string, string>();
 
+    // Outgoing /collision_object messages are paced across frames instead of bursting: a
+    // scene transition emits ~90 teardown REMOVEs + ~90 sweep REMOVEs + the next scene's
+    // ADDs within single frames, and bursts that size overflowed queues at multiple hops
+    // (the connector's sender logged "Queue full! Messages are getting dropped!", and
+    // move_group's /collision_object subscriber drops history overruns silently) — leaving
+    // stale objects in the planning scene. The outbox also holds messages while the
+    // connection is down, unlike the connector's own queues, which are wiped on disconnect.
+    private static readonly System.Collections.Generic.Queue<(CollisionObjectMsg msg, bool pad)> s_Outbox =
+        new System.Collections.Generic.Queue<(CollisionObjectMsg msg, bool pad)>();
+    private const int kOutboxMessagesPerFrame = 15;
+    private static int s_LastPumpFrame = -1;
+
+    private static void EnqueueOutgoing(CollisionObjectMsg msg, bool useTrailingPad = true)
+    {
+        ROSConnection rosConnection = ROSConnection.GetOrCreateInstance();
+        if (rosConnection == null)
+            return;
+        rosConnection.RegisterPublisher<CollisionObjectMsg>("/collision_object", CollisionObjectQueueSize);
+        s_Outbox.Enqueue((msg, useTrailingPad));
+    }
+
+    // Sends up to kOutboxMessagesPerFrame queued messages. Called once per frame (guarded)
+    // from PersistentXRInfrastructure.Update and from every live publisher's Update, so the
+    // queue keeps draining even in scenes with no publishers of their own.
+    public static void PumpOutbox()
+    {
+        if (Time.frameCount == s_LastPumpFrame)
+            return;
+        s_LastPumpFrame = Time.frameCount;
+
+        if (s_Outbox.Count == 0)
+            return;
+
+        ROSConnection rosConnection = ROSConnection.GetOrCreateInstance();
+        if (rosConnection == null || rosConnection.HasConnectionError)
+            return;
+
+        int budget = kOutboxMessagesPerFrame;
+        while (budget-- > 0 && s_Outbox.Count > 0)
+        {
+            (CollisionObjectMsg msg, bool pad) = s_Outbox.Dequeue();
+            rosConnection.Publish("/collision_object", msg, pad);
+        }
+    }
+
     private ROSConnection ros;
     private float lastPublishTime = 0f;
     private Vector3 lastPosition;
@@ -116,6 +161,9 @@ public class CollisionObjectPublisher : MonoBehaviour
 
     void Update()
     {
+        // Drain the shared outbox even when this publisher itself is paused.
+        PumpOutbox();
+
         if (pausePublishing) return;
 
         if (ros != null)
@@ -319,16 +367,35 @@ public class CollisionObjectPublisher : MonoBehaviour
             Debug.Log($"[Latency] Publishing '{objectId}' op={msg.operation} stamp.sec={msg.header.stamp.sec} stamp.nanosec={msg.header.stamp.nanosec}");
         try
         {
-            if (isMesh)
-                ros.Publish(topicName, msg, false);
-            else
-                ros.Publish(topicName, msg);
+            EnqueueOutgoing(msg, useTrailingPad: !isMesh);
             s_AddedFrameById[objectId] = frameId;
         }
         catch (System.Exception e)
         {
             Debug.LogError($"Failed to publish collision object '{objectId}': {e.Message}");
         }
+    }
+
+    // Clears every world collision object from the planning scene (a REMOVE with an empty id
+    // is MoveIt's remove-all convention — the same clear planning_scene_watcher.py performs
+    // on 2D scene changes). Called once at study start: the in-memory ownership/orphan
+    // registries die with the app, so residue from a crashed previous session is invisible
+    // to them and can only be cleaned by a full wipe before this session's first ADDs.
+    public static void PublishRemoveAll()
+    {
+        EnqueueOutgoing(new CollisionObjectMsg
+        {
+            id = "",
+            header = new HeaderMsg
+            {
+                frame_id = "world",
+                stamp = GetRosTimestamp()
+            },
+            operation = CollisionObjectMsg.REMOVE
+        });
+
+        s_AddedFrameById.Clear();
+        Debug.Log("[CollisionObjectPublisher] Cleared all world collision objects from the planning scene.");
     }
 
     // Publishes REMOVEs for every id that was ADDed at some point but no longer has a live
@@ -353,17 +420,17 @@ public class CollisionObjectPublisher : MonoBehaviour
         }
 
         if (orphanedIds == null)
+        {
+            // Logged so a transition with a silent sweep is distinguishable from a sweep
+            // that never ran (stale build, missed call site) when reading session logs.
+            Debug.Log("[CollisionObjectPublisher] Orphan sweep ran: nothing to remove.");
             return;
-
-        ROSConnection rosConnection = ROSConnection.GetOrCreateInstance();
-        if (rosConnection == null)
-            return;
-        rosConnection.RegisterPublisher<CollisionObjectMsg>("/collision_object", CollisionObjectQueueSize);
+        }
 
         foreach (string id in orphanedIds)
         {
             Debug.Log($"[CollisionObjectPublisher] Removing orphaned collision object '{id}' from the planning scene.");
-            rosConnection.Publish("/collision_object", new CollisionObjectMsg
+            EnqueueOutgoing(new CollisionObjectMsg
             {
                 id = id,
                 header = new HeaderMsg
@@ -374,13 +441,9 @@ public class CollisionObjectPublisher : MonoBehaviour
                 operation = CollisionObjectMsg.REMOVE
             });
 
-            // Stop tracking only when the connection is healthy at queue time — a REMOVE
-            // queued while disconnected is discarded by the connector, so the id must stay
-            // tracked for the next sweep to retry.
-            if (!rosConnection.HasConnectionError)
-            {
-                s_AddedFrameById.Remove(id);
-            }
+            // The outbox holds messages across disconnects and only sends on a healthy
+            // connection, so tracking can end at enqueue time.
+            s_AddedFrameById.Remove(id);
         }
     }
 
@@ -512,10 +575,9 @@ public class CollisionObjectPublisher : MonoBehaviour
                 operation = CollisionObjectMsg.REMOVE
             };
 
-            // Best-effort only: Publish just queues, and the connector clears its queues on
-            // disconnect. The id deliberately stays in s_AddedFrameById so the post-transition
-            // sweep re-publishes the REMOVE if this one is lost.
-            ros.Publish("/collision_object", msg);
+            // Best-effort only: the id deliberately stays in s_AddedFrameById so the
+            // post-transition sweep re-publishes the REMOVE if this one is lost.
+            EnqueueOutgoing(msg);
         }
         // Clean up the readable mesh copy to prevent memory leaks
         if (readableMeshCopy != null)

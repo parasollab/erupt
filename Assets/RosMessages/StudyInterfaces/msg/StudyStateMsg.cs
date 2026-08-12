@@ -13,10 +13,14 @@ namespace RosMessageTypes.StudyInterfaces
         public const string k_RosMessageName = "study_interfaces/StudyState";
         public override string RosMessageName => k_RosMessageName;
 
-        //  phase is one of: "interlude", "scene", "complete"
+        //  phase is one of: "tutorial", "interlude", "scene", "survey", "complete"
         public string phase;
         //  Interlude scene name for the current task (empty when phase == "complete")
         public string task_interlude;
+        //  Instructions text to show the participant -- tutorial walkthrough text when
+        //  phase == "tutorial", per-task interlude instructions when phase == "interlude",
+        //  empty otherwise
+        public string interlude_instructions;
         //  Current task-scene name (empty unless phase == "scene")
         public string scene_name;
         //  0-based index into StudyPlan.tasks
@@ -29,16 +33,18 @@ namespace RosMessageTypes.StudyInterfaces
         {
             this.phase = "";
             this.task_interlude = "";
+            this.interlude_instructions = "";
             this.scene_name = "";
             this.task_index = 0;
             this.scene_index = 0;
             this.is_complete = false;
         }
 
-        public StudyStateMsg(string phase, string task_interlude, string scene_name, int task_index, int scene_index, bool is_complete)
+        public StudyStateMsg(string phase, string task_interlude, string interlude_instructions, string scene_name, int task_index, int scene_index, bool is_complete)
         {
             this.phase = phase;
             this.task_interlude = task_interlude;
+            this.interlude_instructions = interlude_instructions;
             this.scene_name = scene_name;
             this.task_index = task_index;
             this.scene_index = scene_index;
@@ -51,6 +57,7 @@ namespace RosMessageTypes.StudyInterfaces
         {
             deserializer.Read(out this.phase);
             deserializer.Read(out this.task_interlude);
+            deserializer.Read(out this.interlude_instructions);
             deserializer.Read(out this.scene_name);
             deserializer.Read(out this.task_index);
             deserializer.Read(out this.scene_index);
@@ -61,6 +68,7 @@ namespace RosMessageTypes.StudyInterfaces
         {
             serializer.Write(this.phase);
             serializer.Write(this.task_interlude);
+            serializer.Write(this.interlude_instructions);
             serializer.Write(this.scene_name);
             serializer.Write(this.task_index);
             serializer.Write(this.scene_index);
@@ -72,6 +80,7 @@ namespace RosMessageTypes.StudyInterfaces
             return "StudyStateMsg: " +
             "\nphase: " + phase.ToString() +
             "\ntask_interlude: " + task_interlude.ToString() +
+            "\ninterlude_instructions: " + interlude_instructions.ToString() +
             "\nscene_name: " + scene_name.ToString() +
             "\ntask_index: " + task_index.ToString() +
             "\nscene_index: " + scene_index.ToString() +

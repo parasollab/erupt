@@ -39,7 +39,10 @@ public class ObjectMetricsLogger : MonoBehaviour
         // See StudyLogger.cs's Awake() for why this explicit call is needed: ObjectEventMsg's own
         // Register() defaults to AfterSceneLoad, which runs after this (BeforeSceneLoad).
         ObjectEventMsg.Register();
-        ros.RegisterPublisher<ObjectEventMsg>(Topic);
+        // A scene teardown emits object_deleted for every publisher in the scene (~90 in
+        // factory scenes) within one frame; the connector's default queue of 10 dropped most
+        // of the burst ("Queue full!" warnings). Same 512 the /collision_object topic uses.
+        ros.RegisterPublisher<ObjectEventMsg>(Topic, CollisionObjectPublisher.CollisionObjectQueueSize);
     }
 
     // worldPos/worldRot are in world space; they're made relative to the robot's base

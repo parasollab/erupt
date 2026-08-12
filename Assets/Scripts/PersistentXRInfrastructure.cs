@@ -87,6 +87,13 @@ public sealed class PersistentXRInfrastructure : MonoBehaviour
         SceneManager.sceneLoaded += OnSceneLoaded;
     }
 
+    private void Update()
+    {
+        // Drains the paced /collision_object outbox even in scenes with no publishers of
+        // their own (interludes), so teardown REMOVEs queued by a retired scene still flow.
+        CollisionObjectPublisher.PumpOutbox();
+    }
+
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
         GameObject[] roots = scene.GetRootGameObjects();

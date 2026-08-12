@@ -291,7 +291,7 @@ public class StudyController : MonoBehaviour
     // volatile relay subscription means latching alone never delivers it), so when recovery
     // is active the message lands well inside this window; in a normal session nothing
     // arrives and startup proceeds after the wait.
-    private const float kResumeWaitSeconds = 2.5f;
+    private const float kResumeWaitSeconds = 4f;
 
     private void FinishInitialization()
     {
@@ -307,6 +307,15 @@ public class StudyController : MonoBehaviour
             {
                 yield return null;
             }
+            if (_pendingResume == null)
+            {
+                Debug.Log("StudyController: no /study/resume arrived within " +
+                    $"{kResumeWaitSeconds}s of the ROS plan; starting the study normally.");
+            }
+        }
+        else if (!_planFromRos)
+        {
+            Debug.Log("StudyController: plan is the local fallback (no ROS); crash-recovery resume is not possible.");
         }
 
         // In a crash-recovery session the resume stop, not the study's first scene, is what
@@ -324,6 +333,14 @@ public class StudyController : MonoBehaviour
     // Leaves StartScene automatically once settled, instead of waiting for a button press.
     private void BeginStudy()
     {
+        // Wipe any planning-scene residue from a previous app run (mirrors the 2D session's
+        // clear-then-populate on scene change). Queued before any content scene loads, so it
+        // is sent ahead of this session's first collision-object ADDs on the same topic.
+        if (_planFromRos)
+        {
+            CollisionObjectPublisher.PublishRemoveAll();
+        }
+
         if (_pendingResume != null && TryResumeFrom(_pendingResume))
         {
             return;
