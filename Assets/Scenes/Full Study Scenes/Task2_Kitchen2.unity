@@ -4797,6 +4797,54 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1810615830
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1810615832}
+  - component: {fileID: 1810615831}
+  m_Layer: 0
+  m_Name: HideRobotVisuals
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1810615831
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1810615830}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: caf4b21003e7d457e9ac391f2c722ea4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: xrviz::HideRobotVisuals
+  robotRoot: {fileID: 0}
+  alsoDisableColliders: 1
+  additionalObjectNames:
+  - EndEffectorHandle
+--- !u!4 &1810615832
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1810615830}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1897186338 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 8298115101934582173, guid: 5a898bca8115f465ba729909cf9fa37f, type: 3}
@@ -4830,54 +4878,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 05c065f740c1f4c94b68815678f02569, type: 3}
   m_Name: 
   m_EditorClassIdentifier: xrviz::MoveItPlanningRequestMenuUI
---- !u!1 &1909533495
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1909533497}
-  - component: {fileID: 1909533496}
-  m_Layer: 0
-  m_Name: HideRobotVisuals
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1909533496
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1909533495}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: caf4b21003e7d457e9ac391f2c722ea4, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: xrviz::HideRobotVisuals
-  robotRoot: {fileID: 0}
-  alsoDisableColliders: 1
-  additionalObjectNames:
-  - EndEffectorHandle
---- !u!4 &1909533497
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1909533495}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &1954102491
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -5970,4 +5970,4 @@ SceneRoots:
   - {fileID: 319647682}
   - {fileID: 44031126}
   - {fileID: 1143796822}
-  - {fileID: 1909533497}
+  - {fileID: 1810615832}
