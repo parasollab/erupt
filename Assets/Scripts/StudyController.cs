@@ -261,10 +261,15 @@ public class StudyController : MonoBehaviour
         _tasks = orderedTasks;
         _shuffledSequences = sequences;
         ParticipantId = plan.participant_id;
+        _planFromRos = true;
         Debug.Log($"StudyController: applied external study plan for participant '{plan.participant_id}' ({_tasks.Count} tasks).");
 
         FinishInitialization();
     }
+
+    // True when the plan came from /study/plan (vs the local standalone fallback) — only
+    // then can a crash-recovery /study/resume arrive, so only then is it worth waiting for.
+    private bool _planFromRos;
 
     // Local random generation, unchanged from the original behavior -- used as a fallback
     // when no /study/plan message arrives in time (e.g. running standalone without ROS).
@@ -281,13 +286,39 @@ public class StudyController : MonoBehaviour
         FinishInitialization();
     }
 
+    // How long a ROS-driven session waits for a possible /study/resume before committing to
+    // a normal start. The crash-recovery node republishes resume at 1 Hz (the endpoint's
+    // volatile relay subscription means latching alone never delivers it), so when recovery
+    // is active the message lands well inside this window; in a normal session nothing
+    // arrives and startup proceeds after the wait.
+    private const float kResumeWaitSeconds = 2.5f;
+
     private void FinishInitialization()
     {
+        StartCoroutine(FinishInitializationCoroutine());
+    }
+
+    private IEnumerator FinishInitializationCoroutine()
+    {
+        if (_planFromRos && _pendingResume == null)
+        {
+            float deadline = Time.unscaledTime + kResumeWaitSeconds;
+            while (_pendingResume == null && Time.unscaledTime < deadline)
+            {
+                yield return null;
+            }
+        }
+
         // In a crash-recovery session the resume stop, not the study's first scene, is what
         // should warm up — a held preload for the wrong scene would block the resume load.
         string resumeTarget = _pendingResume != null ? GetResumeTargetSceneName(_pendingResume) : null;
         BeginScenePreloadIfEnabled(resumeTarget ?? GetFirstSceneName());
-        Invoke(nameof(BeginStudy), _startSceneAutoAdvanceDelay);
+
+        if (_startSceneAutoAdvanceDelay > 0f)
+        {
+            yield return new WaitForSecondsRealtime(_startSceneAutoAdvanceDelay);
+        }
+        BeginStudy();
     }
 
     // Leaves StartScene automatically once settled, instead of waiting for a button press.
