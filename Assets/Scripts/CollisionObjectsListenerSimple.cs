@@ -81,6 +81,15 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
         if (!objectsById.ContainsKey(co.id) && CollisionObjectPublisher.HasLivePublisher(co.id))
             return;
 
+        // Wrist-menu user shapes are always spawned by this app, never by RViz, so any
+        // ADD/MOVE echo for one is a mirror of a shape that already exists here — or one
+        // whose publishers just died in a scene transition, which the two guards above can't
+        // see: the echo then lands on the next scene's listener (empty objectsById, no live
+        // publisher) and resurrects the shape into the planning scene. REMOVE echoes are
+        // handled above and must stay live — they're how an RViz-side delete reaches Unity.
+        if (IsUserShapeId(co.id))
+            return;
+
         Debug.Log($"[CO Listener] Adding/Appending/Moving object id={co.id}");
 
         // ADD / APPEND / MOVE → upsert parent
@@ -258,6 +267,22 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
         }
 
         // Optional: parent.SetActive(built > 0);
+    }
+
+    // Ids WristMenuController assigns to user-created shapes: "unity_{primitive}_{ticks}"
+    // from AddPrimitiveShape (PrimitiveType.ToString().ToLower()) and "unity_mesh_{ticks}"
+    // from DuplicateSelectedObject. Environment publishers ("unity_Gas_Stove", ...) never
+    // carry the trailing "_" + primitive-word form, and RViz-created objects ("Box_0")
+    // don't start with "unity_".
+    static bool IsUserShapeId(string id)
+    {
+        return id.StartsWith("unity_cube_") ||
+               id.StartsWith("unity_sphere_") ||
+               id.StartsWith("unity_cylinder_") ||
+               id.StartsWith("unity_capsule_") ||
+               id.StartsWith("unity_plane_") ||
+               id.StartsWith("unity_quad_") ||
+               id.StartsWith("unity_mesh_");
     }
 
     // ---------- Pose helpers ----------
