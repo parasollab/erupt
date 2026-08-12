@@ -71,6 +71,16 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
             return;
         }
 
+        // planning_scene_watcher mirrors every planning-scene change back on this topic,
+        // including objects this app itself published (environment publishers, wrist-menu
+        // shapes). Instantiating such an echo would add a second CollisionObjectPublisher
+        // under the same id, and OnDestroy's live-publisher refcount would then suppress the
+        // REMOVE when the user deletes the original — leaving the object in the planning
+        // scene forever. objectsById pre-registration only covers the one listener the wrist
+        // menu is bound to; this covers every publisher and every listener instance.
+        if (!objectsById.ContainsKey(co.id) && CollisionObjectPublisher.HasLivePublisher(co.id))
+            return;
+
         Debug.Log($"[CO Listener] Adding/Appending/Moving object id={co.id}");
 
         // ADD / APPEND / MOVE → upsert parent

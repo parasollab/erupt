@@ -222,11 +222,7 @@ public class SelectionManager : MonoBehaviour
         if (selectedRenderer != null)
         {
             originalMaterial = selectedRenderer.material;
-            // Wrist-menu collision shapes use a distinctive translucent-green material and are
-            // selected immediately after spawning. Keep that appearance instead of replacing it
-            // with the opaque general-purpose selection highlight.
-            if (!IsWristMenuCollisionObject(SelectedObject))
-                // One shared transparent copy of the highlight material, built lazily so the
+            // One shared transparent copy of the highlight material, built lazily so the
             // Teal asset itself stays opaque for its other users and repeated selections
             // don't each instantiate a new material.
             if (transparentHighlightMaterial == null && highlightMaterial != null)
@@ -239,23 +235,6 @@ public class SelectionManager : MonoBehaviour
         
         // Notify listeners that an object was selected
         OnObjectSelected?.Invoke(SelectedObject);
-    }
-
-    private static bool IsWristMenuCollisionObject(GameObject candidate)
-    {
-        CollisionObjectPublisher publisher = candidate != null
-            ? candidate.GetComponent<CollisionObjectPublisher>()
-            : null;
-        string objectId = publisher != null ? publisher.objectId : null;
-        if (string.IsNullOrEmpty(objectId))
-            return false;
-
-        return objectId.StartsWith("unity_cube_") ||
-               objectId.StartsWith("unity_sphere_") ||
-               objectId.StartsWith("unity_cylinder_") ||
-               objectId.StartsWith("unity_capsule_") ||
-               objectId.StartsWith("unity_plane_") ||
-               objectId.StartsWith("unity_mesh_");
     }
 
     public void ClearSelection()

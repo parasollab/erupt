@@ -65,6 +65,15 @@ public class CollisionObjectPublisher : MonoBehaviour
         s_Outbox.Enqueue((msg, useTrailingPad));
     }
 
+    // True while any live CollisionObjectPublisher owns this id. Used by
+    // CollisionObjectsListenerSimple to recognize /collision_objects_ros echoes of objects
+    // this app itself published (planning_scene_watcher mirrors every planning-scene change
+    // back on that topic) so it never instantiates a duplicate copy of them.
+    public static bool HasLivePublisher(string objectId)
+    {
+        return !string.IsNullOrEmpty(objectId) && s_LivePublishersById.ContainsKey(objectId);
+    }
+
     // Sends up to kOutboxMessagesPerFrame queued messages. Called once per frame (guarded)
     // from PersistentXRInfrastructure.Update and from every live publisher's Update, so the
     // queue keeps draining even in scenes with no publishers of their own.

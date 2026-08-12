@@ -33,6 +33,9 @@ public class TutorialStepDisplay : MonoBehaviour
             "Wrist Menu (again)",
             "Press the small Menu button on your left controller to open your wrist menu again if it isn't already open. Choose Add Shape, then Cylinder, to spawn a practice cylinder in front of you. Point the right controller at the cylinder and pull the trigger to select it. Press Edit Shape on the wrist menu and edit the scale of each dimension.\n\nPress 'B' on your right controller to advance to the next step."),
         new Step(
+            "Two-Handed Scaling",
+            "You can also resize an object directly with your hands. Point at the cylinder and pull the trigger to select it, then squeeze the grip button on both controllers at the same time to hold it with both hands. Keeping both grips held, move your hands apart to grow the cylinder or bring them together to shrink it, then release to keep the new size.\n\nPress 'B' on your right controller to advance to the next step."),
+        new Step(
             "Wrist Menu (one more time)",
             "Point the controller at the cube and press the trigger to select it. Open the wrist menu if needed (go back to the main menu if not already there) and press Delete Shape to delete the cube. Repeat with the Cylinder.\n\nPress 'B' on your right controller to advance to the next step."),
         new Step(

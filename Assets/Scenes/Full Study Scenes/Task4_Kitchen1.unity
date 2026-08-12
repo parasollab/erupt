@@ -2394,7 +2394,6 @@ GameObject:
   - component: {fileID: 1001558314}
   - component: {fileID: 1001558313}
   - component: {fileID: 1001558312}
-  - component: {fileID: 1001558311}
   m_Layer: 0
   m_Name: Ground
   m_TagString: SnapSurface
@@ -2402,21 +2401,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1001558311
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1001558310}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5750a2b1e5a0d4a519606a09878a0e61, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: xrviz::CollisionObjectsListenerSimple
-  topic: /collision_objects_ros
-  worldOrigin: {fileID: 0}
-  litMaterial: {fileID: 0}
 --- !u!114 &1001558312
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5349,10 +5333,58 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 3927579247218649798, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
   m_PrefabInstance: {fileID: 2480101148333321771}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &221656725
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 221656727}
+  - component: {fileID: 221656726}
+  m_Layer: 0
+  m_Name: CollisionObjectListener
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &221656726
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 221656725}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5750a2b1e5a0d4a519606a09878a0e61, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: xrviz::CollisionObjectsListenerSimple
+  topic: /collision_objects_ros
+  worldOrigin: {fileID: 1053846959}
+  litMaterial: {fileID: 2100000, guid: fc226930e8fad4c499969204cecfbc05, type: 2}
+--- !u!4 &221656727
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 221656725}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
+  - {fileID: 221656727}
   - {fileID: 2480101148333321771}
   - {fileID: 6565728465572174795}
   - {fileID: 4530284861057829791}
