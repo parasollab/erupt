@@ -114,6 +114,11 @@ public class WristMenuController : MonoBehaviour
         toggle.style.paddingLeft = 10;
         toggle.style.paddingRight = 10;
         toggle.value = true; // Default to enabled
+        // The whole Toggle row is clickable by default; swallow presses on the
+        // text label so only the checkbox itself toggles the value.
+        toggle.labelElement.RegisterCallback<PointerDownEvent>((evt) => evt.StopPropagation());
+        toggle.labelElement.RegisterCallback<PointerUpEvent>((evt) => evt.StopPropagation());
+        toggle.labelElement.RegisterCallback<ClickEvent>((evt) => evt.StopPropagation());
         toggle.RegisterCallback<ChangeEvent<bool>>((evt) =>
         {
             var selected = selectionManager.SelectedObject;
