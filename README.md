@@ -1,4 +1,4 @@
-# XRViz
+# ERUPT
 
 Interactive Extended Reality Robotics Visualization Tool
 
