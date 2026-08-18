@@ -4999,6 +4999,9 @@ GameObject:
   - component: {fileID: 595720470}
   - component: {fileID: 595720471}
   - component: {fileID: 595720472}
+  - component: {fileID: 595720480}
+  - component: {fileID: 595720481}
+  - component: {fileID: 595720482}
   m_Layer: 0
   m_Name: Camera
   m_TagString: Untagged
@@ -5240,6 +5243,64 @@ MonoBehaviour:
   m_EditorClassIdentifier: xrviz::FPSPublisher
   topic: /fps
   _togglePublishAction: {fileID: 0}
+--- !u!114 &595720480
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 595720460}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 42a9669f335545dca2fca84ce7810514, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: xrviz::NetworkJitterPublisher
+  pingTopic: /latency_ping
+  pongTopic: /latency_ping_pong
+  dataTopic: /network_jitter
+  pingRateHz: 10
+--- !u!114 &595720481
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 595720460}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: eabc0e064d004c9bbe0573c0d84128c4, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: xrviz::GCMetricsPublisher
+  topic: /gc_metrics
+  publishIntervalSeconds: 1
+--- !u!114 &595720482
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 595720460}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 519d288d679a4f44a73d4748653e1756, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: xrviz::LatencyBenchmark
+  startTopic: /benchmark/start
+  statusTopic: /benchmark/status
+  runOnStart: 0
+  trialsPerConfig: 10
+  movesPerTrial: 10
+  interOpDelaySeconds: 0.5
+  includeCube: 1
+  meshTriangleTargets:
+  - 500
+  - 5000
+  - 20000
+  spawnCenter: {x: 0, y: 1, z: 0.75}
+  objectScale: 0.15
+  moveRadius: 0.1
+  worldOrigin: {fileID: 737031959}
+  objectMaterial: {fileID: 2100000, guid: fc226930e8fad4c499969204cecfbc05, type: 2}
 --- !u!1 &597799757
 GameObject:
   m_ObjectHideFlags: 0

@@ -17,10 +17,10 @@ EditorBuildSettings:
   - enabled: 0
     path: Assets/Scenes/AR.unity
     guid: 49dca3fc627f34e8ea835ac53e590d93
-  - enabled: 0
+  - enabled: 1
     path: Assets/Scenes/KitchenLoadingScene.unity
     guid: 460ff48f0e3c9432cac9b71597ccf702
-  - enabled: 0
+  - enabled: 1
     path: Assets/Scenes/Kitchen.unity
     guid: 332a5352bed064330b7ad52128992f65
   - enabled: 1

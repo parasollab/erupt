@@ -49,6 +49,15 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
             return;
         }
 
+        // Objects Unity publishes reach the planning scene and come back through the
+        // watcher; a live local publisher means this message is our own echo, not a
+        // ROS-side creation, so mirroring it would duplicate the object.
+        if (CollisionObjectPublisher.HasLivePublisher(co.id))
+        {
+            Debug.Log($"[CO Listener] Ignoring echo for locally-published id={co.id}");
+            return;
+        }
+
         if (co.operation == OP_REMOVE)
         {
             Debug.Log($"[CO Listener] Removing object id={co.id}");
