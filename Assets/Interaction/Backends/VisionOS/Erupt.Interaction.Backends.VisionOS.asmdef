@@ -1,0 +1,19 @@
+{
+    "name": "Erupt.Interaction.Backends.VisionOS",
+    "rootNamespace": "Erupt.Interaction.Backends",
+    "references": [
+        "Erupt.Interaction.Core",
+        "Unity.InputSystem"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [
+        "Android"
+    ],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

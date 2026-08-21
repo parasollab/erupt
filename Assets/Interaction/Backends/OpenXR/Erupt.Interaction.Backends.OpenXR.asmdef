@@ -1,0 +1,26 @@
+{
+    "name": "Erupt.Interaction.Backends.OpenXR",
+    "rootNamespace": "Erupt.Interaction.Backends",
+    "references": [
+        "Erupt.Interaction.Core",
+        "Unity.InputSystem",
+        "Unity.XR.Interaction.Toolkit",
+        "Unity.XR.Hands",
+        "Unity.XR.CoreUtils"
+    ],
+    "includePlatforms": [
+        "Android",
+        "Editor",
+        "LinuxStandalone64",
+        "macOSStandalone",
+        "WindowsStandalone64"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
