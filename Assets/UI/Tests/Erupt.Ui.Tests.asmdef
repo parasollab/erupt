@@ -4,7 +4,9 @@
     "references": [
         "Erupt.Ui",
         "Erupt.Interaction.Core",
-        "UnityEngine.TestRunner"
+        "UnityEngine.TestRunner",
+        "UnityEngine.UI",
+        "Unity.TextMeshPro"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
