@@ -26,6 +26,11 @@ public class SelectionManager : MonoBehaviour
              "for allowing both, which is a Phase 2 change.")]
     [SerializeField] private string selectionSourceId = "";
 
+    [Tooltip("When assigned, selection is mirrored into the shared SelectionService so " +
+             "tier 2 menus can key off the selected object's kind. Leave empty to keep " +
+             "the pre-refactor behavior.")]
+    [SerializeField] private SelectionService selectionService;
+
     [Header("Highlighting")]
     public Material highlightMaterial;
     private Material originalMaterial;
@@ -72,6 +77,30 @@ public class SelectionManager : MonoBehaviour
     }
 
     private void OnSelectPerformed(InputAction.CallbackContext _) => TrySelect();
+
+    // Bridges the legacy tag-based selection onto the typed SelectionService. Objects
+    // without a SelectableMarker are reported as Obstacle, which is what everything
+    // tagged "Selectable" was before kinds existed.
+    private void MirrorToService(GameObject selected)
+    {
+        if (selectionService == null) return;
+
+        if (selected == null)
+        {
+            selectionService.ClearSelection();
+            return;
+        }
+
+        ISelectable selectable = SelectionService.Resolve(selected);
+        if (selectable == null)
+        {
+            var marker = selected.AddComponent<SelectableMarker>();
+            marker.SetKind(SelectionKind.Obstacle);
+            selectable = marker;
+        }
+
+        selectionService.Select(selectable);
+    }
 
     // Target resolution and UI rejection already happened in the router, so this is the
     // selection rule only — no raycasting and no name matching.
@@ -194,6 +223,8 @@ public class SelectionManager : MonoBehaviour
             selectedRenderer.material = highlightMaterial;
         }
         
+        MirrorToService(SelectedObject);
+
         // Notify listeners that an object was selected
         OnObjectSelected?.Invoke(SelectedObject);
     }
@@ -207,7 +238,9 @@ public class SelectionManager : MonoBehaviour
 
         selectedRenderer = null;
         SelectedObject = null;
-        
+
+        MirrorToService(null);
+
         // Notify listeners that selection was cleared
         OnSelectionCleared?.Invoke();
     }
