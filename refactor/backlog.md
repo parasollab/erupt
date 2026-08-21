@@ -84,12 +84,19 @@ Every tier 2 verb is scoped to a selection; "Add Cube" has no selection. Propose
 resolution is a Build-mode in-world placement tool (Part 4 step 2), but this is a visible
 UX change and needs review before Phase 2 implements it. See survey §7 C5.
 
-### B13 — Plugin UI has UXML but no controller — `open`
+### B13 — Plugin UI has UXML but no controller — `done` (partially; see below)
 `XRDashboard.uxml`, `AddPlugin.uxml`, `AddPluginCard.uxml`, `PluginCard.uxml`, and
 `PluginCards.uss` exist under `Assets/UI Toolkit/`, plus a stray duplicate
 `Assets/AddPlugin.uxml`. No script in `Assets/Scripts` queries their element names.
-Either dead UI or driven from a package. Resolve before the Phase 2 tier audit, so it is
-not assigned a tier it never had.
+Maintainer confirmed the plugin UI is no longer used. Removed:
+`AddPlugin.uxml`, `AddPluginCard.uxml`, `PluginCard.uxml`, `PluginCards.uss`, and the
+stray duplicate `Assets/AddPlugin.uxml`.
+
+**`XRDashboard.uxml` was NOT removed.** It is the `sourceAsset` of a live `UIDocument`
+component in `Assets/Scenes/AR.unity`, so deleting it would leave a broken reference in
+that scene. It has no controller script in `Assets/Scripts`, which means it renders but
+nothing drives it — worth deciding separately whether the AR scene still needs it. Tracked
+as **B19**.
 
 ---
 
@@ -174,3 +181,10 @@ stay on the legacy input path. `Quest3ControllerRayInteractor` is not deleted, t
 opt-in flags stay, and Part 8 CR-2/CR-4 keep passing per-scene rather than repo-wide.
 Every change to selection or input must keep the legacy path working. Retires only when
 those five scenes migrate. B7 and B3 are blocked behind this for the same reason.
+
+### B19 — XRDashboard.uxml renders in AR.unity with no controller — `open`
+`Assets/UI Toolkit/XRDashboard.uxml` is bound to a `UIDocument` in
+`Assets/Scenes/AR.unity` but no script in `Assets/Scripts` queries its element names, so
+it displays without anything driving it. Kept during the B13 cleanup precisely because the
+scene reference is live. Decide whether the AR scene still needs it; if not, remove the
+`UIDocument` component and the asset together. Out of scope while work is KitchenFR3-only.
