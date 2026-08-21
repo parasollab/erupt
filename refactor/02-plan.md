@@ -286,13 +286,31 @@ because of 3, and §0 was added because of 4.
 | §2.3 — tier 2 contextual menus | not started |
 | §2.4 — tier 3 consolidation | not started |
 | §2.5 — in-world widgets | not started |
-| §2.6 — mode manager | not started |
-| Bridging `SelectionManager` / robot selection onto `SelectionService` | not started |
-| Concrete undo commands (create / delete / move / scale / snap) | not started |
+| §2.6 — mode manager | **done** — `AppMode`, `ModeManager` (6 tests) |
+| Bridging `SelectionManager` onto `SelectionService` | **done** — opt-in, default off |
+| Bridging robot selection onto `SelectionService` | not started |
+| Concrete undo commands | **done** — `ObstacleSnapshot`, `ObstacleFactory`, three commands (5 tests) |
 
-**42/42 PlayMode tests pass.** No scene or prefab has been modified in Phase 2 — the
+**53/53 PlayMode tests pass.** No scene or prefab has been modified in Phase 2 — the
 foundations are pure logic with no scene presence yet.
 
 New assemblies this phase: `Erupt.Ui`, `Erupt.Ui.Tests`, `Erupt.Ros.Tests`.
 `SelectableMarker` is named to avoid colliding with `UnityEngine.UI.Selectable`, which
 tier UI code will have in scope.
+
+
+## Blocked on maintainer commits
+
+Three pieces of finished, passing work cannot be committed because they depend on
+uncommitted changes in files the maintainer also edited:
+
+| Held | Depends on |
+|---|---|
+| `Assets/Scripts/Obstacles/` | `CollisionObjectPublisher.suppressRemoveOnDestroy`, which is not at HEAD |
+| `Assets/Scripts/Tests/` | the seamed `CollisionObjectPublisher` — the flow and obstacle tests assert against `FakeRosBus` |
+| Five of nine ROS seam adopters | `CollisionObjectPublisher`, `CollisionObjectsListenerSimple`, `MTCDataManager`, `PickPlaceTaskRecorder`, `AttachedCollisionObjectListener` |
+| `Assets/Scenes/KitchenFR3.unity` | an 18-line maintainer change interleaved with the Phase 1 migration |
+
+Committing any of these would sweep in the maintainer's in-flight MTC work. The
+unblocking step is for those files to be committed first; the refactor work then lands
+cleanly on top.
