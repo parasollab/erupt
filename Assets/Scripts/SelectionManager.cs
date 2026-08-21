@@ -1,3 +1,4 @@
+using Erupt.Interaction;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.XR.Interaction.Toolkit.Interactors;
@@ -12,6 +13,18 @@ public class SelectionManager : MonoBehaviour
 
     [Header("Ray Interactor")]
     public XRRayInteractor rayInteractor; // Assign your controller's ray interactor in the Inspector
+
+    [Header("Interaction Router (opt-in)")]
+    [Tooltip("When assigned, selection is driven by the router instead of a bound input " +
+             "action, and target resolution happens there. Leave empty to keep the " +
+             "pre-refactor behavior.")]
+    [SerializeField] private InteractionRouter interactionRouter;
+
+    [Tooltip("Only accept select intents from this source id (\"left\", \"right\"). Empty " +
+             "means any source. Set to \"right\" on migration because the pre-refactor " +
+             "binding was right-trigger only; Guidelines Part 3's busy-hand rule argues " +
+             "for allowing both, which is a Phase 2 change.")]
+    [SerializeField] private string selectionSourceId = "";
 
     [Header("Highlighting")]
     public Material highlightMaterial;
@@ -35,13 +48,50 @@ public class SelectionManager : MonoBehaviour
 
     private void Start()
     {
+        if (interactionRouter != null)
+        {
+            interactionRouter.Select += OnRouterSelect;
+            return;
+        }
+
         if (rayInteractor == null)
         {
             Debug.LogError("Ray Interactor is not assigned in SelectionManager.");
             return;
         }
 
-        selectAction.action.performed += ctx => TrySelect();
+        selectAction.action.performed += OnSelectPerformed;
+    }
+
+    private void OnDestroy()
+    {
+        if (interactionRouter != null)
+            interactionRouter.Select -= OnRouterSelect;
+        else if (selectAction != null && selectAction.action != null)
+            selectAction.action.performed -= OnSelectPerformed;
+    }
+
+    private void OnSelectPerformed(InputAction.CallbackContext _) => TrySelect();
+
+    // Target resolution and UI rejection already happened in the router, so this is the
+    // selection rule only — no raycasting and no name matching.
+    private void OnRouterSelect(InteractionIntent intent)
+    {
+        if (!string.IsNullOrEmpty(selectionSourceId) && intent.Sample.SourceId != selectionSourceId)
+            return;
+
+        GameObject hitObj = intent.Target;
+
+        if (hitObj == null || !hitObj.CompareTag("Selectable"))
+        {
+            ClearSelection();
+            return;
+        }
+
+        if (SelectedObject == hitObj)
+            return; // Already selected — keep it so the user can grab it
+
+        SetSelectedObject(hitObj);
     }
 
     void TrySelect()

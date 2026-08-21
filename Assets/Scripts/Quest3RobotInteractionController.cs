@@ -1,3 +1,4 @@
+using Erupt.Interaction;
 using UnityEngine;
 
 public class Quest3RobotInteractionController : MonoBehaviour
@@ -13,7 +14,10 @@ public class Quest3RobotInteractionController : MonoBehaviour
     private ArticulationBody selectedJoint;
     private Renderer[] selectedRenderers;
     private Color[] originalColors;
-    private Quest3ControllerRayInteractor activeDragInteractor;
+    // Widened from Quest3ControllerRayInteractor so the router can own a drag too.
+    // Private, so this is not an API change for the scenes still on the old path.
+    private object activeDragInteractor;
+    private static readonly object RouterDragToken = new object();
     private float dragDistance;
     private Vector3 dragOffset;
 
@@ -66,6 +70,17 @@ public class Quest3RobotInteractionController : MonoBehaviour
 
     public bool TryBeginHandleDrag(Quest3ControllerRayInteractor interactor, Ray ray, RaycastHit hit)
     {
+        return TryBeginHandleDrag((object)interactor, ray, hit);
+    }
+
+    /// <summary>Router-driven equivalent of TryBeginHandleDrag. Guidelines Part 3.</summary>
+    public bool TryBeginHandleDrag(InteractionIntent intent)
+    {
+        return TryBeginHandleDrag(RouterDragToken, intent.Ray, intent.HasHit ? intent.Hit : default);
+    }
+
+    private bool TryBeginHandleDrag(object interactor, Ray ray, RaycastHit hit)
+    {
         if (ikController == null || handle == null || interactor == null)
         {
             return false;
@@ -88,6 +103,17 @@ public class Quest3RobotInteractionController : MonoBehaviour
 
     public void UpdateHandleDrag(Quest3ControllerRayInteractor interactor, Ray ray)
     {
+        UpdateHandleDrag((object)interactor, ray);
+    }
+
+    /// <summary>Router-driven equivalent of UpdateHandleDrag.</summary>
+    public void UpdateHandleDrag(InteractionIntent intent)
+    {
+        UpdateHandleDrag(RouterDragToken, intent.Ray);
+    }
+
+    private void UpdateHandleDrag(object interactor, Ray ray)
+    {
         if (activeDragInteractor != interactor || ikController == null || handle == null)
         {
             return;
@@ -95,10 +121,24 @@ public class Quest3RobotInteractionController : MonoBehaviour
 
         Vector3 target = ray.GetPoint(dragDistance) + dragOffset;
         handle.position = target;
-        ikController.SolveToTarget(target);
+
+        // Refusal is reported rather than swallowed; the legacy path used the void
+        // SolveToTarget and had no way to say "out of reach".
+        LastRefusal = ikController.TrySolveToTarget(target);
     }
 
     public void EndHandleDrag(Quest3ControllerRayInteractor interactor)
+    {
+        EndHandleDrag((object)interactor);
+    }
+
+    /// <summary>Router-driven equivalent of EndHandleDrag.</summary>
+    public void EndHandleDrag(InteractionIntent intent)
+    {
+        EndHandleDrag(RouterDragToken);
+    }
+
+    private void EndHandleDrag(object interactor)
     {
         if (activeDragInteractor != interactor)
         {
@@ -123,9 +163,22 @@ public class Quest3RobotInteractionController : MonoBehaviour
         }
 
         ikController.BeginInteraction();
-        ikController.NudgeJoint(selectedJoint, deltaRadians);
+        LastRefusal = ikController.TryNudgeJoint(selectedJoint, deltaRadians);
         ikController.EndInteraction();
     }
+
+    /// <summary>Router-driven selection. Target resolution already happened upstream.</summary>
+    public void SelectFromIntent(InteractionIntent intent)
+    {
+        if (intent.HasHit) SelectFromHit(intent.Hit);
+        else ClearSelection();
+    }
+
+    /// <summary>
+    /// Why the most recent manipulation could not fully proceed, or
+    /// <see cref="InteractionRefusal.None"/>. Guidelines Part 3.
+    /// </summary>
+    public InteractionRefusal LastRefusal { get; private set; } = InteractionRefusal.None;
 
     private void SelectJoint(ArticulationBody joint)
     {
