@@ -1,3 +1,4 @@
+using Erupt.Ros;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using Unity.Robotics.ROSTCPConnector;
@@ -8,7 +9,7 @@ public class FPSPublisher : MonoBehaviour
     public string topic = "/fps";
     [SerializeField] private InputActionReference _togglePublishAction;
 
-    private ROSConnection ros;
+    private IRosBus ros;
     private float elapsedSincePublish;
     private float sumFps;
     private uint fpsSamples;
@@ -16,7 +17,7 @@ public class FPSPublisher : MonoBehaviour
 
     void Start()
     {
-        ros = ROSConnection.GetOrCreateInstance();
+        ros = RosBus.Instance;
         ros.RegisterPublisher<Int32Msg>(topic);
         _togglePublishAction.action.performed += OnTogglePublish;
     }

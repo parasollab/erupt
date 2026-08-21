@@ -1,3 +1,4 @@
+using Erupt.Ros;
 using System;
 using System.Collections.Generic;
 using Meta.XR.MRUtilityKit;
@@ -44,7 +45,7 @@ public class SceneAnchorCollisionBridge : MonoBehaviour
              "If null, Unity world space is used directly.")]
     public GameObject worldOrigin;
 
-    private ROSConnection _ros;
+    private IRosBus _ros;
     private Mesh _cubeMesh;
     private Mesh _quadMesh;
     private readonly List<string> _publishedIds = new();
@@ -91,7 +92,7 @@ public class SceneAnchorCollisionBridge : MonoBehaviour
     {
         Debug.Log("[SceneAnchorCollisionBridge] Start() — build is current.");
 
-        _ros = ROSConnection.GetOrCreateInstance();
+        _ros = RosBus.Instance;
         _ros.RegisterPublisher<CollisionObjectMsg>("/collision_object");
 
         var tmp = GameObject.CreatePrimitive(PrimitiveType.Cube);

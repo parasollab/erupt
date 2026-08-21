@@ -1,3 +1,4 @@
+using Erupt.Ros;
 using UnityEngine;
 using Unity.Robotics.ROSTCPConnector;
 using RosMessageTypes.Moveit;
@@ -48,7 +49,7 @@ public class SystemPrewarmer : MonoBehaviour
         try
         {
             // Initialize ROS connection
-            ROSConnection ros = ROSConnection.GetOrCreateInstance();
+            IRosBus ros = RosBus.Instance;
             
             // Pre-register the publisher that will be used by collision objects
             ros.RegisterPublisher<CollisionObjectMsg>("/collision_object");
