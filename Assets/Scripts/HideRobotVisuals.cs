@@ -30,11 +30,12 @@ public class HideRobotVisuals : MonoBehaviour
     {
         if (robotRoot == null)
         {
-            robotRoot = GameObject.Find(RobotRootName);
+            robotRoot = FindInOwnScene(RobotRootName);
         }
         if (robotRoot == null)
         {
-            Debug.LogWarning($"HideRobotVisuals: no '{RobotRootName}' found in the scene; nothing hidden.");
+            Debug.LogWarning($"HideRobotVisuals: no '{RobotRootName}' found in scene " +
+                             $"'{gameObject.scene.name}'; nothing hidden.");
             return;
         }
 
@@ -44,7 +45,7 @@ public class HideRobotVisuals : MonoBehaviour
 
         foreach (string name in additionalObjectNames)
         {
-            GameObject go = GameObject.Find(name);
+            GameObject go = FindInOwnScene(name);
             if (go == null) continue;
             Hide(go, ref hidden, ref collidersOff);
             hiddenNames.Add(go.name);
@@ -53,6 +54,32 @@ public class HideRobotVisuals : MonoBehaviour
         Debug.Log($"HideRobotVisuals: disabled {hidden} renderer(s)" +
                   (alsoDisableColliders ? $" and {collidersOff} collider(s)" : "") +
                   $" under: {string.Join(", ", hiddenNames)}.");
+    }
+
+    // The study controller loads scenes additively and unloads the outgoing scene only
+    // after the incoming one activates, so during Awake two 'ur5e_robot's can be loaded
+    // at once and GameObject.Find may return the outgoing scene's copy. Search only this
+    // component's own scene (inactive objects included) so the right robot gets hidden.
+    private GameObject FindInOwnScene(string name)
+    {
+        foreach (GameObject root in gameObject.scene.GetRootGameObjects())
+        {
+            if (root.name == name) return root;
+            Transform found = FindChildRecursive(root.transform, name);
+            if (found != null) return found.gameObject;
+        }
+        return null;
+    }
+
+    private static Transform FindChildRecursive(Transform parent, string name)
+    {
+        foreach (Transform child in parent)
+        {
+            if (child.name == name) return child;
+            Transform found = FindChildRecursive(child, name);
+            if (found != null) return found;
+        }
+        return null;
     }
 
     private void Hide(GameObject root, ref int hidden, ref int collidersOff)
