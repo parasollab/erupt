@@ -1,3 +1,4 @@
+using Erupt.Interaction;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -43,6 +44,36 @@ public class DirectArticulationIKController : MonoBehaviour
 
     public Transform EndEffector => endEffector;
     public IReadOnlyList<string> JointNames => jointNames;
+
+    private readonly Dictionary<string, Transform> linkByName = new Dictionary<string, Transform>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Resolve a URDF link name (e.g. "fr3_hand") to its Transform in the imported robot.
+    /// The URDF importer names link GameObjects after their link names. Falls back to the
+    /// end effector (with a warning) so attach visuals degrade gracefully on a name mismatch.
+    /// </summary>
+    public Transform FindLinkTransform(string linkName)
+    {
+        if (string.IsNullOrEmpty(linkName)) return endEffector;
+
+        if (linkByName.TryGetValue(linkName, out var cached) && cached) return cached;
+
+        if (robotRoot != null)
+        {
+            foreach (Transform t in robotRoot.GetComponentsInChildren<Transform>(true))
+            {
+                if (string.Equals(t.name, linkName, StringComparison.OrdinalIgnoreCase))
+                {
+                    linkByName[linkName] = t;
+                    return t;
+                }
+            }
+        }
+
+        Debug.LogWarning($"[IK] FindLinkTransform: no link named '{linkName}' under robot root; using end effector.");
+        linkByName[linkName] = endEffector;
+        return endEffector;
+    }
 
     private void Awake()
     {
@@ -111,6 +142,29 @@ public class DirectArticulationIKController : MonoBehaviour
         ZeroJointVelocities();
     }
 
+    /// <summary>
+    /// SolveToTarget, but reporting why it could not reach the target. Guidelines Part 3:
+    /// interaction refusals carry a user-facing reason instead of failing silently.
+    /// </summary>
+    public InteractionRefusal TrySolveToTarget(Vector3 targetPosition)
+    {
+        if (endEffector == null || joints.Count == 0)
+        {
+            return InteractionRefusal.Refuse("Robot is not configured for interaction.", targetPosition);
+        }
+
+        SolveToTarget(targetPosition);
+
+        float residual = Vector3.Distance(endEffector.position, targetPosition);
+        if (residual > positionTolerance)
+        {
+            return InteractionRefusal.Refuse(
+                $"Target is out of reach by {residual * 100f:F0} cm.", targetPosition);
+        }
+
+        return InteractionRefusal.None;
+    }
+
     public bool CanControlJoint(ArticulationBody joint)
     {
         return joint != null && joints.Contains(joint);
@@ -126,6 +180,33 @@ public class DirectArticulationIKController : MonoBehaviour
         ApplyJointPosition(joint, ClampJointPosition(joint, joint.jointPosition[0] + deltaRadians));
         CaptureHeldPose();
         ZeroJointVelocities();
+    }
+
+    /// <summary>
+    /// NudgeJoint, but reporting when the requested angle was clamped away. The clamp in
+    /// ClampJointPosition is otherwise silent, which Guidelines Part 3 calls out as the
+    /// most common source of novice confusion.
+    /// </summary>
+    public InteractionRefusal TryNudgeJoint(ArticulationBody joint, float deltaRadians)
+    {
+        if (!CanControlJoint(joint))
+        {
+            return InteractionRefusal.Refuse("That joint cannot be driven.", transform.position);
+        }
+
+        float requested = joint.jointPosition[0] + deltaRadians;
+        float clamped = ClampJointPosition(joint, requested);
+
+        NudgeJoint(joint, deltaRadians);
+
+        if (!Mathf.Approximately(requested, clamped))
+        {
+            return InteractionRefusal.Refuse(
+                $"{joint.name} is at its {(requested > clamped ? "upper" : "lower")} limit.",
+                joint.transform.position);
+        }
+
+        return InteractionRefusal.None;
     }
 
     public string[] GetJointStateNames()

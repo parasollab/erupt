@@ -1,3 +1,5 @@
+using Erupt.Ros;
+using Erupt.Interaction;
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
@@ -15,9 +17,10 @@ public class PickPlaceTaskRecorder : MonoBehaviour
     public bool IsRecording { get; private set; }
 
     // Invoked when a task is successfully captured; passes the object_id.
-    public System.Action<string> OnRecordingComplete;
+    // Event so multiple UIs (wrist menu + MTC dashboard) can both observe completion.
+    public event System.Action<string> OnRecordingComplete;
 
-    private ROSConnection ros;
+    private IRosBus ros;
     private XRGrabInteractable watchedInteractable;
     private CollisionObjectPublisher watchedPublisher;
 
@@ -32,7 +35,11 @@ public class PickPlaceTaskRecorder : MonoBehaviour
 
     void Start()
     {
-        ros = ROSConnection.GetOrCreateInstance();
+        // Study telemetry subscribes to the single interaction sink rather than
+        // tapping input directly. Guidelines Part 3.
+        InteractionSampleBus.Sample += OnInteractionSample;
+
+        ros = RosBus.Instance;
         ros.RegisterPublisher<PickPlaceTaskMsg>(Topic);
     }
 
@@ -151,5 +158,21 @@ public class PickPlaceTaskRecorder : MonoBehaviour
     {
         if (IsRecording)
             StopRecording();
+
+        InteractionSampleBus.Sample -= OnInteractionSample;
+    }
+
+    /// <summary>
+    /// Latest routed manipulation sample, carrying modality and tracking confidence.
+    /// Recorded for study reporting; the /pick_place_task payload is unchanged.
+    /// </summary>
+    public InteractionSample LastSample { get; private set; }
+
+    public bool HasSample { get; private set; }
+
+    private void OnInteractionSample(InteractionSample sample)
+    {
+        LastSample = sample;
+        HasSample = true;
     }
 }

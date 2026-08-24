@@ -1,4 +1,5 @@
 using System;
+using Unity.Robotics.ROSTCPConnector;
 using Unity.Robotics.ROSTCPConnector.MessageGeneration;
 
 namespace Erupt.Ros
@@ -25,6 +26,10 @@ namespace Erupt.Ros
 
         void SendServiceMessage<TResponse>(string serviceName, Message request, Action<TResponse> callback)
             where TResponse : Message, new();
+
+        IRosActionClient<TGoal, TResult, TFeedback>
+            RegisterActionClient<TGoal, TResult, TFeedback>(string actionName)
+            where TGoal : Message where TResult : Message where TFeedback : Message;
 
         void Publish(string topic, Message message);
 

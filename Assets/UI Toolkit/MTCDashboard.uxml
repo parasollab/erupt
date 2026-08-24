@@ -27,6 +27,10 @@
             <ui:ScrollView name="mtcStageScrollView" style="flex-grow: 1;">
                 <ui:VisualElement name="mtcStageTreeContainer" />
             </ui:ScrollView>
+            <ui:Label text="Stage Solutions" name="mtcStageSolutionsTitle" style="-unity-font-style: bold; color: rgb(200, 200, 200); font-size: 13px; margin-top: 4px; margin-bottom: 4px;" />
+            <ui:ScrollView name="mtcStageSolutionsScrollView" style="height: 130px; border-top-width: 1px; border-top-color: rgb(60, 60, 60);">
+                <ui:VisualElement name="mtcStageSolutionsContainer" />
+            </ui:ScrollView>
         </ui:VisualElement>
 
         <!-- Tab 3: Solutions -->
@@ -42,7 +46,11 @@
             <ui:VisualElement style="flex-direction: row;">
                 <ui:Button text="Preview" name="mtcPreviewButton" selectable="false" focusable="false" style="flex-grow: 1; -unity-font-style: bold;" />
                 <ui:Button text="Stop" name="mtcStopPreviewButton" selectable="false" focusable="false" style="flex-grow: 1; -unity-font-style: bold;" />
+                <ui:Button text="Execute" name="mtcExecuteButton" selectable="false" focusable="false" style="flex-grow: 1; -unity-font-style: bold; color: rgb(120, 255, 120);" />
+                <ui:Button text="Cancel" name="mtcCancelExecuteButton" selectable="false" focusable="false" style="flex-grow: 1; -unity-font-style: bold; color: rgb(255, 150, 120);" />
             </ui:VisualElement>
+            <ui:ProgressBar title="Execution progress" value="0" low-value="0" high-value="100" name="mtcExecProgress" style="display: none; margin-top: 4px;" />
+            <ui:Label text="" name="mtcExecStatusLabel" style="-unity-text-align: upper-center; color: rgb(190, 190, 190); font-size: 12px; margin-top: 4px;" />
         </ui:VisualElement>
 
     </ui:VisualElement>

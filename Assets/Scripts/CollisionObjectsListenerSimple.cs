@@ -1,3 +1,4 @@
+using Erupt.Ros;
 using System.Collections.Generic;
 using UnityEngine;
 using Unity.Robotics.ROSTCPConnector;
@@ -26,8 +27,16 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
     [Header("Materials")]
     public Material litMaterial;
 
-    private ROSConnection ros;
+    private IRosBus ros;
     public Dictionary<string, GameObject> objectsById = new();
+
+    // Ids currently attached to the robot (maintained by AttachedCollisionObjectListener).
+    // While an id is in here, inbound REMOVEs for it are ignored — the object is being
+    // carried by the gripper, not deleted.
+    public readonly HashSet<string> attachedIds = new();
+
+    // Fired after an inbound ADD/APPEND/MOVE has been applied to the GameObject for this id.
+    public event System.Action<string> OnObjectUpdated;
 
     // IDs owned by CollisionObjectPublisher components already in the scene — never spawn duplicates for these
     private readonly HashSet<string> _publisherOwnedIds = new();
@@ -40,7 +49,7 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
 
     void Start()
     {
-        ros = ROSConnection.GetOrCreateInstance();
+        ros = RosBus.Instance;
 
         foreach (var pub in FindObjectsByType<CollisionObjectPublisher>(FindObjectsSortMode.None))
             if (!string.IsNullOrEmpty(pub.objectId))
@@ -65,15 +74,21 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
 
         if (co.operation == OP_REMOVE)
         {
+            if (attachedIds.Contains(co.id))
+            {
+                Debug.Log($"[CO Listener] Ignoring REMOVE for attached object id={co.id}");
+                return;
+            }
             Debug.Log($"[CO Listener] Removing object id={co.id}");
-            if (objectsById.TryGetValue(co.id, out var old) && old) Destroy(old);
+            if (objectsById.TryGetValue(co.id, out var old) && old)
+            {
+                // This destroy was commanded by ROS — don't let the object's own publisher
+                // echo a REMOVE back to /collision_object and erase it from MoveIt's scene.
+                foreach (var pub in old.GetComponentsInChildren<CollisionObjectPublisher>(true))
+                    pub.suppressRemoveOnDestroy = true;
+                Destroy(old);
+            }
             objectsById.Remove(co.id);
-            return;
-        }
-
-        if (co.operation == OP_ADD && objectsById.ContainsKey(co.id))
-        {
-            Debug.LogWarning($"[CO Listener] Ignoring ADD for existing id={co.id}; use APPEND or MOVE.");
             return;
         }
 
@@ -94,6 +109,18 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
         ApplyWorldPose(parent.transform, objPose);
 
         Debug.Log($"[CO Listener] Applied world pose to '{co.id}': position=({objPose.position.x}, {objPose.position.y}, {objPose.position.z}), orientation=({objPose.orientation.x}, {objPose.orientation.y}, {objPose.orientation.z}, {objPose.orientation.w})");
+
+        // MOVE (and any other geometry-less message) only updates the pose — rebuilding here
+        // would destroy all visuals since there is no geometry to rebuild from.
+        bool hasGeometry = (co.primitives?.Length ?? 0) > 0
+                        || (co.meshes?.Length ?? 0) > 0
+                        || (co.planes?.Length ?? 0) > 0;
+        if (!hasGeometry)
+        {
+            Debug.Log($"[CO Listener] No geometry in message for '{co.id}'; pose-only update.");
+            OnObjectUpdated?.Invoke(co.id);
+            return;
+        }
 
         // Rebuild children fresh for correctness
         for (int i = parent.transform.childCount - 1; i >= 0; i--)
@@ -165,9 +192,6 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
             publisher.objectId = name;
             publisher.hasBeenPublished = true;
             publisher.worldOrigin = worldOrigin;
-
-            // Register the new object
-            objectsById.Add(publisher.objectId, child);
         }
 
         // ---- MESHES (local to parent) ----
@@ -220,9 +244,6 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
                 publisher.objectId = name;
                 publisher.hasBeenPublished = true;
                 publisher.worldOrigin = worldOrigin;
-
-                // Register the new object
-                objectsById.Add(publisher.objectId, child);
             }
         }
 
@@ -239,6 +260,15 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
         }
 
         // Optional: parent.SetActive(built > 0);
+
+        OnObjectUpdated?.Invoke(co.id);
+    }
+
+    public bool TryGetObject(string id, out GameObject go)
+    {
+        if (objectsById.TryGetValue(id, out go) && go) return true;
+        go = null;
+        return false;
     }
 
     // ---------- Pose helpers ----------

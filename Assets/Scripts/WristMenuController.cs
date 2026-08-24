@@ -1,3 +1,4 @@
+using Erupt.Interaction;
 using UnityEngine;
 using UnityEngine.UIElements;
 using UnityEngine.InputSystem;
@@ -11,6 +12,12 @@ public class WristMenuController : MonoBehaviour
     
     [Header("Input Actions")]
     public InputActionAsset inputActions;
+
+    [Header("Interaction Router (opt-in)")]
+    [Tooltip("When assigned, the menu toggle comes from the router's Activate intent " +
+             "instead of a hardcoded action-map lookup. Leave empty to keep the " +
+             "pre-refactor behavior.")]
+    [SerializeField] private InteractionRouter interactionRouter;
     
     [Header("Materials")]
     public Material litMaterial;
@@ -341,6 +348,14 @@ public class WristMenuController : MonoBehaviour
 
     private void SetupInputActions()
     {
+        // Router path: the menu is an Activate intent, so it is no longer bound to a
+        // specific action map — or to a specific hand.
+        if (interactionRouter != null)
+        {
+            interactionRouter.Activate += OnRouterActivate;
+            return;
+        }
+
         if (inputActions == null)
         {
             Debug.LogError("WristMenuController: InputActionAsset is not assigned.");
@@ -360,6 +375,11 @@ public class WristMenuController : MonoBehaviour
     }
     
     private void OnMenuToggle(InputAction.CallbackContext context)
+    {
+        ToggleMenu();
+    }
+
+    private void OnRouterActivate(InteractionIntent intent)
     {
         ToggleMenu();
     }
@@ -739,7 +759,9 @@ public class WristMenuController : MonoBehaviour
 
         if (!pickPlaceRecorder.IsRecording)
         {
-            pickPlaceRecorder.OnRecordingComplete = OnPickPlaceRecorded;
+            // -= first so repeated recordings never stack the handler
+            pickPlaceRecorder.OnRecordingComplete -= OnPickPlaceRecorded;
+            pickPlaceRecorder.OnRecordingComplete += OnPickPlaceRecorded;
             pickPlaceRecorder.StartRecording();
             if (recordPickPlaceButton != null)
             {
@@ -834,6 +856,9 @@ public class WristMenuController : MonoBehaviour
     // Cleanup
     private void OnDisable()
     {
+        if (interactionRouter != null)
+            interactionRouter.Activate -= OnRouterActivate;
+
         if (menuAction != null)
         {
             menuAction.performed -= OnMenuToggle;
@@ -843,6 +868,9 @@ public class WristMenuController : MonoBehaviour
     
     private void OnDestroy()
     {
+        if (interactionRouter != null)
+            interactionRouter.Activate -= OnRouterActivate;
+
         if (menuAction != null)
         {
             menuAction.performed -= OnMenuToggle;

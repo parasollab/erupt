@@ -16,7 +16,8 @@
         "GUID:f64c9ebcd7899c3448a08dc9f9ddbe30",
         "GUID:f5eda1afa2a1241a59c4db6830e1c890",
         "GUID:1641e37a24158429791b72b28eeb61c7",
-        "Erupt.Interaction.Core"
+        "Erupt.Interaction.Core",
+        "Erupt.Ui"
     ],
     "includePlatforms": [
         "Android",

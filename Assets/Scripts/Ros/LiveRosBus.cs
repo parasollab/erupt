@@ -29,6 +29,11 @@ namespace Erupt.Ros
             where TResponse : Message, new() =>
             Connection.SendServiceMessage(serviceName, request, callback);
 
+        public IRosActionClient<TGoal, TResult, TFeedback>
+            RegisterActionClient<TGoal, TResult, TFeedback>(string actionName)
+            where TGoal : Message where TResult : Message where TFeedback : Message =>
+            Connection.RegisterActionClient<TGoal, TResult, TFeedback>(actionName);
+
         public void Publish(string topic, Message message) =>
             Connection.Publish(topic, message);
 

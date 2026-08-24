@@ -1,21 +1,37 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using RosMessageTypes.MoveitTaskConstructorMsgs;
 using RosMessageTypes.BuiltinInterfaces;
+using RosMessageTypes.Moveit;
 using RosMessageTypes.Trajectory;
 
 public class MTCTrajectoryPlayer : MonoBehaviour
 {
     [SerializeField] private DirectArticulationIKController ikController;
+    [SerializeField] private CollisionObjectsListenerSimple sceneListener;
 
     private bool isPlaying;
     private Coroutine playRoutine;
     private string[] savedNames;
     private float[] savedPositions;
 
+    // Objects the preview has reparented to a robot link (via scene_diff attach), with
+    // everything needed to put them back when the preview ends.
+    private struct PreviewAttach
+    {
+        public GameObject go;
+        public Transform originalParent;
+        public Vector3 originalPos;
+        public Quaternion originalRot;
+        public bool wasPaused;
+    }
+    private readonly Dictionary<string, PreviewAttach> previewAttached = new();
+
     public void PlaySolution(SolutionMsg solution)
     {
         if (ikController == null) { Debug.LogError("[MTCTrajectoryPlayer] ikController not assigned."); return; }
+        if (sceneListener == null) sceneListener = FindFirstObjectByType<CollisionObjectsListenerSimple>();
         Stop();
         playRoutine = StartCoroutine(PlayRoutine(solution));
     }
@@ -38,6 +54,11 @@ public class MTCTrajectoryPlayer : MonoBehaviour
             foreach (var seg in solution.sub_trajectory)
             {
                 if (!isPlaying) break;
+
+                // Attach/detach stages are zero-motion ModifyPlanningScene segments — the
+                // scene_diff must be processed even when there is no trajectory to play.
+                ProcessSceneDiff(seg.scene_diff);
+
                 var jt = seg.trajectory?.joint_trajectory;
                 if (jt == null || jt.points == null || jt.points.Length == 0) continue;
                 yield return PlayJointTrajectory(jt);
@@ -49,6 +70,57 @@ public class MTCTrajectoryPlayer : MonoBehaviour
             isPlaying = false;
             playRoutine = null;
         }
+    }
+
+    // Mirror scene_diff attach/detach onto the Unity objects so the preview shows the
+    // object riding the gripper, exactly like the live execution will.
+    private void ProcessSceneDiff(PlanningSceneMsg sceneDiff)
+    {
+        var acos = sceneDiff?.robot_state?.attached_collision_objects;
+        if (acos == null || sceneListener == null) return;
+
+        foreach (var aco in acos)
+        {
+            string id = aco.@object?.id;
+            if (string.IsNullOrEmpty(id)) continue;
+
+            if (aco.@object.operation == CollisionObjectMsg.REMOVE)
+                PreviewDetach(id);
+            else
+                PreviewAttachObject(id, aco.link_name);
+        }
+    }
+
+    private void PreviewAttachObject(string id, string linkName)
+    {
+        if (previewAttached.ContainsKey(id)) return;
+        if (!sceneListener.TryGetObject(id, out var go)) return;
+
+        Transform link = ikController.FindLinkTransform(linkName);
+        if (link == null) return;
+
+        var publishers = go.GetComponentsInChildren<CollisionObjectPublisher>(true);
+        var state = new PreviewAttach
+        {
+            go = go,
+            originalParent = go.transform.parent,
+            originalPos = go.transform.position,
+            originalRot = go.transform.rotation,
+            wasPaused = publishers.Length > 0 && publishers[0].pausePublishing,
+        };
+        previewAttached[id] = state;
+
+        // Don't stream the preview motion into MoveIt's live scene.
+        foreach (var pub in publishers) pub.pausePublishing = true;
+        go.transform.SetParent(link, worldPositionStays: true);
+    }
+
+    private void PreviewDetach(string id)
+    {
+        if (!previewAttached.TryGetValue(id, out var state) || state.go == null) return;
+        // Leave the object where the preview placed it for now; full state (pose, parent,
+        // publisher) is restored in RestorePose when the preview ends.
+        state.go.transform.SetParent(state.originalParent, worldPositionStays: true);
     }
 
     private IEnumerator PlayJointTrajectory(JointTrajectoryMsg jt)
@@ -92,6 +164,17 @@ public class MTCTrajectoryPlayer : MonoBehaviour
             ikController.ApplyJointState(savedNames, savedPositions);
         savedNames = null;
         savedPositions = null;
+
+        // Put preview-attached objects back exactly as they were before the preview.
+        foreach (var state in previewAttached.Values)
+        {
+            if (state.go == null) continue;
+            state.go.transform.SetParent(state.originalParent, worldPositionStays: true);
+            state.go.transform.SetPositionAndRotation(state.originalPos, state.originalRot);
+            foreach (var pub in state.go.GetComponentsInChildren<CollisionObjectPublisher>(true))
+                pub.pausePublishing = state.wasPaused;
+        }
+        previewAttached.Clear();
     }
 
     private static double DurationToSeconds(DurationMsg d) => d.sec + d.nanosec * 1e-9;

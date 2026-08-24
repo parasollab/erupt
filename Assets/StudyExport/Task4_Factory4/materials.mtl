@@ -1,0 +1,66 @@
+newmtl Lit
+Kd 0.5 0.5 0.5
+d 1
+
+newmtl Mat_Tools
+Kd 0.8 0.8 0.8
+d 1
+map_Kd Tools_Composite_Base_Color_1.png
+
+newmtl Mat_Pegboard
+Kd 0.7353569 0.7353569 0.7353569
+d 1
+
+newmtl lathe
+Kd 1 1 1
+d 1
+map_Kd metal_albedo.jpg
+
+newmtl Mat_Vice
+Kd 0.8 0.8 0.8
+d 1
+map_Kd Vice_Base_Color.png
+
+newmtl Mat_Tool_Cabinet
+Kd 0.8 0.8 0.8
+d 1
+map_Kd Tool_Cabinet_Base_Color.png
+
+newmtl Mat_Workbench
+Kd 0.8 0.8 0.8
+d 1
+map_Kd Workbench_Base_Color.png
+
+newmtl Light_Fixture
+Kd 1 1 1
+d 1
+map_Kd Light_Fixture_Base_Color.png
+
+newmtl Material_001
+Kd 1 1 1
+d 1
+map_Kd Box_Diffuse.png
+
+newmtl Material512px
+Kd 1 1 1
+d 1
+map_Kd Material_Base_Color_512px_.png
+
+newmtl Pegboard
+Kd 1 1 1
+d 1
+map_Kd Pegboard_Base_Color.png
+
+newmtl TransluscentGreen
+Kd 0 0.9529411 0.1706259
+d 0.3411765
+
+newmtl toolbox
+Kd 1 1 1
+d 1
+map_Kd TOOLBOX_albedo.jpg
+
+newmtl TransluscentOrange
+Kd 0.9529411 0.5206915 0
+d 0.3411765
+

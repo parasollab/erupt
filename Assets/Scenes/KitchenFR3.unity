@@ -516,6 +516,79 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 1, y: 1, z: 1}
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!1 &107977294
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 107977296}
+  - component: {fileID: 107977295}
+  m_Layer: 0
+  m_Name: Interaction Router
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &107977295
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 107977294}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2629a39ab62a14bf7b386f6d32d4974c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Erupt.Interaction.Core::Erupt.Interaction.InteractionRouter
+  rayLength: 6
+  raycastLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  uiLayers:
+    serializedVersion: 2
+    m_Bits: 32
+  profiles:
+  - modality: 0
+    minCutoff: 1
+    beta: 0.007
+    precisionScale: 1
+    axisDeadzone: 0.18
+  - modality: 1
+    minCutoff: 0.6
+    beta: 0.02
+    precisionScale: 0.75
+    axisDeadzone: 0.2
+  - modality: 2
+    minCutoff: 0.5
+    beta: 0.03
+    precisionScale: 0.6
+    axisDeadzone: 0.25
+  - modality: 3
+    minCutoff: 1
+    beta: 0
+    precisionScale: 1
+    axisDeadzone: 0.05
+  logRefusals: 1
+--- !u!4 &107977296
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 107977294}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1482355975519924577}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &111117932
 GameObject:
   m_ObjectHideFlags: 0
@@ -775,6 +848,7 @@ MonoBehaviour:
   publishRateHz: 1
   trackLatency: 0
   pausePublishing: 0
+  suppressRemoveOnDestroy: 0
   worldOrigin: {fileID: 1122808672}
   hasBeenPublished: 0
 --- !u!114 &127640227
@@ -861,6 +935,8 @@ MonoBehaviour:
   m_StartingHoverFilters: []
   m_StartingSelectFilters: []
   m_StartingInteractionStrengthFilters: []
+  m_AutoFindParentInteractableInHierarchy: 0
+  m_ParentInteractableObject: {fileID: 0}
   m_AttachTransform: {fileID: 0}
   m_SecondaryAttachTransform: {fileID: 0}
   m_UseDynamicAttach: 0
@@ -1108,6 +1184,7 @@ MonoBehaviour:
   publishRateHz: 1
   trackLatency: 0
   pausePublishing: 0
+  suppressRemoveOnDestroy: 0
   worldOrigin: {fileID: 1122808672}
   hasBeenPublished: 0
 --- !u!114 &140176121
@@ -1194,6 +1271,8 @@ MonoBehaviour:
   m_StartingHoverFilters: []
   m_StartingSelectFilters: []
   m_StartingInteractionStrengthFilters: []
+  m_AutoFindParentInteractableInHierarchy: 0
+  m_ParentInteractableObject: {fileID: 0}
   m_AttachTransform: {fileID: 0}
   m_SecondaryAttachTransform: {fileID: 0}
   m_UseDynamicAttach: 0
@@ -1890,6 +1969,7 @@ GameObject:
   - component: {fileID: 326645955}
   - component: {fileID: 326645954}
   - component: {fileID: 326645956}
+  - component: {fileID: 326645957}
   m_Layer: 0
   m_Name: Robot IK Manager
   m_TagString: Untagged
@@ -1951,6 +2031,21 @@ MonoBehaviour:
   handleIdleColor: {r: 0.05, g: 0.75, b: 1, a: 1}
   handleActiveColor: {r: 1, g: 0.75, b: 0.05, a: 1}
   selectedJointColor: {r: 1, g: 0.35, b: 0.08, a: 1}
+--- !u!114 &326645957
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 326645953}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c1be83ae602c64d2e900331833fb4cdb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: xrviz::RobotInteractionRouterBinding
+  router: {fileID: 107977295}
+  robotInteraction: {fileID: 326645956}
+  jointJogRadiansPerSecond: 0.8
 --- !u!1001 &329113161
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -3127,7 +3222,8 @@ GameObject:
   m_Component:
   - component: {fileID: 610609377}
   - component: {fileID: 610609379}
-  - component: {fileID: 610609378}
+  - component: {fileID: 610609381}
+  - component: {fileID: 610609380}
   m_Layer: 0
   m_Name: Robot Ray
   m_TagString: Untagged
@@ -3150,29 +3246,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1482355975519924574}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &610609378
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 610609376}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 93b0ddef24c884d7cb4971212b799083, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: xrviz::Quest3ControllerRayInteractor
-  controllerNode: 5
-  robotInteraction: {fileID: 326645956}
-  rayLength: 6
-  jointJogRadiansPerSecond: 0.8
-  thumbstickDeadzone: 0.18
-  raycastLayers:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  localRayDirection: {x: 0, y: 0, z: 1}
-  idleRayColor: {r: 0.05, g: 0.75, b: 1, a: 0.85}
-  hitRayColor: {r: 1, g: 0.75, b: 0.05, a: 0.95}
 --- !u!120 &610609379
 LineRenderer:
   serializedVersion: 2
@@ -3283,6 +3356,85 @@ LineRenderer:
   m_UseWorldSpace: 1
   m_Loop: 0
   m_ApplyActiveColorSpace: 1
+--- !u!114 &610609380
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 610609376}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f6e82ce3a2aae454c95047a60e44dc0b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Erupt.Interaction.Core::Erupt.Interaction.InteractionRayVisual
+  router: {fileID: 107977295}
+  source: {fileID: 610609381}
+  requireRayCapability: 1
+  idleRayColor: {r: 0.05, g: 0.75, b: 1, a: 0.85}
+  hitRayColor: {r: 1, g: 0.75, b: 0.05, a: 0.95}
+--- !u!114 &610609381
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 610609376}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 317cc65a72a63431188d3d1d4db5fefb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Erupt.Interaction.Backends.OpenXR::Erupt.Interaction.Backends.XriControllerBackend
+  sourceId: right
+  rayOrigin: {fileID: 610609377}
+  selectAction:
+    m_UseReference: 1
+    m_Action:
+      m_Name: 
+      m_Type: 0
+      m_ExpectedControlType: 
+      m_Id: 0fc350dc-cec4-482c-a024-f607f41a560c
+      m_Processors: 
+      m_Interactions: 
+      m_SingletonActionBindings: []
+      m_Flags: 0
+    m_Reference: {fileID: -2432073547575864795, guid: c348712bda248c246b8c49b3db54643f, type: 3}
+  gripAction:
+    m_UseReference: 1
+    m_Action:
+      m_Name: 
+      m_Type: 0
+      m_ExpectedControlType: 
+      m_Id: cd1f5aa7-5a68-4663-aed6-855ebac17bef
+      m_Processors: 
+      m_Interactions: 
+      m_SingletonActionBindings: []
+      m_Flags: 0
+    m_Reference: {fileID: 2952293240542986942, guid: c348712bda248c246b8c49b3db54643f, type: 3}
+  axisAction:
+    m_UseReference: 1
+    m_Action:
+      m_Name: 
+      m_Type: 0
+      m_ExpectedControlType: 
+      m_Id: 50f3f223-6cf7-4fd1-9bdc-47fb8dd786b6
+      m_Processors: 
+      m_Interactions: 
+      m_SingletonActionBindings: []
+      m_Flags: 0
+    m_Reference: {fileID: 7489563345203072732, guid: c348712bda248c246b8c49b3db54643f, type: 3}
+  activateAction:
+    m_UseReference: 0
+    m_Action:
+      m_Name: 
+      m_Type: 0
+      m_ExpectedControlType: 
+      m_Id: edd54bcc-518c-4ffb-9f63-8a404251b3fd
+      m_Processors: 
+      m_Interactions: 
+      m_SingletonActionBindings: []
+      m_Flags: 0
+    m_Reference: {fileID: 0}
 --- !u!1 &621569157
 GameObject:
   m_ObjectHideFlags: 8
@@ -3685,6 +3837,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   selectAction: {fileID: -7988439510033093839, guid: c348712bda248c246b8c49b3db54643f, type: 3}
   rayInteractor: {fileID: 560994527}
+  interactionRouter: {fileID: 107977295}
+  selectionSourceId: right
+  selectionService: {fileID: 0}
   highlightMaterial: {fileID: 2100000, guid: c2895afaaa851457ba48086242a8499d, type: 2}
 --- !u!4 &647391640
 Transform:
@@ -4472,7 +4627,8 @@ GameObject:
   m_Component:
   - component: {fileID: 807202782}
   - component: {fileID: 807202784}
-  - component: {fileID: 807202783}
+  - component: {fileID: 807202786}
+  - component: {fileID: 807202785}
   m_Layer: 0
   m_Name: Robot Ray
   m_TagString: Untagged
@@ -4495,29 +4651,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1482355975519924573}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &807202783
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 807202781}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 93b0ddef24c884d7cb4971212b799083, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: xrviz::Quest3ControllerRayInteractor
-  controllerNode: 4
-  robotInteraction: {fileID: 326645956}
-  rayLength: 6
-  jointJogRadiansPerSecond: 0.8
-  thumbstickDeadzone: 0.18
-  raycastLayers:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  localRayDirection: {x: 0, y: 0, z: 1}
-  idleRayColor: {r: 0.05, g: 0.75, b: 1, a: 0.85}
-  hitRayColor: {r: 1, g: 0.75, b: 0.05, a: 0.95}
 --- !u!120 &807202784
 LineRenderer:
   serializedVersion: 2
@@ -4628,6 +4761,85 @@ LineRenderer:
   m_UseWorldSpace: 1
   m_Loop: 0
   m_ApplyActiveColorSpace: 1
+--- !u!114 &807202785
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 807202781}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f6e82ce3a2aae454c95047a60e44dc0b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Erupt.Interaction.Core::Erupt.Interaction.InteractionRayVisual
+  router: {fileID: 107977295}
+  source: {fileID: 807202786}
+  requireRayCapability: 1
+  idleRayColor: {r: 0.05, g: 0.75, b: 1, a: 0.85}
+  hitRayColor: {r: 1, g: 0.75, b: 0.05, a: 0.95}
+--- !u!114 &807202786
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 807202781}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 317cc65a72a63431188d3d1d4db5fefb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Erupt.Interaction.Backends.OpenXR::Erupt.Interaction.Backends.XriControllerBackend
+  sourceId: left
+  rayOrigin: {fileID: 807202782}
+  selectAction:
+    m_UseReference: 1
+    m_Action:
+      m_Name: 
+      m_Type: 0
+      m_ExpectedControlType: 
+      m_Id: 9e4ea289-6edd-4817-947c-b3d326bf53ca
+      m_Processors: 
+      m_Interactions: 
+      m_SingletonActionBindings: []
+      m_Flags: 0
+    m_Reference: {fileID: -8244156659083291672, guid: c348712bda248c246b8c49b3db54643f, type: 3}
+  gripAction:
+    m_UseReference: 1
+    m_Action:
+      m_Name: 
+      m_Type: 0
+      m_ExpectedControlType: 
+      m_Id: 66e0121a-4fae-491f-aacf-fc2d34b20cd0
+      m_Processors: 
+      m_Interactions: 
+      m_SingletonActionBindings: []
+      m_Flags: 0
+    m_Reference: {fileID: -7966444640328253993, guid: c348712bda248c246b8c49b3db54643f, type: 3}
+  axisAction:
+    m_UseReference: 1
+    m_Action:
+      m_Name: 
+      m_Type: 0
+      m_ExpectedControlType: 
+      m_Id: 9d7169f5-8502-4e41-aea4-75f8e342aa4c
+      m_Processors: 
+      m_Interactions: 
+      m_SingletonActionBindings: []
+      m_Flags: 0
+    m_Reference: {fileID: -1031338271674280626, guid: c348712bda248c246b8c49b3db54643f, type: 3}
+  activateAction:
+    m_UseReference: 1
+    m_Action:
+      m_Name: 
+      m_Type: 0
+      m_ExpectedControlType: 
+      m_Id: 31cc86d2-f166-4274-8fbd-b1d6461361b0
+      m_Processors: 
+      m_Interactions: 
+      m_SingletonActionBindings: []
+      m_Flags: 0
+    m_Reference: {fileID: 1007401884413673255, guid: c348712bda248c246b8c49b3db54643f, type: 3}
 --- !u!1 &815771080
 GameObject:
   m_ObjectHideFlags: 0
@@ -7449,6 +7661,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: xrviz::MTCTrajectoryPlayer
   ikController: {fileID: 326645954}
+  sceneListener: {fileID: 1697517152}
 --- !u!1 &1242433775
 GameObject:
   m_ObjectHideFlags: 0
@@ -7609,6 +7822,7 @@ MonoBehaviour:
   publishRateHz: 1
   trackLatency: 0
   pausePublishing: 0
+  suppressRemoveOnDestroy: 0
   worldOrigin: {fileID: 1122808672}
   hasBeenPublished: 0
 --- !u!114 &1246145206
@@ -7695,6 +7909,8 @@ MonoBehaviour:
   m_StartingHoverFilters: []
   m_StartingSelectFilters: []
   m_StartingInteractionStrengthFilters: []
+  m_AutoFindParentInteractableInHierarchy: 0
+  m_ParentInteractableObject: {fileID: 0}
   m_AttachTransform: {fileID: 0}
   m_SecondaryAttachTransform: {fileID: 0}
   m_UseDynamicAttach: 0
@@ -8303,6 +8519,52 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Unity.Robotics.UrdfImporter::Unity.Robotics.UrdfImporter.UrdfLink
   IsBaseLink: 0
+--- !u!1 &1325038034
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1325038036}
+  - component: {fileID: 1325038035}
+  m_Layer: 0
+  m_Name: ROS2 Action Demo
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!114 &1325038035
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1325038034}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f1f969d0d00b64bc588495cc2677060c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: xrviz::Ros2ActionClientDemo
+  m_SuccessOrder: 12
+  m_AutoRunOnReady: 1
+--- !u!4 &1325038036
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1325038034}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -3.34206, y: 0, z: 0.09531}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &1342538851
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -8446,6 +8708,7 @@ MonoBehaviour:
   publishRateHz: 1
   trackLatency: 0
   pausePublishing: 0
+  suppressRemoveOnDestroy: 0
   worldOrigin: {fileID: 1122808672}
   hasBeenPublished: 0
 --- !u!114 &1342538858
@@ -8532,6 +8795,8 @@ MonoBehaviour:
   m_StartingHoverFilters: []
   m_StartingSelectFilters: []
   m_StartingInteractionStrengthFilters: []
+  m_AutoFindParentInteractableInHierarchy: 0
+  m_ParentInteractableObject: {fileID: 0}
   m_AttachTransform: {fileID: 0}
   m_SecondaryAttachTransform: {fileID: 0}
   m_UseDynamicAttach: 0
@@ -9075,6 +9340,7 @@ MonoBehaviour:
   publishRateHz: 1
   trackLatency: 0
   pausePublishing: 0
+  suppressRemoveOnDestroy: 0
   worldOrigin: {fileID: 1122808672}
   hasBeenPublished: 0
 --- !u!114 &1387992867
@@ -9161,6 +9427,8 @@ MonoBehaviour:
   m_StartingHoverFilters: []
   m_StartingSelectFilters: []
   m_StartingInteractionStrengthFilters: []
+  m_AutoFindParentInteractableInHierarchy: 0
+  m_ParentInteractableObject: {fileID: 0}
   m_AttachTransform: {fileID: 0}
   m_SecondaryAttachTransform: {fileID: 0}
   m_UseDynamicAttach: 0
@@ -10231,6 +10499,8 @@ MonoBehaviour:
   m_StartingHoverFilters: []
   m_StartingSelectFilters: []
   m_StartingInteractionStrengthFilters: []
+  m_AutoFindParentInteractableInHierarchy: 0
+  m_ParentInteractableObject: {fileID: 0}
   m_AttachTransform: {fileID: 0}
   m_SecondaryAttachTransform: {fileID: 0}
   m_UseDynamicAttach: 0
@@ -10333,6 +10603,7 @@ MonoBehaviour:
   publishRateHz: 1
   trackLatency: 0
   pausePublishing: 0
+  suppressRemoveOnDestroy: 0
   worldOrigin: {fileID: 1122808672}
   hasBeenPublished: 0
 --- !u!64 &1549528037
@@ -11254,6 +11525,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 3731865409109120876, guid: 46fae3e1bd65645b4835315513e75b34, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1633403976}
+    - targetCorrespondingSourceObject: {fileID: 3731865409109120876, guid: 46fae3e1bd65645b4835315513e75b34, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 0}
   m_SourcePrefab: {fileID: 100100000, guid: 46fae3e1bd65645b4835315513e75b34, type: 3}
 --- !u!1 &1633403973 stripped
 GameObject:
@@ -11571,6 +11845,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1697517153}
   - component: {fileID: 1697517152}
+  - component: {fileID: 1697517154}
   m_Layer: 0
   m_Name: CollisionObjectListener
   m_TagString: Untagged
@@ -11608,6 +11883,22 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1697517154
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1697517151}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d4a98b52a4c244d7a35188e74bbe06f5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  topic: /attached_collision_objects_ros
+  sceneListener: {fileID: 1697517152}
+  ikController: {fileID: 326645954}
+  worldOrigin: {fileID: 1122808672}
 --- !u!1 &1703739666
 GameObject:
   m_ObjectHideFlags: 8
@@ -12732,6 +13023,7 @@ MonoBehaviour:
   publishRateHz: 1
   trackLatency: 0
   pausePublishing: 0
+  suppressRemoveOnDestroy: 0
   worldOrigin: {fileID: 1122808672}
   hasBeenPublished: 0
 --- !u!114 &1888166426
@@ -12818,6 +13110,8 @@ MonoBehaviour:
   m_StartingHoverFilters: []
   m_StartingSelectFilters: []
   m_StartingInteractionStrengthFilters: []
+  m_AutoFindParentInteractableInHierarchy: 0
+  m_ParentInteractableObject: {fileID: 0}
   m_AttachTransform: {fileID: 0}
   m_SecondaryAttachTransform: {fileID: 0}
   m_UseDynamicAttach: 0
@@ -13338,6 +13632,7 @@ MonoBehaviour:
   publishRateHz: 1
   trackLatency: 0
   pausePublishing: 0
+  suppressRemoveOnDestroy: 0
   worldOrigin: {fileID: 1122808672}
   hasBeenPublished: 0
 --- !u!1001 &2042867270
@@ -14131,6 +14426,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 647391639}
     - target: {fileID: 3006219390251926832, guid: 48516d5ede86a4731b56a6e555864e5b, type: 3}
+      propertyPath: interactionRouter
+      value: 
+      objectReference: {fileID: 107977295}
+    - target: {fileID: 3006219390251926832, guid: 48516d5ede86a4731b56a6e555864e5b, type: 3}
       propertyPath: mtcDashboardPanel
       value: 
       objectReference: {fileID: 1633403973}
@@ -14197,6 +14496,9 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects:
+    - targetCorrespondingSourceObject: {fileID: 3282372009203156751, guid: 48516d5ede86a4731b56a6e555864e5b, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 107977296}
     - targetCorrespondingSourceObject: {fileID: 347086280322041543, guid: 48516d5ede86a4731b56a6e555864e5b, type: 3}
       insertIndex: -1
       addedObject: {fileID: 807202782}
@@ -14216,6 +14518,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 7603677897352812517, guid: 48516d5ede86a4731b56a6e555864e5b, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1482355975519924576}
+    - targetCorrespondingSourceObject: {fileID: 1375403636790619792, guid: 48516d5ede86a4731b56a6e555864e5b, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 0}
     - targetCorrespondingSourceObject: {fileID: 8946133952073130294, guid: 48516d5ede86a4731b56a6e555864e5b, type: 3}
       insertIndex: -1
       addedObject: {fileID: 733727867}
@@ -14249,6 +14554,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: xrviz::PickPlaceTaskRecorder
   selectionManager: {fileID: 647391639}
   worldOrigin: {fileID: 1122808672}
+--- !u!4 &1482355975519924577 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 3282372009203156751, guid: 48516d5ede86a4731b56a6e555864e5b, type: 3}
+  m_PrefabInstance: {fileID: 1482355975519924572}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &1929881126119543319
 Transform:
   m_ObjectHideFlags: 0
@@ -14355,7 +14665,10 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 3731865409109120876, guid: 46fae3e1bd65645b4835315513e75b34, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 0}
   m_SourcePrefab: {fileID: 100100000, guid: 46fae3e1bd65645b4835315513e75b34, type: 3}
 --- !u!1001 &7862754869064648038
 PrefabInstance:
@@ -14458,3 +14771,4 @@ SceneRoots:
   - {fileID: 1228241012}
   - {fileID: 7862754869064648038}
   - {fileID: 244453}
+  - {fileID: 1325038036}

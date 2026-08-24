@@ -1,3 +1,4 @@
+using Erupt.Ros;
 using UnityEngine;
 using Unity.Robotics.ROSTCPConnector;
 using RosMessageTypes.Moveit;
@@ -19,9 +20,12 @@ public class CollisionObjectPublisher : MonoBehaviour
     public float publishRateHz = 1f;
     public bool trackLatency = false;
     public bool pausePublishing = false;
+    // Set before Destroy() when the destruction was commanded by ROS itself (inbound REMOVE) —
+    // publishing our own REMOVE back would delete the object from MoveIt's live scene.
+    public bool suppressRemoveOnDestroy = false;
     public GameObject worldOrigin; // Optional world origin for relative positioning
 
-    private ROSConnection ros;
+    private IRosBus ros;
     private float lastPublishTime = 0f;
     private Vector3 lastPosition;
     private Quaternion lastRotation;
@@ -32,7 +36,7 @@ public class CollisionObjectPublisher : MonoBehaviour
     void Start()
     {
         // Use existing ROS connection if available (pre-warmed by SystemPrewarmer)
-        ros = ROSConnection.GetOrCreateInstance();
+        ros = RosBus.Instance;
         
         // Validate ROS connection
         if (ros == null)
@@ -365,7 +369,7 @@ public class CollisionObjectPublisher : MonoBehaviour
     void OnDestroy()
     {
         // Delete the collision object from the planning scene
-        if (ros != null)
+        if (ros != null && !suppressRemoveOnDestroy)
         {
             CollisionObjectMsg msg = new CollisionObjectMsg
             {
