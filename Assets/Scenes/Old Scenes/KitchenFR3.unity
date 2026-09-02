@@ -3106,17 +3106,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 46398bc5d6905ad429a6d2d973afe002, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Robotics.UrdfImporter::Unity.Robotics.UrdfImporter.UrdfCollisions
---- !u!114 &560994527 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 934624646295732522, guid: 48516d5ede86a4731b56a6e555864e5b, type: 3}
-  m_PrefabInstance: {fileID: 1482355975519924572}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 6803edce0201f574f923fd9d10e5b30a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!1 &610609376
 GameObject:
   m_ObjectHideFlags: 0
@@ -3166,6 +3155,7 @@ MonoBehaviour:
   robotInteraction: {fileID: 326645956}
   rayLength: 6
   jointJogRadiansPerSecond: 0.8
+  handlePushPullMetersPerSecond: 1.5
   thumbstickDeadzone: 0.18
   raycastLayers:
     serializedVersion: 2
@@ -3684,7 +3674,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   selectAction: {fileID: -7988439510033093839, guid: c348712bda248c246b8c49b3db54643f, type: 3}
-  rayInteractor: {fileID: 560994527}
+  rayInteractor: {fileID: 0}
   highlightMaterial: {fileID: 2100000, guid: c2895afaaa851457ba48086242a8499d, type: 2}
 --- !u!4 &647391640
 Transform:
@@ -4511,6 +4501,7 @@ MonoBehaviour:
   robotInteraction: {fileID: 326645956}
   rayLength: 6
   jointJogRadiansPerSecond: 0.8
+  handlePushPullMetersPerSecond: 1.5
   thumbstickDeadzone: 0.18
   raycastLayers:
     serializedVersion: 2
@@ -11254,6 +11245,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 3731865409109120876, guid: 46fae3e1bd65645b4835315513e75b34, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1633403976}
+    - targetCorrespondingSourceObject: {fileID: 3731865409109120876, guid: 46fae3e1bd65645b4835315513e75b34, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 0}
   m_SourcePrefab: {fileID: 100100000, guid: 46fae3e1bd65645b4835315513e75b34, type: 3}
 --- !u!1 &1633403973 stripped
 GameObject:
@@ -13175,6 +13169,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: xrviz::TrajectoryReplay
   ikController: {fileID: 326645954}
+  ghostSpawner: {fileID: 0}
+  replayGhostColor: {r: 0, g: 0.5, b: 1, a: 0.5}
+  playbackSpeed: 1
 --- !u!114 &1936320622
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -13191,6 +13188,9 @@ MonoBehaviour:
   startGhostColor: {r: 0, g: 1, b: 0, a: 0.5}
   goalGhostColor: {r: 1, g: 0.5, b: 0, a: 0.5}
   realRobot: {fileID: 1228241008}
+  ghostControlPanelPrefab: {fileID: 0}
+  controlPanelLocalOffset: {x: 0, y: 0.5, z: 0}
+  ghostSelectionRadius: 0.35
 --- !u!4 &1936320623
 Transform:
   m_ObjectHideFlags: 0
@@ -14216,6 +14216,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 7603677897352812517, guid: 48516d5ede86a4731b56a6e555864e5b, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1482355975519924576}
+    - targetCorrespondingSourceObject: {fileID: 1375403636790619792, guid: 48516d5ede86a4731b56a6e555864e5b, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 0}
     - targetCorrespondingSourceObject: {fileID: 8946133952073130294, guid: 48516d5ede86a4731b56a6e555864e5b, type: 3}
       insertIndex: -1
       addedObject: {fileID: 733727867}
@@ -14355,7 +14358,10 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 3731865409109120876, guid: 46fae3e1bd65645b4835315513e75b34, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 0}
   m_SourcePrefab: {fileID: 100100000, guid: 46fae3e1bd65645b4835315513e75b34, type: 3}
 --- !u!1001 &7862754869064648038
 PrefabInstance:

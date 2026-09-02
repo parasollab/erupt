@@ -11,6 +11,14 @@ using Unity.Robotics.ROSTCPConnector.ROSGeometry;
 
 public class CollisionObjectPublisher : MonoBehaviour
 {
+    // Outgoing queue size for the shared /collision_object topic. The connector's default is
+    // 10 and TopicMessageSender silently drops the OLDEST queued message on overflow -- with
+    // ~60 publishers all bursting in the same frame (scene load ADDs, scene unload REMOVEs),
+    // most of the burst was dropped, leaving arbitrary objects missing from (or lingering in)
+    // the planning scene. The first RegisterPublisher call for a topic wins and later ones are
+    // ignored, so every script that registers this topic must pass this same value.
+    public const int CollisionObjectQueueSize = 512;
+
     public string objectId = "unity_object";
     public string frameId = "world";
     public bool isMesh = false;
@@ -44,7 +52,7 @@ public class CollisionObjectPublisher : MonoBehaviour
         // Register collision object publisher
         try
         {
-            ros.RegisterPublisher<CollisionObjectMsg>("/collision_object");
+            ros.RegisterPublisher<CollisionObjectMsg>("/collision_object", CollisionObjectQueueSize);
             Debug.Log($"[{gameObject.name}] Registered /collision_object publisher");
         }
         catch (System.Exception e)
@@ -71,7 +79,7 @@ public class CollisionObjectPublisher : MonoBehaviour
         // Initialize tracking variables
         lastPosition = transform.position;
         lastRotation = transform.rotation;
-        lastScale = transform.localScale;
+        lastScale = transform.lossyScale;
 
         ObjectMetricsLogger.Instance?.LogEvent("object_created", objectId);
 
@@ -291,7 +299,9 @@ public class CollisionObjectPublisher : MonoBehaviour
         }
 
         string meshName = meshFilter.mesh.name;
-        Vector3 scale = transform.localScale;
+        // lossyScale, not localScale: props nested under scaled parents (e.g. the 0.12-scaled
+        // computer model in the Task4 factory scenes) need the full hierarchy scale.
+        Vector3 scale = transform.lossyScale;
 
         // Match Unity primitive types based on mesh name
         if (meshName.Contains("Cube"))
@@ -363,14 +373,14 @@ public class CollisionObjectPublisher : MonoBehaviour
     bool HasScaleChanged()
     {
         const float epsilon = 0.001f;
-        return Vector3.Distance(transform.localScale, lastScale) > epsilon;
+        return Vector3.Distance(transform.lossyScale, lastScale) > epsilon;
     }
 
     void UpdateLastTransform()
     {
         lastPosition = transform.position;
         lastRotation = transform.rotation;
-        lastScale = transform.localScale;
+        lastScale = transform.lossyScale;
     }
 
     void OnDestroy()
@@ -430,10 +440,11 @@ public class CollisionObjectPublisher : MonoBehaviour
         {
             Vector3 vertex = unityMesh.vertices[i];
 
-            // Apply scale if transform is provided
+            // Apply scale if transform is provided; lossyScale so parents' scale (e.g. scaled
+            // model prefab roots in the Task4 scenes) is included, not just this object's own.
             if (transform != null)
             {
-                vertex = Vector3.Scale(vertex, transform.localScale);
+                vertex = Vector3.Scale(vertex, transform.lossyScale);
             }
 
             rosVertices[i] = new PointMsg(vertex.x, vertex.z, vertex.y);
@@ -841,7 +852,11 @@ public class CollisionObjectPublisher : MonoBehaviour
         long ticks = DateTimeOffset.UtcNow.UtcTicks - DateTimeOffset.UnixEpoch.UtcTicks;
         return new TimeMsg
         {
+#if ROS2
             sec = (int)(ticks / TimeSpan.TicksPerSecond),
+#else
+            sec = (uint)(ticks / TimeSpan.TicksPerSecond),
+#endif
             nanosec = (uint)((ticks % TimeSpan.TicksPerSecond) * 100L) // 1 tick = 100 ns
         };
     }

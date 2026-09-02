@@ -18,6 +18,12 @@ public static class StudySceneExporter
 {
     private const string ExportRoot = "Assets/StudyExport";
 
+    // Scene lookups are scoped to this folder because several scene names (StartScene,
+    // StudyComplete, Task1-4 Factory/Kitchen/Interlude/Placeholder, Tutorial) also exist
+    // as stale duplicates directly under Assets/Scenes/ -- without scoping, which copy
+    // AssetDatabase.FindAssets resolves first is not deterministic by folder.
+    private const string StudyScenesFolder = "Assets/Scenes/Full Study Scenes";
+
     // Root GameObject name of the UR5e robot prefab instance placed in every task scene
     // (confirmed via the PrefabInstance's m_Name override in the scene YAML, source prefab
     // guid 792b9a32fef2641c3be1678d4de8461c). The robot itself is never exported as a static
@@ -196,7 +202,7 @@ public static class StudySceneExporter
 
     private static string FindScenePath(string sceneName)
     {
-        foreach (string guid in AssetDatabase.FindAssets($"t:Scene {sceneName}"))
+        foreach (string guid in AssetDatabase.FindAssets($"t:Scene {sceneName}", new[] { StudyScenesFolder }))
         {
             string path = AssetDatabase.GUIDToAssetPath(guid);
             if (Path.GetFileNameWithoutExtension(path) == sceneName)

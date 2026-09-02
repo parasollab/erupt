@@ -8,6 +8,7 @@ public class Quest3ControllerRayInteractor : MonoBehaviour
     [SerializeField] private Quest3RobotInteractionController robotInteraction;
     [SerializeField] private float rayLength = 6f;
     [SerializeField] private float jointJogRadiansPerSecond = 0.8f;
+    [SerializeField] private float handlePushPullMetersPerSecond = 1.5f;
     [SerializeField] private float thumbstickDeadzone = 0.18f;
     [SerializeField] private LayerMask raycastLayers = ~0;
     [SerializeField] private Vector3 localRayDirection = Vector3.forward;
@@ -82,6 +83,15 @@ public class Quest3ControllerRayInteractor : MonoBehaviour
 
         if (isDraggingHandle && gripPressed && robotInteraction != null)
         {
+            if (device.TryGetFeatureValue(CommonUsages.primary2DAxis, out Vector2 pushPullAxis))
+            {
+                float pushPullY = Mathf.Abs(pushPullAxis.y) > thumbstickDeadzone ? pushPullAxis.y : 0f;
+                if (pushPullY != 0f)
+                {
+                    robotInteraction.AdjustHandleDragDistance(this, pushPullY * handlePushPullMetersPerSecond * Time.deltaTime, rayLength);
+                }
+            }
+
             robotInteraction.UpdateHandleDrag(this, ray);
         }
 

@@ -15,6 +15,11 @@ public class CertifyPathMenuController : MonoBehaviour
 
     private Button certifyButton;
     private bool hasCertified = false;
+    private MoveItPlanningRequestMenuUI planningMenu;
+
+    // Read by StudyController's advance gate: Task 4 scenes can't be left until the
+    // participant has certified a path.
+    public bool HasCertified => hasCertified;
 
     private void OnEnable()
     {
@@ -38,6 +43,26 @@ public class CertifyPathMenuController : MonoBehaviour
         hasCertified = false;
         UpdateButtonLabel();
         certifyButton.clicked += OnCertifyClicked;
+
+        planningMenu = FindFirstObjectByType<MoveItPlanningRequestMenuUI>(FindObjectsInactive.Include);
+        if (planningMenu == null)
+            Debug.LogWarning("CertifyPathMenuController: no MoveItPlanningRequestMenuUI in this scene; certify button stays enabled.");
+        UpdateInteractability();
+    }
+
+    // Certification only makes sense once there is a successfully planned path to certify,
+    // so the button stays disabled until then. Fails open (enabled) if the planning menu is
+    // missing from the scene.
+    private void Update()
+    {
+        UpdateInteractability();
+    }
+
+    private void UpdateInteractability()
+    {
+        if (certifyButton == null)
+            return;
+        certifyButton.SetEnabled(planningMenu == null || planningMenu.HasPlannedSuccessfully);
     }
 
     private void OnDisable()

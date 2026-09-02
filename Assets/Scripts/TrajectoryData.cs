@@ -23,7 +23,11 @@ public class TrajectoryData : ScriptableObject
         {
             var wp = waypoints[i];
             int sec = (int)wp.timeFromStart;
+#if ROS2
             uint nanosec = (uint)((wp.timeFromStart - sec) * 1e9);
+#else
+            int nanosec = (int)((wp.timeFromStart - sec) * 1e9);
+#endif
             points[i] = new JointTrajectoryPointMsg
             {
                 positions = wp.positions,

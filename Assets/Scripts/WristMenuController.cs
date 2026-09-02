@@ -27,8 +27,9 @@ public class WristMenuController : MonoBehaviour
     [SerializeField] private PickPlaceTaskRecorder pickPlaceRecorder;
     [SerializeField] private GameObject mtcDashboardPanel;
 
-    [Header("Shape Spawning")]
-    [SerializeField] private float shapeSpawnDistance = 0.75f;
+    private float shapeSpawnDistance = 1.25f;
+    // Alpha applied to shapes spawned from the wrist menu (1 = opaque, 0 = invisible)
+    private float spawnedShapeAlpha = 0.75f;
     
     // UI Elements
     private VisualElement root;
@@ -79,7 +80,7 @@ public class WristMenuController : MonoBehaviour
         SetMenuVisibility(false);
     }
     
-    public VisualElement CreateToggleStack(string shape, string label)
+    public VisualElement CreateToggleStack(string shape, string label, bool includeToggle = true)
     {
         // <ui:VisualElement name="toggle-stack" style="flex-direction: column; align-items: stretch;">
         var container = new VisualElement { name = "wristMenuEditScale" + label + "Stack" };
@@ -163,6 +164,9 @@ public class WristMenuController : MonoBehaviour
         IVisualElementScheduledItem gestureEndCheck = null;
         const float minScale = 0.01f;
         const long gestureEndDebounceMs = 200;
+        // Scale applied per unit of slider travel: full throw from center (100 units) changes
+        // localScale by 100 * scaleSensitivity / 100 on the affected axes.
+        const float scaleSensitivity = 0.5f;
 
         void ResetToCenterDeferred()
         {
@@ -179,7 +183,7 @@ public class WristMenuController : MonoBehaviour
         {
             gestureActive = false;
 
-            float totalDeltaPercent = (slider.value - gestureStartValue) / 100f;
+            float totalDeltaPercent = (slider.value - gestureStartValue) / 100f * scaleSensitivity;
             if (!Mathf.Approximately(totalDeltaPercent, 0f))
             {
                 GameObject selected = selectionManager.SelectedObject;
@@ -188,7 +192,12 @@ public class WristMenuController : MonoBehaviour
                 {
                     string sign = totalDeltaPercent >= 0 ? "+" : "";
                     ObjectMetricsLogger.Instance?.LogEvent("edit_operation", publisher.objectId,
+                        scale: selected.transform.localScale,
                         details: $"resize:{shape}:{label}:{sign}{totalDeltaPercent:F3}");
+                    // A scale-only change doesn't trip CollisionObjectPublisher's transform
+                    // check, so push the new size to the planning scene explicitly -- otherwise
+                    // MoveIt keeps the old geometry until the object is next moved.
+                    publisher.ForceRepublish();
                 }
                 else
                 {
@@ -207,6 +216,7 @@ public class WristMenuController : MonoBehaviour
                 if (axisLabel == "X") return new Vector3(delta, 0f, 0f);
                 if (axisLabel == "Y") return new Vector3(0f, delta, 0f);
                 if (axisLabel == "Z") return new Vector3(0f, 0f, delta);
+                if (axisLabel == "Uniform") return new Vector3(delta, delta, delta);
                 return Vector3.zero;
             }
             else if (shapeName.Contains("Cylinder"))
@@ -214,6 +224,7 @@ public class WristMenuController : MonoBehaviour
                 // Support your "Height" and "Radius" UI
                 if (axisLabel == "Height") return new Vector3(0f, delta, 0f);
                 if (axisLabel == "Radius") return new Vector3(delta, 0f, delta);
+                if (axisLabel == "Uniform") return new Vector3(delta, delta, delta);
                 // fallback uniform
                 return new Vector3(delta, delta, delta);
             }
@@ -244,7 +255,7 @@ public class WristMenuController : MonoBehaviour
             gestureEndCheck = slider.schedule.Execute(FinishGesture);
             gestureEndCheck.ExecuteLater(gestureEndDebounceMs);
 
-            float delta = (evt.newValue - prevValue) / 100f;
+            float delta = (evt.newValue - prevValue) / 100f * scaleSensitivity;
             prevValue = evt.newValue;
             if (Mathf.Approximately(delta, 0f)) return;
 
@@ -278,7 +289,19 @@ public class WristMenuController : MonoBehaviour
             }
         });
 
-        container.Add(toggle);
+        if (includeToggle)
+        {
+            container.Add(toggle);
+        }
+        else
+        {
+            // A uniform slider has no single axis to lock, so a plain caption stands in for
+            // the axis-lock toggle (per-axis locks still apply in the slider path above).
+            var caption = new Label("Scale " + label + ": ") { name = "wristMenuEditScale" + label + "Label" };
+            caption.style.paddingLeft = 10;
+            caption.style.paddingRight = 10;
+            container.Add(caption);
+        }
         container.Add(slider);
 
         return container;
@@ -501,6 +524,7 @@ public class WristMenuController : MonoBehaviour
             wristMenuEditSliderPanel.Add(CreateToggleStack("Cube", "X"));
             wristMenuEditSliderPanel.Add(CreateToggleStack("Cube", "Y"));
             wristMenuEditSliderPanel.Add(CreateToggleStack("Cube", "Z"));
+            wristMenuEditSliderPanel.Add(CreateToggleStack("Cube", "Uniform", includeToggle: false));
         }
         else if (meshName.Contains("Sphere"))
         {
@@ -512,6 +536,7 @@ public class WristMenuController : MonoBehaviour
             Debug.Log("WristMenuController: Populating edit panel for Cylinder");
             wristMenuEditSliderPanel.Add(CreateToggleStack("Cylinder", "Height"));
             wristMenuEditSliderPanel.Add(CreateToggleStack("Cylinder", "Radius"));
+            wristMenuEditSliderPanel.Add(CreateToggleStack("Cylinder", "Uniform", includeToggle: false));
         }
         else if (meshName.Contains("Mesh"))
         {
@@ -658,6 +683,24 @@ public class WristMenuController : MonoBehaviour
         ShowOptionsPanel(); // Return to main menu after adding shape
     }
     
+    // Converts a URP/Lit material instance to alpha-blended transparency at the given
+    // alpha. Mirrors what the URP shader GUI does when Surface Type is set to Transparent.
+    public static void MakeMaterialTransparent(Material mat, float alpha)
+    {
+        mat.SetFloat("_Surface", 1f); // 1 = Transparent
+        mat.SetFloat("_Blend", 0f);   // 0 = Alpha blend
+        mat.SetOverrideTag("RenderType", "Transparent");
+        mat.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+        mat.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+        mat.SetFloat("_ZWrite", 0f);
+        mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+        mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+
+        Color c = mat.color;
+        c.a = alpha;
+        mat.color = c;
+    }
+
     // Shape Creation Methods
     private void AddPrimitiveShape(PrimitiveType primitiveType)
     {
@@ -678,15 +721,27 @@ public class WristMenuController : MonoBehaviour
         shape.AddComponent<XRGrabInteractable>();
         var gi = shape.GetComponent<XRGrabInteractable>();
         gi.selectMode = InteractableSelectMode.Single;
+        // Keep the object where it's grabbed instead of snapping it to the controller
+        gi.useDynamicAttach = true;
+        // Don't match the ray hit point's position for the attach anchor — keep it at the
+        // object's own pivot so joystick rotation spins the object about its own center
+        // instead of orbiting around wherever the ray happened to hit its surface.
+        gi.matchAttachPosition = false;
+        // Don't apply release velocity, object should stop moving as soon as it's let go
+        gi.throwOnDetach = false;
 
         // Controls grabbing based on SelectionManager selection state
         shape.AddComponent<SelectableGrabController>();
 
-        shape.transform.localScale = Vector3.one * 0.5f;
+        shape.transform.localScale = Vector3.one * 0.25f;
         shape.tag = "Selectable";
 
         shape.AddComponent<XRGrabTransformerScaleAxisLock>();
         shape.AddComponent<XRGrabTransformerLockPose>();
+        // Don't freeze rotation by default — joystick manipulation should be able to spin
+        // the object about its own center. SnapSelectedToSurface() still re-syncs this via
+        // SyncInitialRotation() in case freezePose is turned back on elsewhere.
+        shape.GetComponent<XRGrabTransformerLockPose>().freezePose = false;
 
         shape.AddComponent<XRGeneralGrabTransformer>();
         shape.GetComponent<XRGeneralGrabTransformer>().allowTwoHandedScaling = false;
@@ -703,7 +758,13 @@ public class WristMenuController : MonoBehaviour
 
         var meshRenderer = shape.GetComponent<MeshRenderer>();
         if (meshRenderer != null && litMaterial != null)
+        {
+            // .material instantiates a per-renderer copy, so making it transparent here
+            // leaves the shared litMaterial asset (also used by CollisionObjectsListenerSimple
+            // for RViz-synced objects) opaque.
             meshRenderer.material = litMaterial;
+            MakeMaterialTransparent(meshRenderer.material, spawnedShapeAlpha);
+        }
 
         Collider collider = shape.GetComponent<Collider>();
         if (collider != null)
