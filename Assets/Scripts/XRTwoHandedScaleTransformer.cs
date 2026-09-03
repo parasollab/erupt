@@ -32,6 +32,24 @@ namespace UnityEngine.XR.Interaction.Toolkit.Transformers
         private bool _orientationLocked;
         private Quaternion _lockedOrientation;
 
+        /// <summary>
+        /// True while a two-handed scale gesture is in progress (the second controller has
+        /// joined and a baseline size was captured). XRI does not call OnGrabCountChanged
+        /// once the last controller lets go, so SelectableGrabController reads this from its
+        /// selectExited handler to log the gesture, then calls <see cref="EndGesture"/>.
+        /// </summary>
+        public bool IsGestureActive => _initialized;
+
+        /// <summary>The object's local scale when the current gesture began.</summary>
+        public Vector3 GestureStartScale => _scaleAtTwoHandStart;
+
+        /// <summary>Marks the current gesture as consumed so it is not reported twice.</summary>
+        public void EndGesture()
+        {
+            _initialized = false;
+            _orientationLocked = false;
+        }
+
         public override void OnGrabCountChanged(
             UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable grab,
             Pose targetPose,

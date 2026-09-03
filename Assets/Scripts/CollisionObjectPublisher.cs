@@ -7,6 +7,7 @@ using RosMessageTypes.Std;
 using System;
 using System.Linq;
 using RosMessageTypes.BuiltinInterfaces;
+using Unity.Robotics.ROSTCPConnector.MessageGeneration;
 using Unity.Robotics.ROSTCPConnector.ROSGeometry;
 
 public class CollisionObjectPublisher : MonoBehaviour
@@ -26,6 +27,12 @@ public class CollisionObjectPublisher : MonoBehaviour
     public bool createReadableMeshCopy = false; // Create readable copy of non-readable meshes
     public float publishRateHz = 1f;
     public bool trackLatency = false;
+    // Off by default so the study's /latency_data rows keep their 3-column shape
+    // (operation,id,rtt_ms) and every tracking instance reports every pong, exactly as before.
+    // On (benchmark scenes): rows gain msg_bytes,verts,tris,object_type, and only the
+    // instance that owns the object reports its pong. Requires trackLatency.
+    [Tooltip("Benchmark-only: append serialized size / mesh density / object type to /latency_data rows and report only this object's pongs. Leave off for the study.")]
+    public bool extendedLatencyMetrics = false;
     public bool pausePublishing = false;
     public GameObject worldOrigin; // Optional world origin for relative positioning
 
@@ -106,6 +113,23 @@ public class CollisionObjectPublisher : MonoBehaviour
     public bool hasBeenPublished = false;
     private Mesh readableMeshCopy = null; // Cache for the readable mesh copy
 
+    // Extended latency metrics (extendedLatencyMetrics only): per-message size and mesh
+    // density awaiting their pong, keyed by the stamp echoed back in the pong.
+    struct MessageMetrics
+    {
+        public int msgBytes;
+        public int vertexCount;
+        public int triangleCount;
+        public string objectType;
+        public float recordedAt;
+    }
+    private string objectTypeName = "unknown";
+    private static readonly MessageSerializer metricsSerializer = new MessageSerializer();
+    private readonly System.Collections.Generic.Dictionary<(int sec, uint nanosec), MessageMetrics> pendingMetrics =
+        new System.Collections.Generic.Dictionary<(int, uint), MessageMetrics>();
+    private const float kPendingMetricsTimeout = 30f;
+    private bool ExtendedMetricsActive => trackLatency && extendedLatencyMetrics;
+
     void Start()
     {
         // Use existing ROS connection if available (pre-warmed by SystemPrewarmer)
@@ -156,6 +180,8 @@ public class CollisionObjectPublisher : MonoBehaviour
         lastPosition = transform.position;
         lastRotation = transform.rotation;
         lastScale = transform.lossyScale;
+        if (ExtendedMetricsActive)
+            objectTypeName = DetermineInitialObjectType();
 
         ObjectMetricsLogger.Instance?.LogEvent("object_created", objectId);
 
@@ -373,7 +399,11 @@ public class CollisionObjectPublisher : MonoBehaviour
         }
 
         if (trackLatency)
+        {
             Debug.Log($"[Latency] Publishing '{objectId}' op={msg.operation} stamp.sec={msg.header.stamp.sec} stamp.nanosec={msg.header.stamp.nanosec}");
+            if (extendedLatencyMetrics)
+                RecordMessageMetrics(msg);
+        }
         try
         {
             EnqueueOutgoing(msg, useTrailingPad: !isMesh);
@@ -584,6 +614,8 @@ public class CollisionObjectPublisher : MonoBehaviour
                 operation = CollisionObjectMsg.REMOVE
             };
 
+            if (ExtendedMetricsActive)
+                RecordMessageMetrics(msg);
             // Best-effort only: the id deliberately stays in s_AddedFrameById so the
             // post-transition sweep re-publishes the REMOVE if this one is lost.
             EnqueueOutgoing(msg);
@@ -1012,6 +1044,11 @@ public class CollisionObjectPublisher : MonoBehaviour
     private void OnLatencyPong(HeaderMsg msg)
     {
         if (!trackLatency) return;
+        if (extendedLatencyMetrics)
+        {
+            OnLatencyPongExtended(msg);
+            return;
+        }
         Debug.Log($"[Latency] Pong received: frame_id='{msg.frame_id}' stamp.sec={msg.stamp.sec} stamp.nanosec={msg.stamp.nanosec}");
         if (msg.stamp.sec == 0 && msg.stamp.nanosec == 0)
         {
@@ -1030,6 +1067,122 @@ public class CollisionObjectPublisher : MonoBehaviour
 
         // Debug.Log($"[Latency] {operation} '{objectId}'  RTT={rttMs:F1} ms  (~{rttMs / 2:F1} ms one-way)");
         ros.Publish("/latency_data", new StringMsg($"{operation},{objectId},{rttMs:F3}"));
+    }
+
+    // extendedLatencyMetrics variant: joins the pong with the size/density recorded at
+    // publish time, and only the instance that owns the object reports it (every
+    // publisher instance receives every pong; without this filter each pong would
+    // produce one row per tracking instance).
+    private void OnLatencyPongExtended(HeaderMsg msg)
+    {
+        if (msg.stamp.sec == 0 && msg.stamp.nanosec == 0)
+        {
+            Debug.LogWarning("[Latency] Pong stamp is zero — ROS node sent a blank timestamp");
+            return;
+        }
+
+        // frame_id is encoded as "OPERATION:object_id"
+        int sep = msg.frame_id.IndexOf(':');
+        string operation = sep >= 0 ? msg.frame_id.Substring(0, sep) : "UNKNOWN";
+        string pongObjectId = sep >= 0 ? msg.frame_id.Substring(sep + 1) : msg.frame_id;
+        if (pongObjectId != objectId)
+            return;
+
+        Debug.Log($"[Latency] Pong received: frame_id='{msg.frame_id}' stamp.sec={msg.stamp.sec} stamp.nanosec={msg.stamp.nanosec}");
+        long sentTicks = (long)msg.stamp.sec * TimeSpan.TicksPerSecond
+                       + (long)msg.stamp.nanosec / 100L;
+        var sentTime = new DateTimeOffset(DateTimeOffset.UnixEpoch.Ticks + sentTicks, TimeSpan.Zero);
+        double rttMs = (DateTimeOffset.UtcNow - sentTime).TotalMilliseconds;
+
+        var stampKey = (msg.stamp.sec, msg.stamp.nanosec);
+        MessageMetrics metrics;
+        if (pendingMetrics.TryGetValue(stampKey, out metrics))
+            pendingMetrics.Remove(stampKey);
+        else
+            metrics = new MessageMetrics { msgBytes = -1, vertexCount = -1, triangleCount = -1 };
+
+        string objectType = metrics.objectType ?? objectTypeName;
+        Debug.Log($"[Latency] {operation} '{pongObjectId}' ({objectType})  RTT={rttMs:F1} ms  (~{rttMs / 2:F1} ms one-way)  " +
+                  $"size={metrics.msgBytes} B  verts={metrics.vertexCount}  tris={metrics.triangleCount}");
+        ros.Publish("/latency_data", new StringMsg(
+            $"{operation},{pongObjectId},{rttMs:F3},{metrics.msgBytes},{metrics.vertexCount},{metrics.triangleCount},{objectType}"));
+    }
+
+    // Capture serialized size and mesh density of an outgoing message so they can be
+    // joined with the round-trip latency when the pong for this stamp arrives.
+    void RecordMessageMetrics(CollisionObjectMsg msg)
+    {
+        int vertexCount = 0;
+        int triangleCount = 0;
+        if (msg.meshes != null)
+        {
+            foreach (var mesh in msg.meshes)
+            {
+                vertexCount += mesh.vertices?.Length ?? 0;
+                triangleCount += mesh.triangles?.Length ?? 0;
+            }
+        }
+
+        // Geometry-bearing messages (ADD) tell us the true object type; MOVE/REMOVE
+        // carry no geometry, so they reuse the type from the last ADD.
+        if (msg.meshes != null && msg.meshes.Length > 0)
+            objectTypeName = "mesh";
+        else if (msg.primitives != null && msg.primitives.Length > 0)
+            objectTypeName = PrimitiveTypeName(msg.primitives[0].type);
+
+        int msgBytes;
+        try
+        {
+            metricsSerializer.Clear();
+            metricsSerializer.SerializeMessage(msg);
+            msgBytes = metricsSerializer.Length;
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[Latency] Failed to measure serialized size of '{objectId}': {e.Message}");
+            msgBytes = -1;
+        }
+
+        // Drop entries whose pong never arrived so the dictionary cannot grow unbounded
+        if (pendingMetrics.Count > 64)
+        {
+            float now = Time.realtimeSinceStartup;
+            var stale = pendingMetrics.Where(kv => now - kv.Value.recordedAt > kPendingMetricsTimeout)
+                                      .Select(kv => kv.Key).ToList();
+            foreach (var key in stale)
+                pendingMetrics.Remove(key);
+        }
+
+        pendingMetrics[(msg.header.stamp.sec, msg.header.stamp.nanosec)] = new MessageMetrics
+        {
+            msgBytes = msgBytes,
+            vertexCount = vertexCount,
+            triangleCount = triangleCount,
+            objectType = objectTypeName,
+            recordedAt = Time.realtimeSinceStartup
+        };
+    }
+
+    string DetermineInitialObjectType()
+    {
+        MeshFilter meshFilter = GetComponent<MeshFilter>();
+        if (meshFilter == null || meshFilter.mesh == null)
+            return "unknown";
+        if (ShouldTreatAsMesh())
+            return "mesh";
+        return GetPrimitiveType(meshFilter.mesh.name).ToLower();
+    }
+
+    static string PrimitiveTypeName(int solidPrimitiveType)
+    {
+        switch (solidPrimitiveType)
+        {
+            case 1: return "cube";      // SolidPrimitive.BOX
+            case 2: return "sphere";
+            case 3: return "cylinder";
+            case 4: return "cone";
+            default: return "primitive";
+        }
     }
 
     private static TimeMsg GetRosTimestamp()

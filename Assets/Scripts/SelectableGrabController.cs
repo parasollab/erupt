@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
 using UnityEngine.XR.Interaction.Toolkit;
 using UnityEngine.XR.Interaction.Toolkit.Interactors;
+using UnityEngine.XR.Interaction.Toolkit.Transformers;
 using System.Collections;
 
 /// <summary>
@@ -112,11 +113,66 @@ public class SelectableGrabController : MonoBehaviour
         UpdateGrabState();
 
         CollisionObjectPublisher publisher = GetComponent<CollisionObjectPublisher>();
+
+        // A two-handed scale gesture ends when either controller lets go, so check on every
+        // release, not just the last one.
+        LogTwoHandedScaleIfEnded(publisher);
+
         if (!isGrabbed && publisher != null)
         {
             // ObjectMetricsLogger makes this relative to the robot base transform itself.
             ObjectMetricsLogger.Instance?.LogEvent("grab_end", publisher.objectId, transform.position, transform.rotation);
         }
+    }
+
+    // Logs a finished two-handed scale gesture exactly like WristMenuController logs a
+    // uniform slider resize: one edit_operation carrying the final localScale and a
+    // "resize:<shape>:<label>:<signed delta>" detail using the slider's own shape/label
+    // names and its additive per-axis delta (new = old + delta on every axis). The erupt_ws
+    // analysis therefore needs no changes to include these edits.
+    void LogTwoHandedScaleIfEnded(CollisionObjectPublisher publisher)
+    {
+        XRTwoHandedScaleTransformer twoHand = GetComponent<XRTwoHandedScaleTransformer>();
+        if (twoHand == null || !twoHand.IsGestureActive)
+            return;
+
+        Vector3 startScale = twoHand.GestureStartScale;
+        twoHand.EndGesture();
+
+        Vector3 endScale = transform.localScale;
+        Vector3 axisDelta = endScale - startScale;
+        // Two-hand scaling is uniform, so the per-axis deltas only differ when the start
+        // scale was already non-uniform; the scale field holds the exact result regardless.
+        float delta = (axisDelta.x + axisDelta.y + axisDelta.z) / 3f;
+        if (Mathf.Approximately(delta, 0f))
+            return;
+
+        if (publisher == null)
+        {
+            Debug.LogWarning($"SelectableGrabController: two-handed resize on '{name}' not logged -- no CollisionObjectPublisher component.");
+            return;
+        }
+
+        UniformResizeNames(gameObject, out string shape, out string label);
+        string sign = delta >= 0 ? "+" : "";
+        ObjectMetricsLogger.Instance?.LogEvent("edit_operation", publisher.objectId,
+            scale: endScale,
+            details: $"resize:{shape}:{label}:{sign}{delta:F3}");
+        // Same reason the wrist menu does this: a scale-only change doesn't trip the
+        // publisher's transform check, so push the new size to the planning scene.
+        publisher.ForceRepublish();
+    }
+
+    // The shape and slider label WristMenuController uses for a uniform resize of this
+    // object (see its edit-panel population and CreateToggleStack calls).
+    static void UniformResizeNames(GameObject obj, out string shape, out string label)
+    {
+        MeshFilter meshFilter = obj.GetComponent<MeshFilter>();
+        string meshName = meshFilter != null && meshFilter.sharedMesh != null ? meshFilter.sharedMesh.name : "";
+        if (meshName.Contains("Cube"))          { shape = "Cube";     label = "Uniform"; }
+        else if (meshName.Contains("Sphere"))   { shape = "Sphere";   label = "Radius";  }
+        else if (meshName.Contains("Cylinder")) { shape = "Cylinder"; label = "Uniform"; }
+        else                                    { shape = "Mesh";     label = "Scale";   }
     }
 
     void OnObjectSelected(GameObject selectedObject)
