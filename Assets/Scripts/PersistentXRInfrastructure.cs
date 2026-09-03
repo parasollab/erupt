@@ -160,20 +160,87 @@ public sealed class PersistentXRInfrastructure : MonoBehaviour
 
     private void EnsureControllerRobotRays()
     {
-        if (_xrOrigin == null)
-            return;
+        _leftRobotRay = EnsureRobotRay(_leftRobotRay, XRNode.LeftHand, "Left Controller", "LeftHandAnchor");
+        _rightRobotRay = EnsureRobotRay(_rightRobotRay, XRNode.RightHand, "Right Controller", "RightHandAnchor");
+    }
 
-        if (_leftRobotRay == null)
+    /// <summary>
+    /// Keeps one robot ray per hand under a controller transform that is actually tracked. Study
+    /// scenes track through the XRI rig's "Left/Right Controller"; the AR demo scenes keep that rig
+    /// inactive and track through the Meta building-block camera rig's "Left/RightHandAnchor"
+    /// instead, so a ray parented under the inactive rig never updates. A ray that already exists
+    /// under an active parent is left alone; one under an inactive parent is rebuilt.
+    /// </summary>
+    private Quest3ControllerRayInteractor EnsureRobotRay(
+        Quest3ControllerRayInteractor existing,
+        XRNode node,
+        string xriControllerName,
+        string ovrAnchorName)
+    {
+        if (existing != null && existing.transform.parent != null
+            && existing.transform.parent.gameObject.activeInHierarchy)
         {
-            Transform leftController = FindDescendantByName(_xrOrigin.transform, "Left Controller");
-            _leftRobotRay = CreateRobotRay(leftController, XRNode.LeftHand);
+            return existing;
         }
 
-        if (_rightRobotRay == null)
+        Transform controller = FindTrackedControllerTransform(xriControllerName, ovrAnchorName);
+        if (controller == null)
         {
-            Transform rightController = FindDescendantByName(_xrOrigin.transform, "Right Controller");
-            _rightRobotRay = CreateRobotRay(rightController, XRNode.RightHand);
+            // Same as before: silent when there is no XR origin at all, an error when the rig
+            // exists but has no controller of that name.
+            if (existing == null && _xrOrigin != null)
+                Debug.LogError($"PersistentXRInfrastructure: could not find {node} controller transform.");
+            return existing;
         }
+
+        if (existing != null)
+        {
+            if (existing.transform.parent == controller)
+                return existing;
+            Destroy(existing.gameObject);
+        }
+
+        return CreateRobotRay(controller, node);
+    }
+
+    /// <summary>
+    /// Prefers the XRI rig's controller when it is active, then any active hand anchor in the
+    /// loaded scenes (OVR camera rig, or an XRI controller outside the persistent rig), and finally
+    /// falls back to the inactive XRI controller so behaviour matches the previous lookup.
+    /// </summary>
+    private Transform FindTrackedControllerTransform(string xriControllerName, string ovrAnchorName)
+    {
+        Transform xriController = _xrOrigin != null
+            ? FindDescendantByName(_xrOrigin.transform, xriControllerName)
+            : null;
+        if (xriController != null && xriController.gameObject.activeInHierarchy)
+            return xriController;
+
+        for (int sceneIndex = 0; sceneIndex < SceneManager.sceneCount; sceneIndex++)
+        {
+            Scene scene = SceneManager.GetSceneAt(sceneIndex);
+            if (!scene.isLoaded)
+                continue;
+
+            GameObject[] roots = scene.GetRootGameObjects();
+            for (int i = 0; i < roots.Length; i++)
+            {
+                if (!roots[i].activeInHierarchy)
+                    continue;
+
+                Transform anchor = FindDescendantByName(roots[i].transform, ovrAnchorName);
+                if (anchor == null)
+                    anchor = FindDescendantByName(roots[i].transform, xriControllerName);
+                if (anchor != null && anchor.gameObject.activeInHierarchy)
+                {
+                    Debug.Log($"PersistentXRInfrastructure: robot ray for '{xriControllerName}' " +
+                              $"attached to active '{anchor.name}' in scene '{scene.name}'.");
+                    return anchor;
+                }
+            }
+        }
+
+        return xriController;
     }
 
     private static Quest3ControllerRayInteractor CreateRobotRay(Transform controller, XRNode node)

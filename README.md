@@ -2,7 +2,10 @@
 
 Interactive Extended Reality Robotics Visualization Tool
 
-> Note: The AR scene depends on OpenCV for Unity (not included).
+> Note: The AR scene locates the robot with a printed AprilTag (family `tagStandard41h12`),
+> detected by the `jp.keijiro.apriltag` fork in the `Packages/AprilTag` submodule, so run
+> `git submodule update --init --recursive` after cloning. Print [Docs/tag41_12_id0.svg](Docs/tag41_12_id0.svg)
+> at 100% scale (10 cm detection square) and lay it flat where the robot base should go.
 
 ## ROS2 Setup
 
