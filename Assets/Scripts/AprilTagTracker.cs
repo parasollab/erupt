@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using AprilTag;
 using Meta.XR;
 using Unity.Collections;
@@ -5,16 +7,45 @@ using UnityEngine;
 using UnityEngine.Rendering;
 
 /// <summary>
-/// Positions a GameObject on a printed AprilTag (tagStandard41h12 family) seen by the Quest
-/// passthrough camera. Replaces the OpenCV-for-Unity ChArUco tracker that used to live on
-/// this GameObject: frames come from Meta's <see cref="PassthroughCameraAccess"/> through an
-/// async GPU readback, detection and pose estimation run in jp.keijiro.apriltag (the
-/// courtneymcbeth fork, whose full-intrinsics ProcessImage overload is required because the
-/// passthrough camera's principal point is not at the image centre). Detection logic is
-/// ported from BARD's AprilTagLocator.
+/// Tracks printed AprilTags (tagStandard41h12 family) seen by the Quest passthrough camera.
+/// The primary tag places <see cref="_arObject"/> (the marker MarkerRobotPlacement reads);
+/// any number of additional tags with their own IDs and sizes are tracked alongside it from the
+/// same detection pass and reported through <see cref="OnTagObserved"/> / <see cref="TryGetTag"/>.
+/// Replaces the OpenCV-for-Unity ChArUco tracker that used to live on this GameObject: frames
+/// come from Meta's <see cref="PassthroughCameraAccess"/> through an async GPU readback,
+/// detection and pose estimation run in jp.keijiro.apriltag (the courtneymcbeth fork, whose
+/// full-intrinsics ProcessImage overload is required because the passthrough camera's principal
+/// point is not at the image centre). Detection logic is ported from BARD's AprilTagLocator.
 /// </summary>
 public class AprilTagTracker : MonoBehaviour
 {
+    [Serializable]
+    public class AdditionalTagEntry
+    {
+        [Tooltip("tagStandard41h12 ID (0-2114). Must differ from the primary tag ID and from the other entries.")]
+        public int id = 1;
+
+        [Tooltip("Detection-square size in metres: the 5 central cells of the 9-cell printed pattern, NOT the " +
+                 "full printed square. 0.05 for the object tags from Docs/make_apriltag_svg.py --size 0.05.")]
+        public float tagSize = 0.05f;
+
+        [Tooltip("Optional transform laid on the tag with the same tagToObjectEuler as the primary tag. Leave " +
+                 "empty for tags that are only consumed through OnTagObserved / TryGetTag.")]
+        public Transform target;
+    }
+
+    /// <summary>Latest filtered observation of one tag.</summary>
+    public struct TrackedTag
+    {
+        public int Id;
+        /// <summary>Detection-square size in metres that was configured for this tag.</summary>
+        public float Size;
+        /// <summary>World-space tag pose (tag frame: x right, y up in the tag plane, z into the tag).</summary>
+        public Pose FilteredPose;
+        public float LastSeenTime;
+        public long DetectionCount;
+    }
+
     [Header("Passthrough Camera")]
     [SerializeField] private PassthroughCameraAccess m_passthroughCameraAccess;
 
@@ -22,7 +53,8 @@ public class AprilTagTracker : MonoBehaviour
     [SerializeField, Tooltip("GameObject placed on the detected tag (the marker indicator MarkerRobotPlacement reads).")]
     private GameObject _arObject;
 
-    [SerializeField, Tooltip("Only accept this tag ID. -1 accepts the first tag detected in the frame.")]
+    [SerializeField, Tooltip("Only accept this tag ID as the primary tag. -1 accepts the first detected tag that is not " +
+                             "listed under Additional Tags.")]
     private int tagId = 0;
 
     [SerializeField, Tooltip("Detection-square size in metres. For tagStandard41h12 this is the 5 central cells " +
@@ -34,6 +66,13 @@ public class AprilTagTracker : MonoBehaviour
                              "to the AR object. The default lays the object flat on the tag with its up = tag " +
                              "normal and its right = tag x (MarkerRobotPlacement uses right as the robot's forward).")]
     private Vector3 tagToObjectEuler = new Vector3(-90f, 0f, 0f);
+
+    [Header("Additional Tags")]
+    [SerializeField, Tooltip("Other tags to track from the same detection pass (e.g. small tags on objects for the " +
+                             "reachability indicators). Detection runs once at the primary tag size; each entry's " +
+                             "pose is rescaled to its own size, which is exact because the estimated translation " +
+                             "is proportional to the assumed tag size and the rotation does not depend on it.")]
+    private List<AdditionalTagEntry> additionalTags = new List<AdditionalTagEntry>();
 
     [Header("Detection")]
     [SerializeField, Tooltip("Detections per second. Detection is expensive and placement is not time-critical.")]
@@ -65,18 +104,31 @@ public class AprilTagTracker : MonoBehaviour
     private float _nextDetection;
     private Texture2D _debugTexture;
     private bool _warnedNoReadback;
+    private readonly Dictionary<int, AdditionalTagEntry> _entriesById = new Dictionary<int, AdditionalTagEntry>();
+    private readonly Dictionary<int, TrackedTag> _tags = new Dictionary<int, TrackedTag>();
 
     /// <summary>True once the passthrough camera is delivering frames.</summary>
     public bool IsReady => m_passthroughCameraAccess != null && m_passthroughCameraAccess.IsPlaying;
 
-    /// <summary>True once the tag has been detected at least once.</summary>
+    /// <summary>True once the primary tag has been detected at least once.</summary>
     public bool HasPose { get; private set; }
 
-    /// <summary>Filtered world-space tag pose (tag frame: x right, y up in the tag plane, z into the tag).</summary>
+    /// <summary>Filtered world-space primary tag pose (tag frame: x right, y up in the tag plane, z into the tag).</summary>
     public Pose FilteredTagPose { get; private set; }
 
     public float LastDetectionTime { get; private set; } = -1f;
     public long DetectionCount { get; private set; }
+
+    /// <summary>ID of the primary (robot) tag, or -1 when any unlisted tag is accepted.</summary>
+    public int PrimaryTagId => tagId;
+
+    /// <summary>Raised on the main thread for every tag (primary and additional) each time it is observed.</summary>
+    public event Action<TrackedTag> OnTagObserved;
+
+    /// <summary>All tags observed so far, keyed by ID (including the primary tag).</summary>
+    public IReadOnlyDictionary<int, TrackedTag> Tags => _tags;
+
+    public bool TryGetTag(int id, out TrackedTag tag) => _tags.TryGetValue(id, out tag);
 
     public string StatusText
     {
@@ -84,11 +136,54 @@ public class AprilTagTracker : MonoBehaviour
         {
             if (m_passthroughCameraAccess == null) return "no PassthroughCameraAccess assigned";
             if (!m_passthroughCameraAccess.IsPlaying) return "waiting for passthrough camera";
-            if (DetectionCount == 0) return "camera running | no tag seen yet";
-            float age = Time.time - LastDetectionTime;
-            return age < 2f
-                ? $"tag {tagId} tracked ({DetectionCount} detections)"
-                : $"tag lost {age:F0}s ago";
+            if (DetectionCount == 0 && _tags.Count == 0) return "camera running | no tag seen yet";
+            string primary;
+            if (DetectionCount == 0)
+            {
+                primary = "primary tag not seen yet";
+            }
+            else
+            {
+                float age = Time.time - LastDetectionTime;
+                primary = age < 2f
+                    ? $"tag {tagId} tracked ({DetectionCount} detections)"
+                    : $"tag lost {age:F0}s ago";
+            }
+            if (additionalTags.Count == 0)
+                return primary;
+
+            int objectTags = 0;
+            foreach (var kv in _tags)
+            {
+                if (_entriesById.ContainsKey(kv.Key) && Time.time - kv.Value.LastSeenTime < 2f)
+                    objectTags++;
+            }
+            return $"{primary} | {objectTags}/{additionalTags.Count} object tags visible";
+        }
+    }
+
+    private void Awake()
+    {
+        _entriesById.Clear();
+        foreach (var entry in additionalTags)
+        {
+            if (entry == null) continue;
+            if (entry.id == tagId)
+            {
+                Debug.LogError($"[AprilTagTracker] additionalTags: id {entry.id} is the primary tag ID; entry ignored.");
+                continue;
+            }
+            if (entry.tagSize <= 0f)
+            {
+                Debug.LogError($"[AprilTagTracker] additionalTags: id {entry.id} has tagSize {entry.tagSize}; entry ignored.");
+                continue;
+            }
+            if (_entriesById.ContainsKey(entry.id))
+            {
+                Debug.LogError($"[AprilTagTracker] additionalTags: duplicate id {entry.id}; later entry ignored.");
+                continue;
+            }
+            _entriesById.Add(entry.id, entry);
         }
     }
 
@@ -166,46 +261,101 @@ public class AprilTagTracker : MonoBehaviour
             Debug.Log($"[AprilTagTracker] Detector {width}x{height}, fx={fx:F1} fy={fy:F1} cx={cx:F1} cy={cy:F1}");
         }
 
+        // One pass at the primary tag size; other sizes are recovered by rescaling below.
         _detector.ProcessImage(_pixels, fx, fy, cx, cy, tagSize);
         UpdateDebugTexture(width, height);
 
-        TagPose tag = default;
-        bool found = false;
+        bool primarySeen = false;
         foreach (var detected in _detector.DetectedTags)
         {
-            if (tagId >= 0 && detected.ID != tagId)
+            bool isPrimary;
+            float realSize;
+            Transform target;
+
+            bool isListed = _entriesById.TryGetValue(detected.ID, out var entry);
+            if (tagId >= 0 ? detected.ID == tagId : (!primarySeen && !isListed))
+            {
+                isPrimary = true;
+                realSize = tagSize;
+                target = _arObject != null ? _arObject.transform : null;
+            }
+            else if (isListed)
+            {
+                isPrimary = false;
+                realSize = entry.tagSize;
+                target = entry.target;
+            }
+            else
+            {
                 continue;
-            tag = detected;
-            found = true;
-            break;
+            }
+
+            // The pose estimator solved for corners at +/- tagSize/2. Corners at +/- realSize/2 project
+            // to the same pixels exactly when the translation is scaled by realSize/tagSize; the
+            // rotation is unchanged. TagPose is immutable, so build the rescaled vector here.
+            Vector3 cameraLocal = detected.Position * (realSize / tagSize);
+
+            // Tag pose is camera-local; lift to world with the camera pose at acquisition.
+            var worldPose = new Pose(
+                _pendingCameraPose.position + _pendingCameraPose.rotation * cameraLocal,
+                _pendingCameraPose.rotation * detected.Rotation);
+
+            ObserveTag(detected.ID, realSize, worldPose, isPrimary, target);
+            if (isPrimary)
+                primarySeen = true;
         }
-        if (!found)
-            return;
+    }
 
-        // Tag pose is camera-local; lift to world with the camera pose at acquisition.
-        var worldPose = new Pose(
-            _pendingCameraPose.position + _pendingCameraPose.rotation * tag.Position,
-            _pendingCameraPose.rotation * tag.Rotation);
+    /// <summary>
+    /// Feeds a fake observation through the same filtering/event path as a real detection. For
+    /// editor testing of consumers (e.g. TagReachabilityIndicator) where passthrough is unavailable.
+    /// </summary>
+    public void InjectDebugObservation(int id, float size, Pose worldPose)
+    {
+        bool isPrimary = id == tagId;
+        Transform target = null;
+        if (isPrimary)
+            target = _arObject != null ? _arObject.transform : null;
+        else if (_entriesById.TryGetValue(id, out var entry))
+            target = entry.target;
+        ObserveTag(id, size, worldPose, isPrimary, target);
+    }
 
-        if (!HasPose)
+    private void ObserveTag(int id, float size, Pose worldPose, bool isPrimary, Transform target)
+    {
+        TrackedTag tracked;
+        if (_tags.TryGetValue(id, out var previous))
         {
-            FilteredTagPose = worldPose;
-            HasPose = true;
+            float t = poseFilterCoefficient;
+            tracked.FilteredPose = new Pose(
+                Vector3.Lerp(worldPose.position, previous.FilteredPose.position, t),
+                Quaternion.Slerp(worldPose.rotation, previous.FilteredPose.rotation, t));
+            tracked.DetectionCount = previous.DetectionCount + 1;
         }
         else
         {
-            float t = poseFilterCoefficient;
-            FilteredTagPose = new Pose(
-                Vector3.Lerp(worldPose.position, FilteredTagPose.position, t),
-                Quaternion.Slerp(worldPose.rotation, FilteredTagPose.rotation, t));
+            tracked.FilteredPose = worldPose;
+            tracked.DetectionCount = 1;
         }
-        LastDetectionTime = Time.time;
-        DetectionCount++;
+        tracked.Id = id;
+        tracked.Size = size;
+        tracked.LastSeenTime = Time.time;
+        _tags[id] = tracked;
 
-        if (_arObject != null)
-            _arObject.transform.SetPositionAndRotation(
-                FilteredTagPose.position,
-                FilteredTagPose.rotation * Quaternion.Euler(tagToObjectEuler));
+        if (target != null)
+            target.SetPositionAndRotation(
+                tracked.FilteredPose.position,
+                tracked.FilteredPose.rotation * Quaternion.Euler(tagToObjectEuler));
+
+        if (isPrimary)
+        {
+            FilteredTagPose = tracked.FilteredPose;
+            HasPose = true;
+            LastDetectionTime = Time.time;
+            DetectionCount++;
+        }
+
+        OnTagObserved?.Invoke(tracked);
     }
 
     /// <summary>

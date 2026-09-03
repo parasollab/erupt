@@ -10,6 +10,11 @@ public class MarkerRobotPlacement : MonoBehaviour
     [SerializeField] private GameObject leftRobot;
     [SerializeField] private GameObject rightRobot;
 
+    [SerializeField, Tooltip("Keep the AprilTag tracker running after the robot is placed. Required when the tracker " +
+                             "also tracks object tags (TagReachabilityIndicator). Off restores the old behaviour of " +
+                             "stopping passthrough reads once the robot is placed.")]
+    private bool keepTrackerRunningAfterPlacement = true;
+
     private AprilTagTracker _tracker;
 
     void Start()
@@ -70,8 +75,8 @@ public class MarkerRobotPlacement : MonoBehaviour
             MoveRobot(rightRobot, placementPosition + projectedRight * halfDist, newRotation);
         }
 
-        // Placement is done; stop reading passthrough frames.
-        if (_tracker != null)
+        // Placement is done; stop reading passthrough frames unless other consumers still need tags.
+        if (!keepTrackerRunningAfterPlacement && _tracker != null)
             _tracker.enabled = false;
     }
 

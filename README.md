@@ -6,6 +6,11 @@ Interactive Extended Reality Robotics Visualization Tool
 > detected by the `jp.keijiro.apriltag` fork in the `Packages/AprilTag` submodule, so run
 > `git submodule update --init --recursive` after cloning. Print [Docs/tag41_12_id0.svg](Docs/tag41_12_id0.svg)
 > at 100% scale (10 cm detection square) and lay it flat where the robot base should go.
+>
+> Object tags for the reachability indicators are smaller (5 cm detection square) and use other
+> IDs: generate them with [Docs/make_apriltag_svg.py](Docs/make_apriltag_svg.py) (`--ids 1-4 --size 0.05`,
+> patterns from the [apriltag-imgs](https://github.com/AprilRobotics/apriltag-imgs) repo), print at
+> 100% scale and list the IDs under *Additional Tags* on the `AprilTagTracker` in the AR scene.
 
 ## ROS2 Setup
 

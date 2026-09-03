@@ -404,6 +404,7 @@ GameObject:
   - component: {fileID: 5410201463809928479}
   - component: {fileID: 7222998910593265698}
   - component: {fileID: 1884100035686430158}
+  - component: {fileID: 900000021}
   m_Layer: 0
   m_Name: ur5e_robot
   m_TagString: robot
@@ -4749,3 +4750,20 @@ MeshCollider:
   m_Convex: 1
   m_CookingOptions: 30
   m_Mesh: {fileID: 4300000, guid: db26f1e34f312c04398637965e07cc78, type: 2}
+--- !u!114 &900000021
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1197162766632367493}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a7c3e1f2b9d84c6e8f1a2b3c4d5e6f70, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: xrviz::RobotReachProfile
+  planningGroupName: ur_manipulator
+  ikLinkName: 
+  planningFrameId: base_link
+  baseYawOffsetDegrees: -90
+  baseAnchor: {fileID: 0}

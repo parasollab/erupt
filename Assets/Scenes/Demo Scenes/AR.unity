@@ -4958,6 +4958,19 @@ MonoBehaviour:
   poseFilterCoefficient: 0.5
   flipImageVertically: 0
   m_debugRenderer: {fileID: 0}
+  additionalTags:
+  - id: 1
+    tagSize: 0.05
+    target: {fileID: 0}
+  - id: 2
+    tagSize: 0.05
+    target: {fileID: 0}
+  - id: 3
+    tagSize: 0.05
+    target: {fileID: 0}
+  - id: 4
+    tagSize: 0.05
+    target: {fileID: 0}
 --- !u!114 &595720465
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4975,6 +4988,7 @@ MonoBehaviour:
   anchorBridge: {fileID: 595720468}
   leftRobot: {fileID: 192318983}
   rightRobot: {fileID: 0}
+  keepTrackerRunningAfterPlacement: 1
 --- !u!114 &595720466
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5017,7 +5031,7 @@ MonoBehaviour:
   volumeAlpha: 0.6
   publishPlanes: 0
   collisionObjectsListener: {fileID: 909369343}
-  worldOrigin: {fileID: 0}
+  worldOrigin: {fileID: 900000001}
 --- !u!114 &595720469
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5105,7 +5119,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4a8c3486f64694df495ede661a5abd41, type: 3}
   m_Name: 
   m_EditorClassIdentifier: xrviz::RobotBaseTFPublisher
-  robotBase: {fileID: 0}
+  robotBase: {fileID: 192318983}
   positionThreshold: 0.01
   rotationThreshold: 1
   cooldownSeconds: 2
@@ -5176,7 +5190,7 @@ MonoBehaviour:
   spawnCenter: {x: 0, y: 1, z: 0.75}
   objectScale: 0.15
   moveRadius: 0.1
-  worldOrigin: {fileID: 0}
+  worldOrigin: {fileID: 900000001}
   objectMaterial: {fileID: 2100000, guid: fc226930e8fad4c499969204cecfbc05, type: 2}
   fpsPhaseTopic: /fps_phase
   idleSeconds: 30
@@ -8577,7 +8591,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: xrviz::CollisionObjectsListenerSimple
   topic: /collision_objects_ros
-  worldOrigin: {fileID: 0}
+  worldOrigin: {fileID: 900000001}
   litMaterial: {fileID: 2100000, guid: fc226930e8fad4c499969204cecfbc05, type: 2}
 --- !u!4 &909369344
 Transform:
@@ -10107,7 +10121,10 @@ PrefabInstance:
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
-    m_AddedGameObjects: []
+    m_AddedGameObjects:
+    - targetCorrespondingSourceObject: {fileID: 5410201463809928479, guid: 792b9a32fef2641c3be1678d4de8461c, type: 3}
+      insertIndex: 0
+      addedObject: {fileID: 900000002}
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 792b9a32fef2641c3be1678d4de8461c, type: 3}
 --- !u!4 &1036378500 stripped
@@ -12482,7 +12499,7 @@ MonoBehaviour:
   litMaterial: {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
   selectionManager: {fileID: 1578009742}
   collisionObjectsListener: {fileID: 909369343}
-  worldOrigin: {fileID: 0}
+  worldOrigin: {fileID: 900000001}
   enableMTC: 0
   pickPlaceRecorder: {fileID: 0}
   mtcDashboardPanel: {fileID: 0}
@@ -13500,7 +13517,7 @@ MonoBehaviour:
   litMaterial: {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
   selectionManager: {fileID: 1578009742}
   collisionObjectsListener: {fileID: 909369343}
-  worldOrigin: {fileID: 0}
+  worldOrigin: {fileID: 900000001}
   enableMTC: 0
   pickPlaceRecorder: {fileID: 0}
   mtcDashboardPanel: {fileID: 0}
@@ -20002,6 +20019,119 @@ MonoBehaviour:
   m_ShadowLayerMask: 1
   m_RenderingLayers: 1
   m_ShadowRenderingLayers: 1
+--- !u!1 &900000001
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 900000002}
+  m_Layer: 0
+  m_Name: BaseTransform
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &900000002
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 900000001}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0.7071068, z: -0, w: 0.7071068}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1036378501}
+  m_LocalEulerAnglesHint: {x: 0, y: -90, z: 0}
+--- !u!1 &900000011
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 900000012}
+  - component: {fileID: 900000013}
+  m_Layer: 0
+  m_Name: Tag Reachability
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &900000012
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 900000011}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &900000013
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 900000011}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c9e5a3b4d1f06e8a0b3c4d5e6f708192, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: xrviz::TagReachabilityIndicator
+  robot: {fileID: 192318983}
+  seedController: {fileID: 0}
+  planningGroupName: ur_manipulator
+  ikLinkName: 
+  planningFrameId: base_link
+  baseYawOffsetDegrees: -90
+  tracker: {fileID: 595720464}
+  objectTagIds: []
+  hideAfterSeconds: 3
+  fadeSeconds: 0.5
+  ikServiceName: /compute_ik
+  positionOnlyIk: 0
+  avoidCollisions: 1
+  standoffDistance: 0.05
+  ikTimeoutSeconds: 0.05
+  serviceReplyTimeoutSeconds: 3
+  requeryDistance: 0.02
+  robotMoveDistance: 0.01
+  robotMoveAngle: 1
+  maxResultAgeSeconds: 30
+  minSecondsBetweenRequests: 0.1
+  noRosRetrySeconds: 5
+  discMaterial: {fileID: 2100000, guid: d0f6b4c5e2a17f9b1c4d5e6f70819203, type: 2}
+  labelFont: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  billboardCamera: {fileID: 1445414684}
+  discDiameterFactor: 1.4
+  labelHeightFactor: 0.9
+  labelScale: 0.15
+  reachableColor: {r: 0.1, g: 0.9, b: 0.2, a: 0.5}
+  unreachableColor: {r: 0.95, g: 0.15, b: 0.1, a: 0.5}
+  checkingColor: {r: 0.7, g: 0.7, b: 0.7, a: 0.45}
+  noRosColor: {r: 0.4, g: 0.4, b: 0.4, a: 0.3}
+  debugTags:
+  - id: 1
+    offsetFromRobotRoot: {x: 0, y: 0.05, z: 0.4}
+  - id: 2
+    offsetFromRobotRoot: {x: 0.3, y: 0.05, z: 1.4}
+  verboseLogging: 1
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -20028,3 +20158,4 @@ SceneRoots:
   - {fileID: 1372353813}
   - {fileID: 1179876260}
   - {fileID: 170000002}
+  - {fileID: 900000011}
