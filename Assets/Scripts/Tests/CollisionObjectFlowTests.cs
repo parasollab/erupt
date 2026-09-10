@@ -3,6 +3,7 @@ using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
 using RosMessageTypes.Moveit;
+using RosMessageTypes.Shape;
 using Erupt.Ros;
 
 namespace Erupt.Ros.Tests
@@ -15,6 +16,7 @@ namespace Erupt.Ros.Tests
     {
         private FakeRosBus bus;
         private GameObject obstacle;
+        private GameObject listenerHost;
 
         [SetUp]
         public void SetUp()
@@ -26,8 +28,9 @@ namespace Erupt.Ros.Tests
         [TearDown]
         public void TearDown()
         {
-            RosBus.Reset();
+            if (listenerHost != null) Object.DestroyImmediate(listenerHost);
             if (obstacle != null) Object.DestroyImmediate(obstacle);
+            RosBus.Reset();
         }
 
         [Test]
@@ -71,6 +74,66 @@ namespace Erupt.Ros.Tests
 
             Assert.Greater(bus.CountOn("/collision_object"), afterAdd,
                 "Moving an obstacle must publish an update.");
+        }
+
+        [UnityTest]
+        public IEnumerator ScalingAnObstacle_PublishesUpdatedGeometry()
+        {
+            obstacle = MakeObstacle("unity_cube_scale");
+
+            yield return WaitForPublish();
+            int afterAdd = bus.CountOn("/collision_object");
+
+            obstacle.transform.localScale = new Vector3(2f, 3f, 4f);
+            yield return WaitForPublish();
+
+            Assert.Greater(bus.CountOn("/collision_object"), afterAdd,
+                "Scale-only edits must republish geometry to MoveIt.");
+            var msg = (CollisionObjectMsg)LastOn("/collision_object");
+            Assert.AreEqual(CollisionObjectMsg.ADD, msg.operation,
+                "A scale change must replace geometry, not publish a pose-only MOVE.");
+        }
+
+        [UnityTest]
+        public IEnumerator RuntimeUnityOwnedObject_WatcherEchoDoesNotBuildCoincidentGeometry()
+        {
+            listenerHost = new GameObject("collision-listener");
+            var listener = listenerHost.AddComponent<CollisionObjectsListenerSimple>();
+            listener.requestInitialPlanningScene = false;
+            yield return null; // Start subscribes to the fake bus.
+
+            obstacle = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            var publisher = obstacle.AddComponent<CollisionObjectPublisher>();
+            publisher.objectId = "unity_runtime_owned";
+            listener.RegisterUnityOwnedObject(publisher.objectId, obstacle);
+
+            bus.Inbound(listener.topic, MakeBoxCollisionObject(publisher.objectId));
+
+            Assert.AreSame(obstacle, listener.objectsById[publisher.objectId]);
+            Assert.AreEqual(0, obstacle.transform.childCount,
+                "The watcher echo must not add a second renderer on top of the Unity-owned shape.");
+        }
+
+        [UnityTest]
+        public IEnumerator Startup_RequestsAndAppliesExistingPlanningSceneObjects()
+        {
+            bus.SetServiceHandler("/get_planning_scene", _ =>
+                new GetPlanningSceneResponse(new PlanningSceneMsg
+                {
+                    world = new PlanningSceneWorldMsg
+                    {
+                        collision_objects = new[] { MakeBoxCollisionObject("moveit_existing_box") }
+                    }
+                }));
+
+            listenerHost = new GameObject("collision-listener");
+            var listener = listenerHost.AddComponent<CollisionObjectsListenerSimple>();
+            yield return null; // Start subscribes, registers the service, and requests the snapshot.
+
+            Assert.Contains("/get_planning_scene", bus.RegisteredServices);
+            Assert.IsTrue(listener.TryGetObject("moveit_existing_box", out GameObject spawned));
+            Assert.AreEqual(1, spawned.transform.childCount,
+                "The full planning-scene snapshot must be rendered even when no live diff arrives.");
         }
 
         // Guards the destroy -> REMOVE feedback loop that suppressRemoveOnDestroy exists
@@ -155,10 +218,34 @@ namespace Erupt.Ros.Tests
             return go;
         }
 
+        private static CollisionObjectMsg MakeBoxCollisionObject(string id)
+        {
+            return new CollisionObjectMsg
+            {
+                id = id,
+                operation = CollisionObjectMsg.ADD,
+                primitives = new[]
+                {
+                    new SolidPrimitiveMsg
+                    {
+                        type = SolidPrimitiveMsg.BOX,
+                        dimensions = new[] { 1.0, 1.0, 1.0 }
+                    }
+                }
+            };
+        }
+
         private Unity.Robotics.ROSTCPConnector.MessageGeneration.Message FirstOn(string topic)
         {
             foreach (var m in bus.PublishedOn(topic)) return m;
             return null;
+        }
+
+        private Unity.Robotics.ROSTCPConnector.MessageGeneration.Message LastOn(string topic)
+        {
+            Unity.Robotics.ROSTCPConnector.MessageGeneration.Message last = null;
+            foreach (var message in bus.PublishedOn(topic)) last = message;
+            return last;
         }
     }
 }

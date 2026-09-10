@@ -296,8 +296,7 @@ public class SceneAnchorCollisionBridge : MonoBehaviour
 
         // Register with the listener so it ignores this ID when the planning_scene_watcher
         // bounces it back via /collision_objects_ros — same pattern as WristMenuController.
-        if (collisionObjectsListener != null && !collisionObjectsListener.objectsById.ContainsKey(id))
-            collisionObjectsListener.objectsById[id] = visual;
+        collisionObjectsListener?.RegisterUnityOwnedObject(id, visual);
 
         Debug.Log($"[SceneAnchorCollisionBridge] Published {anchor.Label} as '{id}', size={size}");
     }
@@ -313,7 +312,7 @@ public class SceneAnchorCollisionBridge : MonoBehaviour
                 header = new HeaderMsg { frame_id = frameId, stamp = RosTimestamp() },
                 operation = CollisionObjectMsg.REMOVE
             });
-            collisionObjectsListener?.objectsById.Remove(id);
+            collisionObjectsListener?.UnregisterUnityOwnedObject(id);
         }
         _publishedIds.Clear();
 
@@ -337,6 +336,7 @@ public class SceneAnchorCollisionBridge : MonoBehaviour
                 header = new HeaderMsg { frame_id = frameId, stamp = RosTimestamp() },
                 operation = CollisionObjectMsg.REMOVE
             });
+            collisionObjectsListener?.UnregisterUnityOwnedObject(id);
         }
     }
 

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Erupt.Interaction;
 using UnityEngine;
 
@@ -10,16 +11,33 @@ public class Quest3RobotInteractionController : MonoBehaviour
     [SerializeField] private Color handleIdleColor = new Color(0.05f, 0.75f, 1f, 1f);
     [SerializeField] private Color handleActiveColor = new Color(1f, 0.75f, 0.05f, 1f);
     [SerializeField] private Color selectedJointColor = new Color(1f, 0.35f, 0.08f, 1f);
+    [Header("Joint IK Handles")]
+    [SerializeField] private bool createJointHandles = true;
+    [SerializeField, Min(0.01f)] private float jointHandleDiameter = 0.075f;
+    [SerializeField] private Color jointHandleColor = new Color(0.1f, 0.85f, 1f, 0.8f);
+    [SerializeField, Range(1, 2)] private int maximumConcurrentDrags = 2;
+    [Header("Link Grabbing")]
+    [SerializeField] private bool allowLinkGrabbing = true;
 
     private ArticulationBody selectedJoint;
     private Renderer[] selectedRenderers;
     private Color[] originalColors;
-    // Widened from Quest3ControllerRayInteractor so the router can own a drag too.
-    // Private, so this is not an API change for the scenes still on the old path.
-    private object activeDragInteractor;
-    private static readonly object RouterDragToken = new object();
-    private float dragDistance;
-    private Vector3 dragOffset;
+    private readonly Dictionary<Transform, ArticulationBody> jointByHandle =
+        new Dictionary<Transform, ArticulationBody>();
+    private readonly List<GameObject> jointHandles = new List<GameObject>();
+    private sealed class ActiveDrag
+    {
+        public ArticulationBody body;
+        public Vector3 localGrabPoint;
+        public bool isJointPivot;
+        public float distance;
+        public Vector3 offset;
+        public Vector3 target;
+    }
+
+    private readonly Dictionary<object, ActiveDrag> activeDrags =
+        new Dictionary<object, ActiveDrag>();
+    private readonly List<ActiveDrag> orderedDrags = new List<ActiveDrag>(2);
 
     public Transform Handle => handle;
 
@@ -37,11 +55,18 @@ public class Quest3RobotInteractionController : MonoBehaviour
         handle = handleTransform;
         handleRenderer = handle != null ? handle.GetComponentInChildren<Renderer>() : null;
         SetHandleActive(false);
+        EnsureJointHandles();
     }
 
     private void LateUpdate()
     {
-        if (endEffector != null && handle != null && activeDragInteractor == null)
+        EnsureJointHandles();
+        SolveActiveDrags();
+        UpdateJointHandleWorldPositions();
+
+        // A joint-handle drag moves the end effector as a consequence, so its original
+        // handle should continue following it rather than being left behind in space.
+        if (endEffector != null && handle != null && !HasEndEffectorDrag())
         {
             handle.position = endEffector.position;
         }
@@ -53,6 +78,13 @@ public class Quest3RobotInteractionController : MonoBehaviour
         {
             ClearSelection();
             SetHandleActive(true);
+            return;
+        }
+
+        if (TryGetJointHandle(hit.transform, out ArticulationBody handleJoint))
+        {
+            SetHandleActive(false);
+            SelectJoint(handleJoint, hit.transform.GetComponent<Renderer>());
             return;
         }
 
@@ -76,28 +108,75 @@ public class Quest3RobotInteractionController : MonoBehaviour
     /// <summary>Router-driven equivalent of TryBeginHandleDrag. Guidelines Part 3.</summary>
     public bool TryBeginHandleDrag(InteractionIntent intent)
     {
-        return TryBeginHandleDrag(RouterDragToken, intent.Ray, intent.HasHit ? intent.Hit : default);
+        return TryBeginHandleDrag(
+            intent.Sample.SourceId ?? "default", intent.Ray, intent.HasHit ? intent.Hit : default);
     }
 
     private bool TryBeginHandleDrag(object interactor, Ray ray, RaycastHit hit)
     {
-        if (ikController == null || handle == null || interactor == null)
+        if (ikController == null || handle == null || interactor == null ||
+            activeDrags.ContainsKey(interactor) || activeDrags.Count >= maximumConcurrentDrags)
         {
             return false;
         }
 
         bool hitHandle = hit.transform != null && (hit.transform == handle || hit.transform.IsChildOf(handle));
-        if (!hitHandle && Vector3.Cross(ray.direction, handle.position - ray.origin).magnitude > 0.08f)
+        bool hitJointHandle = TryGetJointHandle(hit.transform, out ArticulationBody joint);
+        ArticulationBody linkBody = null;
+        bool hitLink = false;
+        if (allowLinkGrabbing && !hitHandle && !hitJointHandle && hit.transform != null)
+        {
+            linkBody = hit.transform.GetComponentInParent<ArticulationBody>();
+            hitLink = ikController.CanControlBodyPoint(linkBody);
+        }
+
+        bool hitDragTarget = hitHandle || hitJointHandle || hitLink;
+        if (!hitDragTarget &&
+            Vector3.Cross(ray.direction, handle.position - ray.origin).magnitude <= 0.08f)
+        {
+            hitHandle = true;
+        }
+
+        if (!hitHandle && !hitJointHandle && !hitLink)
         {
             return false;
         }
 
-        activeDragInteractor = interactor;
-        dragDistance = hitHandle ? hit.distance : Mathf.Max(0.1f, Vector3.Dot(handle.position - ray.origin, ray.direction));
-        dragOffset = handle.position - ray.GetPoint(dragDistance);
-        ikController.BeginInteraction();
-        SetHandleActive(true);
-        ClearSelection();
+        ArticulationBody grabbedBody = hitJointHandle ? joint : linkBody;
+        if (IsTargetAlreadyGrabbed(grabbedBody))
+            return false;
+
+        Transform jointHandle = hitJointHandle ? hit.transform : null;
+        Vector3 draggedPoint = hitJointHandle
+            ? jointHandle.position
+            : hitLink ? hit.point : handle.position;
+        float distance = hitDragTarget
+            ? hit.distance
+            : Mathf.Max(0.1f, Vector3.Dot(draggedPoint - ray.origin, ray.direction));
+        var drag = new ActiveDrag
+        {
+            body = grabbedBody,
+            localGrabPoint = hitJointHandle
+                ? joint.anchorPosition
+                : hitLink ? linkBody.transform.InverseTransformPoint(hit.point) : Vector3.zero,
+            isJointPivot = hitJointHandle,
+            distance = distance,
+            offset = draggedPoint - ray.GetPoint(distance),
+            target = draggedPoint
+        };
+
+        if (activeDrags.Count == 0) ikController.BeginInteraction();
+        activeDrags.Add(interactor, drag);
+        if (hitHandle) SetHandleActive(true);
+        if (hitJointHandle) SelectJoint(joint, jointHandle.GetComponent<Renderer>());
+        else if (hitLink)
+        {
+            int jointIndex = ikController.GetBodyPointEffectorIndex(linkBody) - 1;
+            Renderer hitRenderer = hit.transform.GetComponent<Renderer>() ??
+                hit.transform.GetComponentInChildren<Renderer>();
+            SelectJoint(ikController.Joints[jointIndex], hitRenderer);
+        }
+        else ClearSelection();
         return true;
     }
 
@@ -109,22 +188,19 @@ public class Quest3RobotInteractionController : MonoBehaviour
     /// <summary>Router-driven equivalent of UpdateHandleDrag.</summary>
     public void UpdateHandleDrag(InteractionIntent intent)
     {
-        UpdateHandleDrag(RouterDragToken, intent.Ray);
+        UpdateHandleDrag(intent.Sample.SourceId ?? "default", intent.Ray);
     }
 
     private void UpdateHandleDrag(object interactor, Ray ray)
     {
-        if (activeDragInteractor != interactor || ikController == null || handle == null)
+        if (interactor == null || ikController == null || handle == null ||
+            !activeDrags.TryGetValue(interactor, out ActiveDrag drag))
         {
             return;
         }
 
-        Vector3 target = ray.GetPoint(dragDistance) + dragOffset;
-        handle.position = target;
-
-        // Refusal is reported rather than swallowed; the legacy path used the void
-        // SolveToTarget and had no way to say "out of reach".
-        LastRefusal = ikController.TrySolveToTarget(target);
+        drag.target = ray.GetPoint(drag.distance) + drag.offset;
+        if (drag.body == null) handle.position = drag.target;
     }
 
     public void EndHandleDrag(Quest3ControllerRayInteractor interactor)
@@ -135,24 +211,29 @@ public class Quest3RobotInteractionController : MonoBehaviour
     /// <summary>Router-driven equivalent of EndHandleDrag.</summary>
     public void EndHandleDrag(InteractionIntent intent)
     {
-        EndHandleDrag(RouterDragToken);
+        EndHandleDrag(intent.Sample.SourceId ?? "default");
     }
 
     private void EndHandleDrag(object interactor)
     {
-        if (activeDragInteractor != interactor)
+        if (interactor == null || !activeDrags.TryGetValue(interactor, out ActiveDrag drag))
         {
             return;
         }
 
-        activeDragInteractor = null;
-        ikController.EndInteraction();
-        if (endEffector != null && handle != null)
-        {
-            handle.position = endEffector.position;
-        }
+        bool draggedEndEffector = drag.body == null;
+        activeDrags.Remove(interactor);
+        if (activeDrags.Count == 0) ikController.EndInteraction();
 
-        SetHandleActive(false);
+        if (endEffector != null && handle != null && !HasEndEffectorDrag())
+            handle.position = endEffector.position;
+
+        if (draggedEndEffector) SetHandleActive(HasEndEffectorDrag());
+    }
+
+    public void EndHandleDragBySource(string sourceId)
+    {
+        EndHandleDrag(sourceId ?? "default");
     }
 
     public void JogSelectedJoint(float deltaRadians)
@@ -180,7 +261,7 @@ public class Quest3RobotInteractionController : MonoBehaviour
     /// </summary>
     public InteractionRefusal LastRefusal { get; private set; } = InteractionRefusal.None;
 
-    private void SelectJoint(ArticulationBody joint)
+    private void SelectJoint(ArticulationBody joint, Renderer preferredRenderer = null)
     {
         if (selectedJoint == joint)
         {
@@ -189,7 +270,9 @@ public class Quest3RobotInteractionController : MonoBehaviour
 
         ClearSelection();
         selectedJoint = joint;
-        selectedRenderers = selectedJoint.GetComponentsInChildren<Renderer>();
+        selectedRenderers = preferredRenderer != null
+            ? new[] { preferredRenderer }
+            : selectedJoint.GetComponentsInChildren<Renderer>();
         originalColors = new Color[selectedRenderers.Length];
 
         for (int i = 0; i < selectedRenderers.Length; i++)
@@ -225,6 +308,131 @@ public class Quest3RobotInteractionController : MonoBehaviour
         {
             SetColor(handleRenderer.material, active ? handleActiveColor : handleIdleColor);
         }
+    }
+
+    private void SolveActiveDrags()
+    {
+        if (ikController == null || activeDrags.Count == 0)
+            return;
+
+        orderedDrags.Clear();
+        foreach (ActiveDrag drag in activeDrags.Values)
+            orderedDrags.Add(drag);
+
+        orderedDrags.Sort((a, b) => GetEffectorIndex(a).CompareTo(GetEffectorIndex(b)));
+
+        int firstJointIndex = 0;
+        LastRefusal = InteractionRefusal.None;
+        foreach (ActiveDrag drag in orderedDrags)
+        {
+            InteractionRefusal refusal;
+            if (drag.body != null)
+            {
+                int effectorIndex = GetEffectorIndex(drag);
+                refusal = drag.isJointPivot
+                    ? ikController.TrySolveJointToTarget(
+                        drag.body, drag.target, firstJointIndex)
+                    : ikController.TrySolveBodyPointToTarget(
+                        drag.body, drag.localGrabPoint, drag.target, firstJointIndex);
+                if (effectorIndex >= 0) firstJointIndex = effectorIndex;
+            }
+            else
+            {
+                refusal = ikController.TrySolveToTarget(drag.target, firstJointIndex);
+                firstJointIndex = ikController.Joints.Count;
+                if (handle != null) handle.position = drag.target;
+            }
+
+            if (!LastRefusal.IsRefused && refusal.IsRefused)
+                LastRefusal = refusal;
+        }
+    }
+
+    private int GetEffectorIndex(ActiveDrag drag)
+    {
+        if (drag.body == null)
+            return ikController.Joints.Count;
+
+        return drag.isJointPivot
+            ? ikController.GetJointIndex(drag.body)
+            : ikController.GetBodyPointEffectorIndex(drag.body);
+    }
+
+    private bool IsTargetAlreadyGrabbed(ArticulationBody body)
+    {
+        foreach (ActiveDrag drag in activeDrags.Values)
+        {
+            if (drag.body == body)
+                return true;
+        }
+
+        return false;
+    }
+
+    private bool HasEndEffectorDrag()
+    {
+        foreach (ActiveDrag drag in activeDrags.Values)
+        {
+            if (drag.body == null)
+                return true;
+        }
+
+        return false;
+    }
+
+    private bool TryGetJointHandle(Transform candidate, out ArticulationBody joint)
+    {
+        joint = null;
+        return candidate != null && jointByHandle.TryGetValue(candidate, out joint);
+    }
+
+    private void EnsureJointHandles()
+    {
+        if (!createJointHandles || jointByHandle.Count > 0 || ikController == null ||
+            ikController.Joints.Count == 0)
+            return;
+
+        foreach (ArticulationBody joint in ikController.Joints)
+        {
+            GameObject sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            sphere.name = $"Joint IK Handle ({joint.name})";
+            sphere.transform.SetParent(null, false);
+            sphere.transform.SetPositionAndRotation(GetJointPivot(joint), Quaternion.identity);
+            sphere.transform.localScale = Vector3.one * jointHandleDiameter;
+            if (handle != null) sphere.layer = handle.gameObject.layer;
+
+            SphereCollider sphereCollider = sphere.GetComponent<SphereCollider>();
+            sphereCollider.isTrigger = true;
+
+            Renderer sphereRenderer = sphere.GetComponent<Renderer>();
+            if (handleRenderer != null && handleRenderer.sharedMaterial != null)
+                sphereRenderer.material = new Material(handleRenderer.sharedMaterial);
+            SetColor(sphereRenderer.material, jointHandleColor);
+            jointByHandle.Add(sphere.transform, joint);
+            jointHandles.Add(sphere);
+        }
+    }
+
+    private void UpdateJointHandleWorldPositions()
+    {
+        foreach (KeyValuePair<Transform, ArticulationBody> pair in jointByHandle)
+        {
+            if (pair.Key != null && pair.Value != null)
+                pair.Key.position = GetJointPivot(pair.Value);
+        }
+    }
+
+    private void OnDestroy()
+    {
+        foreach (GameObject sphere in jointHandles)
+        {
+            if (sphere != null) Destroy(sphere);
+        }
+    }
+
+    private static Vector3 GetJointPivot(ArticulationBody joint)
+    {
+        return joint.transform.TransformPoint(joint.anchorPosition);
     }
 
     private static Color GetColor(Material mat)

@@ -38,6 +38,13 @@ namespace Erupt.Ros.Tests
             list.Add(callback);
         }
 
+        public void Unsubscribe<T>(string topic, Action<T> callback) where T : Message
+        {
+            if (!callbacks.TryGetValue(topic, out var list)) return;
+            list.Remove(callback);
+            if (list.Count == 0) callbacks.Remove(topic);
+        }
+
         public void RegisterPublisher<T>(string topic) where T : Message =>
             RegisteredPublishers.Add(topic);
 

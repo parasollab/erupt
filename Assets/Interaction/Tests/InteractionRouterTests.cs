@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 using Erupt.Interaction;
@@ -13,6 +14,7 @@ namespace Erupt.Interaction.Tests
     public class InteractionRouterTests
     {
         private GameObject host;
+        private GameObject target;
         private InteractionRouter router;
         private TestInteractionSource source;
 
@@ -30,6 +32,7 @@ namespace Erupt.Interaction.Tests
         public void TearDown()
         {
             InteractionSampleBus.Reset();
+            if (target != null) Object.DestroyImmediate(target);
             Object.DestroyImmediate(host);
         }
 
@@ -94,6 +97,49 @@ namespace Erupt.Interaction.Tests
         }
 
         [Test]
+        public void Select_HittingUi_IsConsumedInsteadOfDispatchedAsAnEmptyMiss()
+        {
+            const int isolatedLayer = 29;
+            SetLayerMask("raycastLayers", 1 << isolatedLayer);
+            SetLayerMask("uiLayers", 1 << isolatedLayer);
+
+            target = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            target.layer = isolatedLayer;
+            target.transform.position = new Vector3(0f, 0f, 2f);
+            Physics.SyncTransforms();
+
+            int selects = 0;
+            router.Select += _ => selects++;
+
+            source.EmitAt(IntentKind.Select, Vector3.zero, Modality.Controller, 1.0);
+
+            Assert.AreEqual(0, selects,
+                "A trigger press consumed by wrist UI must not become a world miss that clears selection.");
+        }
+
+        [Test]
+        public void Select_MissingEverything_IsStillDispatchedForEmptySpaceDeselection()
+        {
+            const int isolatedLayer = 29;
+            SetLayerMask("raycastLayers", 1 << isolatedLayer);
+            SetLayerMask("uiLayers", 1 << isolatedLayer);
+
+            int selects = 0;
+            GameObject selectedTarget = null;
+            router.Select += intent =>
+            {
+                selects++;
+                selectedTarget = intent.Target;
+            };
+
+            source.EmitAt(IntentKind.Select, Vector3.zero, Modality.Controller, 1.0);
+
+            Assert.AreEqual(1, selects);
+            Assert.IsNull(selectedTarget,
+                "A genuine empty-space press must remain distinguishable from a UI-consumed press.");
+        }
+
+        [Test]
         public void Refusal_IsBroadcastWithReason()
         {
             InteractionRefusal seen = InteractionRefusal.None;
@@ -149,6 +195,14 @@ namespace Erupt.Interaction.Tests
             source.EmitAt(IntentKind.Drag, target, Modality.Controller, timestamp: 1.0);
 
             Assert.AreEqual(target.x, last.x, 1e-4f);
+        }
+
+        private void SetLayerMask(string fieldName, int value)
+        {
+            FieldInfo field = typeof(InteractionRouter).GetField(
+                fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.IsNotNull(field, $"InteractionRouter.{fieldName} was not found.");
+            field.SetValue(router, (LayerMask)value);
         }
 
     }

@@ -94,6 +94,7 @@ namespace Erupt.Interaction
         private void OnRaw(InteractionIntent raw)
         {
             ModalityFilterProfile profile = ProfileFor(raw.Sample.Modality);
+            bool blockedByUi = false;
 
             InteractionIntent routed;
             switch (raw.Kind)
@@ -106,18 +107,23 @@ namespace Erupt.Interaction
                 // press only adds targeting lag, and makes the drawn ray (which reads the
                 // live pose) disagree with the resolved target under fast motion.
                 case IntentKind.Drag:
-                    routed = ResolveTarget(ApplyFilter(raw, profile));
+                    routed = ResolveTarget(ApplyFilter(raw, profile), out blockedByUi);
                     break;
 
                 case IntentKind.BeginDrag:
                     ResetFilter(raw.Sample.SourceId);
-                    routed = ResolveTarget(raw);
+                    routed = ResolveTarget(raw, out blockedByUi);
                     break;
 
                 default:
-                    routed = ResolveTarget(raw);
+                    routed = ResolveTarget(raw, out blockedByUi);
                     break;
             }
+
+            // The controller trigger feeds both XRI UI Press and the world Select intent.
+            // A UI hit must consume the world Select. Dispatching it as an empty miss made
+            // SelectionManager clear the object before the button callback could edit it.
+            if (raw.Kind == IntentKind.Select && blockedByUi) return;
 
             Dispatch(routed);
         }
@@ -148,12 +154,13 @@ namespace Erupt.Interaction
         // Replaces the raycasting previously done inside the controller script and in
         // SelectionManager.TrySelect. UI surfaces are rejected by layer rather than by
         // matching GameObject names.
-        private InteractionIntent ResolveTarget(InteractionIntent intent)
+        private InteractionIntent ResolveTarget(InteractionIntent intent, out bool blockedByUi)
         {
             bool hasHit = Physics.Raycast(
                 intent.Ray, out RaycastHit hit, rayLength, raycastLayers, QueryTriggerInteraction.Collide);
 
-            if (hasHit && IsUiSurface(hit.collider.gameObject)) hasHit = false;
+            blockedByUi = hasHit && IsUiSurface(hit.collider.gameObject);
+            if (blockedByUi) hasHit = false;
 
             return new InteractionIntent(intent.Kind, intent.Sample, intent.Ray, hasHit, hit, intent.Axis);
         }

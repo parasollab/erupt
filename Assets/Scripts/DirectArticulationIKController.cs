@@ -44,6 +44,27 @@ public class DirectArticulationIKController : MonoBehaviour
 
     public Transform EndEffector => endEffector;
     public IReadOnlyList<string> JointNames => jointNames;
+    public IReadOnlyList<ArticulationBody> Joints => joints;
+
+    public int GetJointIndex(ArticulationBody joint)
+    {
+        return joint != null ? joints.IndexOf(joint) : -1;
+    }
+
+    /// <summary>
+    /// Returns the exclusive end of the controlled joint range that can move a point
+    /// on this body. A link point includes the body's own revolute joint.
+    /// </summary>
+    public int GetBodyPointEffectorIndex(ArticulationBody body)
+    {
+        int lastJointIndex = GetLastAffectingJointIndex(body);
+        return lastJointIndex >= 0 ? lastJointIndex + 1 : -1;
+    }
+
+    public bool CanControlBodyPoint(ArticulationBody body)
+    {
+        return GetBodyPointEffectorIndex(body) > 0;
+    }
 
     private readonly Dictionary<string, Transform> linkByName = new Dictionary<string, Transform>(StringComparer.OrdinalIgnoreCase);
 
@@ -107,24 +128,106 @@ public class DirectArticulationIKController : MonoBehaviour
 
     public void SolveToTarget(Vector3 targetPosition)
     {
-        if (endEffector == null || joints.Count == 0)
+        SolvePointToTarget(endEffector, Vector3.zero, 0, joints.Count, targetPosition);
+    }
+
+    /// <summary>
+    /// Treats a selected joint handle as the temporary effector. Only joints between
+    /// the articulation root and the selected joint are changed; the selected joint's
+    /// own rotation cannot move its pivot.
+    /// </summary>
+    public InteractionRefusal TrySolveJointToTarget(
+        ArticulationBody selectedJoint,
+        Vector3 targetPosition,
+        int firstJointIndex = 0)
+    {
+        int selectedIndex = joints.IndexOf(selectedJoint);
+        if (selectedIndex < 0)
         {
-            return;
+            return InteractionRefusal.Refuse("That joint cannot be used as an IK target.", targetPosition);
         }
+
+        firstJointIndex = Mathf.Clamp(firstJointIndex, 0, selectedIndex);
+        if (selectedIndex == firstJointIndex)
+            return InteractionRefusal.Refuse(
+                "No movable joint exists before this target in the active chain segment.",
+                targetPosition);
+
+        SolvePointToTarget(
+            selectedJoint.transform,
+            selectedJoint.anchorPosition,
+            firstJointIndex,
+            selectedIndex,
+            targetPosition);
+
+        float residual = Vector3.Distance(GetJointPivot(selectedJoint), targetPosition);
+        return residual > positionTolerance
+            ? InteractionRefusal.Refuse(
+                $"{selectedJoint.name} target is out of reach by {residual * 100f:F0} cm.",
+                targetPosition)
+            : InteractionRefusal.None;
+    }
+
+    /// <summary>
+    /// Drives a material point captured in an articulation body's local frame. This is
+    /// the link-grab equivalent of TrySolveJointToTarget.
+    /// </summary>
+    public InteractionRefusal TrySolveBodyPointToTarget(
+        ArticulationBody body,
+        Vector3 localGrabPoint,
+        Vector3 targetPosition,
+        int firstJointIndex = 0)
+    {
+        int effectorIndex = GetBodyPointEffectorIndex(body);
+        if (effectorIndex < 0)
+            return InteractionRefusal.Refuse(
+                "That robot link is not part of the controlled revolute chain.",
+                targetPosition);
+
+        firstJointIndex = Mathf.Clamp(firstJointIndex, 0, effectorIndex);
+        if (firstJointIndex == effectorIndex)
+            return InteractionRefusal.Refuse(
+                "No movable joint remains in this active chain segment.",
+                targetPosition);
+
+        SolvePointToTarget(
+            body.transform, localGrabPoint, firstJointIndex, effectorIndex, targetPosition);
+
+        Vector3 achieved = body.transform.TransformPoint(localGrabPoint);
+        float residual = Vector3.Distance(achieved, targetPosition);
+        return residual > positionTolerance
+            ? InteractionRefusal.Refuse(
+                $"{body.name} grab point is out of reach by {residual * 100f:F0} cm.",
+                targetPosition)
+            : InteractionRefusal.None;
+    }
+
+    private void SolvePointToTarget(
+        Transform effectorFrame,
+        Vector3 localEffectorPoint,
+        int firstJointIndex,
+        int jointCount,
+        Vector3 targetPosition)
+    {
+        if (effectorFrame == null || jointCount <= 0)
+            return;
 
         for (int iteration = 0; iteration < maxIterations; iteration++)
         {
-            Vector3 error = targetPosition - endEffector.position;
+            Vector3 effectorPosition = effectorFrame.TransformPoint(localEffectorPoint);
+            Vector3 error = targetPosition - effectorPosition;
             if (error.sqrMagnitude <= positionTolerance * positionTolerance)
             {
                 break;
             }
 
-            for (int i = joints.Count - 1; i >= 0; i--)
+            for (int i = Mathf.Min(jointCount, joints.Count) - 1;
+                 i >= Mathf.Max(0, firstJointIndex);
+                 i--)
             {
                 ArticulationBody joint = joints[i];
-                Vector3 jointPosition = joint.transform.position;
-                Vector3 toEnd = endEffector.position - jointPosition;
+                Vector3 jointPosition = GetJointPivot(joint);
+                Vector3 toEnd = effectorPosition - jointPosition;
                 Vector3 toTarget = targetPosition - jointPosition;
                 if (toEnd.sqrMagnitude < 0.000001f || toTarget.sqrMagnitude < 0.000001f)
                 {
@@ -134,7 +237,13 @@ public class DirectArticulationIKController : MonoBehaviour
                 Vector3 axis = GetWorldMotionAxis(joint);
                 float deltaDegrees = Vector3.SignedAngle(toEnd, toTarget, axis);
                 deltaDegrees = Mathf.Clamp(deltaDegrees * solveWeight, -maxAngleStepDegrees, maxAngleStepDegrees);
-                ApplyBestJointDelta(joint, deltaDegrees * Mathf.Deg2Rad, targetPosition);
+                ApplyBestJointDelta(
+                    joint,
+                    effectorFrame,
+                    localEffectorPoint,
+                    deltaDegrees * Mathf.Deg2Rad,
+                    targetPosition);
+                effectorPosition = effectorFrame.TransformPoint(localEffectorPoint);
             }
         }
 
@@ -148,12 +257,22 @@ public class DirectArticulationIKController : MonoBehaviour
     /// </summary>
     public InteractionRefusal TrySolveToTarget(Vector3 targetPosition)
     {
+        return TrySolveToTarget(targetPosition, 0);
+    }
+
+    public InteractionRefusal TrySolveToTarget(Vector3 targetPosition, int firstJointIndex)
+    {
         if (endEffector == null || joints.Count == 0)
         {
             return InteractionRefusal.Refuse("Robot is not configured for interaction.", targetPosition);
         }
 
-        SolveToTarget(targetPosition);
+        SolvePointToTarget(
+            endEffector,
+            Vector3.zero,
+            Mathf.Clamp(firstJointIndex, 0, joints.Count),
+            joints.Count,
+            targetPosition);
 
         float residual = Vector3.Distance(endEffector.position, targetPosition);
         if (residual > positionTolerance)
@@ -447,26 +566,55 @@ public class DirectArticulationIKController : MonoBehaviour
         return worldAxis.sqrMagnitude > 0.000001f ? worldAxis.normalized : joint.transform.right;
     }
 
-    private void ApplyBestJointDelta(ArticulationBody joint, float deltaRadians, Vector3 targetPosition)
+    private void ApplyBestJointDelta(
+        ArticulationBody joint,
+        Transform effectorFrame,
+        Vector3 localEffectorPoint,
+        float deltaRadians,
+        Vector3 targetPosition)
     {
-        float currentError = (targetPosition - endEffector.position).sqrMagnitude;
+        float currentError =
+            (targetPosition - effectorFrame.TransformPoint(localEffectorPoint)).sqrMagnitude;
         float startPosition = joint.jointPosition[0];
 
         ApplyJointPosition(joint, ClampJointPosition(joint, startPosition + deltaRadians));
-        float forwardError = (targetPosition - endEffector.position).sqrMagnitude;
+        float forwardError =
+            (targetPosition - effectorFrame.TransformPoint(localEffectorPoint)).sqrMagnitude;
         if (forwardError <= currentError)
         {
             return;
         }
 
         ApplyJointPosition(joint, ClampJointPosition(joint, startPosition - deltaRadians));
-        float reverseError = (targetPosition - endEffector.position).sqrMagnitude;
+        float reverseError =
+            (targetPosition - effectorFrame.TransformPoint(localEffectorPoint)).sqrMagnitude;
         if (reverseError <= currentError)
         {
             return;
         }
 
         ApplyJointPosition(joint, startPosition);
+    }
+
+    private int GetLastAffectingJointIndex(ArticulationBody body)
+    {
+        if (body == null)
+            return -1;
+
+        Transform bodyTransform = body.transform;
+        for (int i = joints.Count - 1; i >= 0; i--)
+        {
+            Transform jointTransform = joints[i].transform;
+            if (bodyTransform == jointTransform || bodyTransform.IsChildOf(jointTransform))
+                return i;
+        }
+
+        return -1;
+    }
+
+    private static Vector3 GetJointPivot(ArticulationBody joint)
+    {
+        return joint.transform.TransformPoint(joint.anchorPosition);
     }
 
     private static float ClampJointPosition(ArticulationBody joint, float positionRadians)

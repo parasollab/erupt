@@ -350,7 +350,8 @@ public class CollisionObjectPublisher : MonoBehaviour
         // Debug.Log("Local Scale: " + transform.localScale);
         
         return Vector3.Distance(transform.position, lastPosition) > epsilon ||
-               Quaternion.Angle(transform.rotation, lastRotation) > epsilon;
+               Quaternion.Angle(transform.rotation, lastRotation) > epsilon ||
+               HasScaleChanged();
     }
 
     bool HasScaleChanged()

@@ -20,6 +20,12 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
     [Header("ROS")]
     public string topic = "/collision_objects_ros";
 
+    [Tooltip("MoveIt service used to fetch objects that existed before this subscriber connected.")]
+    public string planningSceneServiceTopic = "/get_planning_scene";
+
+    [Tooltip("Request a full world-object snapshot after subscribing to live updates.")]
+    public bool requestInitialPlanningScene = true;
+
     [Header("Frame Root (ROS world frame)")]
     public GameObject worldOrigin; // If null, uses this.transform
     private Transform worldOriginTransform => worldOrigin ? worldOrigin.transform : this.transform;
@@ -38,7 +44,8 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
     // Fired after an inbound ADD/APPEND/MOVE has been applied to the GameObject for this id.
     public event System.Action<string> OnObjectUpdated;
 
-    // IDs owned by CollisionObjectPublisher components already in the scene — never spawn duplicates for these
+    // IDs represented by Unity-owned GameObjects. Echoes from planning_scene_watcher must
+    // not create a second renderer at the same pose.
     private readonly HashSet<string> _publisherOwnedIds = new();
 
     // MoveIt op codes (per message spec)
@@ -53,9 +60,88 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
 
         foreach (var pub in FindObjectsByType<CollisionObjectPublisher>(FindObjectsSortMode.None))
             if (!string.IsNullOrEmpty(pub.objectId))
-                _publisherOwnedIds.Add(pub.objectId);
+                RegisterUnityOwnedObject(pub.objectId, pub.gameObject);
 
+        // Subscribe before requesting the snapshot so an update that occurs while the
+        // service request is in flight cannot be missed.
         ros.Subscribe<CollisionObjectMsg>(topic, OnCollisionObject);
+
+        if (requestInitialPlanningScene)
+            RequestInitialPlanningScene();
+    }
+
+    void OnDestroy()
+    {
+        if (ros != null)
+            ros.Unsubscribe<CollisionObjectMsg>(topic, OnCollisionObject);
+    }
+
+    private void RequestInitialPlanningScene()
+    {
+        try
+        {
+            ros.RegisterRosService<GetPlanningSceneRequest, GetPlanningSceneResponse>(planningSceneServiceTopic);
+
+            uint components = PlanningSceneComponentsMsg.WORLD_OBJECT_NAMES
+                            | PlanningSceneComponentsMsg.WORLD_OBJECT_GEOMETRY;
+            var request = new GetPlanningSceneRequest(new PlanningSceneComponentsMsg(components));
+            ros.SendServiceMessage<GetPlanningSceneResponse>(
+                planningSceneServiceTopic, request, OnInitialPlanningSceneReceived);
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[CO Listener] Could not request the initial planning scene: {e.Message}");
+        }
+    }
+
+    private void OnInitialPlanningSceneReceived(GetPlanningSceneResponse response)
+    {
+        CollisionObjectMsg[] objects = response?.scene?.world?.collision_objects;
+        if (objects == null)
+        {
+            Debug.LogWarning("[CO Listener] Initial planning-scene response contained no world object list.");
+            return;
+        }
+
+        Debug.Log($"[CO Listener] Applying initial planning-scene snapshot ({objects.Length} objects).");
+        foreach (CollisionObjectMsg collisionObject in objects)
+            OnCollisionObject(collisionObject);
+    }
+
+    /// <summary>
+    /// Registers a GameObject whose ROS id originated in Unity. The watcher will echo
+    /// that id back, but the listener must keep the existing object rather than rebuild
+    /// coincident geometry on top of it.
+    /// </summary>
+    public void RegisterUnityOwnedObject(string id, GameObject unityObject)
+    {
+        if (string.IsNullOrEmpty(id)) return;
+
+        _publisherOwnedIds.Add(id);
+        if (unityObject != null)
+            objectsById[id] = unityObject;
+    }
+
+    public void UnregisterUnityOwnedObject(string id)
+    {
+        if (string.IsNullOrEmpty(id)) return;
+        _publisherOwnedIds.Remove(id);
+        objectsById.Remove(id);
+    }
+
+    private bool TryGetUnityOwnedObject(string id, out GameObject unityObject)
+    {
+        unityObject = null;
+        if (!_publisherOwnedIds.Contains(id)) return false;
+
+        if (objectsById.TryGetValue(id, out unityObject) && unityObject != null)
+            return true;
+
+        // The owner may have been destroyed locally before the watcher echoed REMOVE.
+        _publisherOwnedIds.Remove(id);
+        objectsById.Remove(id);
+        unityObject = null;
+        return false;
     }
 
     void OnCollisionObject(CollisionObjectMsg co)
@@ -66,8 +152,17 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
             return;
         }
 
-        if (_publisherOwnedIds.Contains(co.id))
+        if (TryGetUnityOwnedObject(co.id, out GameObject unityOwnedObject))
         {
+            if (co.operation == OP_REMOVE)
+            {
+                foreach (var pub in unityOwnedObject.GetComponentsInChildren<CollisionObjectPublisher>(true))
+                    pub.suppressRemoveOnDestroy = true;
+                Destroy(unityOwnedObject);
+                UnregisterUnityOwnedObject(co.id);
+                return;
+            }
+
             Debug.Log($"[CO Listener] Skipping '{co.id}' — already managed by CollisionObjectPublisher.");
             return;
         }
@@ -391,7 +486,10 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
         var mr = go.AddComponent<MeshRenderer>();
         mr.material = litMaterial;
 
-        var uMesh = new Mesh();
+        // Named so downstream shape sniffing can identify it. An unnamed mesh reports
+        // name "" and matches nothing, which left the wrist menu's edit panel empty for
+        // every mesh-type collision object.
+        var uMesh = new Mesh { name = $"Mesh_{name}" };
         var verts = new Vector3[meshMsg.vertices.Length];
         for (int i = 0; i < verts.Length; i++)
         {

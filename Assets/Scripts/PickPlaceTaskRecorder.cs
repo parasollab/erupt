@@ -14,6 +14,14 @@ public class PickPlaceTaskRecorder : MonoBehaviour
     [SerializeField] private SelectionManager selectionManager;
     [SerializeField] private GameObject worldOrigin;
 
+    [Header("Task delivery")]
+    [Tooltip("When assigned, the captured task is sent as a /pick_place action goal " +
+             "instead of being published on /pick_place_task. Leave empty to keep the topic.")]
+    [SerializeField] private PickPlaceActionClient pickPlaceAction;
+
+    [Tooltip("Action goals only: false plans without executing.")]
+    [SerializeField] private bool executeOnServer = true;
+
     public bool IsRecording { get; private set; }
 
     // Invoked when a task is successfully captured; passes the object_id.
@@ -74,7 +82,7 @@ public class PickPlaceTaskRecorder : MonoBehaviour
             Vector3 relPos = origin != null ? origin.InverseTransformPoint(worldPos) : worldPos;
             Quaternion relRot = origin != null ? Quaternion.Inverse(origin.rotation) * worldRot : worldRot;
 
-            PublishPickPlaceTask(objectId, relPos, relRot);
+            SendPickPlaceTask(objectId, relPos, relRot);
             ResetWatchedObjectToPickPose();
             ClearWatchedObject();
             OnRecordingComplete?.Invoke(objectId);
@@ -137,10 +145,16 @@ public class PickPlaceTaskRecorder : MonoBehaviour
         Debug.Log($"PickPlaceTaskRecorder: object released — pose will be read from transform when recording stops");
     }
 
-    private void PublishPickPlaceTask(string objectId, Vector3 relPos, Quaternion relRot)
+    private void SendPickPlaceTask(string objectId, Vector3 relPos, Quaternion relRot)
     {
         PointMsg rosPos = RosUnityConversion.UnityToRosPosition(relPos);
         QuaternionMsg rosRot = RosUnityConversion.UnityToRosQuaternion(relRot);
+
+        if (pickPlaceAction != null)
+        {
+            SendPickPlaceGoal(objectId, rosPos, rosRot);
+            return;
+        }
 
         var msg = new PickPlaceTaskMsg(
             objectId,
@@ -152,6 +166,23 @@ public class PickPlaceTaskRecorder : MonoBehaviour
 
         ros.Publish(Topic, msg);
         Debug.Log($"PickPlaceTaskRecorder: published PickPlaceTask object_id={objectId} place_pose=({rosPos.x:F3}, {rosPos.y:F3}, {rosPos.z:F3})");
+    }
+
+    // The action reports acceptance, per-stage feedback and a result, so failures are
+    // logged here rather than disappearing into a fire-and-forget topic.
+    private async void SendPickPlaceGoal(string objectId, PointMsg rosPos, QuaternionMsg rosRot)
+    {
+        Debug.Log($"PickPlaceTaskRecorder: sending {pickPlaceAction.ActionName} goal object_id={objectId} place_pose=({rosPos.x:F3}, {rosPos.y:F3}, {rosPos.z:F3})");
+        try
+        {
+            var result = await pickPlaceAction.SendGoalAsync(objectId, rosPos, rosRot, executeOnServer);
+            Debug.Log($"PickPlaceTaskRecorder: {pickPlaceAction.ActionName} finished status={result.Status} " +
+                      $"success={result.Result?.success} message='{result.Result?.message}'");
+        }
+        catch (System.Exception exception)
+        {
+            Debug.LogError($"PickPlaceTaskRecorder: {pickPlaceAction.ActionName} goal failed — {exception.Message}");
+        }
     }
 
     void OnDestroy()

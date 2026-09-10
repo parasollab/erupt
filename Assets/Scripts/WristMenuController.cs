@@ -483,12 +483,16 @@ public class WristMenuController : MonoBehaviour
         }
 
         MeshFilter meshFilter = selectedObject.GetComponent<MeshFilter>();
-        if (meshFilter == null || meshFilter.mesh == null)
+        if (meshFilter == null || meshFilter.sharedMesh == null)
         {
+            // Listener-spawned collision objects put geometry on children, so a selection
+            // that resolved to the parent has no mesh of its own.
+            Debug.LogWarning($"WristMenuController: '{selectedObject.name}' has no mesh; " +
+                             "nothing to edit. Select the geometry itself.");
             return;
         }
 
-        string meshName = meshFilter.mesh.name;
+        string meshName = meshFilter.sharedMesh.name;
 
         if (meshName.Contains("Cube"))
         {
@@ -515,7 +519,11 @@ public class WristMenuController : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning($"WristMenuController: Unsupported shape '{meshName}' for editing.");
+            // Anything unrecognised still gets a uniform scale control. Previously this
+            // branch added nothing, so objects built from MoveIt meshes or planes - whose
+            // mesh names are "Mesh_<id>", "Quad" or empty - produced an empty edit panel.
+            Debug.Log($"WristMenuController: Unrecognised shape '{meshName}'; offering uniform scale.");
+            wristMenuEditSliderPanel.Add(CreateToggleStack("Mesh", "Scale"));
         }
     }
     
@@ -609,7 +617,7 @@ public class WristMenuController : MonoBehaviour
                 publisher.hasBeenPublished = false;
                 publisher.worldOrigin = worldOrigin;
                 if (collisionObjectsListener != null)
-                    collisionObjectsListener.objectsById.Add(newId, duplicate);
+                    collisionObjectsListener.RegisterUnityOwnedObject(newId, duplicate);
             }
 
             if (selectionManager != null)
@@ -710,7 +718,7 @@ public class WristMenuController : MonoBehaviour
         if (selectionManager != null)
             selectionManager.SetSelectedObject(shape);
         if (collisionObjectsListener != null)
-            collisionObjectsListener.objectsById.Add(publisher.objectId, shape);
+            collisionObjectsListener.RegisterUnityOwnedObject(publisher.objectId, shape);
     }
     
     // Public convenience methods for external access

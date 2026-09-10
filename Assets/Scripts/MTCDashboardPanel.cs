@@ -10,6 +10,9 @@ public class MTCDashboardPanel : MonoBehaviour
     [SerializeField] private UIDocument uiDocument;
     [SerializeField] private MTCDataManager dataManager;
     [SerializeField] private PickPlaceTaskRecorder pickPlaceRecorder;
+    [Tooltip("Optional: same client the recorder sends goals through, so the plan tab " +
+             "shows /pick_place acceptance, feedback stages and the final result.")]
+    [SerializeField] private PickPlaceActionClient pickPlaceAction;
     [SerializeField] private MTCTrajectoryPlayer trajectoryPlayer;
 
     // Root
@@ -79,6 +82,12 @@ public class MTCDashboardPanel : MonoBehaviour
             pickPlaceRecorder.OnRecordingComplete -= OnPickPlaceRecorded;
             pickPlaceRecorder.OnRecordingComplete += OnPickPlaceRecorded;
         }
+
+        if (pickPlaceAction != null)
+        {
+            pickPlaceAction.OnStatus -= OnPickPlaceStatus;
+            pickPlaceAction.OnStatus += OnPickPlaceStatus;
+        }
     }
 
     private void OnDisable()
@@ -95,6 +104,9 @@ public class MTCDashboardPanel : MonoBehaviour
 
         if (pickPlaceRecorder != null)
             pickPlaceRecorder.OnRecordingComplete -= OnPickPlaceRecorded;
+
+        if (pickPlaceAction != null)
+            pickPlaceAction.OnStatus -= OnPickPlaceStatus;
     }
 
     private void BindUI()
@@ -179,6 +191,12 @@ public class MTCDashboardPanel : MonoBehaviour
         if (planObjectIdLabel != null) planObjectIdLabel.text = objectId;
         if (planStatusLabel != null) planStatusLabel.text = $"Sent: {objectId}";
         ResetRecordButton();
+    }
+
+    // /pick_place progress: SENDING → RUNNING → PLANNING/EXECUTING (feedback) → result.
+    private void OnPickPlaceStatus(string status)
+    {
+        if (planStatusLabel != null) planStatusLabel.text = $"Pick & place: {status}";
     }
 
     private void ResetRecordButton()

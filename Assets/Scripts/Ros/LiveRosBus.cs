@@ -9,14 +9,34 @@ namespace Erupt.Ros
     {
         private ROSConnection connection;
 
-        // Lazy, matching the pre-seam behavior where each component called
-        // GetOrCreateInstance() from its own Start().
-        private ROSConnection Connection => connection ??= ROSConnection.GetOrCreateInstance();
+        /// <summary>
+        /// Lazy, matching the pre-seam behaviour where each component called
+        /// GetOrCreateInstance() from its own Start().
+        /// </summary>
+        /// <remarks>
+        /// The null check must be Unity's, not <c>??=</c>. ROSConnection is a
+        /// MonoBehaviour, so once it is destroyed the reference is "fake null": Unity's
+        /// overloaded == reports null while ?? and ??= see a live object and refuse to
+        /// refresh it. With ??= a cached connection from a previous play session survives
+        /// into the next one and every Subscribe/Publish lands on a destroyed object,
+        /// silently, which is exactly what stopped the collision object listener working.
+        /// </remarks>
+        private ROSConnection Connection
+        {
+            get
+            {
+                if (connection == null) connection = ROSConnection.GetOrCreateInstance();
+                return connection;
+            }
+        }
 
         public bool HasConnectionThread => Connection.HasConnectionThread;
 
         public void Subscribe<T>(string topic, Action<T> callback) where T : Message =>
             Connection.Subscribe(topic, callback);
+
+        public void Unsubscribe<T>(string topic, Action<T> callback) where T : Message =>
+            Connection.Unsubscribe(topic, callback);
 
         public void RegisterPublisher<T>(string topic) where T : Message =>
             Connection.RegisterPublisher<T>(topic);

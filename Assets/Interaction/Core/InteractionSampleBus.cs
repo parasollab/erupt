@@ -35,6 +35,15 @@ namespace Erupt.Interaction
             if (refusal.IsRefused) Refusal?.Invoke(refusal);
         }
 
+        /// <summary>
+        /// Drop subscribers left over from a previous play session, for the same reason
+        /// RosBus resets: static event handlers survive a domain-reload-free Play and
+        /// would otherwise fire into destroyed objects.
+        /// </summary>
+        [UnityEngine.RuntimeInitializeOnLoadMethod(
+            UnityEngine.RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetOnPlay() => Reset();
+
         /// <summary>Drop all subscribers. Called by the router on destroy.</summary>
         public static void Reset()
         {

@@ -19,6 +19,8 @@ namespace Erupt.Ros
 
         void Subscribe<T>(string topic, Action<T> callback) where T : Message;
 
+        void Unsubscribe<T>(string topic, Action<T> callback) where T : Message;
+
         void RegisterPublisher<T>(string topic) where T : Message;
 
         void RegisterRosService<TRequest, TResponse>(string serviceName)

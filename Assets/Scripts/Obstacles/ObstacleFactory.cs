@@ -69,8 +69,7 @@ namespace Erupt.Obstacles
             publisher.objectId = snapshot.ObjectId ?? NewObjectId(snapshot.PrimitiveType);
             publisher.worldOrigin = snapshot.WorldOrigin;
 
-            if (listener != null && !listener.objectsById.ContainsKey(publisher.objectId))
-                listener.objectsById[publisher.objectId] = shape;
+            listener?.RegisterUnityOwnedObject(publisher.objectId, shape);
 
             return shape;
         }
@@ -94,7 +93,7 @@ namespace Erupt.Obstacles
             if (publisher != null)
             {
                 publisher.suppressRemoveOnDestroy = !publishRemoval;
-                if (listener != null) listener.objectsById.Remove(publisher.objectId);
+                listener?.UnregisterUnityOwnedObject(publisher.objectId);
             }
 
             Object.Destroy(obstacle);

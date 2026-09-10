@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using Erupt.Interaction;
 
@@ -19,12 +20,7 @@ public class RobotInteractionRouterBinding : MonoBehaviour
     [Tooltip("Matches the pre-refactor jog rate in Quest3ControllerRayInteractor.")]
     [SerializeField] private float jointJogRadiansPerSecond = 0.8f;
 
-    private bool isDraggingHandle;
-
-    // Which source owns the current drag. The pre-refactor script kept one active
-    // interactor, so a second controller gripping took over rather than both driving
-    // the handle at once. Tracking the source id preserves that.
-    private string dragOwnerSourceId;
+    private readonly HashSet<string> dragOwnerSourceIds = new HashSet<string>();
 
     private void Awake()
     {
@@ -58,17 +54,16 @@ public class RobotInteractionRouterBinding : MonoBehaviour
         router.EndDrag -= OnEndDrag;
         router.Axis -= OnAxis;
 
-        if (isDraggingHandle)
+        foreach (string sourceId in dragOwnerSourceIds)
         {
-            robotInteraction.EndHandleDrag(default(InteractionIntent));
-            isDraggingHandle = false;
-            dragOwnerSourceId = null;
+            robotInteraction.EndHandleDragBySource(sourceId);
         }
+        dragOwnerSourceIds.Clear();
     }
 
     private void OnSelect(InteractionIntent intent)
     {
-        if (isDraggingHandle) return;
+        if (dragOwnerSourceIds.Count > 0) return;
 
         // The pre-refactor script called SelectFromHit only when the ray hit something;
         // a miss left the joint highlight alone rather than clearing it.
@@ -83,31 +78,30 @@ public class RobotInteractionRouterBinding : MonoBehaviour
 
         if (robotInteraction.TryBeginHandleDrag(intent))
         {
-            isDraggingHandle = true;
-            dragOwnerSourceId = intent.Sample.SourceId;
+            dragOwnerSourceIds.Add(intent.Sample.SourceId ?? "default");
         }
     }
 
     private void OnDrag(InteractionIntent intent)
     {
-        if (!isDraggingHandle || intent.Sample.SourceId != dragOwnerSourceId) return;
+        if (!dragOwnerSourceIds.Contains(intent.Sample.SourceId ?? "default")) return;
         robotInteraction.UpdateHandleDrag(intent);
         Surface(robotInteraction.LastRefusal);
     }
 
     private void OnEndDrag(InteractionIntent intent)
     {
-        if (!isDraggingHandle || intent.Sample.SourceId != dragOwnerSourceId) return;
+        string sourceId = intent.Sample.SourceId ?? "default";
+        if (!dragOwnerSourceIds.Contains(sourceId)) return;
 
         robotInteraction.EndHandleDrag(intent);
-        isDraggingHandle = false;
-        dragOwnerSourceId = null;
+        dragOwnerSourceIds.Remove(sourceId);
     }
 
     private void OnAxis(InteractionIntent intent)
     {
         // Deadzone and precision scaling already applied by the router.
-        if (isDraggingHandle) return;
+        if (dragOwnerSourceIds.Count > 0) return;
 
         float delta = intent.Axis.y * jointJogRadiansPerSecond * Time.deltaTime;
         if (Mathf.Approximately(delta, 0f)) return;

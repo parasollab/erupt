@@ -10,7 +10,25 @@ namespace Erupt.Ros
     {
         private static IRosBus instance;
 
-        public static IRosBus Instance => instance ??= new LiveRosBus();
+        public static IRosBus Instance
+        {
+            get
+            {
+                if (instance == null) instance = new LiveRosBus();
+                return instance;
+            }
+        }
+
+        /// <summary>
+        /// Drop any bus left over from a previous play session.
+        /// </summary>
+        /// <remarks>
+        /// Static state survives entering play mode when domain reload is disabled, so
+        /// without this a stale LiveRosBus - or a FakeRosBus left behind by a test run -
+        /// would still be serving Instance on the next Play.
+        /// </remarks>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetOnPlay() => instance = null;
 
         /// <summary>True when a test has substituted the transport.</summary>
         public static bool IsOverridden => instance != null && !(instance is LiveRosBus);

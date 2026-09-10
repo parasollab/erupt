@@ -129,6 +129,7 @@ GameObject:
   m_Component:
   - component: {fileID: 244453}
   - component: {fileID: 244452}
+  - component: {fileID: 244454}
   m_Layer: 0
   m_Name: MTCManager
   m_TagString: Untagged
@@ -163,6 +164,20 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &244454
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 244451}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4dbfbe06a6164f87a57fa58cd4e4d843, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: xrviz::PickPlaceActionClient
+  actionName: /pick_place
+  placeFrameId: world
 --- !u!1 &7292625
 GameObject:
   m_ObjectHideFlags: 8
@@ -2031,6 +2046,11 @@ MonoBehaviour:
   handleIdleColor: {r: 0.05, g: 0.75, b: 1, a: 1}
   handleActiveColor: {r: 1, g: 0.75, b: 0.05, a: 1}
   selectedJointColor: {r: 1, g: 0.35, b: 0.08, a: 1}
+  createJointHandles: 1
+  jointHandleDiameter: 0.075
+  jointHandleColor: {r: 0.1, g: 0.85, b: 1, a: 0.8}
+  maximumConcurrentDrags: 2
+  allowLinkGrabbing: 1
 --- !u!114 &326645957
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -7631,6 +7651,7 @@ MonoBehaviour:
   chosenAxis: 0
   currentOrientation: 0
   collisionExceptions: []
+  jointNameAliases: []
 --- !u!4 &1228241012
 Transform:
   m_ObjectHideFlags: 0
@@ -11565,6 +11586,7 @@ MonoBehaviour:
   uiDocument: {fileID: 1633403975}
   dataManager: {fileID: 244452}
   pickPlaceRecorder: {fileID: 1482355975519924576}
+  pickPlaceAction: {fileID: 244454}
   trajectoryPlayer: {fileID: 1228241013}
 --- !u!1 &1680050374
 GameObject:
@@ -14554,6 +14576,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: xrviz::PickPlaceTaskRecorder
   selectionManager: {fileID: 647391639}
   worldOrigin: {fileID: 1122808672}
+  pickPlaceAction: {fileID: 0}
+  executeOnServer: 1
 --- !u!4 &1482355975519924577 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 3282372009203156751, guid: 48516d5ede86a4731b56a6e555864e5b, type: 3}
