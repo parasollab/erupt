@@ -100,11 +100,6 @@ public class Quest3RobotInteractionController : MonoBehaviour
         }
     }
 
-    public bool TryBeginHandleDrag(Quest3ControllerRayInteractor interactor, Ray ray, RaycastHit hit)
-    {
-        return TryBeginHandleDrag((object)interactor, ray, hit);
-    }
-
     /// <summary>Router-driven equivalent of TryBeginHandleDrag. Guidelines Part 3.</summary>
     public bool TryBeginHandleDrag(InteractionIntent intent)
     {
@@ -180,11 +175,6 @@ public class Quest3RobotInteractionController : MonoBehaviour
         return true;
     }
 
-    public void UpdateHandleDrag(Quest3ControllerRayInteractor interactor, Ray ray)
-    {
-        UpdateHandleDrag((object)interactor, ray);
-    }
-
     /// <summary>Router-driven equivalent of UpdateHandleDrag.</summary>
     public void UpdateHandleDrag(InteractionIntent intent)
     {
@@ -201,11 +191,6 @@ public class Quest3RobotInteractionController : MonoBehaviour
 
         drag.target = ray.GetPoint(drag.distance) + drag.offset;
         if (drag.body == null) handle.position = drag.target;
-    }
-
-    public void EndHandleDrag(Quest3ControllerRayInteractor interactor)
-    {
-        EndHandleDrag((object)interactor);
     }
 
     /// <summary>Router-driven equivalent of EndHandleDrag.</summary>

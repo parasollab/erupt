@@ -6,7 +6,6 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using Erupt.Interaction;
-using Erupt.Interaction.Backends;
 
 namespace Erupt.Interaction.EditorTools
 {
@@ -36,7 +35,6 @@ namespace Erupt.Interaction.EditorTools
             var references = LoadActionReferences();
 
             InteractionRouter router = CreateRouter(roots);
-            MigrateRays(roots, router, references);
             BindRobot(roots, router);
             BindSelection(roots, router);
             BindWristMenu(roots, router, references);
@@ -95,58 +93,10 @@ namespace Erupt.Interaction.EditorTools
         }
 
         // --- Rays -----------------------------------------------------------
-
-        private static void MigrateRays(GameObject[] roots, InteractionRouter router,
-                                        Dictionary<string, InputActionReference> refs)
-        {
-            var rays = roots.SelectMany(r => r.GetComponentsInChildren<Quest3ControllerRayInteractor>(true)).ToList();
-
-            foreach (var ray in rays)
-            {
-                GameObject go = ray.gameObject;
-
-                // XRNode: 4 = LeftHand, 5 = RightHand.
-                var so = new SerializedObject(ray);
-                int node = so.FindProperty("controllerNode").intValue;
-                bool isLeft = node == 4;
-                string hand = isLeft ? "Left" : "Right";
-                string sourceId = isLeft ? "left" : "right";
-
-                Color idle = so.FindProperty("idleRayColor").colorValue;
-                Color hitColor = so.FindProperty("hitRayColor").colorValue;
-
-                Object.DestroyImmediate(ray, true);
-
-                var backend = go.AddComponent<XriControllerBackend>();
-                var bso = new SerializedObject(backend);
-                bso.FindProperty("sourceId").stringValue = sourceId;
-                bso.FindProperty("rayOrigin").objectReferenceValue = go.transform;
-
-                // Trigger selects and grip drags, matching the raw CommonUsages reads the
-                // deleted script performed. XRI names these the other way round: its
-                // "Activate" is the trigger and its "Select" is the grip.
-                SetActionProperty(bso, "selectAction", refs, $"XRI {hand} Interaction/Activate");
-                SetActionProperty(bso, "gripAction", refs, $"XRI {hand} Interaction/Select");
-                SetActionProperty(bso, "axisAction", refs, $"XRI {hand} Interaction/Manipulation");
-                if (isLeft) SetActionProperty(bso, "activateAction", refs, "XRI Left Interaction/Menu");
-
-                bso.ApplyModifiedPropertiesWithoutUndo();
-
-                var visual = go.AddComponent<InteractionRayVisual>();
-                var vso = new SerializedObject(visual);
-                vso.FindProperty("router").objectReferenceValue = router;
-                vso.FindProperty("source").objectReferenceValue = backend;
-                vso.FindProperty("idleRayColor").colorValue = idle;
-                vso.FindProperty("hitRayColor").colorValue = hitColor;
-                vso.ApplyModifiedPropertiesWithoutUndo();
-
-                router.Register(backend);
-                Line($"ray: '{go.name}' ({hand}) -> XriControllerBackend + InteractionRayVisual");
-            }
-
-            Line($"ray: migrated {rays.Count}, remaining Quest3ControllerRayInteractor = " +
-                 roots.SelectMany(r => r.GetComponentsInChildren<Quest3ControllerRayInteractor>(true)).Count());
-        }
+        // The Quest3ControllerRayInteractor -> XriControllerBackend migration ran in
+        // Guidelines Phase 1 and the legacy script was deleted in plugin-refactor Phase 0,
+        // so the ray step no longer exists. The action-reference loader stays for the
+        // wrist-menu binding below.
 
         // --- Feature bindings -----------------------------------------------
 

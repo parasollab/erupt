@@ -19,9 +19,6 @@ namespace Erupt.Interaction.EditorTools
             var routers = roots.SelectMany(r => r.GetComponentsInChildren<InteractionRouter>(true)).ToList();
             Check(sb, "exactly one router", routers.Count == 1, $"found {routers.Count}");
 
-            var legacy = roots.SelectMany(r => r.GetComponentsInChildren<Quest3ControllerRayInteractor>(true)).ToList();
-            Check(sb, "no legacy ray interactors", legacy.Count == 0, $"found {legacy.Count}");
-
             var backends = roots.SelectMany(r => r.GetComponentsInChildren<InteractionSourceBehaviour>(true)).ToList();
             Check(sb, "two controller backends", backends.Count == 2, $"found {backends.Count}");
             foreach (var b in backends)
