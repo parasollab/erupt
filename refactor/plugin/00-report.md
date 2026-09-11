@@ -1,6 +1,7 @@
 # Plugin refactor — Phase 0 report (hygiene, tag, prune)
 
-Implements `00-plan.md`. Branch `design_refactor`; tag `pre-plugin-refactor` = `46e3bef`.
+Implements `00-plan.md`. Branch `design_refactor`; tag `pre-plugin-refactor` = `46e3bef`;
+Phase 0 landed as `eea585c Phase 0 refactor` (pushed).
 
 **Scope honored:** `Assets/Scenes/KitchenFR3.unity` is the only scene modified. No prefab
 asset was modified: every removal was a scene-local object or an added-component override.
@@ -68,8 +69,8 @@ instance, the `Ground` missing-script and listener components, and the duplicate
 | `ERUPT/Refactor/Verify KitchenFR3` (Guidelines Phase 1 interaction wiring, regression check) | PASS — 8/8 after the prune and clean-up |
 | `ERUPT/Refactor/Verify KitchenFR3 Clean-up` | PASS — 11/11 (Ground clean, one listener, one reset, no action demo, one robot root, consumers agree, ghost prefab is an asset, no missing scripts anywhere, rig still a prefab instance) |
 | 53 + 12 PlayMode tests | PASS — all green in the Test Runner after the prune and clean-up |
-| Quest smoke (create obstacle → set goal → plan → preview → execute; MTC record/preview/execute) | PENDING — requires headset |
-| Submodule pointers (`URDF-Importer` 33 dirty files, `ROS-TCP-Connector` 4; `RADER` + `ROS-TCP-Connector` pointers differ from recorded) | PENDING — maintainer action on the parasollab forks |
+| Quest smoke (create obstacle → set goal → plan → preview → execute; MTC record/preview/execute) | SKIPPED — maintainer waived for Phase 0 (pure prune, PlayMode tests and both scene verifiers green) |
+| Submodule pointers | PASS — forks pushed and pointers recorded: `RADER` 4fa1053, `ROS-TCP-Connector` ae12ea7 (action-support), `URDF-Importer` c05f7a0 (main); all three working trees clean |
 
 ## Next
 
