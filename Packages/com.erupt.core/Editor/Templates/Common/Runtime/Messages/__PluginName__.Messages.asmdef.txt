@@ -1,0 +1,25 @@
+{
+    "name": "{{AssemblyName}}.Messages",
+    "rootNamespace": "RosMessageTypes",
+    "references": [
+        "Unity.Robotics.ROSTCPConnector.MessageGeneration",
+        "Unity.Robotics.ROSTCPConnector.Messages"
+    ],
+    "includePlatforms": [
+        "Android",
+        "Editor",
+        "EmbeddedLinux",
+        "LinuxStandalone64",
+        "macOSStandalone",
+        "WindowsStandalone32",
+        "WindowsStandalone64"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

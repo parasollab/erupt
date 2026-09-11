@@ -1,0 +1,8 @@
+# Generated ROS messages — {{DisplayName}} plugin
+
+| Source ROS package | Files | Generated from |
+|---|---|---|
+| _(none yet)_ | | |
+
+Output path for the message browser: `Packages/{{PackageId}}/Runtime/Messages`.
+See `Runtime/Messages/README.md`.

@@ -1,0 +1,23 @@
+{
+    "name": "Erupt.Core.Editor",
+    "rootNamespace": "Erupt.Editor",
+    "references": [
+        "Erupt.Plugins",
+        "Erupt.Interaction.Core",
+        "Erupt.Ui",
+        "Erupt.Ros",
+        "Erupt.Robot",
+        "Erupt.Environment"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

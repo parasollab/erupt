@@ -1,0 +1,37 @@
+using UnityEngine;
+using Erupt.Interaction;
+using Erupt.Plugins;
+
+namespace {{Namespace}}
+{
+    /// <summary>
+    /// {{DisplayName}}: an ERUPT plugin with the bare contract. Registered by PluginHost on
+    /// Start; contributes to the UI only through <see cref="IEruptContext.Ui"/>.
+    /// Guidelines Part 4: a feature is a verb on an existing selection kind, a tier 3 tab, or an
+    /// in-world widget — never a new menu.
+    /// </summary>
+    public class {{PluginName}}Plugin : EruptPluginBehaviour
+    {
+        public override string Id => "{{PluginId}}";
+        public override string DisplayName => "{{DisplayName}}";
+
+        // Ids of plugins that must register before this one, e.g. new[] { "moveit" }.
+        // public override System.Collections.Generic.IReadOnlyList<string> DependsOn => ...;
+
+        protected override void OnRegister(IEruptContext context)
+        {
+            // TODO: subscribe to ROS through context.Ros (an IRosBus; a FakeRosBus in tests).
+            // TODO: contribute verbs/tabs: context.Ui?.RegisterVerb(SelectionKind.Obstacle, "my-verb", "My Verb", OnMyVerb, Id);
+        }
+
+        protected override void OnUnregister(IEruptContext context)
+        {
+            // TODO: undo what OnRegister did (verbs are removed for you; ROS subscriptions are not).
+        }
+
+        protected override void OnModeChanged(AppMode mode)
+        {
+            // TODO: gate behaviour on Build / Plan / Teach (Guidelines Part 4).
+        }
+    }
+}

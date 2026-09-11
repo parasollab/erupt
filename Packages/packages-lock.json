@@ -12,6 +12,14 @@
         "com.unity.xr.core-utils": "2.5.2"
       }
     },
+    "com.erupt.plugin.demo": {
+      "version": "file:com.erupt.plugin.demo",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.erupt.core": "0.1.0"
+      }
+    },
     "com.erupt.plugin.moveit": {
       "version": "file:com.erupt.plugin.moveit",
       "depth": 0,

@@ -1,0 +1,11 @@
+{
+  "name": "{{PackageId}}",
+  "version": "0.1.0",
+  "displayName": "ERUPT {{DisplayName}} Plugin",
+  "description": "{{DisplayName}} ({{Family}} family) plugin for ERUPT.",
+  "unity": "6000.2",
+  "dependencies": {
+    "com.erupt.core": "0.1.0"
+  },
+  "keywords": ["robotics", "xr", "erupt", "plugin"]
+}

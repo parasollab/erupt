@@ -1,0 +1,29 @@
+using NUnit.Framework;
+using UnityEngine;
+using Erupt.Interaction;
+using Erupt.Plugins;
+using Erupt.Plugins.Tests;
+using Erupt.Ros.Tests;
+
+namespace {{Namespace}}.Tests
+{
+    public class {{PluginName}}SmokeTests
+    {
+        [Test]
+        public void Registers_AgainstAFakeContext()
+        {
+            var go = new GameObject("{{PluginName}}");
+            var plugin = go.AddComponent<{{PluginName}}Plugin>();
+            var context = new EruptContext { Ros = new FakeRosBus(), Ui = new FakeUiHost(), Undo = new UndoStack() };
+
+            ((IEruptPlugin)plugin).OnRegister(context);
+
+            Assert.IsTrue(plugin.IsRegistered);
+            Assert.AreEqual("{{PluginId}}", plugin.Id);
+
+            ((IEruptPlugin)plugin).OnUnregister(context);
+            Assert.IsFalse(plugin.IsRegistered);
+            Object.DestroyImmediate(go);
+        }
+    }
+}

@@ -1,0 +1,31 @@
+using System.Linq;
+using NUnit.Framework;
+using UnityEngine;
+using Erupt.Interaction;
+using Erupt.Plugins;
+using Erupt.Plugins.Tests;
+using Erupt.Ros.Tests;
+
+namespace {{Namespace}}.Tests
+{
+    public class {{PluginName}}SmokeTests
+    {
+        [Test]
+        public void Registers_AndContributesThePlannerTab()
+        {
+            var go = new GameObject("{{PluginName}}");
+            var plugin = go.AddComponent<{{PluginName}}Plugin>();
+            var ui = new FakeUiHost();
+            var context = new EruptContext { Ros = new FakeRosBus(), Ui = ui, Undo = new UndoStack() };
+
+            ((IEruptPlugin)plugin).OnRegister(context);
+
+            Assert.IsTrue(plugin.IsRegistered);
+            Assert.Contains("planner-{{PluginId}}", ui.Tabs.ToList());
+            CollectionAssert.IsSubsetOf(new[] { "set-goal", "preview", "execute" }, ui.Bound.Keys);
+
+            ((IEruptPlugin)plugin).OnUnregister(context);
+            Object.DestroyImmediate(go);
+        }
+    }
+}

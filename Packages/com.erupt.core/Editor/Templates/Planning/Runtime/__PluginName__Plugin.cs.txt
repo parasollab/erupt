@@ -1,0 +1,75 @@
+using System;
+using UnityEngine;
+using Erupt.Interaction;
+using Erupt.Plugins;
+
+namespace {{Namespace}}
+{
+    /// <summary>
+    /// {{DisplayName}}: an ERUPT planning plugin. The base class contributes the end-effector
+    /// verbs (set-goal, plan), the trajectory verbs (preview, execute) and a tier 3 tab
+    /// "planner-{{PluginId}}"; this class supplies the planner behind them.
+    /// Guidelines Part 5 (Planning), Part 2 (verbs attach to a selection).
+    /// </summary>
+    public class {{PluginName}}Plugin : PlanningPlugin
+    {
+        public override string Id => "{{PluginId}}";
+        public override string DisplayName => "{{DisplayName}}";
+
+        // A planner that plans on the ROS side from a recorded task should say false, so the
+        // shared set-goal / plan verbs go to a planner that can act on them.
+        // public override bool AcceptsGoals => true;
+
+        protected override void OnRegister(IEruptContext context)
+        {
+            // TODO: connect to your planner through context.Ros (register services / publishers).
+            base.OnRegister(context);       // binds the verbs and adds the settings tab
+        }
+
+        protected override void OnUnregister(IEruptContext context)
+        {
+            base.OnUnregister(context);     // destroys this plugin's trajectory selectables
+            // TODO: unsubscribe from ROS.
+        }
+
+        /// <summary>The user chose the end effector and pressed set-goal. Return a refusal with a reason when you cannot take one.</summary>
+        public override InteractionRefusal SetGoal(ISelectable endEffector)
+        {
+            // TODO: capture the goal (e.g. context.Robot.GetJointStatePositions()).
+            return InteractionRefusal.None;
+        }
+
+        /// <summary>Plan and hand the result back; call PublishResult so a trajectory selectable exists, then PlaceHandle to put it in the world.</summary>
+        public override void RequestPlan(PlanPreferences preferences, Action<PlanResult> done)
+        {
+            // TODO: ask the planner; on success:
+            //   var result = PublishResult(new PlanResult { Trajectory = jointTrajectoryInUnityNames, PlannerPayload = raw });
+            //   PlaceHandle(result, Context.Robot.EndEffector.position, Context.Robot.EndEffector);
+            //   done?.Invoke(result);
+            done?.Invoke(null);
+        }
+
+        public override void Preview(PlanResult plan)
+        {
+            // TODO: play plan.Trajectory on a JointTrajectoryPlayer (see the MoveIt plugin).
+        }
+
+        public override void StopPreview()
+        {
+            // TODO
+        }
+
+        public override void Execute(PlanResult plan, Action<ExecutionStatus> status)
+        {
+            // TODO: send the plan for execution and report ExecutionStatus phases.
+            status?.Invoke(new ExecutionStatus(ExecutionPhase.Unavailable, "{{DisplayName}} execution not implemented."));
+        }
+
+        /// <summary>Fill the tier 3 settings tab (≤ 7 interactive elements, Guidelines Part 8). Use UiBuilder.</summary>
+        protected override void BuildSettingsTab(RectTransform content)
+        {
+            if (content == null) return;   // headless UI host (tests)
+            // TODO: e.g. Erupt.Ui.UiBuilder.CreateToggle("Verbose", content, "Verbose", false, new Vector2(300f, 60f), on => { });
+        }
+    }
+}

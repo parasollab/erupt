@@ -1,0 +1,54 @@
+using UnityEngine;
+using Erupt.Interaction;
+using Erupt.Plugins;
+
+namespace {{Namespace}}
+{
+    /// <summary>
+    /// {{DisplayName}}: an ERUPT demonstration (learning-from-demonstration) plugin. The base
+    /// class gates recording on Teach mode, feeds interaction samples to OnSample while
+    /// recording, binds the trajectory "correct" verb and adds a tier 3 tab "demos-{{PluginId}}".
+    /// Guidelines Part 5 (Learning from demonstration), Part 4 (Teach mode).
+    /// </summary>
+    public class {{PluginName}}Plugin : DemonstrationPlugin
+    {
+        public override string Id => "{{PluginId}}";
+        public override string DisplayName => "{{DisplayName}}";
+
+        protected override void OnRegister(IEruptContext context)
+        {
+            // TODO: register the publisher your demonstrations go out on (context.Ros).
+            base.OnRegister(context);
+        }
+
+        /// <summary>One interaction sample (modality, confidence, pose). Only while Teach mode and recording are both on.</summary>
+        protected override void OnSample(InteractionSample sample)
+        {
+            // TODO: append to the current demonstration.
+        }
+
+        public override void StartDemonstration()
+        {
+            // TODO: clear the buffer, then:
+            SetRecording(true);
+        }
+
+        public override void StopDemonstration()
+        {
+            SetRecording(false);
+            // TODO: finalise the demonstration.
+        }
+
+        public override void Publish()
+        {
+            // TODO: send the demonstration through Context.Ros.
+        }
+
+        /// <summary>Fill the demos tab (record / stop / list; ≤ 7 interactive elements). Use UiBuilder.</summary>
+        protected override void BuildDemosTab(RectTransform content)
+        {
+            if (content == null) return;   // headless UI host (tests)
+            // TODO
+        }
+    }
+}
