@@ -1,0 +1,21 @@
+{
+  "name": "com.erupt.plugin.mtc",
+  "version": "0.1.0",
+  "displayName": "ERUPT MTC Plugin",
+  "description": "MoveIt Task Constructor solutions, execution and pick/place study tooling for ERUPT.",
+  "unity": "6000.2",
+  "dependencies": {
+    "com.erupt.core": "0.1.0",
+    "com.erupt.plugin.moveit": "0.1.0"
+  },
+  "keywords": [
+    "robotics",
+    "xr",
+    "erupt"
+  ],
+  "author": {
+    "name": "Parasol Lab, UIUC",
+    "email": "parasol-opensource@cs.illinois.edu",
+    "url": "https://parasollab.web.illinois.edu"
+  }
+}

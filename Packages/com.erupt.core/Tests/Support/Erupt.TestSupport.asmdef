@@ -1,0 +1,33 @@
+{
+    "name": "Erupt.TestSupport",
+    "rootNamespace": "Erupt.Ros.Tests",
+    "references": [
+        "Erupt.Ros",
+        "Erupt.Interaction.Core",
+        "Unity.Robotics.ROSTCPConnector",
+        "Unity.Robotics.ROSTCPConnector.MessageGeneration",
+        "Unity.Robotics.ROSTCPConnector.Messages",
+        "UnityEngine.TestRunner"
+    ],
+    "includePlatforms": [
+        "Android",
+        "Editor",
+        "EmbeddedLinux",
+        "LinuxStandalone64",
+        "macOSStandalone",
+        "WindowsStandalone32",
+        "WindowsStandalone64"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

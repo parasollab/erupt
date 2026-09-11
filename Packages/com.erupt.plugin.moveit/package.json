@@ -1,0 +1,20 @@
+{
+  "name": "com.erupt.plugin.moveit",
+  "version": "0.1.0",
+  "displayName": "ERUPT MoveIt Plugin",
+  "description": "Kinematic planning and planning-scene sync for ERUPT via MoveIt 2.",
+  "unity": "6000.2",
+  "dependencies": {
+    "com.erupt.core": "0.1.0"
+  },
+  "keywords": [
+    "robotics",
+    "xr",
+    "erupt"
+  ],
+  "author": {
+    "name": "Parasol Lab, UIUC",
+    "email": "parasol-opensource@cs.illinois.edu",
+    "url": "https://parasollab.web.illinois.edu"
+  }
+}

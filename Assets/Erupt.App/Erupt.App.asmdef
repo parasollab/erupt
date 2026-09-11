@@ -1,0 +1,43 @@
+{
+    "name": "Erupt.App",
+    "rootNamespace": "",
+    "references": [
+        "Erupt.Interaction.Core",
+        "Erupt.Interaction.Backends.OpenXR",
+        "Erupt.Ui",
+        "Erupt.Ros",
+        "Erupt.Robot",
+        "Erupt.Environment",
+        "Erupt.Plugins.MoveIt",
+        "Erupt.Plugins.MoveIt.Messages",
+        "Erupt.Plugins.Mtc",
+        "Erupt.Plugins.Mtc.Messages",
+        "Unity.Robotics.ROSTCPConnector",
+        "Unity.Robotics.ROSTCPConnector.MessageGeneration",
+        "Unity.Robotics.ROSTCPConnector.Messages",
+        "Unity.InputSystem",
+        "Unity.XR.Interaction.Toolkit",
+        "Unity.XR.CoreUtils",
+        "UnityEngine.UI",
+        "Unity.TextMeshPro",
+        "GUID:f64c9ebcd7899c3448a08dc9f9ddbe30",
+        "GUID:f5eda1afa2a1241a59c4db6830e1c890"
+    ],
+    "includePlatforms": [
+        "Android",
+        "Editor",
+        "EmbeddedLinux",
+        "LinuxStandalone64",
+        "macOSStandalone",
+        "WindowsStandalone32",
+        "WindowsStandalone64"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

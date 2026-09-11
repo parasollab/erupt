@@ -1,5 +1,34 @@
 {
   "dependencies": {
+    "com.erupt.core": {
+      "version": "file:com.erupt.core",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.unity.xr.interaction.toolkit": "3.3.1",
+        "com.unity.xr.hands": "1.7.3",
+        "com.unity.inputsystem": "1.19.0",
+        "com.unity.ugui": "2.0.0",
+        "com.unity.xr.core-utils": "2.5.2"
+      }
+    },
+    "com.erupt.plugin.moveit": {
+      "version": "file:com.erupt.plugin.moveit",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.erupt.core": "0.1.0"
+      }
+    },
+    "com.erupt.plugin.mtc": {
+      "version": "file:com.erupt.plugin.mtc",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.erupt.core": "0.1.0",
+        "com.erupt.plugin.moveit": "0.1.0"
+      }
+    },
     "com.github-glitchenzo.nugetforunity": {
       "version": "https://github.com/GlitchEnzo/NuGetForUnity.git?path=/src/NuGetForUnity",
       "depth": 0,

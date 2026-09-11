@@ -1,0 +1,31 @@
+{
+    "name": "Erupt.App.Editor",
+    "rootNamespace": "Erupt.Interaction.EditorTools",
+    "references": [
+        "Erupt.Interaction.Core",
+        "Erupt.Interaction.Backends.OpenXR",
+        "Erupt.Interaction.Backends.VisionOS",
+        "Erupt.Interaction.Backends.Desktop",
+        "Erupt.Ui",
+        "Erupt.Ros",
+        "Erupt.Robot",
+        "Erupt.Environment",
+        "Erupt.Plugins.MoveIt",
+        "Erupt.Plugins.Mtc",
+        "Erupt.App",
+        "Unity.InputSystem",
+        "Unity.XR.Interaction.Toolkit",
+        "Unity.XR.CoreUtils"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

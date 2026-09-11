@@ -4145,6 +4145,51 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Unity.Robotics.UrdfImporter::Unity.Robotics.UrdfImporter.UrdfVisual
   geometryType: 3
+--- !u!1 &728200077
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 728200079}
+  - component: {fileID: 728200078}
+  m_Layer: 0
+  m_Name: Environment
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &728200078
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 728200077}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 013b3b9d44674f8dbe0233c58f19e882, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Erupt.Environment::Erupt.Environment.EnvironmentRegistry
+  worldOrigin: {fileID: 1122808672}
+--- !u!4 &728200079
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 728200077}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &754600693
 GameObject:
   m_ObjectHideFlags: 8
@@ -7635,7 +7680,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: xrviz::MTCTrajectoryPlayer
   ikController: {fileID: 326645954}
-  sceneListener: {fileID: 1697517152}
+  registry: {fileID: 728200078}
 --- !u!1 &1242433775
 GameObject:
   m_ObjectHideFlags: 0
@@ -11772,6 +11817,7 @@ GameObject:
   - component: {fileID: 1697517153}
   - component: {fileID: 1697517152}
   - component: {fileID: 1697517154}
+  - component: {fileID: 1697517155}
   m_Layer: 0
   m_Name: CollisionObjectListener
   m_TagString: Untagged
@@ -11795,6 +11841,7 @@ MonoBehaviour:
   planningSceneServiceTopic: /get_planning_scene
   requestInitialPlanningScene: 1
   worldOrigin: {fileID: 1122808672}
+  registry: {fileID: 728200078}
   litMaterial: {fileID: 2100000, guid: fc226930e8fad4c499969204cecfbc05, type: 2}
 --- !u!4 &1697517153
 Transform:
@@ -11825,8 +11872,23 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   topic: /attached_collision_objects_ros
   sceneListener: {fileID: 1697517152}
+  registry: {fileID: 728200078}
   ikController: {fileID: 326645954}
   worldOrigin: {fileID: 1122808672}
+--- !u!114 &1697517155
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1697517151}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a727758a9e444ca7aa9598865872138d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Erupt.Plugins.MoveIt::MoveItPlanningSceneSync
+  registry: {fileID: 728200078}
+  listener: {fileID: 1697517152}
 --- !u!1 &1703739666
 GameObject:
   m_ObjectHideFlags: 8
@@ -14346,6 +14408,10 @@ PrefabInstance:
       value: XR Origin (XR Rig)
       objectReference: {fileID: 0}
     - target: {fileID: 3006219390251926832, guid: 48516d5ede86a4731b56a6e555864e5b, type: 3}
+      propertyPath: registry
+      value: 
+      objectReference: {fileID: 728200078}
+    - target: {fileID: 3006219390251926832, guid: 48516d5ede86a4731b56a6e555864e5b, type: 3}
       propertyPath: worldOrigin
       value: 
       objectReference: {fileID: 1122808672}
@@ -14625,3 +14691,4 @@ SceneRoots:
   - {fileID: 326645955}
   - {fileID: 1228241012}
   - {fileID: 244453}
+  - {fileID: 728200079}

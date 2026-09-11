@@ -80,6 +80,8 @@ sysinfo.txt
 *.unitypackage
 *.unitypackage.meta
 *.app
+# The reference app folder is code, not a macOS bundle
+!/Assets/Erupt.App/
 
 # Crashlytics generated file
 crashlytics-build.properties

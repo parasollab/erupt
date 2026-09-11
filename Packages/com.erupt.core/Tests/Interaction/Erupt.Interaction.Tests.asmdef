@@ -1,0 +1,30 @@
+{
+    "name": "Erupt.Interaction.Tests",
+    "rootNamespace": "Erupt.Interaction.Tests",
+    "references": [
+        "Erupt.Interaction.Core",
+        "Erupt.TestSupport",
+        "UnityEngine.TestRunner"
+    ],
+    "includePlatforms": [
+        "Android",
+        "Editor",
+        "EmbeddedLinux",
+        "LinuxStandalone64",
+        "macOSStandalone",
+        "WindowsStandalone32",
+        "WindowsStandalone64"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

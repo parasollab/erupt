@@ -1,0 +1,37 @@
+{
+    "name": "Erupt.Plugins.Mtc.Tests",
+    "rootNamespace": "Erupt.Plugins.Mtc.Tests",
+    "references": [
+        "Erupt.Plugins.Mtc",
+        "Erupt.Plugins.Mtc.Messages",
+        "Erupt.Plugins.MoveIt",
+        "Erupt.Plugins.MoveIt.Messages",
+        "Erupt.Ros",
+        "Erupt.TestSupport",
+        "Unity.Robotics.ROSTCPConnector",
+        "Unity.Robotics.ROSTCPConnector.MessageGeneration",
+        "Unity.Robotics.ROSTCPConnector.Messages",
+        "UnityEngine.TestRunner"
+    ],
+    "includePlatforms": [
+        "Android",
+        "Editor",
+        "EmbeddedLinux",
+        "LinuxStandalone64",
+        "macOSStandalone",
+        "WindowsStandalone32",
+        "WindowsStandalone64"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
