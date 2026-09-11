@@ -56,14 +56,17 @@ public class SelectionHighlighter : MonoBehaviour
         selectedRenderer = current.GameObject.GetComponent<Renderer>();
         if (selectedRenderer == null || highlightMaterial == null) { selectedRenderer = null; return; }
 
-        originalMaterial = selectedRenderer.material;
-        selectedRenderer.material = highlightMaterial;
+        // Shared, not instanced: swapping the shared reference leaves no per-object
+        // material instance behind, and a copy taken of a selected object gets its
+        // original shared material back with the selection change.
+        originalMaterial = selectedRenderer.sharedMaterial;
+        selectedRenderer.sharedMaterial = highlightMaterial;
     }
 
     private void Restore()
     {
         if (selectedRenderer != null && selectedRenderer.gameObject != null && originalMaterial != null)
-            selectedRenderer.material = originalMaterial;
+            selectedRenderer.sharedMaterial = originalMaterial;
         selectedRenderer = null;
         originalMaterial = null;
     }

@@ -15,7 +15,11 @@
         "Erupt.Plugins",
         "Erupt.Robot",
         "Erupt.Environment",
-        "Erupt.Interaction.Core"
+        "Erupt.Interaction.Core",
+        "Erupt.Ui",
+        "Erupt.Plugins.Tests",
+        "UnityEngine.UI",
+        "Unity.TextMeshPro"
     ],
     "includePlatforms": [
         "Android",

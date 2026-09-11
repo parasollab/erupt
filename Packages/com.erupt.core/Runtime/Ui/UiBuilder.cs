@@ -20,6 +20,13 @@ namespace Erupt.Ui
     {
         public const float PixelsPerUnit = 1000f;
 
+        /// <summary>
+        /// Raised for every world canvas built here, so a platform backend can add the
+        /// raycaster its input needs (XRI's tracked-device raycaster on OpenXR) without
+        /// this assembly knowing about it.
+        /// </summary>
+        public static event System.Action<Canvas> CanvasCreated;
+
         public static Canvas CreateWorldCanvas(string name, Transform parent, Vector2 size)
         {
             var go = new GameObject(name, typeof(RectTransform));
@@ -40,6 +47,16 @@ namespace Erupt.Ui
             rect.sizeDelta = size;
             rect.localScale = Vector3.one / PixelsPerUnit;
 
+            // A thin collider on the UI layer, so the interaction router's physics ray
+            // sees the panel and consumes the press instead of selecting (or clearing)
+            // whatever the world has behind it. The router rejects UI-layer hits by design.
+            var collider = go.AddComponent<BoxCollider>();
+            collider.size = new Vector3(size.x, size.y, 1f);
+            collider.isTrigger = true;
+            int uiLayer = LayerMask.NameToLayer("UI");
+            if (uiLayer >= 0) go.layer = uiLayer;
+
+            CanvasCreated?.Invoke(canvas);
             return canvas;
         }
 
@@ -109,6 +126,49 @@ namespace Erupt.Ui
             if (onClick != null) button.onClick.AddListener(() => onClick());
             return button;
         }
+
+        /// <summary>
+        /// A button that cycles through fixed choices, rendered as "label: value". One
+        /// interactive element instead of a dropdown, which world-space uGUI lacks and
+        /// which would cost two (open + pick).
+        /// </summary>
+        public static Button CreateCycle(string name, Transform parent, string label, string[] choices, int initial,
+                                         Vector2 size, System.Action<int> onChanged)
+        {
+            int index = choices.Length == 0 ? -1 : Mathf.Clamp(initial, 0, choices.Length - 1);
+            Button button = null;
+            button = CreateButton(name, parent, Render(), size, () =>
+            {
+                if (choices.Length == 0) return;
+                index = (index + 1) % choices.Length;
+                SetButtonText(button, Render());
+                onChanged?.Invoke(index);
+            });
+            return button;
+
+            string Render() => index < 0 ? $"{label}: —" : $"{label}: {choices[index]}";
+        }
+
+        /// <summary>A two-state button, rendered as "label: on/off".</summary>
+        public static Button CreateToggle(string name, Transform parent, string label, bool initial,
+                                          Vector2 size, System.Action<bool> onChanged)
+        {
+            bool on = initial;
+            Button button = null;
+            button = CreateButton(name, parent, Render(), size, () =>
+            {
+                on = !on;
+                SetButtonText(button, Render());
+                onChanged?.Invoke(on);
+            });
+            return button;
+
+            string Render() => $"{label}: {(on ? "on" : "off")}";
+        }
+
+        /// <summary>Interactive elements under a root: what Part 8's "~7 visible" counts.</summary>
+        public static int CountInteractive(Transform root) =>
+            root == null ? 0 : root.GetComponentsInChildren<UnityEngine.UI.Selectable>(false).Length;
 
         public static void SetButtonText(Button button, string text)
         {

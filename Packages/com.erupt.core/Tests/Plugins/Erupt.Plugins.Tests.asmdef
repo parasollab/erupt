@@ -11,7 +11,9 @@
         "Erupt.TestSupport",
         "Unity.Robotics.ROSTCPConnector.Messages",
         "Unity.Robotics.ROSTCPConnector.MessageGeneration",
-        "UnityEngine.TestRunner"
+        "UnityEngine.TestRunner",
+        "UnityEngine.UI",
+        "Unity.TextMeshPro"
     ],
     "includePlatforms": [
         "Android",

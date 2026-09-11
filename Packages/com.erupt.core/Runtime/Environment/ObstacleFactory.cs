@@ -78,8 +78,9 @@ namespace Erupt.Obstacles
         }
 
         /// <summary>Matches the id scheme WristMenuController has always used.</summary>
-        public static string NewObjectId(PrimitiveType primitiveType) =>
-            $"unity_{primitiveType.ToString().ToLower()}_{System.DateTime.Now.Ticks}";
+        public static string NewObjectId(PrimitiveType primitiveType) => NewObjectId(primitiveType.ToString().ToLower());
+
+        public static string NewObjectId(string kind) => $"unity_{kind}_{System.DateTime.Now.Ticks}";
 
         /// <summary>Remove an obstacle from the mirror and the scene.</summary>
         /// <param name="publishRemoval">

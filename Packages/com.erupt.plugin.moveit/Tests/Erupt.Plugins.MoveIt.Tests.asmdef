@@ -14,7 +14,11 @@
         "UnityEngine.TestRunner",
         "Unity.XR.Interaction.Toolkit",
         "Erupt.Plugins",
-        "Erupt.Robot"
+        "Erupt.Robot",
+        "Erupt.Ui",
+        "Erupt.Plugins.Tests",
+        "UnityEngine.UI",
+        "Unity.TextMeshPro"
     ],
     "includePlatforms": [
         "Android",

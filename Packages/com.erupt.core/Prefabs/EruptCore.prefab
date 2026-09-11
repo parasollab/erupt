@@ -16,6 +16,9 @@ GameObject:
   - component: {fileID: 1258451728946425108}
   - component: {fileID: 3117733394962076456}
   - component: {fileID: 3575828963327804693}
+  - component: {fileID: 7832859383080732455}
+  - component: {fileID: 2350159173302138411}
+  - component: {fileID: 8164029184253866424}
   m_Layer: 0
   m_Name: EruptCore
   m_TagString: Untagged
@@ -136,7 +139,52 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0ee013783f7304b52835434349b9ed87, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Erupt.Ui::Erupt.Ui.TierUiRig
-  useTierUi: 0
-  legacyMenu: {fileID: 0}
+  useTierUi: 1
   tierOneAnchor: {fileID: 0}
   tierThreeAnchor: {fileID: 0}
+--- !u!114 &7832859383080732455
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2271841663759161846}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 93fd78b626f814f4a9d8684cffde3bdc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Erupt.Environment::Erupt.UiBindings.ObstacleVerbBindings
+  rig: {fileID: 3575828963327804693}
+  selection: {fileID: 7612471598499163310}
+  registry: {fileID: 3117733394962076456}
+  duplicateOffset: {x: 0.2, y: 0, z: 0}
+--- !u!114 &2350159173302138411
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2271841663759161846}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 40eba625645e415c82111aa9564ad265, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Erupt.Environment::Erupt.UiBindings.ScenePlacementTab
+  rig: {fileID: 3575828963327804693}
+  registry: {fileID: 3117733394962076456}
+  modes: {fileID: 1258451728946425108}
+  selection: {fileID: 7612471598499163310}
+  shapeMaterial: {fileID: 0}
+  placementDistance: 2
+--- !u!114 &8164029184253866424
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2271841663759161846}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a4f8364c82b54fe0a903f6c0efc08326, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Erupt.Interaction.Backends.OpenXR::Erupt.Interaction.Backends.XrUiRaycastInstaller

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using Erupt.Interaction;
 using Erupt.Ui;
@@ -42,6 +43,24 @@ namespace Erupt.Plugins
 
         // --- base contributions ------------------------------------------------
 
+        /// <summary>
+        /// Whether this planner takes goals from the end effector. A planner that plans on
+        /// the ROS side from a recorded task (MTC) says false, so the shared set-goal / plan
+        /// verbs go to the planner that can act on them.
+        /// </summary>
+        public virtual bool AcceptsGoals => true;
+
+        // Every registered planner, per UI host, so the shared verbs are bound once and
+        // dispatched rather than rebound by whichever planner registered last.
+        private static readonly Dictionary<IUiHost, List<PlanningPlugin>> plannersByHost = new();
+
+        /// <summary>Registered planners on a host, in registration order.</summary>
+        public static IReadOnlyList<PlanningPlugin> PlannersOn(IUiHost host) =>
+            host != null && plannersByHost.TryGetValue(host, out var list) ? list : Array.Empty<PlanningPlugin>();
+
+        /// <summary>The planner the end-effector verbs address: the first registered one that accepts goals.</summary>
+        public static PlanningPlugin ActiveOn(IUiHost host) => PlannersOn(host).FirstOrDefault(p => p != null && p.AcceptsGoals);
+
         protected override void OnRegister(IEruptContext context)
         {
             IUiHost ui = context.Ui;
@@ -51,13 +70,22 @@ namespace Erupt.Plugins
                 return;
             }
 
-            ui.BindVerb("set-goal", target => Report(SetGoal(target)));
-            if (!ui.Verbs.Contains(SelectionKind.EndEffector, "plan"))
-                ui.RegisterVerb(SelectionKind.EndEffector, "plan", "Plan", _ => RequestPlan(DefaultPreferences(), _ => { }), Id);
-            else
-                ui.BindVerb("plan", _ => RequestPlan(DefaultPreferences(), _ => { }));
-            ui.BindVerb("preview", target => { if (TryResult(target, out var r)) Preview(r); });
-            ui.BindVerb("execute", target => { if (TryResult(target, out var r)) Execute(r, _ => { }); });
+            if (!plannersByHost.TryGetValue(ui, out var planners)) plannersByHost[ui] = planners = new List<PlanningPlugin>();
+            bool first = planners.Count == 0;
+            planners.Add(this);
+
+            if (first)
+            {
+                // Shared verbs, bound once. set-goal / plan go to the active planner; preview /
+                // execute go to whichever planner produced the selected trajectory.
+                ui.BindVerb("set-goal", target => { var p = ActiveOn(ui); if (p != null) p.Report(p.SetGoal(target)); });
+                if (!ui.Verbs.Contains(SelectionKind.EndEffector, "plan"))
+                    ui.RegisterVerb(SelectionKind.EndEffector, "plan", "Plan", _ => ActiveOn(ui)?.RequestPlan(ActiveOn(ui).DefaultPreferences(), _ => { }), Id);
+                else
+                    ui.BindVerb("plan", _ => ActiveOn(ui)?.RequestPlan(ActiveOn(ui).DefaultPreferences(), _ => { }));
+                ui.BindVerb("preview", target => { if (TryResult(target, out var r, out var owner)) owner.Preview(r); });
+                ui.BindVerb("execute", target => { if (TryResult(target, out var r, out var owner)) owner.Execute(r, _ => { }); });
+            }
 
             settingsTab = ui.AddTab(SettingsTabId, DisplayName, BuildSettingsTab);
         }
@@ -66,6 +94,11 @@ namespace Erupt.Plugins
         {
             ClearResults();
             settingsTab = null;
+            if (context?.Ui != null && plannersByHost.TryGetValue(context.Ui, out var planners))
+            {
+                planners.Remove(this);
+                if (planners.Count == 0) plannersByHost.Remove(context.Ui);
+            }
         }
 
         /// <summary>
@@ -90,6 +123,49 @@ namespace Erupt.Plugins
             return result;
         }
 
+        [Header("Trajectory handle")]
+        [Tooltip("Diameter of the sphere that makes a plan selectable in the world.")]
+        [SerializeField, Min(0.01f)] private float handleDiameter = 0.06f;
+        [SerializeField] private Color handleColor = new Color(0.55f, 0.35f, 1f, 0.9f);
+
+        /// <summary>
+        /// Give a plan a presence in the world: a small sphere at <paramref name="worldPosition"/>
+        /// (optionally following <paramref name="follow"/>) carrying its
+        /// <see cref="TrajectorySelectable"/>, so a ray on it selects the plan and the
+        /// Trajectory verbs (preview, execute) appear. Guidelines Part 2: verbs attach to a
+        /// selection, so a plan must be selectable to have verbs at all.
+        /// </summary>
+        protected TrajectorySelectable PlaceHandle(PlanResult result, Vector3 worldPosition, Transform follow = null)
+        {
+            var selectable = results.Find(r => r != null && r.Result == result);
+            if (selectable == null) return null;
+
+            GameObject go = selectable.gameObject;
+            if (go.GetComponent<Collider>() == null)
+            {
+                var sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                sphere.name = "Handle";
+                sphere.transform.SetParent(go.transform, false);
+                sphere.transform.localScale = Vector3.one * handleDiameter;
+                sphere.GetComponent<Collider>().isTrigger = true;
+                var renderer = sphere.GetComponent<Renderer>();
+                renderer.material.color = handleColor;
+                // The handle is the collider the ray hits; SelectionService.Resolve walks
+                // up to the TrajectorySelectable on this object.
+            }
+            go.transform.SetParent(follow != null ? follow : transform, true);
+            go.transform.position = worldPosition;
+            go.SetActive(true);
+            return selectable;
+        }
+
+        /// <summary>Hide every handle except the given plan's (e.g. only the selected solution is placed).</summary>
+        protected void ShowOnlyHandle(PlanResult result)
+        {
+            foreach (var r in results)
+                if (r != null) r.gameObject.SetActive(r.Result == result);
+        }
+
         protected void ClearResults()
         {
             foreach (var r in results)
@@ -98,10 +174,12 @@ namespace Erupt.Plugins
             LastResult = null;
         }
 
-        private static bool TryResult(ISelectable target, out PlanResult result)
+        private static bool TryResult(ISelectable target, out PlanResult result, out PlanningPlugin owner)
         {
-            result = (target as TrajectorySelectable)?.Result;
-            return result != null;
+            var selectable = target as TrajectorySelectable;
+            result = selectable?.Result;
+            owner = selectable?.Owner;
+            return result != null && owner != null;
         }
 
         private void Report(InteractionRefusal refusal)

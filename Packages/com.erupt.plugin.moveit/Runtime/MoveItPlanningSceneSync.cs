@@ -63,6 +63,13 @@ public class MoveItPlanningSceneSync : MonoBehaviour, IEnvironmentSync
             publisher.objectId = obj.Id;
             publisher.worldOrigin = registry.WorldOriginObject;
         }
+        else if (publisher.objectId != obj.Id)
+        {
+            // A clone of another object: its copied publisher still names the source id.
+            publisher.objectId = obj.Id;
+            publisher.hasBeenPublished = false;
+            if (publisher.worldOrigin == null) publisher.worldOrigin = registry.WorldOriginObject;
+        }
 
         listener?.RegisterUnityOwnedObject(obj.Id, go);
     }

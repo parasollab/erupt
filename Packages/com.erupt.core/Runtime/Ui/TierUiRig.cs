@@ -6,28 +6,26 @@ using Erupt.Interaction;
 namespace Erupt.Ui
 {
     /// <summary>
-    /// Assembles tiers 1, 2 and 3 and switches between the new UI and the legacy menu.
+    /// Assembles tiers 1, 2 and 3 and is the <see cref="IUiHost"/> plugins contribute to.
     /// </summary>
     /// <remarks>
-    /// The legacy wrist menu and the tier UI are both present, one active at a time, so
-    /// the new UI can be compared against the old and fallen back from instantly. The
-    /// legacy object is only disabled, never removed — it lives in a prefab shared with
-    /// 15 other scenes, and disabling a prefab instance's child is a scene-local override.
-    ///
-    /// Once the tier UI is trusted, this component and the toggle go away.
+    /// Since plugin-refactor Phase 3 the tier UI is the only UI; the legacy wrist menu and
+    /// its toggle are gone. <c>useTierUi</c> remains as a debugging switch that hides the
+    /// tiers.
     /// </remarks>
     public class TierUiRig : MonoBehaviour, IUiHost
     {
         [Header("Switch")]
-        [Tooltip("On: tier 1/2/3. Off: the original wrist menu.")]
+        [Tooltip("Off hides tiers 1–3 (debugging only; the legacy wrist menu is gone since Phase 3).")]
         [SerializeField] private bool useTierUi = true;
-
-        [Tooltip("The legacy wrist menu object, disabled while the tier UI is active.")]
-        [SerializeField] private GameObject legacyMenu;
 
         [Header("Placement")]
         [SerializeField] private Transform tierOneAnchor;
         [SerializeField] private Transform tierThreeAnchor;
+
+        [Header("Summoning")]
+        [Tooltip("Tier 3 toggles on the router's Activate intent (the controller Menu button, as the wrist menu did). Found in the scene if empty.")]
+        [SerializeField] private InteractionRouter router;
 
         public TierOneBar TierOne { get; private set; }
         public ContextualMenuView TierTwo { get; private set; }
@@ -70,6 +68,29 @@ namespace Erupt.Ui
             Apply();
         }
 
+        private void OnEnable()
+        {
+            if (router == null) router = FindFirstObjectByType<InteractionRouter>();
+            if (router != null) router.Activate += OnActivate;
+        }
+
+        private void OnDisable()
+        {
+            if (router != null) router.Activate -= OnActivate;
+        }
+
+        private void OnActivate(InteractionIntent intent) => ToggleTierThree();
+
+        /// <summary>Open tier 3 on its current (or first) tab, or close it if open.</summary>
+        public void ToggleTierThree()
+        {
+            if (TierThree == null || !useTierUi) return;
+            if (TierThree.IsOpen) { Registry?.Close(TierThree); return; }
+            string tab = TierThree.ActiveTab?.Id ?? (TierThree.Tabs.Count > 0 ? TierThree.Tabs[0].Id : null);
+            if (tab == null) return;
+            SummonTab(tab);
+        }
+
         private T CreateChild<T>(string name, Transform anchor, Action<T> beforeAwake = null) where T : Component
         {
             var go = new GameObject(name);
@@ -105,7 +126,6 @@ namespace Erupt.Ui
                 TierThree.Close();
             }
 
-            if (legacyMenu != null) legacyMenu.SetActive(!useTierUi);
             foreach (var widget in widgets)
                 if (widget.GameObject != null) widget.GameObject.SetActive(useTierUi);
         }

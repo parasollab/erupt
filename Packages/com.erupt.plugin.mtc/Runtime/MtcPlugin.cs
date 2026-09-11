@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using Erupt.Interaction;
@@ -7,55 +8,136 @@ using RosMessageTypes.MoveitTaskConstructorMsgs;
 
 /// <summary>
 /// MoveIt Task Constructor as an ERUPT planning plugin. MTC plans on the ROS side from a
-/// recorded task; here "plan" means "take the latest solution", preview plays it on
+/// recorded task; here "plan" means "take the best solution", preview plays it on
 /// <see cref="MtcSolutionPlayer"/>, execute sends it to /execute_task_solution through
-/// <see cref="MtcClient"/>. Depends on the MoveIt plugin for the planning scene.
+/// <see cref="MtcClient"/>. The pick/place recorder is the Teach-mode entry (Part 5).
+/// Depends on the MoveIt plugin for the planning scene.
 /// </summary>
 public class MtcPlugin : PlanningPlugin
 {
     [Tooltip("Sibling components by default; found in the scene if empty.")]
     [SerializeField] private MtcClient client;
     [SerializeField] private MtcSolutionPlayer player;
+    [SerializeField] private PickPlaceTaskRecorder recorder;
+    [SerializeField] private PickPlaceActionClient pickPlace;
 
     private static readonly string[] Deps = { "moveit" };
+    private readonly Dictionary<SolutionMsg, PlanResult> resultBySolution = new();
+    private SolutionsTab tab;
 
     public override string Id => "mtc";
     public override string DisplayName => "MTC";
-    public override System.Collections.Generic.IReadOnlyList<string> DependsOn => Deps;
+    public override IReadOnlyList<string> DependsOn => Deps;
+    /// <summary>MTC plans from the recorded task; the end-effector goal verbs belong to MoveIt.</summary>
+    public override bool AcceptsGoals => false;
 
     public MtcClient Client => client;
     public MtcSolutionPlayer Player => player;
+    public PickPlaceTaskRecorder Recorder => recorder;
+    public PickPlaceActionClient PickPlace => pickPlace;
+    public SolutionsTab Tab => tab;
+    public bool InTeachMode { get; private set; }
+    public SolutionMsg SelectedSolution { get; private set; }
+
+    public event Action SelectedSolutionChanged;
+    public event Action TeachModeChanged;
+
+    /// <summary>Solutions by ascending total cost.</summary>
+    public IEnumerable<(SolutionMsg sol, double cost)> RankedSolutions =>
+        client == null ? Enumerable.Empty<(SolutionMsg, double)>() :
+        client.Solutions.Select(s => (s, (double)s.sub_trajectory.Sum(t => t.info.cost))).OrderBy(x => x.Item2);
 
     private void Awake()
     {
         if (client == null) client = GetComponent<MtcClient>();
         if (player == null) player = GetComponent<MtcSolutionPlayer>();
+        if (recorder == null) recorder = GetComponent<PickPlaceTaskRecorder>();
+        if (pickPlace == null) pickPlace = GetComponent<PickPlaceActionClient>();
     }
 
     protected override void OnRegister(IEruptContext context)
     {
         if (client == null) client = FindFirstObjectByType<MtcClient>(FindObjectsInactive.Include);
         if (player == null) player = FindFirstObjectByType<MtcSolutionPlayer>(FindObjectsInactive.Include);
+        if (recorder == null) recorder = FindFirstObjectByType<PickPlaceTaskRecorder>(FindObjectsInactive.Include);
         if (client == null) Debug.LogError("[mtc] No MtcClient in the scene.", this);
         if (player != null && context.Robot != null) player.SetRobot(context.Robot);
 
-        // Inject the context's bus before the client starts (same frame as registration
-        // when the prefab is enabled, otherwise the client keeps RosBus.Instance).
         try { client?.Initialise(context.Ros); }
-        catch (InvalidOperationException) { /* already started: it used RosBus.Instance, which is the same bus */ }
+        catch (InvalidOperationException) { /* already started on RosBus.Instance, the same bus */ }
 
-        if (client != null) client.OnSolutionReceived += OnSolution;
+        if (client != null)
+        {
+            client.OnSolutionReceived += OnSolution;
+            client.OnTaskReset += OnTaskReset;
+        }
+        InTeachMode = context.Modes != null && context.Modes.Is(AppMode.Teach);
         base.OnRegister(context);
     }
 
     protected override void OnUnregister(IEruptContext context)
     {
-        if (client != null) client.OnSolutionReceived -= OnSolution;
+        if (client != null)
+        {
+            client.OnSolutionReceived -= OnSolution;
+            client.OnTaskReset -= OnTaskReset;
+        }
+        tab?.Dispose();
+        tab = null;
         StopPreview();
+        resultBySolution.Clear();
+        SelectedSolution = null;
         base.OnUnregister(context);
     }
 
-    private void OnSolution(SolutionMsg solution) => PublishResult(ToResult(solution));
+    protected override void OnModeChanged(AppMode mode)
+    {
+        bool teach = mode == AppMode.Teach;
+        if (teach == InTeachMode) return;
+        InTeachMode = teach;
+        if (!teach && recorder != null && recorder.IsRecording) recorder.StopRecording();
+        TeachModeChanged?.Invoke();
+    }
+
+    protected override void BuildSettingsTab(RectTransform content)
+    {
+        if (content == null) return;
+        tab = new SolutionsTab(this, content);
+    }
+
+    // --- solutions ----------------------------------------------------------------
+
+    private void OnSolution(SolutionMsg solution)
+    {
+        var result = PublishResult(ToResult(solution));
+        resultBySolution[solution] = result;
+        // The first solution of a task is selected so its handle exists in the world.
+        if (SelectedSolution == null) SelectSolution(solution);
+    }
+
+    private void OnTaskReset()
+    {
+        ClearResults();
+        resultBySolution.Clear();
+        SelectedSolution = null;
+        SelectedSolutionChanged?.Invoke();
+    }
+
+    /// <summary>Make one solution the current plan: its handle appears at the end effector, others hide.</summary>
+    public void SelectSolution(SolutionMsg solution)
+    {
+        if (solution == null || !resultBySolution.TryGetValue(solution, out var result)) return;
+        SelectedSolution = solution;
+        Transform ee = Context?.Robot?.EndEffector;
+        PlaceHandle(result, ee != null ? ee.position : transform.position, ee);
+        ShowOnlyHandle(result);
+        if (Context?.Selection != null)
+        {
+            var selectable = Results.FirstOrDefault(r => r != null && r.Result == result);
+            if (selectable != null) Context.Selection.Select(selectable);
+        }
+        SelectedSolutionChanged?.Invoke();
+    }
 
     private PlanResult ToResult(SolutionMsg solution)
     {
@@ -71,14 +153,16 @@ public class MtcPlugin : PlanningPlugin
 
     /// <summary>MTC goals come from the recorded task; set-goal has nothing to set here.</summary>
     public override InteractionRefusal SetGoal(ISelectable endEffector) =>
-        InteractionRefusal.Refuse("MTC plans from the recorded task; record a pick/place instead.",
+        InteractionRefusal.Refuse("MTC plans from the recorded task; record a pick & place in Teach mode instead.",
             endEffector?.GameObject != null ? endEffector.GameObject.transform.position : Vector3.zero);
 
+    /// <summary>"Plan" for MTC selects the best-cost solution.</summary>
     public override void RequestPlan(PlanPreferences preferences, Action<PlanResult> done)
     {
-        var latest = client != null && client.Solutions.Count > 0 ? client.Solutions[^1] : null;
-        if (latest == null) { done?.Invoke(null); return; }
-        done?.Invoke(LastResult != null && ReferenceEquals(LastResult.PlannerPayload, latest) ? LastResult : PublishResult(ToResult(latest)));
+        var best = RankedSolutions.Select(x => x.sol).FirstOrDefault();
+        if (best == null) { done?.Invoke(null); return; }
+        SelectSolution(best);
+        done?.Invoke(resultBySolution[best]);
     }
 
     public override void Preview(PlanResult plan)
@@ -103,7 +187,7 @@ public class MtcPlugin : PlanningPlugin
         status?.Invoke(new ExecutionStatus(ExecutionPhase.Sending));
         try
         {
-            var result = await client.ExecuteSolutionAsync(solution);
+            await client.ExecuteSolutionAsync(solution);
             status?.Invoke(new ExecutionStatus(Map(client.LastExecutionStatus), client.LastExecutionStatus));
         }
         catch (Exception e)

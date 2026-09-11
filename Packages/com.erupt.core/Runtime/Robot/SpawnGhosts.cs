@@ -13,6 +13,9 @@ public class SpawnGhosts : MonoBehaviour
     private GameObject startGhost;
     private GameObject goalGhost;
 
+    public GameObject StartGhost => startGhost;
+    public GameObject GoalGhost => goalGhost;
+
     public void SpawnStartGhost()
     {
         ClearStartGhost();

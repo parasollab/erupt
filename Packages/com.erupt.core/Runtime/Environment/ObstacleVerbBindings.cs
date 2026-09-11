@@ -51,8 +51,11 @@ namespace Erupt.UiBindings
                 GameObject target = selectable.GameObject;
                 if (target == null) return;
 
-                undo.Do(new DeleteObstacleCommand(target, PrimitiveTypeOf(target), registry));
                 selection?.ClearSelection();
+                if (TryPrimitive(target, out var primitive))
+                    undo.Do(new DeleteObstacleCommand(target, primitive, registry));
+                else
+                    undo.Do(new DeleteMeshObstacleCommand(target, registry));   // a mug is cloned back, not rebuilt as a cube
             });
 
             menu.Bind("duplicate", selectable =>
@@ -60,13 +63,27 @@ namespace Erupt.UiBindings
                 GameObject original = selectable.GameObject;
                 if (original == null) return;
 
-                var snapshot = ObstacleSnapshot.Capture(original, PrimitiveTypeOf(original));
-                snapshot.ObjectId = null;                    // a duplicate is a new planning-scene object
-                snapshot.Position += duplicateOffset;
+                // Deselect first: the highlighter has swapped the original's material, and a
+                // copy taken now would be born wearing the highlight as its real material.
+                selection?.ClearSelection();
 
-                var create = new CreateObstacleCommand(snapshot, registry);
-                undo.Do(create);
-                if (selection != null) selection.Select(SelectableMarker.Ensure(create.Spawned, SelectionKind.Obstacle));
+                GameObject spawned;
+                if (TryPrimitive(original, out var primitive))
+                {
+                    var snapshot = ObstacleSnapshot.Capture(original, primitive);
+                    snapshot.ObjectId = null;                // a duplicate is a new planning-scene object
+                    snapshot.Position += duplicateOffset;
+                    var create = new CreateObstacleCommand(snapshot, registry);
+                    undo.Do(create);
+                    spawned = create.Spawned;
+                }
+                else
+                {
+                    var clone = new DuplicateMeshObstacleCommand(original, registry, duplicateOffset);
+                    undo.Do(clone);
+                    spawned = clone.Spawned;
+                }
+                if (selection != null && spawned != null) selection.Select(SelectableMarker.Ensure(spawned, SelectionKind.Obstacle));
             });
 
             menu.Bind("snap", selectable =>
@@ -88,23 +105,26 @@ namespace Erupt.UiBindings
             // visible and disabled until that widget exists.
         }
 
-        // Objects built through ObstacleFactory record their primitive; anything else
-        // (wrist-menu shapes, remote objects) falls back to the mesh-name sniffing the
-        // wrist menu always used for duplicate.
-        private static PrimitiveType PrimitiveTypeOf(GameObject obstacle)
+        // Objects built through ObstacleFactory record their primitive; legacy shapes are
+        // recognised by Unity's built-in mesh names. Anything else is a mesh and is cloned
+        // rather than rebuilt — the old "default to Cube" turned a duplicated mug into a cube.
+        private static bool TryPrimitive(GameObject obstacle, out PrimitiveType primitive)
         {
             var env = obstacle.GetComponent<EnvironmentObject>();
-            if (env != null && env.Primitive.HasValue) return env.Primitive.Value;
+            if (env != null && env.Primitive.HasValue) { primitive = env.Primitive.Value; return true; }
 
             var filter = obstacle.GetComponent<MeshFilter>();
             string mesh = filter != null && filter.sharedMesh != null ? filter.sharedMesh.name : "";
-
-            if (mesh.Contains("Sphere")) return PrimitiveType.Sphere;
-            if (mesh.Contains("Cylinder")) return PrimitiveType.Cylinder;
-            if (mesh.Contains("Capsule")) return PrimitiveType.Capsule;
-            if (mesh.Contains("Plane")) return PrimitiveType.Plane;
-
-            return PrimitiveType.Cube;
+            switch (mesh)
+            {
+                case "Cube":     primitive = PrimitiveType.Cube;     return true;
+                case "Sphere":   primitive = PrimitiveType.Sphere;   return true;
+                case "Cylinder": primitive = PrimitiveType.Cylinder; return true;
+                case "Capsule":  primitive = PrimitiveType.Capsule;  return true;
+                case "Plane":    primitive = PrimitiveType.Plane;    return true;
+            }
+            primitive = default;
+            return false;
         }
     }
 }

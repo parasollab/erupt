@@ -6,7 +6,8 @@
         "Unity.InputSystem",
         "Unity.XR.Interaction.Toolkit",
         "Unity.XR.Hands",
-        "Unity.XR.CoreUtils"
+        "Unity.XR.CoreUtils",
+        "Erupt.Ui"
     ],
     "includePlatforms": [
         "Android",

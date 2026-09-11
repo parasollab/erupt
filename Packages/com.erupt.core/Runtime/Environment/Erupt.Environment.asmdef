@@ -7,7 +7,8 @@
         "Unity.InputSystem",
         "Unity.XR.Interaction.Toolkit",
         "Unity.XR.CoreUtils",
-        "UnityEngine.UI"
+        "UnityEngine.UI",
+        "Unity.TextMeshPro"
     ],
     "includePlatforms": [
         "Android",

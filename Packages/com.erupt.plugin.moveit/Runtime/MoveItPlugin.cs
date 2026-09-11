@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using UnityEngine;
 using Erupt.Interaction;
 using Erupt.Plugins;
@@ -17,6 +18,10 @@ public class MoveItPlugin : PlanningPlugin
     [SerializeField] private JointTrajectoryPlayer player;
     [Tooltip("Query /query_planner_interface on register and keep retrying until it answers.")]
     [SerializeField] private bool autoQueryPlanners = true;
+    [Tooltip("Start/goal ghosts; the goal ghost hosts the plan's trajectory handle. Found in the scene if empty.")]
+    [SerializeField] private SpawnGhosts ghosts;
+
+    private PlannerSettingsTab tab;
 
     private RobotStateMsg startState;
     private RobotStateMsg goalState;
@@ -33,6 +38,8 @@ public class MoveItPlugin : PlanningPlugin
 
     /// <summary>Fires with the MoveIt error text when a plan request fails.</summary>
     public event Action<string> PlanFailed;
+    /// <summary>Fires when the start or goal state is set or reset.</summary>
+    public event Action GoalChanged;
 
     protected override void OnRegister(IEruptContext context)
     {
@@ -40,8 +47,14 @@ public class MoveItPlugin : PlanningPlugin
         Client.Connect();
         if (player == null) player = FindFirstObjectByType<JointTrajectoryPlayer>();
         if (player != null && context.Robot != null) player.SetRobot(context.Robot);
+        if (ghosts == null) ghosts = FindFirstObjectByType<SpawnGhosts>();
 
         base.OnRegister(context);
+
+        // The legacy panel let the user pose the robot, set start, pose again, set goal.
+        // set-goal alone cannot express that, so start gets its own verb (plugin origin).
+        if (context.Ui != null && !context.Ui.Verbs.Contains(SelectionKind.EndEffector, "set-start"))
+            context.Ui.RegisterVerb(SelectionKind.EndEffector, "set-start", "Set Start", _ => SetStartFromRobot(), Id);
 
         if (autoQueryPlanners) InvokeRepeating(nameof(TryQueryPlanners), 0.5f, 1.0f);
     }
@@ -50,6 +63,8 @@ public class MoveItPlugin : PlanningPlugin
     {
         CancelInvoke(nameof(TryQueryPlanners));
         StopPreview();
+        tab?.Dispose();
+        tab = null;
         Client?.Dispose();
         Client = null;
         base.OnUnregister(context);
@@ -68,6 +83,8 @@ public class MoveItPlugin : PlanningPlugin
     {
         if (Client == null) return;
         startState = Client.CaptureRobotState();
+        if (ghosts != null) { if (ghosts.StartGhost == null) ghosts.SpawnStartGhost(); else ghosts.UpdateStartGhost(); }
+        GoalChanged?.Invoke();
     }
 
     /// <summary>Capture the robot's current pose as the goal (the user has posed it with the IK handle).</summary>
@@ -75,13 +92,15 @@ public class MoveItPlugin : PlanningPlugin
     {
         if (Client == null) return;
         goalState = Client.CaptureRobotState();
+        if (ghosts != null) { if (ghosts.GoalGhost == null) ghosts.SpawnGoalGhost(); else ghosts.UpdateGoalGhost(); }
+        GoalChanged?.Invoke();
     }
 
+    /// <summary>Capture the goal only; the start has its own verb (set-start).</summary>
     public override InteractionRefusal SetGoal(ISelectable endEffector)
     {
         if (Client == null)
             return InteractionRefusal.Refuse("MoveIt is not connected.", Vector3.zero);
-        if (!HasStart) SetStartFromRobot();
         SetGoalFromRobot();
         return InteractionRefusal.None;
     }
@@ -90,6 +109,8 @@ public class MoveItPlugin : PlanningPlugin
     {
         startState = null;
         goalState = null;
+        ghosts?.ClearGhosts();
+        GoalChanged?.Invoke();
     }
 
     // --- plan / preview / execute ------------------------------------------------
@@ -109,6 +130,8 @@ public class MoveItPlugin : PlanningPlugin
         {
             if (result == null) { done?.Invoke(null); return; }
             PublishResult(result);
+            PlaceOnGoalGhost(result);
+            Preview(result);
             done?.Invoke(result);
         }, message => PlanFailed?.Invoke(message));
     }
@@ -149,11 +172,34 @@ public class MoveItPlugin : PlanningPlugin
         status?.Invoke(new ExecutionStatus(ExecutionPhase.Executing, "Trajectory published to the controller."));
     }
 
-    protected override PlanPreferences DefaultPreferences() => new PlanPreferences
+    protected override PlanPreferences DefaultPreferences() => tab != null ? tab.Preferences : new PlanPreferences
     {
         PipelineId = settings.planningPipelineId,
         PlannerId = settings.defaultPlannerId,
         Attempts = settings.defaultNumPlanningAttempts,
         AllowedTimeSeconds = settings.defaultAllowedPlanningTime
     };
+
+    protected override void BuildSettingsTab(RectTransform content)
+    {
+        if (content == null) return;   // a headless UI host (tests) passes no content
+        tab = new PlannerSettingsTab(this, content);
+    }
+
+    public PlannerSettingsTab Tab => tab;
+
+    // The goal ghost is where the user looks for the plan, so the trajectory handle sits at
+    // its end effector; without a ghost it sits at the real end effector.
+    private void PlaceOnGoalGhost(PlanResult result)
+    {
+        Transform ee = Context?.Robot?.EndEffector;
+        Transform anchor = null;
+        if (ghosts != null && ghosts.GoalGhost != null && ee != null)
+        {
+            var match = ghosts.GoalGhost.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name == ee.name);
+            anchor = match != null ? match : ghosts.GoalGhost.transform;
+        }
+        Vector3 position = anchor != null ? anchor.position : ee != null ? ee.position : transform.position;
+        PlaceHandle(result, position, anchor);
+    }
 }
