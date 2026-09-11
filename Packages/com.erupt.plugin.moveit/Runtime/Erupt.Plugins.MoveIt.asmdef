@@ -15,7 +15,8 @@
         "Unity.XR.Interaction.Toolkit",
         "Unity.XR.CoreUtils",
         "UnityEngine.UI",
-        "Unity.TextMeshPro"
+        "Unity.TextMeshPro",
+        "Erupt.Plugins"
     ],
     "includePlatforms": [
         "Android",

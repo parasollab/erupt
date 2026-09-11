@@ -11,7 +11,7 @@ using RosMessageTypes.BuiltinInterfaces;
 
 public class PickPlaceTaskRecorder : MonoBehaviour
 {
-    [SerializeField] private SelectionManager selectionManager;
+    [SerializeField] private SelectionHighlighter selectionManager;
     [SerializeField] private GameObject worldOrigin;
 
     [Header("Task delivery")]
@@ -57,7 +57,7 @@ public class PickPlaceTaskRecorder : MonoBehaviour
 
         IsRecording = true;
         objectWasPlaced = false;
-        selectionManager.OnObjectSelected += OnObjectSelected;
+        selectionManager.Service.SelectionChanged += OnSelectionChanged;
 
         // Watch whatever is already selected
         if (selectionManager.SelectedObject != null)
@@ -71,7 +71,7 @@ public class PickPlaceTaskRecorder : MonoBehaviour
         if (!IsRecording) return;
 
         IsRecording = false;
-        selectionManager.OnObjectSelected -= OnObjectSelected;
+        selectionManager.Service.SelectionChanged -= OnSelectionChanged;
 
         if (objectWasPlaced && watchedPublisher != null)
         {
@@ -94,6 +94,15 @@ public class PickPlaceTaskRecorder : MonoBehaviour
 
         Debug.Log("PickPlaceTaskRecorder: recording stopped");
     }
+
+    private void OnSelectionChanged(ISelectable current)
+
+    {
+
+        if (current != null && current.GameObject != null) OnObjectSelected(current.GameObject);
+
+    }
+
 
     private void OnObjectSelected(GameObject obj)
     {

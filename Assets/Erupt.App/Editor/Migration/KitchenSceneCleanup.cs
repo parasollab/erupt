@@ -84,11 +84,11 @@ namespace Erupt.Interaction.EditorTools
 
             var ik = Find<DirectArticulationIKController>(roots);
             var ghosts = Find<SpawnGhosts>(roots);
-            var player = Find<MTCTrajectoryPlayer>(roots);
+            var player = Find<MtcSolutionPlayer>(roots);
             var ikRoot = RootOf(ik != null ? new SerializedObject(ik).FindProperty("robotRoot").objectReferenceValue : null);
             var ghostRoot = RootOf(ghosts != null ? ghosts.realRobot : null);
             var playerRoot = RootOf(player);
-            Check(sb, "IK, SpawnGhosts.realRobot and MTCTrajectoryPlayer agree on the robot",
+            Check(sb, "IK, SpawnGhosts.realRobot and MtcSolutionPlayer agree on the robot",
                 ikRoot != null && ikRoot == ghostRoot && ikRoot == playerRoot,
                 $"ik={Name(ikRoot)} ghosts={Name(ghostRoot)} player={Name(playerRoot)}");
             Check(sb, "SpawnGhosts.robotPrefab is a prefab asset",
@@ -115,7 +115,7 @@ namespace Erupt.Interaction.EditorTools
         {
             var ik = Find<DirectArticulationIKController>(roots);
             var ghosts = Find<SpawnGhosts>(roots);
-            var player = Find<MTCTrajectoryPlayer>(roots);
+            var player = Find<MtcSolutionPlayer>(roots);
 
             var refs = new RobotRefs
             {
@@ -128,7 +128,7 @@ namespace Erupt.Interaction.EditorTools
             Line($"robots: roots with ArticulationBody = {string.Join(", ", RobotRoots(roots).Select(Describe))}");
             Line($"robots: DirectArticulationIKController.robotRoot -> {Name(refs.IkRoot)}");
             Line($"robots: SpawnGhosts.realRobot -> {Name(refs.GhostReal)}");
-            Line($"robots: MTCTrajectoryPlayer host -> {Name(refs.PlayerHost)}");
+            Line($"robots: MtcSolutionPlayer host -> {Name(refs.PlayerHost)}");
             Line($"robots: SpawnGhosts.robotPrefab -> {Name(refs.GhostTemplate)} " +
                  $"(scene object={(refs.GhostTemplate != null && refs.GhostTemplate.scene.IsValid())})");
             return refs;

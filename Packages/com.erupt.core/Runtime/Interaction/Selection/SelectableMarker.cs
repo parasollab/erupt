@@ -19,5 +19,20 @@ namespace Erupt.Interaction
         public string DisplayName => string.IsNullOrEmpty(displayName) ? name : displayName;
 
         public void SetKind(SelectionKind newKind) => kind = newKind;
+        public void SetDisplayName(string name) => displayName = name;
+
+        /// <summary>The object's marker, added with the given kind if it has none.</summary>
+        public static SelectableMarker Ensure(GameObject go, SelectionKind kind, string displayName = null)
+        {
+            if (go == null) return null;
+            var marker = go.GetComponent<SelectableMarker>();
+            if (marker == null)
+            {
+                marker = go.AddComponent<SelectableMarker>();
+                marker.SetKind(kind);
+                if (displayName != null) marker.SetDisplayName(displayName);
+            }
+            return marker;
+        }
     }
 }

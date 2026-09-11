@@ -20,7 +20,9 @@ Runtime/Interaction   Erupt.Interaction.Core (+ Backends/OpenXR, Desktop, Vision
 Runtime/Ros           Erupt.Ros          IRosBus, RosBus, LiveRosBus, conversions, FPS publisher
 Runtime/Robot         Erupt.Robot        DirectArticulationIKController, router binding, trajectory replay, ghosts
 Runtime/Environment   Erupt.Environment  EnvironmentRegistry/Object, obstacle factory + undoable commands, grab transformers
-Runtime/Ui            Erupt.Ui           tier UI building blocks
+Runtime/Ui            Erupt.Ui           tier UI building blocks, VerbRegistry, IUiHost (TierUiRig)
+Runtime/Plugins       Erupt.Plugins      IEruptPlugin, PluginHost, IEruptContext, PlanningPlugin, DemonstrationPlugin
+Prefabs/EruptCore     the ERUPT root: PluginHost + SelectionService/Highlighter/RouterBinding + ModeManager + EnvironmentRegistry + TierUiRig
 Tests/Support         Erupt.TestSupport  FakeRosBus, TestInteractionSource (UNITY_INCLUDE_TESTS)
 Tests/*               per-assembly PlayMode tests; Tests/Boundary is EditMode and guards the package boundary
 ```

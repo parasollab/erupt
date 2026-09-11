@@ -24,7 +24,7 @@ public class WristMenuController : MonoBehaviour
     public Material litMaterial;
     
     [Header("Selection Manager")]
-    public SelectionManager selectionManager;
+    public SelectionHighlighter selectionManager;
 
     [Header("CollisionObjectsListener")]
     public CollisionObjectsListenerSimple collisionObjectsListener;
@@ -624,7 +624,7 @@ public class WristMenuController : MonoBehaviour
             }
 
             if (selectionManager != null)
-                selectionManager.SetSelectedObject(duplicate);
+                selectionManager.Select(duplicate);
 
             Debug.Log($"WristMenuController: Duplicated mesh '{original.name}' as '{duplicate.name}'");
         }
@@ -724,7 +724,7 @@ public class WristMenuController : MonoBehaviour
         registry?.Adopt(shape, publisher.objectId, EnvironmentOwner.Unity, primitiveType, isMesh: false);
 
         if (selectionManager != null)
-            selectionManager.SetSelectedObject(shape);
+            selectionManager.Select(shape);
         if (collisionObjectsListener != null)
             collisionObjectsListener.RegisterUnityOwnedObject(publisher.objectId, shape);
     }

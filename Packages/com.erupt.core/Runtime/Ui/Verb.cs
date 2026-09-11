@@ -23,7 +23,9 @@ namespace Erupt.Ui
         Guidelines,
 
         /// <summary>Existing ERUPT functionality with no row in the Part 2 table.</summary>
-        EruptAddition
+        EruptAddition,
+        /// <summary>Contributed by a plugin at registration; <see cref="Verb.PluginId"/> says which.</summary>
+        Plugin
     }
 
     /// <summary>One entry on a contextual menu.</summary>
@@ -33,13 +35,16 @@ namespace Erupt.Ui
         public readonly string Label;
         public readonly VerbAvailability Availability;
         public readonly VerbOrigin Origin;
+        /// <summary>Owning plugin for <see cref="VerbOrigin.Plugin"/> verbs; null otherwise.</summary>
+        public readonly string PluginId;
 
-        public Verb(string id, string label, VerbAvailability availability, VerbOrigin origin = VerbOrigin.Guidelines)
+        public Verb(string id, string label, VerbAvailability availability, VerbOrigin origin = VerbOrigin.Guidelines, string pluginId = null)
         {
             Id = id ?? throw new ArgumentNullException(nameof(id));
             Label = label;
             Availability = availability;
             Origin = origin;
+            PluginId = pluginId;
         }
 
         public bool IsAvailable => Availability == VerbAvailability.Available;

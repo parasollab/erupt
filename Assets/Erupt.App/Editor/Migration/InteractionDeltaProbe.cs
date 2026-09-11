@@ -17,14 +17,8 @@ namespace Erupt.Interaction.EditorTools
             var roots = scene.GetRootGameObjects();
             var sb = new StringBuilder();
 
-            var selection = roots.SelectMany(r => r.GetComponentsInChildren<SelectionManager>(true)).First();
-            var ray = selection.rayInteractor;
-            if (ray != null)
-            {
-                sb.AppendLine($"OLD selection ray: '{ray.name}' maxRaycastDistance={ray.maxRaycastDistance} " +
-                              $"mask=0x{ray.raycastMask.value:X} hitDetection={ray.hitDetectionType}");
-            }
-            else sb.AppendLine("OLD selection ray: NULL");
+            // The legacy SelectionManager (and its ray interactor) is gone since plugin refactor Phase 2.
+            sb.AppendLine("OLD selection ray: (retired in plugin refactor Phase 2)");
 
             var router = roots.SelectMany(r => r.GetComponentsInChildren<InteractionRouter>(true)).First();
             var so = new SerializedObject(router);

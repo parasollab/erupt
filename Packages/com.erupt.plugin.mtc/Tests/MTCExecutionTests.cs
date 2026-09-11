@@ -17,7 +17,7 @@ namespace Erupt.Ros.Tests
 
         FakeRosBus bus;
         GameObject managerObject;
-        MTCDataManager manager;
+        MtcClient manager;
         FakeRosBus.FakeActionClient<ExecuteTaskSolutionGoal,
             ExecuteTaskSolutionResult, ExecuteTaskSolutionFeedback> client;
 
@@ -26,8 +26,8 @@ namespace Erupt.Ros.Tests
         {
             bus = new FakeRosBus();
             RosBus.Override(bus);
-            managerObject = new GameObject("MTCDataManager action test");
-            manager = managerObject.AddComponent<MTCDataManager>();
+            managerObject = new GameObject("MtcClient action test");
+            manager = managerObject.AddComponent<MtcClient>();
             yield return null;
             client = bus.ActionClient<ExecuteTaskSolutionGoal,
                 ExecuteTaskSolutionResult, ExecuteTaskSolutionFeedback>(k_ActionName);

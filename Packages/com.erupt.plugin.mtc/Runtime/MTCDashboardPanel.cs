@@ -8,12 +8,12 @@ using RosMessageTypes.MoveitTaskConstructorMsgs;
 public class MTCDashboardPanel : MonoBehaviour
 {
     [SerializeField] private UIDocument uiDocument;
-    [SerializeField] private MTCDataManager dataManager;
+    [SerializeField] private MtcClient dataManager;
     [SerializeField] private PickPlaceTaskRecorder pickPlaceRecorder;
     [Tooltip("Optional: same client the recorder sends goals through, so the plan tab " +
              "shows /pick_place acceptance, feedback stages and the final result.")]
     [SerializeField] private PickPlaceActionClient pickPlaceAction;
-    [SerializeField] private MTCTrajectoryPlayer trajectoryPlayer;
+    [SerializeField] private MtcSolutionPlayer trajectoryPlayer;
 
     // Root
     private VisualElement root;
@@ -61,7 +61,7 @@ public class MTCDashboardPanel : MonoBehaviour
         BindUI();
         ShowTab(panelPlan);
 
-        if (dataManager == null) dataManager = MTCDataManager.Instance;
+        if (dataManager == null) dataManager = FindFirstObjectByType<MtcClient>();
         if (dataManager != null)
         {
             dataManager.OnDescriptionReceived += RefreshStages;
@@ -566,7 +566,7 @@ public class MTCDashboardPanel : MonoBehaviour
             return;
         }
 
-        uint id = MTCDataManager.TopLevelId(selectedSolution);
+        uint id = MtcClient.TopLevelId(selectedSolution);
         if (id == 0 || !IsTopLevelSolution(id))
         {
             // Only complete (root-stage) solutions start from the robot's current state;

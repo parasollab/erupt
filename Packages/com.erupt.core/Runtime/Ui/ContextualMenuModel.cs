@@ -18,6 +18,28 @@ namespace Erupt.Ui
     public class ContextualMenuModel
     {
         private readonly Dictionary<string, Action<ISelectable>> handlers = new();
+        private VerbRegistry registry;
+
+        public ContextualMenuModel() : this(null) { }
+
+        /// <param name="verbs">Vocabulary to draw from; the Guidelines table when null.</param>
+        public ContextualMenuModel(VerbRegistry verbs)
+        {
+            registry = verbs ?? VerbRegistry.FromTable();
+            registry.Changed += RefreshVerbs;
+        }
+
+        public VerbRegistry Registry => registry;
+
+        /// <summary>Swap the vocabulary (the rig hands plugins' registry to the view it built).</summary>
+        public void SetRegistry(VerbRegistry verbs)
+        {
+            if (verbs == null || ReferenceEquals(verbs, registry)) return;
+            registry.Changed -= RefreshVerbs;
+            registry = verbs;
+            registry.Changed += RefreshVerbs;
+            RefreshVerbs();
+        }
 
         public ISelectable Target { get; private set; }
         public SelectionKind Kind => Target?.Kind ?? SelectionKind.None;
@@ -38,7 +60,12 @@ namespace Erupt.Ui
             if (ReferenceEquals(Target, selectable)) return;
 
             Target = selectable;
-            Verbs = selectable == null ? Array.Empty<Verb>() : VerbTable.For(selectable.Kind);
+            RefreshVerbs();
+        }
+
+        private void RefreshVerbs()
+        {
+            Verbs = Target == null ? Array.Empty<Verb>() : registry.For(Target.Kind);
             Changed?.Invoke();
         }
 

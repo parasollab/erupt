@@ -12,7 +12,9 @@
         "Unity.Robotics.ROSTCPConnector.MessageGeneration",
         "Unity.Robotics.ROSTCPConnector.Messages",
         "UnityEngine.TestRunner",
-        "Unity.XR.Interaction.Toolkit"
+        "Unity.XR.Interaction.Toolkit",
+        "Erupt.Plugins",
+        "Erupt.Robot"
     ],
     "includePlatforms": [
         "Android",

@@ -7,9 +7,15 @@ using RosMessageTypes.Moveit;
 using RosMessageTypes.Trajectory;
 using Erupt.Environment;
 
-public class MTCTrajectoryPlayer : MonoBehaviour
+/// <summary>Previews an MTC solution on the robot, mirroring scene_diff attachments through the environment registry.</summary>
+public class MtcSolutionPlayer : MonoBehaviour
 {
     [SerializeField] private DirectArticulationIKController ikController;
+    private Erupt.Robot.IRobotModel robot;
+
+    /// <summary>Use the context's robot instead of the serialised controller.</summary>
+    public void SetRobot(Erupt.Robot.IRobotModel model) => robot = model;
+    private Erupt.Robot.IRobotModel Robot => robot ?? (ikController != null ? ikController : null);
     [SerializeField] private EnvironmentRegistry registry;
 
     private bool isPlaying;
@@ -31,7 +37,7 @@ public class MTCTrajectoryPlayer : MonoBehaviour
 
     public void PlaySolution(SolutionMsg solution)
     {
-        if (ikController == null) { Debug.LogError("[MTCTrajectoryPlayer] ikController not assigned."); return; }
+        if (Robot == null) { Debug.LogError("[MtcSolutionPlayer] no robot assigned."); return; }
         if (registry == null) registry = FindFirstObjectByType<EnvironmentRegistry>();
         Stop();
         playRoutine = StartCoroutine(PlayRoutine(solution));
@@ -47,8 +53,8 @@ public class MTCTrajectoryPlayer : MonoBehaviour
     private IEnumerator PlayRoutine(SolutionMsg solution)
     {
         isPlaying = true;
-        savedNames = ikController.GetJointStateNames();
-        savedPositions = ikController.GetJointStatePositions();
+        savedNames = Robot.GetJointStateNames();
+        savedPositions = Robot.GetJointStatePositions();
 
         try
         {
@@ -97,7 +103,7 @@ public class MTCTrajectoryPlayer : MonoBehaviour
         if (previewAttached.ContainsKey(id)) return;
         if (!registry.TryGet(id, out var go)) return;
 
-        Transform link = ikController.FindLinkTransform(linkName);
+        Transform link = Robot.FindLinkTransform(linkName);
         if (link == null) return;
 
         var publishers = go.GetComponentsInChildren<CollisionObjectPublisher>(true);
@@ -129,7 +135,7 @@ public class MTCTrajectoryPlayer : MonoBehaviour
         string[] names = jt.joint_names;
         var points = jt.points;
 
-        ikController.ApplyJointState(names, points[0].positions);
+        Robot.ApplyJointState(names, points[0].positions);
         double prevTime = DurationToSeconds(points[0].time_from_start);
         double[] prevPos = points[0].positions;
 
@@ -153,16 +159,16 @@ public class MTCTrajectoryPlayer : MonoBehaviour
             float t = Mathf.Clamp01(elapsed / duration);
             for (int j = 0; j < names.Length; j++)
                 lerped[j] = from[j] + (to[j] - from[j]) * t;
-            ikController.ApplyJointState(names, lerped);
+            Robot.ApplyJointState(names, lerped);
             yield return null;
         }
-        if (isPlaying) ikController.ApplyJointState(names, to);
+        if (isPlaying) Robot.ApplyJointState(names, to);
     }
 
     private void RestorePose()
     {
-        if (savedNames != null && savedPositions != null && ikController != null)
-            ikController.ApplyJointState(savedNames, savedPositions);
+        if (savedNames != null && savedPositions != null && Robot != null)
+            Robot.ApplyJointState(savedNames, savedPositions);
         savedNames = null;
         savedPositions = null;
 

@@ -20,7 +20,7 @@ namespace Erupt.UiBindings
     public class ObstacleVerbBindings : MonoBehaviour
     {
         [SerializeField] private TierUiRig rig;
-        [SerializeField] private SelectionManager selectionManager;
+        [SerializeField] private SelectionService selection;
         [SerializeField] private EnvironmentRegistry registry;
 
         [Tooltip("Offset applied to a duplicated obstacle, matching the wrist menu's behaviour.")]
@@ -35,7 +35,7 @@ namespace Erupt.UiBindings
                 return;
             }
 
-            if (selectionManager == null) selectionManager = FindFirstObjectByType<SelectionManager>();
+            if (selection == null) selection = FindFirstObjectByType<SelectionService>();
             if (registry == null) registry = FindFirstObjectByType<EnvironmentRegistry>();
 
             BindObstacleVerbs();
@@ -52,7 +52,7 @@ namespace Erupt.UiBindings
                 if (target == null) return;
 
                 undo.Do(new DeleteObstacleCommand(target, PrimitiveTypeOf(target), registry));
-                selectionManager?.ClearSelection();
+                selection?.ClearSelection();
             });
 
             menu.Bind("duplicate", selectable =>
@@ -66,7 +66,7 @@ namespace Erupt.UiBindings
 
                 var create = new CreateObstacleCommand(snapshot, registry);
                 undo.Do(create);
-                selectionManager?.SetSelectedObject(create.Spawned);
+                if (selection != null) selection.Select(SelectableMarker.Ensure(create.Spawned, SelectionKind.Obstacle));
             });
 
             menu.Bind("snap", selectable =>

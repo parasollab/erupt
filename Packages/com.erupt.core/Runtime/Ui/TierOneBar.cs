@@ -20,10 +20,20 @@ namespace Erupt.Ui
         [SerializeField] private ModeManager modes;
         [SerializeField] private Vector2 buttonSize = new(160f, 72f);
 
-        private readonly UndoStack undoStack = new();
+        private UndoStack undoStack;
 
         public UiTierRegistry Registry { get; } = new();
-        public UndoStack UndoStack => undoStack;
+        public UndoStack UndoStack => undoStack ??= new UndoStack();
+
+        /// <summary>
+        /// Hand the bar the app's command history before it builds (the plugin host owns
+        /// it; the bar only renders undo/redo). After Build this is a no-op.
+        /// </summary>
+        public void UseUndoStack(UndoStack stack)
+        {
+            if (Canvas != null || stack == null) return;
+            undoStack = stack;
+        }
         public Canvas Canvas { get; private set; }
 
         public ModeIndicatorControl Mode { get; private set; }
@@ -60,8 +70,8 @@ namespace Erupt.Ui
             Registry.RegisterTierOne(Voice);
 
             Mode.Initialise(modes, modeButton);
-            Undo.Initialise(undoStack, undoButton);
-            Redo.Initialise(undoStack, redoButton);
+            Undo.Initialise(UndoStack, undoButton);
+            Redo.Initialise(UndoStack, redoButton);
         }
     }
 }

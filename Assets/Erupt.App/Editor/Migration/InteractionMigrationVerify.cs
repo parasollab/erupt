@@ -30,9 +30,9 @@ namespace Erupt.Interaction.EditorTools
             var binding = roots.SelectMany(r => r.GetComponentsInChildren<RobotInteractionRouterBinding>(true)).FirstOrDefault();
             Check(sb, "robot binding present", binding != null, "missing");
 
-            var selection = roots.SelectMany(r => r.GetComponentsInChildren<SelectionManager>(true)).FirstOrDefault();
+            var selection = roots.SelectMany(r => r.GetComponentsInChildren<SelectionRouterBinding>(true)).FirstOrDefault();
             Check(sb, "selection uses router", selection != null &&
-                new SerializedObject(selection).FindProperty("interactionRouter").objectReferenceValue != null, "not assigned");
+                new SerializedObject(selection).FindProperty("router").objectReferenceValue != null, "no SelectionRouterBinding with a router");
 
             var wrist = roots.SelectMany(r => r.GetComponentsInChildren<WristMenuController>(true)).FirstOrDefault();
             Check(sb, "wrist menu uses router", wrist != null &&

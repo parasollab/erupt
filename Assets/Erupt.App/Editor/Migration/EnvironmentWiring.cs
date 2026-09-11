@@ -66,7 +66,7 @@ namespace Erupt.Interaction.EditorTools
 
             // --- Consumers that used to hold the listener now hold the registry
             Assign<AttachedCollisionObjectListener>(roots, "registry", registry);
-            Assign<MTCTrajectoryPlayer>(roots, "registry", registry);
+            Assign<MtcSolutionPlayer>(roots, "registry", registry);
             Assign<ObstacleVerbBindings>(roots, "registry", registry);
             Assign<WristMenuController>(roots, "registry", registry);
 
@@ -100,8 +100,8 @@ namespace Erupt.Interaction.EditorTools
             Check(sb, "listener references the registry",
                 registry != null && listener != null && new SerializedObject(listener).FindProperty("registry").objectReferenceValue == registry, "not assigned");
 
-            var player = roots.SelectMany(r => r.GetComponentsInChildren<MTCTrajectoryPlayer>(true)).FirstOrDefault();
-            Check(sb, "MTCTrajectoryPlayer references the registry",
+            var player = roots.SelectMany(r => r.GetComponentsInChildren<MtcSolutionPlayer>(true)).FirstOrDefault();
+            Check(sb, "MtcSolutionPlayer references the registry",
                 registry != null && player != null && new SerializedObject(player).FindProperty("registry").objectReferenceValue == registry, "not assigned");
 
             int missing = roots.SelectMany(r => r.GetComponentsInChildren<Transform>(true))

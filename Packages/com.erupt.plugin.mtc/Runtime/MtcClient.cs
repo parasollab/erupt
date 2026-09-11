@@ -7,9 +7,13 @@ using Unity.Robotics.ROSTCPConnector;
 using RosMessageTypes.MoveitTaskConstructorMsgs;
 using RosMessageTypes.Moveit;
 
-public class MTCDataManager : MonoBehaviour
+/// <summary>
+/// MTC introspection (/description, /statistics, /solution), solution cache and the
+/// /execute_task_solution action client. Plain component: the bus is injected by
+/// <see cref="MtcPlugin"/> (or defaults to <see cref="RosBus.Instance"/> at Start).
+/// </summary>
+public class MtcClient : MonoBehaviour
 {
-    public static MTCDataManager Instance { get; private set; }
 
     public string CurrentTaskId { get; private set; }
     public TaskDescriptionMsg LastDescription { get; private set; }
@@ -45,15 +49,19 @@ public class MTCDataManager : MonoBehaviour
     public bool IsExecuting => activeExecutionGoal != null;
     public event Action<ExecuteTaskSolutionFeedback> OnExecutionFeedback;
 
-    void Awake()
+    private bool started;
+
+    /// <summary>Use this bus instead of <see cref="RosBus.Instance"/>. Must be called before Start.</summary>
+    public void Initialise(IRosBus bus)
     {
-        if (Instance != null && Instance != this) { Destroy(gameObject); return; }
-        Instance = this;
+        if (started) throw new InvalidOperationException("MtcClient already started; initialise before Start.");
+        ros = bus;
     }
 
     void Start()
     {
-        ros = RosBus.Instance;
+        started = true;
+        ros ??= RosBus.Instance;
         ros.Subscribe<TaskDescriptionMsg>("/description", OnDescription);
         ros.Subscribe<TaskStatisticsMsg>("/statistics", OnStatistics);
         ros.Subscribe<SolutionMsg>("/solution", OnSolution);
@@ -247,7 +255,7 @@ public class MTCDataManager : MonoBehaviour
         if (svcName == registeredServiceName) return;
         ros.RegisterRosService<GetSolutionRequest, GetSolutionResponse>(svcName);
         registeredServiceName = svcName;
-        Debug.Log($"[MTCDataManager] Registered service {svcName}");
+        Debug.Log($"[MtcClient] Registered service {svcName}");
     }
 
     public void FetchSolution(uint solutionId, Action<SolutionMsg> callback)
@@ -256,7 +264,7 @@ public class MTCDataManager : MonoBehaviour
 
         if (string.IsNullOrEmpty(registeredServiceName))
         {
-            Debug.LogWarning("[MTCDataManager] No task id yet — cannot fetch solution.");
+            Debug.LogWarning("[MtcClient] No task id yet — cannot fetch solution.");
             return;
         }
 
@@ -275,6 +283,5 @@ public class MTCDataManager : MonoBehaviour
     {
         if (executionClient != null)
             executionClient.StateChanged -= OnActionClientStateChanged;
-        if (Instance == this) Instance = null;
     }
 }

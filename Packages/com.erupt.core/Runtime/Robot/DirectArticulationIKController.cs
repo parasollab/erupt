@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
 
-public class DirectArticulationIKController : MonoBehaviour
+public class DirectArticulationIKController : MonoBehaviour, Erupt.Robot.IRobotModel
 {
     [System.Serializable]
     public struct JointInitialPosition
@@ -42,6 +42,7 @@ public class DirectArticulationIKController : MonoBehaviour
     private readonly List<float> heldJointPositions = new List<float>();
     private bool isInteracting;
 
+    public Transform Root => robotRoot;
     public Transform EndEffector => endEffector;
     public IReadOnlyList<string> JointNames => jointNames;
     public IReadOnlyList<ArticulationBody> Joints => joints;

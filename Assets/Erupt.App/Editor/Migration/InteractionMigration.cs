@@ -119,18 +119,10 @@ namespace Erupt.Interaction.EditorTools
 
         private static void BindSelection(GameObject[] roots, InteractionRouter router)
         {
-            var selection = Find<SelectionManager>(roots);
-            if (selection == null) { Line("selection: NOT FOUND"); return; }
-
-            var so = new SerializedObject(selection);
-            so.FindProperty("interactionRouter").objectReferenceValue = router;
-
-            // Pre-refactor this was bound to XRI Right Interaction/SelectObject — right
-            // trigger only. Routing both controllers would silently widen it.
-            so.FindProperty("selectionSourceId").stringValue = "right";
-            so.ApplyModifiedPropertiesWithoutUndo();
-
-            Line($"selection: router assigned on '{selection.name}', sourceId scoped to \"right\"");
+            // Plugin refactor Phase 2 merged SelectionManager into SelectionService +
+            // SelectionRouterBinding (on the ERUPT root); the router-scoped, right-hand-only
+            // selection flag is retired. Nothing to bind here any more.
+            Line("selection: handled by SelectionRouterBinding on the ERUPT root (plugin refactor Phase 2)");
         }
 
         private static void BindWristMenu(GameObject[] roots, InteractionRouter router,

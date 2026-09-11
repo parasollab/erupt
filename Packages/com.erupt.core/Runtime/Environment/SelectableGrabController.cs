@@ -2,16 +2,18 @@ using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
 using UnityEngine.XR.Interaction.Toolkit;
 using System.Collections;
+using Erupt.Interaction;
 
 /// <summary>
 /// Controls whether an object can be grabbed based on its selection state.
-/// Objects can only be grabbed when they are selected through the SelectionManager.
+/// Objects can only be grabbed when they are the current SelectionService selection.
 /// Once actively grabbed by an XRI interactor, the interactable stays enabled until
-/// the grab is released, even if SelectionManager clears the selection.
+/// the grab is released, even if the selection is cleared.
 /// </summary>
 public class SelectableGrabController : MonoBehaviour
 {
     private XRGrabInteractable grabInteractable;
+    private SelectionService selection;
     private bool isSelected = false;
     private bool isGrabbed = false;
 
@@ -28,11 +30,8 @@ public class SelectableGrabController : MonoBehaviour
         grabInteractable.selectExited.AddListener(OnGrabExited);
 
         // Subscribe to selection events
-        if (SelectionManager.Instance != null)
-        {
-            SelectionManager.Instance.OnObjectSelected += OnObjectSelected;
-            SelectionManager.Instance.OnSelectionCleared += OnSelectionCleared;
-        }
+        selection = FindFirstObjectByType<SelectionService>();
+        if (selection != null) selection.SelectionChanged += OnSelectionChanged;
 
         // Check if this object is already selected (important for newly created objects)
         // Use coroutine to ensure all components are initialized
@@ -48,25 +47,14 @@ public class SelectableGrabController : MonoBehaviour
 
     void CheckInitialSelectionState()
     {
-        if (SelectionManager.Instance != null && SelectionManager.Instance.SelectedObject == gameObject)
-        {
-            isSelected = true;
-        }
-        else
-        {
-            isSelected = false;
-        }
+        isSelected = IsCurrent();
         UpdateGrabState();
     }
 
     void OnDestroy()
     {
         // Unsubscribe from events to prevent memory leaks
-        if (SelectionManager.Instance != null)
-        {
-            SelectionManager.Instance.OnObjectSelected -= OnObjectSelected;
-            SelectionManager.Instance.OnSelectionCleared -= OnSelectionCleared;
-        }
+        if (selection != null) selection.SelectionChanged -= OnSelectionChanged;
         if (grabInteractable != null)
         {
             grabInteractable.selectEntered.RemoveListener(OnGrabEntered);
@@ -86,17 +74,13 @@ public class SelectableGrabController : MonoBehaviour
         UpdateGrabState();
     }
 
-    void OnObjectSelected(GameObject selectedObject)
+    void OnSelectionChanged(ISelectable current)
     {
-        isSelected = (selectedObject == gameObject);
+        isSelected = current != null && current.GameObject == gameObject;
         UpdateGrabState();
     }
 
-    void OnSelectionCleared()
-    {
-        isSelected = false;
-        UpdateGrabState();
-    }
+    bool IsCurrent() => selection != null && selection.Current != null && selection.Current.GameObject == gameObject;
 
     void UpdateGrabState()
     {
@@ -110,8 +94,7 @@ public class SelectableGrabController : MonoBehaviour
     // Public method to force update grab state (useful for external calls)
     public void RefreshGrabState()
     {
-        isSelected = SelectionManager.Instance != null &&
-                    SelectionManager.Instance.SelectedObject == gameObject;
+        isSelected = IsCurrent();
         UpdateGrabState();
     }
 }

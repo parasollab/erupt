@@ -15,7 +15,8 @@
         "Erupt.App",
         "Unity.InputSystem",
         "Unity.XR.Interaction.Toolkit",
-        "Unity.XR.CoreUtils"
+        "Unity.XR.CoreUtils",
+        "Erupt.Plugins"
     ],
     "includePlatforms": [
         "Editor"

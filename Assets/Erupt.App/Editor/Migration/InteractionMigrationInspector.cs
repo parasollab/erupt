@@ -19,7 +19,7 @@ namespace Erupt.Interaction.EditorTools
             foreach (var root in scene.GetRootGameObjects())
             {
                 Report<Quest3RobotInteractionController>(root, "ROBOT", sb);
-                Report<SelectionManager>(root, "SELECTION", sb);
+                Report<SelectionHighlighter>(root, "SELECTION", sb);
                 Report<WristMenuController>(root, "WRIST", sb);
                 Report<DirectArticulationIKController>(root, "IK", sb);
             }

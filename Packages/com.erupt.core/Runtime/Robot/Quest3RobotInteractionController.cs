@@ -19,6 +19,10 @@ public class Quest3RobotInteractionController : MonoBehaviour
     [Header("Link Grabbing")]
     [SerializeField] private bool allowLinkGrabbing = true;
 
+    [Header("Selection")]
+    [Tooltip("Robot-link and end-effector selections are published here so tier 2 can offer their verbs. Found in the scene if empty.")]
+    [SerializeField] private SelectionService selectionService;
+
     private ArticulationBody selectedJoint;
     private Renderer[] selectedRenderers;
     private Color[] originalColors;
@@ -46,6 +50,49 @@ public class Quest3RobotInteractionController : MonoBehaviour
         if (handle != null && handleRenderer == null)
             handleRenderer = handle.GetComponentInChildren<Renderer>();
         SetHandleActive(false);
+        if (selectionService == null) selectionService = FindFirstObjectByType<SelectionService>();
+        if (selectionService != null) selectionService.SelectionChanged += OnServiceSelectionChanged;
+        MarkEndEffector();
+    }
+
+    // --- Typed selection (Guidelines Part 2: tier 2 keys off the selected kind) ------
+
+    private readonly Dictionary<ArticulationBody, SelectableMarker> markerByJoint = new();
+
+    private void MarkEndEffector()
+    {
+        if (handle != null) SelectableMarker.Ensure(handle.gameObject, SelectionKind.EndEffector, "End Effector");
+    }
+
+    private SelectableMarker MarkerFor(ArticulationBody joint)
+    {
+        if (joint == null) return null;
+        if (!markerByJoint.TryGetValue(joint, out var marker) || marker == null)
+        {
+            marker = SelectableMarker.Ensure(joint.gameObject, SelectionKind.RobotLink, joint.name);
+            markerByJoint[joint] = marker;
+        }
+        return marker;
+    }
+
+    private bool OwnsSelection(ISelectable s) =>
+        s is SelectableMarker m && (m.Kind == SelectionKind.RobotLink || m.Kind == SelectionKind.EndEffector);
+
+    // Another kind was selected elsewhere (an obstacle): drop the joint tint without
+    // touching the service again.
+    private void OnServiceSelectionChanged(ISelectable current)
+    {
+        if (current == null || !OwnsSelection(current))
+        {
+            if (selectedJoint != null) ClearJointHighlight();
+            return;
+        }
+        if (current is SelectableMarker m && m.Kind == SelectionKind.RobotLink)
+        {
+            var joint = m.GetComponent<ArticulationBody>();
+            if (joint != null && joint != selectedJoint && ikController != null && ikController.CanControlJoint(joint))
+                SelectJoint(joint);
+        }
     }
 
     public void Configure(DirectArticulationIKController controller, Transform toolTransform, Transform handleTransform)
@@ -55,6 +102,7 @@ public class Quest3RobotInteractionController : MonoBehaviour
         handle = handleTransform;
         handleRenderer = handle != null ? handle.GetComponentInChildren<Renderer>() : null;
         SetHandleActive(false);
+        MarkEndEffector();
         EnsureJointHandles();
     }
 
@@ -76,8 +124,10 @@ public class Quest3RobotInteractionController : MonoBehaviour
     {
         if (handle != null && (hit.transform == handle || hit.transform.IsChildOf(handle)))
         {
-            ClearSelection();
+            ClearJointHighlight();
             SetHandleActive(true);
+            // The end effector is a selection kind of its own (set-goal lives on it).
+            selectionService?.Select(SelectableMarker.Ensure(handle.gameObject, SelectionKind.EndEffector, "End Effector"));
             return;
         }
 
@@ -253,8 +303,9 @@ public class Quest3RobotInteractionController : MonoBehaviour
             return;
         }
 
-        ClearSelection();
+        ClearJointHighlight();
         selectedJoint = joint;
+        selectionService?.Select(MarkerFor(joint));
         selectedRenderers = preferredRenderer != null
             ? new[] { preferredRenderer }
             : selectedJoint.GetComponentsInChildren<Renderer>();
@@ -269,6 +320,13 @@ public class Quest3RobotInteractionController : MonoBehaviour
     }
 
     private void ClearSelection()
+    {
+        ClearJointHighlight();
+        if (selectionService != null && OwnsSelection(selectionService.Current))
+            selectionService.ClearSelection();
+    }
+
+    private void ClearJointHighlight()
     {
         if (selectedRenderers != null && originalColors != null)
         {
@@ -393,6 +451,8 @@ public class Quest3RobotInteractionController : MonoBehaviour
             if (handleRenderer != null && handleRenderer.sharedMaterial != null)
                 sphereRenderer.material = new Material(handleRenderer.sharedMaterial);
             SetColor(sphereRenderer.material, jointHandleColor);
+            SelectableMarker.Ensure(sphere, SelectionKind.RobotLink, joint.name);
+            MarkerFor(joint);
             jointByHandle.Add(sphere.transform, joint);
             jointHandles.Add(sphere);
         }
@@ -409,6 +469,7 @@ public class Quest3RobotInteractionController : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (selectionService != null) selectionService.SelectionChanged -= OnServiceSelectionChanged;
         foreach (GameObject sphere in jointHandles)
         {
             if (sphere != null) Destroy(sphere);

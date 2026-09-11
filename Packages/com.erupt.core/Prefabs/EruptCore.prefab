@@ -1,0 +1,142 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &2271841663759161846
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 552018154550207383}
+  - component: {fileID: 2105062845083260536}
+  - component: {fileID: 7612471598499163310}
+  - component: {fileID: 4262661313832939178}
+  - component: {fileID: 3337568076177267331}
+  - component: {fileID: 1258451728946425108}
+  - component: {fileID: 3117733394962076456}
+  - component: {fileID: 3575828963327804693}
+  m_Layer: 0
+  m_Name: EruptCore
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &552018154550207383
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2271841663759161846}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2105062845083260536
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2271841663759161846}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8721ac1314fe433faf33f854172dbe9b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Erupt.Plugins::Erupt.Plugins.PluginHost
+  robot: {fileID: 0}
+  environment: {fileID: 3117733394962076456}
+  selection: {fileID: 7612471598499163310}
+  modes: {fileID: 1258451728946425108}
+  router: {fileID: 0}
+  ui: {fileID: 3575828963327804693}
+  discoverInScene: 1
+--- !u!114 &7612471598499163310
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2271841663759161846}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e2fbb80159847428f9051e1a4b436d4e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Erupt.Interaction.Core::Erupt.Interaction.SelectionService
+--- !u!114 &4262661313832939178
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2271841663759161846}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 744929ff4c58145639ffcbecc0a4aebf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Erupt.Environment::SelectionHighlighter
+  selectionService: {fileID: 7612471598499163310}
+  highlightMaterial: {fileID: 0}
+--- !u!114 &3337568076177267331
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2271841663759161846}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d2fa76ae06c942589b2f06c0552cc3c4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Erupt.Interaction.Core::Erupt.Interaction.SelectionRouterBinding
+  router: {fileID: 0}
+  selectionService: {fileID: 7612471598499163310}
+  legacyTag: Selectable
+--- !u!114 &1258451728946425108
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2271841663759161846}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 01f6b273c32644696b296b381236e06e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Erupt.Interaction.Core::Erupt.Interaction.ModeManager
+  initialMode: 0
+--- !u!114 &3117733394962076456
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2271841663759161846}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 013b3b9d44674f8dbe0233c58f19e882, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Erupt.Environment::Erupt.Environment.EnvironmentRegistry
+  worldOrigin: {fileID: 0}
+--- !u!114 &3575828963327804693
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2271841663759161846}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0ee013783f7304b52835434349b9ed87, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Erupt.Ui::Erupt.Ui.TierUiRig
+  useTierUi: 0
+  legacyMenu: {fileID: 0}
+  tierOneAnchor: {fileID: 0}
+  tierThreeAnchor: {fileID: 0}

@@ -3,9 +3,16 @@ using UnityEngine;
 using RosMessageTypes.Trajectory;
 using RosMessageTypes.BuiltinInterfaces;
 
-public class TrajectoryReplay : MonoBehaviour
+/// <summary>Plays a joint trajectory on the robot model, restoring the pose when stopped.</summary>
+public class JointTrajectoryPlayer : MonoBehaviour
 {
     [SerializeField] private DirectArticulationIKController ikController;
+    private Erupt.Robot.IRobotModel robot;
+
+    /// <summary>Use a robot other than the serialised controller (plugins inject the context's).</summary>
+    public void SetRobot(Erupt.Robot.IRobotModel model) => robot = model;
+    // Explicit null test: a missing serialised reference is a Unity fake null that ?? would keep.
+    private Erupt.Robot.IRobotModel Robot => robot ?? (ikController != null ? ikController : null);
 
     private bool isReplaying = false;
     private Coroutine replayRoutine;
@@ -20,7 +27,7 @@ public class TrajectoryReplay : MonoBehaviour
     {
         if (replayRoutine != null)
         {
-            Debug.LogWarning("[TrajectoryReplay] StartReplay ignored: already running.");
+            Debug.LogWarning("[JointTrajectoryPlayer] StartReplay ignored: already running.");
             return;
         }
         replayRoutine = StartCoroutine(RunReplay(trajectory));
@@ -63,14 +70,14 @@ public class TrajectoryReplay : MonoBehaviour
     {
         hasFinishedOneLoop = false;
 
-        if (ikController == null)
+        if (Robot == null)
         {
-            Debug.LogError("[TrajectoryReplay] ikController not assigned.");
+            Debug.LogError("[JointTrajectoryPlayer] ikController not assigned.");
             yield break;
         }
 
-        savedNames = ikController.GetJointStateNames();
-        savedPositions = ikController.GetJointStatePositions();
+        savedNames = Robot.GetJointStateNames();
+        savedPositions = Robot.GetJointStatePositions();
 
         isReplaying = true;
 
@@ -96,14 +103,14 @@ public class TrajectoryReplay : MonoBehaviour
         var points = trajectory.points;
         if (points == null || points.Length == 0)
         {
-            Debug.LogWarning("[TrajectoryReplay] Empty trajectory.");
+            Debug.LogWarning("[JointTrajectoryPlayer] Empty trajectory.");
             done?.Invoke(false);
             yield break;
         }
 
         string[] names = trajectory.joint_names;
 
-        ikController.ApplyJointState(names, points[0].positions);
+        Robot.ApplyJointState(names, points[0].positions);
 
         double prevTime = DurationToSeconds(points[0].time_from_start);
         double[] prevPos = points[0].positions;
@@ -113,7 +120,7 @@ public class TrajectoryReplay : MonoBehaviour
             double[] targetPos = points[i].positions;
             if (targetPos == null || targetPos.Length != names.Length)
             {
-                Debug.LogError("[TrajectoryReplay] Positions length mismatch.");
+                Debug.LogError("[JointTrajectoryPlayer] Positions length mismatch.");
                 done?.Invoke(false);
                 yield break;
             }
@@ -142,18 +149,18 @@ public class TrajectoryReplay : MonoBehaviour
             float t = Mathf.Clamp01(elapsed / duration);
             for (int j = 0; j < names.Length; j++)
                 lerped[j] = from[j] + (to[j] - from[j]) * t;
-            ikController.ApplyJointState(names, lerped);
+            Robot.ApplyJointState(names, lerped);
             yield return null;
         }
 
         if (isReplaying)
-            ikController.ApplyJointState(names, to);
+            Robot.ApplyJointState(names, to);
     }
 
     private void RestoreSavedPose()
     {
-        if (savedNames != null && savedPositions != null && ikController != null)
-            ikController.ApplyJointState(savedNames, savedPositions);
+        if (savedNames != null && savedPositions != null && Robot != null)
+            Robot.ApplyJointState(savedNames, savedPositions);
         savedNames = null;
         savedPositions = null;
     }

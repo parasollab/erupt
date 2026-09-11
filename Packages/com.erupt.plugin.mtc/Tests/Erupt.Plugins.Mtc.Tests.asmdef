@@ -11,7 +11,11 @@
         "Unity.Robotics.ROSTCPConnector",
         "Unity.Robotics.ROSTCPConnector.MessageGeneration",
         "Unity.Robotics.ROSTCPConnector.Messages",
-        "UnityEngine.TestRunner"
+        "UnityEngine.TestRunner",
+        "Erupt.Plugins",
+        "Erupt.Robot",
+        "Erupt.Environment",
+        "Erupt.Interaction.Core"
     ],
     "includePlatforms": [
         "Android",

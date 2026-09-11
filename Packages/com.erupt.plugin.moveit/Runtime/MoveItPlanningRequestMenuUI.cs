@@ -1,169 +1,88 @@
-using Erupt.Ros;
-using UnityEngine;
-using UnityEngine.UIElements;
-using Unity.Robotics.ROSTCPConnector;
-using RosMessageTypes.Moveit;
-using RosMessageTypes.Geometry;
-using RosMessageTypes.Std;
-using RosMessageTypes.BuiltinInterfaces;
-using RosMessageTypes.Trajectory;
-using RosMessageTypes.Sensor;
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using System;
+using UnityEngine;
+using UnityEngine.UIElements;
+using Erupt.Plugins;
 
+/// <summary>
+/// The legacy UI Toolkit planning panel, now a view over <see cref="MoveItPlugin"/>: it
+/// reads planner listings from the client, captures start/goal through the plugin, and
+/// drives plan / preview / execute. No ROS, no robot access. Retired in Phase 3 when the
+/// tier 3 planner tab replaces it.
+/// </summary>
 public class MoveItPlanningRequestMenuUI : MonoBehaviour
 {
-    [Header("Robot")]
-    [SerializeField] private DirectArticulationIKController ikController;
-    [SerializeField] private string jointStateTopic = "/joint_states";
-    [SerializeField] private string executeTrajectoryTopic = "/joint_trajectory_controller/joint_trajectory";
-
-    [Header("UI Toolkit")]
+    [Tooltip("Found in the scene if empty.")]
+    [SerializeField] private MoveItPlugin plugin;
     [SerializeField] private UIDocument uiDocument;
-    
-    [Header("MoveIt2 Configuration")]
-    [SerializeField] private string planningGroupName = "ur_manipulator";
-    [SerializeField] private string planningPipelineId = "ompl";
-    [SerializeField] private string defaultPlannerId = "ur_manipulator";
-    [SerializeField] private int defaultNumPlanningAttempts = 10;
-    [SerializeField] private float defaultAllowedPlanningTime = 5.0f;
-    [SerializeField] private double goalTolerance = 0.01;
-    
-    [Header("ROS 2 Topics")]
-    [SerializeField] private string motionPlanServiceName = "/plan_kinematic_path";
-    [SerializeField] private string displayTrajectoryTopic = "";
-
-    [Header("Planner Query Service")]
-    [SerializeField] private bool autoQueryPlanners = true;
-    [SerializeField] private string plannerQueryServiceName = "/query_planner_interface";
-
-    [Header("Ghost Robots")]
+    [Tooltip("Optional: start/goal ghosts, as the legacy panel showed them.")]
     [SerializeField] private SpawnGhosts ghostSpawner;
-    [SerializeField] private TrajectoryReplay trajectoryReplayer;
 
-    [Header("Joint Name Remapping")]
-    [Tooltip("Prefix in the incoming ROS joint_states topic (e.g. 'panda_')")]
-    [SerializeField] private string rosJointNamePrefix = "panda_";
-    [Tooltip("Prefix used by the Unity robot prefab joints (e.g. 'fr3_')")]
-    [SerializeField] private string unityJointNamePrefix = "fr3_";
-
-    // Robot
-    private DirectArticulationIKController robotController;
-    
-    // UI Elements
     private VisualElement root;
-    private Button setStartStateButton;
-    private Button setGoalStateButton;
-    private DropdownField plannerPipelineDropdown;
-    private DropdownField plannerDropdown;
+    private Button setStartStateButton, setGoalStateButton, planningRequestButton;
+    private Button stopReplayButton, executeTrajectoryButton, mirrorButton;
+    private DropdownField plannerPipelineDropdown, plannerDropdown;
     private IntegerField numPlanningAttemptsField;
     private FloatField allowedPlanningTimeField;
     private Label planningResultLabel;
-    private Button planningRequestButton;
-    private Button stopReplayButton;
-    private Button executeTrajectoryButton;
-    private Button mirrorButton;
-    private bool isMirroring = false;
-    private bool isReplaying = false;
 
-    // ROS Connection
-    private IRosBus ros;
-    private bool isConnected = false;
-
-    // Planning state
-    private bool startSet = false;
-    private bool goalSet = false;
-    private RobotStateMsg currentStartState;
-    private RobotStateMsg currentGoalState;
-    private bool hasStartState = false;
-    private bool hasGoalState = false;
-    private JointTrajectoryMsg lastPlannedTrajectory;
-    
-    // Planner querying
-    private bool isQueryingPlanners = false;
-    private Dictionary<string, string[]> pipelineToPlanners = new Dictionary<string, string[]>();
-    
-    // Parsed results for planner dropdowns
-    [Serializable]
-    public class PlannerListing
-    {
-        public string pipelineId;
-        public string[] plannerIds;
-    }
-    
-    public List<PlannerListing> PlannerResults = new List<PlannerListing>();
-    
-    // Hardcoded joint names for the UR5e - ideally this would be dynamic
-    public readonly string[] jointNames = new string[]
-    { "shoulder_pan_joint", "shoulder_lift_joint", "elbow_joint", "wrist_1_joint", "wrist_2_joint", "wrist_3_joint" };
-
-    private Dictionary<string, int> jointNameToIndex;
-
-    public readonly Tuple<float, float>[] jointLimits = new Tuple<float, float>[]
-    {
-        new Tuple<float, float>(-351f, 351f),  // shoulder_pan_joint
-        new Tuple<float, float>(-351f, 351f),  // shoulder_lift_joint
-        new Tuple<float, float>(-171f, 171f),  // elbow_joint
-        new Tuple<float, float>(-351f, 351f),  // wrist_1_joint
-        new Tuple<float, float>(-351f, 351f),  // wrist_2_joint
-        new Tuple<float, float>(-351f, 351f)   // wrist_3_joint
-    };
-
-    private void Awake()
-    {
-        if (ikController == null)
-        {
-            Debug.LogError("MoveItPlanningRequestMenuUI: ikController not assigned — drag the Robot IK Manager's DirectArticulationIKController here.");
-            return;
-        }
-
-        jointNameToIndex = new Dictionary<string, int>();
-        for (int i = 0; i < jointNames.Length; i++)
-        {
-            jointNameToIndex[jointNames[i]] = i;
-        }
-    }
+    private bool startSet, goalSet;
+    private PlanResult lastPlan;
+    private bool bound;
 
     private void OnEnable()
     {
-        if (uiDocument == null)
-            uiDocument = GetComponent<UIDocument>();
-
+        if (plugin == null) plugin = FindFirstObjectByType<MoveItPlugin>(FindObjectsInactive.Include);
+        if (uiDocument == null) uiDocument = GetComponent<UIDocument>();
         root = uiDocument?.rootVisualElement;
         if (root == null)
         {
             Debug.LogError("MoveItPlanningRequestMenuUI: No UIDocument/rootVisualElement found.");
             return;
         }
-
-        robotController = ikController;
+        if (plugin == null)
+        {
+            Debug.LogError("MoveItPlanningRequestMenuUI: No MoveItPlugin in the scene.");
+            return;
+        }
 
         InitializeUIElements();
         SetupEventHandlers();
-        InitializeROSConnection();
-
-        // Start planner querying immediately
-        StartPlannerQuerying();
+        BindPlugin();
     }
 
-    private void StartPlannerQuerying()
-    { 
-        // Register the service and start querying
-        if (ros != null)
-        {
-            ros.RegisterRosService<GetMotionPlanRequest, GetMotionPlanResponse>(motionPlanServiceName);
+    private void OnDisable() => UnbindPlugin();
 
-            if (!autoQueryPlanners) return;
-            ros.RegisterRosService<QueryPlannerInterfacesRequest, QueryPlannerInterfacesResponse>(plannerQueryServiceName);
+    private void BindPlugin()
+    {
+        if (bound) return;
+        bound = true;
+        plugin.PlanProduced += OnPlanProduced;
+        plugin.PlanFailed += OnPlanFailed;
+        if (plugin.Client != null) plugin.Client.PlannersUpdated += OnPlannersUpdated;
+        else StartCoroutine(BindClientWhenReady());
+    }
 
-            InvokeRepeating(nameof(TryQueryPlanners), 0.5f, 1.0f); // retry until it succeeds
-        }
+    private System.Collections.IEnumerator BindClientWhenReady()
+    {
+        while (plugin != null && plugin.Client == null) yield return null;
+        if (plugin?.Client == null) yield break;
+        plugin.Client.PlannersUpdated += OnPlannersUpdated;
+        if (plugin.Client.Planners.Count > 0) OnPlannersUpdated(plugin.Client.Planners);
+    }
+
+    private void UnbindPlugin()
+    {
+        if (!bound || plugin == null) return;
+        bound = false;
+        plugin.PlanProduced -= OnPlanProduced;
+        plugin.PlanFailed -= OnPlanFailed;
+        if (plugin.Client != null) plugin.Client.PlannersUpdated -= OnPlannersUpdated;
     }
 
     private void InitializeUIElements()
     {
-        // Get UI elements by name
         planningResultLabel = root.Q<Label>("planningResultLabel");
         setStartStateButton = root.Q<Button>("planningRequestSetStartButton");
         setGoalStateButton = root.Q<Button>("planningRequestSetGoalStateButton");
@@ -176,7 +95,6 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         executeTrajectoryButton = root.Q<Button>("planningRequestExecuteTrajectoryButton");
         mirrorButton = root.Q<Button>("mirrorJointStateButton");
 
-        // Validate UI elements
         if (setStartStateButton == null || setGoalStateButton == null ||
             plannerPipelineDropdown == null || plannerDropdown == null ||
             numPlanningAttemptsField == null || allowedPlanningTimeField == null ||
@@ -187,21 +105,17 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
             Debug.LogError("MoveItPlanningRequestMenuUI: One or more UI elements not found in UXML.");
             return;
         }
-        
-        // Initialize dropdowns with empty lists - will be populated by ROS
+
         plannerPipelineDropdown.choices = new List<string>();
         plannerPipelineDropdown.value = "";
         plannerDropdown.choices = new List<string>();
         plannerDropdown.value = "";
-        
-        // Set default values
-        numPlanningAttemptsField.value = defaultNumPlanningAttempts;
-        allowedPlanningTimeField.value = defaultAllowedPlanningTime;
 
+        var s = plugin.Settings;
+        numPlanningAttemptsField.value = s.defaultNumPlanningAttempts;
+        allowedPlanningTimeField.value = s.defaultAllowedPlanningTime;
         stopReplayButton.SetEnabled(false);
         executeTrajectoryButton.SetEnabled(false);
-
-        // Update button states
         UpdateButtonStates();
     }
 
@@ -209,568 +123,133 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     {
         setStartStateButton.clicked += OnSetStartStateClicked;
         setGoalStateButton.clicked += OnSetGoalStateClicked;
-
-        // Setup dropdown event handlers
         plannerPipelineDropdown.RegisterValueChangedCallback(OnPipelineSelectionChanged);
-
-        // Add planning request button
         planningRequestButton.clicked += SendPlanningRequest;
-
         stopReplayButton.clicked += () =>
         {
-            if (isReplaying)
-            {
-                StopPreview();
-            }
-            else if (!isReplaying)
-            {
-                PreviewTrajectory(lastPlannedTrajectory);
-
-            }
+            if (plugin.IsPreviewing) { plugin.StopPreview(); stopReplayButton.text = "Start Replay"; }
+            else if (lastPlan != null) { plugin.Preview(lastPlan); stopReplayButton.text = "Stop Replay"; }
         };
-
         mirrorButton.clicked += ToggleMirroring;
-        executeTrajectoryButton.clicked += ExectuteTrajectory;
+        executeTrajectoryButton.clicked += ExecuteTrajectory;
     }
 
-    private void OnPipelineSelectionChanged(ChangeEvent<string> evt)
+    // Callbacks may arrive off the panel's schedule; hop onto it.
+    private void UI(Action a)
     {
-        string selectedPipeline = evt.newValue;
-        planningPipelineId = selectedPipeline;
-
-        if (pipelineToPlanners.TryGetValue(selectedPipeline, out var planners))
-        {
-            plannerDropdown.choices = planners.ToList();
-            var pick = planners.Contains(defaultPlannerId) ? defaultPlannerId :
-                       planners.Length > 0 ? planners[0] : "";
-            plannerDropdown.SetValueWithoutNotify(pick);
-        }
-        else
-        {
-            plannerDropdown.choices = new List<string>();
-            plannerDropdown.SetValueWithoutNotify("");
-        }
+        if (root != null) root.schedule.Execute(() => a()).ExecuteLater(0);
+        else a();
     }
 
-    private void TryQueryPlanners()
+    private void OnPlannersUpdated(IReadOnlyList<PlannerListing> planners)
     {
-        if (isQueryingPlanners) return;
-        if (ros == null || !ros.HasConnectionThread)
-        {
-            Debug.LogWarning("[MoveIt] Waiting for ROS-TCP connection...");
-            return;
-        }
-
-        isQueryingPlanners = true;
-        var req = new QueryPlannerInterfacesRequest();
-        try
-        {
-            ros.SendServiceMessage<QueryPlannerInterfacesResponse>(
-                plannerQueryServiceName, req,
-                OnPlannerQueryResponse
-            );
-        }
-        catch (Exception e)
-        {
-            isQueryingPlanners = false;
-            Debug.LogError($"[MoveIt] Service call failed: {e.GetType().Name}: {e.Message}");
-        }
-    }
-
-    // Call this whenever you update UI from a callback/thread.
-    void UI(Action a)
-    {
-        // Ensure we run on the UI panel's schedule (main thread, next frame)
-        if (root != null)
-            root.schedule.Execute(() => a()).ExecuteLater(0);
-        else
-            a();
-    }
-
-    private void OnPlannerQueryResponse(QueryPlannerInterfacesResponse resp)
-    {
-        isQueryingPlanners = false;
-        CancelInvoke(nameof(TryQueryPlanners));
-
-        if (resp == null || resp.planner_interfaces == null)
-        {
-            Debug.LogWarning("[MoveIt] Empty response from /query_planner_interface");
-            return;
-        }
-
-        PlannerResults.Clear();
-        pipelineToPlanners.Clear();
-
-        foreach (var desc in resp.planner_interfaces)
-        {
-            var pipeline = desc.pipeline_id ?? string.Empty;
-            var planners = desc.planner_ids ?? Array.Empty<string>();
-
-            PlannerResults.Add(new PlannerListing
-            {
-                pipelineId = pipeline,
-                plannerIds = planners
-            });
-
-            pipelineToPlanners[pipeline] = planners;
-        }
-
         UI(() =>
         {
-            // 1) Update pipeline dropdown
-            var discoveredPipelines = pipelineToPlanners.Keys.ToList();
+            var pipelines = planners.Select(p => p.PipelineId).ToList();
+            plannerPipelineDropdown.choices = pipelines;
 
-            plannerPipelineDropdown.choices = discoveredPipelines;
-
-            // Pick a valid pipeline
-            string chosenPipeline = planningPipelineId;
-            if (!discoveredPipelines.Contains(chosenPipeline))
-                chosenPipeline = discoveredPipelines.Count > 0 ? discoveredPipelines[0] : "";
-
-            // IMPORTANT: Set without notify, then manually update planners
-            plannerPipelineDropdown.SetValueWithoutNotify(chosenPipeline);
-            planningPipelineId = chosenPipeline;
-
-            // 2) Update planner dropdown for the selected pipeline
-            if (!string.IsNullOrEmpty(chosenPipeline) && pipelineToPlanners.TryGetValue(chosenPipeline, out var planners))
-            {
-                plannerDropdown.choices = planners.ToList();
-                // If your default isn't in the list, pick the first one
-                var chosenPlanner = planners.Contains(defaultPlannerId) ? defaultPlannerId :
-                                    planners.Length > 0 ? planners[0] : "";
-                plannerDropdown.SetValueWithoutNotify(chosenPlanner);
-            }
-            else
-            {
-                plannerDropdown.choices = new List<string>();
-                plannerDropdown.SetValueWithoutNotify("");
-            }
+            string chosen = plugin.Settings.planningPipelineId;
+            if (!pipelines.Contains(chosen)) chosen = pipelines.Count > 0 ? pipelines[0] : "";
+            plannerPipelineDropdown.SetValueWithoutNotify(chosen);
+            FillPlanners(chosen);
         });
     }
 
-    private void InitializeROSConnection()
+    private void OnPipelineSelectionChanged(ChangeEvent<string> evt) => FillPlanners(evt.newValue);
+
+    private void FillPlanners(string pipeline)
     {
-        isConnected = false;
-
-        ros = RosBus.Instance;
-
-        if (ros == null)
-        {
-            Debug.LogError("MoveItPlanningRequestMenuUI: Failed to create ROS connection.");
-            return;
-        }
-
-        isConnected = true;
-
-        ros.RegisterPublisher<JointTrajectoryMsg>(executeTrajectoryTopic);
-
-        ros.Subscribe<JointStateMsg>(jointStateTopic, MirrorJointStates);
-
-        if (!string.IsNullOrEmpty(displayTrajectoryTopic))
-        {
-            ros.Subscribe<DisplayTrajectoryMsg>(displayTrajectoryTopic, DisplayTrajectory);
-        }
-    }
-
-    private void DisplayTrajectory(DisplayTrajectoryMsg trajectory)
-    {
-        if (isReplaying && trajectoryReplayer.HasFinishedOneLoop())
-            StopPreview();
-        else if (isReplaying)
-            return;
-        
-        lastPlannedTrajectory = trajectory.trajectory.Length > 0 ? trajectory.trajectory[0].joint_trajectory : null;
-        if (lastPlannedTrajectory != null)
-        {
-            PreviewTrajectory(lastPlannedTrajectory);
-        }
-    }
-
-    private void MirrorJointStates(JointStateMsg jointState)
-    {
-        if (!isMirroring) return;
-
-        if (robotController == null)
-        {
-            Debug.Log("MoveItPlanningRequestMenuUI: DirectArticulationIKController not assigned.");
-            return;
-        }
-
-        var sb = new System.Text.StringBuilder("MoveItPlanningRequestMenuUI: Mirror joints —");
-        for (int i = 0; i < jointState.name.Length; i++)
-            sb.Append($"\n  {jointState.name[i]}: {(i < jointState.position.Length ? jointState.position[i] : double.NaN):F4} rad");
-        Debug.Log(sb.ToString());
-
-        robotController.ApplyJointState(RemapJointNames(jointState.name), jointState.position);
-
-        string[] unityNames = robotController.GetJointStateNames();
-        float[] unityPositions = robotController.GetJointStatePositions();
-        var sb2 = new System.Text.StringBuilder("MoveItPlanningRequestMenuUI: Unity joint state after apply —");
-        for (int i = 0; i < unityNames.Length; i++)
-            sb2.Append($"\n  {unityNames[i]}: {(i < unityPositions.Length ? unityPositions[i] : float.NaN):F4} rad");
-        Debug.Log(sb2.ToString());
-    }
-
-    private string[] RemapJointNames(string[] rosNames)
-    {
-        if (string.IsNullOrEmpty(rosJointNamePrefix) || rosJointNamePrefix == unityJointNamePrefix)
-            return rosNames;
-
-        string[] remapped = new string[rosNames.Length];
-        for (int i = 0; i < rosNames.Length; i++)
-        {
-            remapped[i] = rosNames[i].StartsWith(rosJointNamePrefix)
-                ? unityJointNamePrefix + rosNames[i].Substring(rosJointNamePrefix.Length)
-                : rosNames[i];
-        }
-        return remapped;
-    }
-
-    private string[] RemapJointNamesToRos(string[] unityNames)
-    {
-        if (string.IsNullOrEmpty(unityJointNamePrefix) || rosJointNamePrefix == unityJointNamePrefix)
-            return unityNames;
-
-        string[] remapped = new string[unityNames.Length];
-        for (int i = 0; i < unityNames.Length; i++)
-        {
-            remapped[i] = unityNames[i].StartsWith(unityJointNamePrefix)
-                ? rosJointNamePrefix + unityNames[i].Substring(unityJointNamePrefix.Length)
-                : unityNames[i];
-        }
-        return remapped;
+        string[] planners = plugin.Client?.PlannersFor(pipeline) ?? Array.Empty<string>();
+        plannerDropdown.choices = planners.ToList();
+        string def = plugin.Settings.defaultPlannerId;
+        plannerDropdown.SetValueWithoutNotify(planners.Contains(def) ? def : planners.Length > 0 ? planners[0] : "");
     }
 
     private void ToggleMirroring()
     {
-        isMirroring = !isMirroring;
-        mirrorButton.text = isMirroring ? "Stop Mirroring" : "Mirror Joint States";
-        Debug.Log($"MoveItPlanningRequestMenuUI: Mirroring {(isMirroring ? "enabled" : "disabled")}.");
-        if (isMirroring && robotController != null)
-            robotController.LogJointDriveLimits();
+        if (plugin.Client == null) return;
+        bool on = !plugin.Client.IsMirroring;
+        plugin.Client.SetMirroring(on);
+        mirrorButton.text = on ? "Stop Mirroring" : "Mirror Joint States";
     }
 
     private void OnSetStartStateClicked()
     {
-        if (!startSet)
-        {
-            ghostSpawner.SpawnStartGhost();
-            startSet = true;
-        }
-        else
-        {
-            ghostSpawner.UpdateStartGhost();
-        }
-
-        if (!isConnected)
-        {
-            Debug.LogWarning("MoveItPlanningRequestMenuUI: ROS connection not available.");
-            return;
-        }
-
-        // Get current robot state (this would typically come from the robot or simulation)
-        currentStartState = GetCurrentRobotState();
-        hasStartState = true;
-
+        if (ghostSpawner != null) { if (!startSet) ghostSpawner.SpawnStartGhost(); else ghostSpawner.UpdateStartGhost(); }
+        startSet = true;
+        plugin.SetStartFromRobot();
         UpdateButtonStates();
     }
 
     private void OnSetGoalStateClicked()
     {
-        if (!goalSet)
-        {
-            ghostSpawner.SpawnGoalGhost();
-            goalSet = true;
-        }
-        else
-        {
-            ghostSpawner.UpdateGoalGhost();
-        }
-
-        if (!isConnected)
-        {
-            Debug.LogWarning("MoveItPlanningRequestMenuUI: ROS connection not available.");
-            return;
-        }
-        
-        // Get goal state (this could be from user interaction, predefined poses, etc.)
-        currentGoalState = GetGoalRobotState();
-        hasGoalState = true;
-        
+        if (ghostSpawner != null) { if (!goalSet) ghostSpawner.SpawnGoalGhost(); else ghostSpawner.UpdateGoalGhost(); }
+        goalSet = true;
+        plugin.SetGoalFromRobot();
         UpdateButtonStates();
     }
 
     public void SendPlanningRequest()
     {
-        if (!isConnected)
+        if (!plugin.HasStart || !plugin.HasGoal)
         {
-            Debug.LogWarning("MoveItPlanningRequestMenuUI: ROS 2 connection not available.");
+            planningResultLabel.text = "Set both start and goal states before planning.";
             return;
         }
-        
-        if (!hasStartState || !hasGoalState)
-        {
-            Debug.LogWarning("MoveItPlanningRequestMenuUI: Both start and goal states must be set before planning.");
-            return;
-        }
-        
-        // Get the selected planner from the dropdown
-        string selectedPlanner = plannerDropdown.value;
-        if (autoQueryPlanners && string.IsNullOrEmpty(selectedPlanner))
-        {
-            Debug.LogWarning("MoveItPlanningRequestMenuUI: No planner selected.");
-            return;
-        }
-
-        // Disable replay button until we have a new trajectory
-        StopPreview();
         stopReplayButton.SetEnabled(false);
         executeTrajectoryButton.SetEnabled(false);
-        
-        var planningRequest = CreateMotionPlanRequest();
-        GetMotionPlanRequest motionPlanRequest = new GetMotionPlanRequest(planningRequest);
-        ros.SendServiceMessage<GetMotionPlanResponse>(
-            motionPlanServiceName, motionPlanRequest,
-            OnMotionPlanResponse
-        );
 
-        Debug.Log($"MoveItPlanningRequestMenuUI: ROS 2 planning request sent with planner: {selectedPlanner}");
+        plugin.RequestPlan(new PlanPreferences
+        {
+            PipelineId = plannerPipelineDropdown.value,
+            PlannerId = plannerDropdown.value,
+            Attempts = numPlanningAttemptsField.value,
+            AllowedTimeSeconds = allowedPlanningTimeField.value
+        }, _ => { });
     }
 
-    private MotionPlanRequestMsg CreateMotionPlanRequest()
+    private void OnPlanProduced(PlanResult plan)
     {
-        var request = new MotionPlanRequestMsg
+        UI(() =>
         {
-            workspace_parameters = new WorkspaceParametersMsg(),
-            start_state = currentStartState,
-            goal_constraints = CreateGoalConstraints(),
-            path_constraints = new ConstraintsMsg(),
-            trajectory_constraints = new TrajectoryConstraintsMsg(),
-            reference_trajectories = new GenericTrajectoryMsg[0],
-            pipeline_id = planningPipelineId,
-            planner_id = plannerDropdown.value, // Use the selected planner from dropdown
-            group_name = planningGroupName,
-            num_planning_attempts = numPlanningAttemptsField.value,
-            allowed_planning_time = allowedPlanningTimeField.value,
-            max_velocity_scaling_factor = 1.0,
-            max_acceleration_scaling_factor = 1.0,
-            cartesian_speed_limited_link = "",
-            max_cartesian_speed = 0.0
-        };
-        
-        return request;
+            lastPlan = plan;
+            int points = plan.Trajectory?.points?.Length ?? 0;
+            planningResultLabel.text = $"Planning successful! Time: {plan.PlanningTimeSeconds}s, Waypoints: {points}";
+            plugin.Preview(plan);
+            stopReplayButton.text = "Stop Replay";
+            stopReplayButton.SetEnabled(true);
+            executeTrajectoryButton.SetEnabled(true);
+        });
     }
 
-    private ConstraintsMsg[] CreateGoalConstraints()
+    private void OnPlanFailed(string message)
     {
-        // Create goal constraints based on the goal state
-        // This is a simplified version - you might want to create more specific constraints
-        var constraints = new ConstraintsMsg
+        UI(() =>
         {
-            name = "goal_constraints",
-            joint_constraints = CreateJointConstraints(currentGoalState),
-            position_constraints = new PositionConstraintMsg[0],
-            orientation_constraints = new OrientationConstraintMsg[0],
-            visibility_constraints = new VisibilityConstraintMsg[0]
-        };
-        
-        return new ConstraintsMsg[] { constraints };
-    }
-
-    private JointConstraintMsg[] CreateJointConstraints(RobotStateMsg robotState)
-    {
-        if (robotState?.joint_state?.name == null || robotState.joint_state.position == null)
-            return new JointConstraintMsg[0];
-        
-        var constraints = new List<JointConstraintMsg>();
-        
-        for (int i = 0; i < robotState.joint_state.name.Length; i++)
-        {
-            if (i < robotState.joint_state.position.Length)
-            {
-                var constraint = new JointConstraintMsg
-                {
-                    joint_name = robotState.joint_state.name[i],
-                    position = robotState.joint_state.position[i],
-                    tolerance_above = goalTolerance,
-                    tolerance_below = goalTolerance,
-                    weight = 1.0
-                };
-                constraints.Add(constraint);
-            }
-        }
-        
-        return constraints.ToArray();
-    }
-
-    private RobotStateMsg GetRobotStateMsgFromController()
-    {
-        if (robotController == null) return new RobotStateMsg();
-
-        string[] names = RemapJointNamesToRos(robotController.GetJointStateNames());
-        float[] positionsF = robotController.GetJointStatePositions();
-        double[] positions = Array.ConvertAll(positionsF, p => (double)p);
-        double[] zeros = new double[names.Length];
-
-        var sb = new System.Text.StringBuilder("[MoveIt] Robot state being sent:\n");
-        for (int i = 0; i < names.Length; i++)
-            sb.AppendLine($"  {names[i]}: {positions[i]:F4} rad");
-        Debug.Log(sb.ToString());
-
-        return new RobotStateMsg
-        {
-            joint_state = new JointStateMsg
-            {
-                header = new HeaderMsg
-                {
-                    frame_id = "base_link",
-                    stamp = new TimeMsg
-                    {
-                        sec = (int)Time.time,
-                        nanosec = (uint)((Time.time - (int)Time.time) * 1e9)
-                    }
-                },
-                name = names,
-                position = positions,
-                velocity = zeros,
-                effort = zeros
-            },
-            multi_dof_joint_state = new MultiDOFJointStateMsg()
-        };
-    }
-
-    private RobotStateMsg GetCurrentRobotState() => GetRobotStateMsgFromController();
-
-    private RobotStateMsg GetGoalRobotState() => GetRobotStateMsgFromController();
-
-    private void OnMotionPlanResponse(GetMotionPlanResponse response)
-    {
-        var motionPlanResponse = response.motion_plan_response;
-        if (motionPlanResponse.error_code.val == 1) // SUCCESS
-        {
-            Debug.Log($"MoveItPlanningRequestMenuUI: Planning successful! Planning time: {motionPlanResponse.planning_time}s");
-
-            // Handle the planned trajectory
-            if (motionPlanResponse.trajectory?.joint_trajectory != null)
-            {
-                lastPlannedTrajectory = motionPlanResponse.trajectory.joint_trajectory;
-                Debug.Log($"MoveItPlanningRequestMenuUI: Trajectory has {lastPlannedTrajectory.points.Length} waypoints");
-
-                planningResultLabel.text = $"Planning successful! Time: {motionPlanResponse.planning_time}s, Waypoints: {lastPlannedTrajectory.points.Length}";
-
-                // You can execute the trajectory here or store it for later execution
-                PreviewTrajectory(lastPlannedTrajectory);
-                executeTrajectoryButton.SetEnabled(true);
-            }
-        }
-        else
-        {
-            planningResultLabel.text = $"Planning failed with error: {motionPlanResponse.error_code.val} {motionPlanResponse.error_code.message}";
-            lastPlannedTrajectory = null;
+            lastPlan = null;
+            planningResultLabel.text = $"Planning failed with error: {message}";
             stopReplayButton.SetEnabled(false);
             executeTrajectoryButton.SetEnabled(false);
-
-            Debug.LogError($"MoveItPlanningRequestMenuUI: Planning failed with error code: {motionPlanResponse.error_code.val} - {motionPlanResponse.error_code.message}");
-        }
+        });
     }
 
-    private void PreviewTrajectory(JointTrajectoryMsg trajectory)
+    private void ExecuteTrajectory()
     {
-        if (trajectoryReplayer != null)
-        {
-            stopReplayButton.SetEnabled(true);
-            isReplaying = true;
-            stopReplayButton.text = "Stop Replay";
-            // Remap joint names from ROS convention (panda_) to Unity convention (fr3_)
-            // so ApplyJointState can find joints in the dictionary.
-            trajectoryReplayer.StartReplay(BuildLocalTrajectory(trajectory));
-        }
-        else
-        {
-            Debug.Log("MoveItPlanningRequestMenuUI: No TrajectoryReplay component assigned.");
-        }
-    }
-
-    private JointTrajectoryMsg BuildLocalTrajectory(JointTrajectoryMsg traj)
-    {
-        return new JointTrajectoryMsg
-        {
-            header = traj.header,
-            joint_names = RemapJointNames(traj.joint_names),
-            points = traj.points
-        };
-    }
-    
-    private void StopPreview()
-    {
-        if (trajectoryReplayer != null && isReplaying)
-        {
-            trajectoryReplayer.StopReplay();
-            isReplaying = false;
-            stopReplayButton.text = "Start Replay";
-        }
-    }
-
-    private void ExectuteTrajectory()
-    {
-        if (!isConnected)
-        {
-            Debug.LogWarning("MoveItPlanningRequestMenuUI: ROS 2 connection not available.");
-            return;
-        }
-
-        if (lastPlannedTrajectory == null)
-        {
-            Debug.LogWarning("MoveItPlanningRequestMenuUI: No planned trajectory to execute.");
-            return;
-        }
-
-        // Stop any ongoing preview and start mirroring if not already
-        StopPreview();
-        if (!isMirroring)
-            ToggleMirroring();
-
-        ros.Publish(executeTrajectoryTopic, lastPlannedTrajectory);
-        Debug.Log("MoveItPlanningRequestMenuUI: Published trajectory for execution.");
+        if (lastPlan == null) { planningResultLabel.text = "No planned trajectory to execute."; return; }
+        plugin.Execute(lastPlan, status => UI(() => planningResultLabel.text = status.ToString()));
+        mirrorButton.text = "Stop Mirroring";
     }
 
     private void UpdateButtonStates()
     {
-        // Update button visual states based on current planning state
-        setStartStateButton.text = hasStartState ? "Start State ✓" : "Set Start State";
-        setGoalStateButton.text = hasGoalState ? "Goal State ✓" : "Set Goal State";
-
-        // You could also change button colors or enable/disable them
-        setStartStateButton.SetEnabled(true);
-        setGoalStateButton.SetEnabled(true);
+        setStartStateButton.text = plugin.HasStart ? "Start State ✓" : "Set Start State";
+        setGoalStateButton.text = plugin.HasGoal ? "Goal State ✓" : "Set Goal State";
     }
 
     public void ResetPlanningState()
     {
-        hasStartState = false;
-        hasGoalState = false;
-        currentStartState = null;
-        currentGoalState = null;
+        startSet = goalSet = false;
+        plugin.ResetPlanningState();
         UpdateButtonStates();
-    }
-
-    public void SetPlanningGroup(string groupName)
-    {
-        planningGroupName = groupName;
-    }
-
-    public void SetPlanningPipeline(string pipelineId)
-    {
-        planningPipelineId = pipelineId;
-    }
-
-    private void OnDisable()
-    {
-    }
-
-    private void OnDestroy()
-    {    
-        // Cancel any pending invokes
-        CancelInvoke(nameof(TryQueryPlanners));
     }
 }
