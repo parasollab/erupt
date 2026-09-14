@@ -12,6 +12,7 @@ EditorBuildSettings:
     path: Assets/Scenes/KitchenFR3.unity
     guid: 18c0e714e847d40e0801c1265a0508df
   m_configObjects:
+    com.unity.dt.app-ui: {fileID: 11400000, guid: 1b1c20d82303e4b5781c3ef50ac1449f, type: 2}
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: c348712bda248c246b8c49b3db54643f, type: 3}
     com.unity.xr.arfoundation.simulation_settings: {fileID: 11400000, guid: e5d25a27610f74c049fefa1b04bb0f96, type: 2}
     com.unity.xr.management.loader_settings: {fileID: 11400000, guid: 5b0a779bec2b643eeace9b632483f26c, type: 2}
