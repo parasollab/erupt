@@ -28,3 +28,11 @@ Tests/*               per-assembly PlayMode tests; Tests/Boundary is EditMode an
 ```
 
 Core assemblies never reference `Erupt.Plugins.*` or `Erupt.App` (enforced by `AssemblyBoundaryTests`).
+
+## Documentation
+
+- `Documentation~/architecture.md` — packages, assembly graph, the `ERUPT` root, flows
+- `Documentation~/plugin-authoring.md` — the plugin contract, context, families, messages, testing, generator
+- `Documentation~/design-guidelines.md` — the UI and interaction rules every feature is reviewed against
+
+Licence: BSD 3-Clause (`LICENSE.md`). Changes: `CHANGELOG.md`.

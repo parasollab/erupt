@@ -1,11 +1,12 @@
 {
   "name": "com.erupt.plugin.moveit",
-  "version": "0.1.0",
+  "version": "1.0.0-preview.1",
   "displayName": "ERUPT MoveIt Plugin",
   "description": "Kinematic planning and planning-scene sync for ERUPT via MoveIt 2.",
   "unity": "6000.2",
+  "license": "BSD-3-Clause",
   "dependencies": {
-    "com.erupt.core": "0.1.0"
+    "com.erupt.core": "1.0.0-preview.1"
   },
   "keywords": [
     "robotics",

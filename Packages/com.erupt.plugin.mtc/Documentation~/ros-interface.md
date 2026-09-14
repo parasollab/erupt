@@ -1,3 +1,10 @@
+> **Provenance.** Written as `mtc_connector.md` at the repo root while the MTC UI was being built on the
+> legacy wrist menu; moved here in Phase 6 of the plugin refactor (2026-09-14). Sections 1, 2 and 4–7 (the
+> ROS interfaces, message fields and node start-up order) remain the reference for `MtcClient`,
+> `PickPlaceActionClient` and `MtcSolutionPlayer`. Section 3 describes the original panel design; in the
+> shipped plugin those components are the tier 3 `SolutionsTab` plus the `preview` / `execute` trajectory
+> verbs (see `README.md`).
+
 # MTC Unity VR Interface — Component & Message Reference
 
 This document defines every ROS topic, service, action, and message field required to build a Unity VR interface for MoveIt Task Constructor (MTC). It is structured as a specification for UI generation: each UI component lists exactly which ROS interface drives it and how the data maps to visual state.

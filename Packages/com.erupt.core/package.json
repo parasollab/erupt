@@ -1,9 +1,10 @@
 {
   "name": "com.erupt.core",
-  "version": "0.1.0",
+  "version": "1.0.0-preview.1",
   "displayName": "ERUPT Core",
   "description": "Extended Reality Universal Programming Toolkit: robot model + IK, environment mirror, interaction router and backends, selection, modes, undo, tier UI, ROS transport. Requires com.unity.robotics.ros-tcp-connector and com.unity.robotics.urdf-importer (installed from the parasollab forks, see README).",
   "unity": "6000.2",
+  "license": "BSD-3-Clause",
   "dependencies": {
     "com.unity.xr.interaction.toolkit": "3.3.1",
     "com.unity.xr.hands": "1.7.3",

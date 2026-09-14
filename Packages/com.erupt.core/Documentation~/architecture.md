@@ -59,5 +59,7 @@ selection) · `SelectionHighlighter` · `SelectionRouterBinding` (router select 
 
 ## History
 
-Built in six phases on `design_refactor`; each phase has a plan and a report under
-`refactor/plugin/`.
+Built in phases 0–6 on `design_refactor` from the former XRViz project (tag
+`pre-plugin-refactor`); each phase has a plan and a report under `refactor/plugin/`, indexed
+in `refactor/README.md`. RADER's provenance: `parasollab/RADER`, branch `xrviz`, absorbed in
+Phase 5.

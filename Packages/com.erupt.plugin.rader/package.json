@@ -1,11 +1,12 @@
 {
   "name": "com.erupt.plugin.rader",
-  "version": "0.1.0",
+  "version": "1.0.0-preview.1",
   "displayName": "ERUPT RADER Plugin",
   "description": "RADER (Demonstration family) plugin for ERUPT: joint-space demonstration recording, replay and publishing, FERL feedback requests, hand and gripper mirroring, point-cloud publishing.",
   "unity": "6000.2",
+  "license": "BSD-3-Clause",
   "dependencies": {
-    "com.erupt.core": "0.1.0"
+    "com.erupt.core": "1.0.0-preview.1"
   },
   "keywords": [
     "robotics",

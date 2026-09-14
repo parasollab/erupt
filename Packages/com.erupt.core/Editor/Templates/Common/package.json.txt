@@ -5,7 +5,7 @@
   "description": "{{DisplayName}} ({{Family}} family) plugin for ERUPT.",
   "unity": "6000.2",
   "dependencies": {
-    "com.erupt.core": "0.1.0"
+    "com.erupt.core": "1.0.0-preview.1"
   },
   "keywords": ["robotics", "xr", "erupt", "plugin"]
 }

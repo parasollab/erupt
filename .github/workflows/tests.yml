@@ -1,0 +1,78 @@
+# ERUPT CI (optional).
+#
+# `boundary` needs no Unity licence and runs on every push / PR: the three grep gates from
+# `refactor_plan.md` § Verification.
+#
+# `unity-tests` runs the EditMode + PlayMode suites in batchmode through game-ci. It needs
+# secrets this repository does not ship, so it only runs on manual dispatch:
+#   UNITY_LICENSE   the .ulf activation file contents (https://game.ci/docs/github/activation)
+#   UNITY_EMAIL / UNITY_PASSWORD   the account the licence belongs to
+#   SUBMODULE_SSH_KEY   a deploy key with read access to parasollab/ROS-TCP-Connector and
+#                       parasollab/URDF-Importer (the submodules use SSH URLs)
+# Once the secrets exist, add `push` / `pull_request` to the `if:` below or drop the guard.
+name: tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  boundary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Core must not reference plugin message types
+        run: |
+          if grep -rlE "RosMessageTypes\.(Moveit|MoveitTaskConstructorMsgs|StudyInterfaces)" Packages/com.erupt.core; then
+            echo "::error::core references plugin message types"; exit 1; fi
+      - name: No asmdef may target Assembly-CSharp
+        run: |
+          if grep -rl "Assembly-CSharp" Assets --include='*.asmdef'; then
+            echo "::error::asmdef references Assembly-CSharp"; exit 1; fi
+      - name: No stray scripts outside Erupt.App
+        run: |
+          stray=$(find Assets -name "*.cs" \
+            -not -path "Assets/Erupt.App/*" -not -path "Assets/Samples/*" \
+            -not -path "Assets/OpenCVForUnity/*" -not -path "Assets/_Heathen*" \
+            -not -path "Assets/LudicWorlds/*" -not -path "Assets/TextMesh Pro/*")
+          if [ -n "$stray" ]; then echo "$stray"; echo "::error::scripts outside Erupt.App would fall into Assembly-CSharp"; exit 1; fi
+      - name: Package versions agree
+        run: |
+          v=$(python3 -c "import json;print(json.load(open('Packages/com.erupt.core/package.json'))['version'])")
+          for p in Packages/com.erupt.plugin.*/package.json; do
+            python3 - "$p" "$v" <<'PY'
+          import json,sys
+          m=json.load(open(sys.argv[1])); want=sys.argv[2]
+          bad=[k for k,val in m['dependencies'].items() if k.startswith('com.erupt.') and val!=want]
+          if m['version']!=want or bad: print(f"::error::{sys.argv[1]}: version {m['version']}, deps {bad} (want {want})"); sys.exit(1)
+          PY
+          done
+
+  unity-tests:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          ssh-key: ${{ secrets.SUBMODULE_SSH_KEY }}
+          lfs: true
+      - uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-${{ hashFiles('Packages/packages-lock.json', 'ProjectSettings/ProjectVersion.txt') }}
+      - uses: game-ci/unity-test-runner@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          testMode: all            # EditMode (boundary, generator) + PlayMode (every Erupt.*.Tests)
+          artifactsPath: test-results
+          githubToken: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: test-results

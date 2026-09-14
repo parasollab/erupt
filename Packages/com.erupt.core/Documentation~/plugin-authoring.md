@@ -43,7 +43,7 @@ Everything core offers, handed to you at registration:
 
 Never `FindObjectOfType` a core service; take it from the context so tests can substitute it.
 
-## Where a feature goes (Guidelines Part 4)
+## Where a feature goes (Guidelines Part 4 — `design-guidelines.md` in this folder)
 
 1. **A verb on an existing selection kind** — the default. `ctx.Ui.RegisterVerb(SelectionKind.EndEffector, "my-verb", "My Verb", handler, Id)`.
    The verb carries your plugin id, so reviewers can see who added it. To implement a verb

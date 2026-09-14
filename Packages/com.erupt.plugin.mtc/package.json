@@ -1,12 +1,13 @@
 {
   "name": "com.erupt.plugin.mtc",
-  "version": "0.1.0",
+  "version": "1.0.0-preview.1",
   "displayName": "ERUPT MTC Plugin",
   "description": "MoveIt Task Constructor solutions, execution and pick/place study tooling for ERUPT.",
   "unity": "6000.2",
+  "license": "BSD-3-Clause",
   "dependencies": {
-    "com.erupt.core": "0.1.0",
-    "com.erupt.plugin.moveit": "0.1.0"
+    "com.erupt.core": "1.0.0-preview.1",
+    "com.erupt.plugin.moveit": "1.0.0-preview.1"
   },
   "keywords": [
     "robotics",
