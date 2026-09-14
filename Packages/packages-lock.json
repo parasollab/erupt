@@ -12,14 +12,6 @@
         "com.unity.xr.core-utils": "2.5.2"
       }
     },
-    "com.erupt.plugin.demo": {
-      "version": "file:com.erupt.plugin.demo",
-      "depth": 0,
-      "source": "embedded",
-      "dependencies": {
-        "com.erupt.core": "0.1.0"
-      }
-    },
     "com.erupt.plugin.moveit": {
       "version": "file:com.erupt.plugin.moveit",
       "depth": 0,
@@ -35,6 +27,14 @@
       "dependencies": {
         "com.erupt.core": "0.1.0",
         "com.erupt.plugin.moveit": "0.1.0"
+      }
+    },
+    "com.erupt.plugin.rader": {
+      "version": "file:com.erupt.plugin.rader",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.erupt.core": "0.1.0"
       }
     },
     "com.github-glitchenzo.nugetforunity": {
@@ -70,17 +70,6 @@
         "com.unity.modules.unitywebrequestaudio": "1.0.0"
       },
       "url": "https://packages.unity.com"
-    },
-    "com.parasol.rader": {
-      "version": "file:RADER",
-      "depth": 0,
-      "source": "embedded",
-      "dependencies": {
-        "com.unity.xr.interaction.toolkit": "2.5.4",
-        "com.unity.xr.core-utils": "2.3.0",
-        "com.unity.textmeshpro": "3.0.9",
-        "com.unity.xr.hands": "1.5.0"
-      }
     },
     "com.unity.2d.common": {
       "version": "11.0.1",

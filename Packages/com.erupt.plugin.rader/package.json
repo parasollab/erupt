@@ -1,0 +1,22 @@
+{
+  "name": "com.erupt.plugin.rader",
+  "version": "0.1.0",
+  "displayName": "ERUPT RADER Plugin",
+  "description": "RADER (Demonstration family) plugin for ERUPT: joint-space demonstration recording, replay and publishing, FERL feedback requests, hand and gripper mirroring, point-cloud publishing.",
+  "unity": "6000.2",
+  "dependencies": {
+    "com.erupt.core": "0.1.0"
+  },
+  "keywords": [
+    "robotics",
+    "xr",
+    "erupt",
+    "plugin",
+    "learning-from-demonstration"
+  ],
+  "author": {
+    "name": "Parasol Lab, UIUC",
+    "email": "parasol-opensource@cs.illinois.edu",
+    "url": "https://parasollab.web.illinois.edu"
+  }
+}

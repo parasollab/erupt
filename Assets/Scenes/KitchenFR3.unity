@@ -10262,9 +10262,9 @@ MonoBehaviour:
   m_GameObject: {fileID: 1496867181}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8d02fcfc20ae90448b306693faa081ce, type: 3}
+  m_Script: {fileID: 11500000, guid: 21082724386042f58965f7f45b24d1e0, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: RADER::CollisionHaptics
+  m_EditorClassIdentifier: Erupt.Interaction.Backends.OpenXR::Erupt.Interaction.Backends::CollisionHaptics
   maxIntensity: 1
   minDistance: 0.3
   leftHapticAction: {fileID: -8785819595477538065, guid: c348712bda248c246b8c49b3db54643f, type: 3}
@@ -14459,6 +14459,51 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1261993076866828461}
   m_Mesh: {fileID: -5574444439875407761, guid: 9c800628fe3875045a831f4278bcf554, type: 3}
+--- !u!1001 &1859034521
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 5182337540911260427, guid: 91d4149585fe4b34afb95fcfec154923, type: 3}
+      propertyPath: m_Name
+      value: RaderPlugin
+      objectReference: {fileID: 0}
+    - target: {fileID: 5182337540911260428, guid: 91d4149585fe4b34afb95fcfec154923, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5182337540911260428, guid: 91d4149585fe4b34afb95fcfec154923, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5182337540911260428, guid: 91d4149585fe4b34afb95fcfec154923, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5182337540911260428, guid: 91d4149585fe4b34afb95fcfec154923, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5182337540911260428, guid: 91d4149585fe4b34afb95fcfec154923, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5182337540911260428, guid: 91d4149585fe4b34afb95fcfec154923, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5182337540911260428, guid: 91d4149585fe4b34afb95fcfec154923, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 91d4149585fe4b34afb95fcfec154923, type: 3}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -14491,3 +14536,4 @@ SceneRoots:
   - {fileID: 2041376975}
   - {fileID: 1758082747}
   - {fileID: 1360108468}
+  - {fileID: 1859034521}

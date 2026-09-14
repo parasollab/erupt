@@ -6,6 +6,7 @@
 Packages/com.erupt.core            ERUPT Core — universal features + the plugin contract
 Packages/com.erupt.plugin.moveit   MoveIt 2 planning + planning-scene sync (Planning family)
 Packages/com.erupt.plugin.mtc      MoveIt Task Constructor solutions + pick/place study tooling (Planning family; depends on moveit)
+Packages/com.erupt.plugin.rader    RADER demonstration recording/replay/publish, FERL feedback, hand + gripper mirroring (Demonstration family)
 Assets/Erupt.App                   the reference app (KitchenFR3): scene-specific scripts only
 Packages/ROS-TCP-Connector, URDF-Importer   parasollab forks (submodules)
 ```
@@ -21,9 +22,10 @@ Erupt.Environment       →  Erupt.Interaction.Core, Erupt.Ui, XRI
 Erupt.Plugins           →  all of the above core assemblies
 Erupt.Plugins.MoveIt    →  Erupt.Plugins, Erupt.Plugins.MoveIt.Messages
 Erupt.Plugins.Mtc       →  Erupt.Plugins.MoveIt, Erupt.Plugins.Mtc.Messages
+Erupt.Plugins.Rader     →  Erupt.Plugins, Erupt.Plugins.Rader.Messages, XR Hands
 Erupt.App               →  everything (the reference app may see plugins)
 Erupt.Core.Editor       →  core (generator, templates)
-Tests: Erupt.TestSupport (FakeRosBus, TestInteractionSource) ← every *.Tests; Erupt.Boundary.Tests enforces the graph
+Tests: Erupt.TestSupport (FakeRosBus, FakeRobotModel, TestInteractionSource) ← every *.Tests; Erupt.Boundary.Tests enforces the graph
 ```
 
 ## The ERUPT root (EruptCore.prefab)
@@ -49,6 +51,11 @@ selection) · `SelectionHighlighter` · `SelectionRouterBinding` (router select 
   / execute (`MoveItPlanningClient` / `MtcClient`).
 - **ROS**: everything goes through `IRosBus` (`RosBus.Instance` → `LiveRosBus`; tests
   `RosBus.Override(new FakeRosBus())`).
+- **Demonstration (Teach)**: `DemonstrationPlugin` gates on Teach and feeds
+  `InteractionSampleBus` samples while recording; the RADER plugin samples the robot's joint
+  state into a `JointTrajectory`, replays it on `JointTrajectoryPlayer`, and publishes it.
+- **Haptics**: `CollisionHaptics` (OpenXR backend) pulses both controllers as the tip link
+  nears a non-robot collider.
 
 ## History
 

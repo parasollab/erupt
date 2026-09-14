@@ -1,14 +1,22 @@
 {
-    "name": "Erupt.TestSupport",
-    "rootNamespace": "Erupt.Ros.Tests",
+    "name": "Erupt.Plugins.Rader.Tests",
+    "rootNamespace": "Erupt.Plugins.Rader.Tests",
     "references": [
-        "Erupt.Ros",
+        "Erupt.Plugins.Rader",
+        "Erupt.Plugins.Rader.Messages",
+        "Erupt.Plugins",
+        "Erupt.Plugins.Tests",
         "Erupt.Interaction.Core",
+        "Erupt.Ui",
+        "Erupt.Ros",
         "Erupt.Robot",
+        "Erupt.TestSupport",
         "Unity.Robotics.ROSTCPConnector",
         "Unity.Robotics.ROSTCPConnector.MessageGeneration",
         "Unity.Robotics.ROSTCPConnector.Messages",
-        "UnityEngine.TestRunner"
+        "UnityEngine.TestRunner",
+        "UnityEngine.UI",
+        "Unity.TextMeshPro"
     ],
     "includePlatforms": [
         "Android",

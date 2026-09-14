@@ -7,7 +7,7 @@ namespace Erupt.Editor.Tests
 {
     /// <summary>
     /// The generator produces the file set a real plugin has, with every token resolved, and
-    /// the shipped MoveIt / MTC packages match the Planning template's shape.
+    /// the shipped MoveIt / MTC / RADER packages match their template's shape.
     /// </summary>
     public class PluginGeneratorTests
     {
@@ -98,10 +98,12 @@ namespace Erupt.Editor.Tests
         }
 
         // The template is the shape of a real plugin: the shipped packages have every file the
-        // Planning template produces (modulo the plugin name and the extra components they grew).
-        [TestCase("Packages/com.erupt.plugin.moveit", "MoveIt", "Erupt.Plugins.MoveIt")]
-        [TestCase("Packages/com.erupt.plugin.mtc", "Mtc", "Erupt.Plugins.Mtc")]
-        public void ShippedPlanningPlugins_HaveTheTemplateShape(string package, string name, string assembly)
+        // Planning / Demonstration template produces (modulo the plugin name and the extra
+        // components they grew).
+        [TestCase("Packages/com.erupt.plugin.moveit", "MoveIt", "Erupt.Plugins.MoveIt", ": PlanningPlugin")]
+        [TestCase("Packages/com.erupt.plugin.mtc", "Mtc", "Erupt.Plugins.Mtc", ": PlanningPlugin")]
+        [TestCase("Packages/com.erupt.plugin.rader", "Rader", "Erupt.Plugins.Rader", ": DemonstrationPlugin")]
+        public void ShippedPlugins_HaveTheTemplateShape(string package, string name, string assembly, string baseClass)
         {
             Assert.IsTrue(File.Exists(Path.Combine(package, "package.json")));
             Assert.IsTrue(File.Exists(Path.Combine(package, "README.md")));
@@ -111,7 +113,7 @@ namespace Erupt.Editor.Tests
             Assert.IsTrue(File.Exists(Path.Combine(package, "Runtime/Messages", assembly + ".Messages.asmdef")), "messages asmdef");
             Assert.IsTrue(File.Exists(Path.Combine(package, "Tests", assembly + ".Tests.asmdef")), "tests asmdef");
             Assert.IsTrue(Directory.Exists(Path.Combine(package, "Prefabs")), "prefab folder");
-            StringAssert.Contains(": PlanningPlugin", File.ReadAllText(Path.Combine(package, "Runtime", name + "Plugin.cs")));
+            StringAssert.Contains(baseClass, File.ReadAllText(Path.Combine(package, "Runtime", name + "Plugin.cs")));
         }
     }
 }

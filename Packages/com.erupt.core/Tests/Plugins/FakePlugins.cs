@@ -101,4 +101,19 @@ namespace Erupt.Plugins.Tests
             status?.Invoke(new ExecutionStatus(ExecutionPhase.Succeeded));
         }
     }
+
+    /// <summary>Demonstration plugin that counts what the base class lets through.</summary>
+    public sealed class FakeDemonstrator : DemonstrationPlugin
+    {
+        public int Samples, StartCalls, StopCalls, PublishCalls;
+        public InteractionSample Last;
+
+        public override string Id => "fake-demo";
+        public override string DisplayName => "Fake Demonstrator";
+
+        protected override void OnSample(InteractionSample sample) { Samples++; Last = sample; }
+        public override void StartDemonstration() { StartCalls++; SetRecording(true); }
+        public override void StopDemonstration() { StopCalls++; SetRecording(false); }
+        public override void Publish() => PublishCalls++;
+    }
 }

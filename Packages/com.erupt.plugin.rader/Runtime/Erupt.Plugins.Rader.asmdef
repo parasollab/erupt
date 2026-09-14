@@ -1,14 +1,20 @@
 {
-    "name": "Erupt.TestSupport",
-    "rootNamespace": "Erupt.Ros.Tests",
+    "name": "Erupt.Plugins.Rader",
+    "rootNamespace": "Erupt.Plugins.Rader",
     "references": [
-        "Erupt.Ros",
+        "Erupt.Plugins",
         "Erupt.Interaction.Core",
+        "Erupt.Ui",
+        "Erupt.Ros",
         "Erupt.Robot",
+        "Erupt.Environment",
+        "Erupt.Plugins.Rader.Messages",
         "Unity.Robotics.ROSTCPConnector",
         "Unity.Robotics.ROSTCPConnector.MessageGeneration",
         "Unity.Robotics.ROSTCPConnector.Messages",
-        "UnityEngine.TestRunner"
+        "Unity.XR.Hands",
+        "UnityEngine.UI",
+        "Unity.TextMeshPro"
     ],
     "includePlatforms": [
         "Android",
@@ -21,14 +27,10 @@
     ],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
-    "overrideReferences": true,
-    "precompiledReferences": [
-        "nunit.framework.dll"
-    ],
-    "autoReferenced": false,
-    "defineConstraints": [
-        "UNITY_INCLUDE_TESTS"
-    ],
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
     "versionDefines": [],
     "noEngineReferences": false
 }

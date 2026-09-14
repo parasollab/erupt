@@ -66,6 +66,10 @@ Plan, environment editing in Build.
 | Planning | `PlanningPlugin` | `SetGoal`, `RequestPlan`, `Preview`, `StopPreview`, `Execute`, `BuildSettingsTab` | `set-goal`/`plan` on the end effector, `preview`/`execute` on trajectories, tab `planner-{Id}`; `PublishResult` makes a plan selectable, `PlaceHandle` puts it in the world |
 | Demonstration | `DemonstrationPlugin` | `OnSample`, `StartDemonstration`, `StopDemonstration`, `Publish`, `BuildDemosTab` | Teach-mode gate, sample feed from `InteractionSampleBus` while recording, `correct` verb, tab `demos-{Id}` |
 
+Shipped examples: `com.erupt.plugin.moveit` and `com.erupt.plugin.mtc` (Planning),
+`com.erupt.plugin.rader` (Demonstration — a plain-C# recorder on `IRosBus` + `IRobotModel`,
+tested with `FakeRosBus` and `FakeRobotModel`).
+
 Two planners can coexist: shared verbs are bound once and dispatched — preview/execute to
 the plugin that produced the selected trajectory, set-goal/plan to the first registered
 planner whose `AcceptsGoals` is true (a planner that plans on the ROS side says false).

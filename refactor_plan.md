@@ -87,7 +87,7 @@ Packages/
     Tests/  Prefabs/MtcPlugin.prefab  README.md  MESSAGES.md
 
   com.erupt.plugin.rader/             (Phase 5) Erupt.Plugins.Rader: RaderPlugin (DemonstrationPlugin), FERL, InfoLog, PointCloudPublisher,
-                                        demonstration recorder ported from SetupUI onto IRosBus
+                                        HandMirror, Robotiq2fGripperMirror (on IRobotModel), demonstration recorder ported from SetupUI onto IRosBus
   ROS-TCP-Connector/  URDF-Importer/  (submodules, unchanged)
 
 Assets/
@@ -183,7 +183,7 @@ Environment cut (keeps Guidelines P1: MoveIt planning scene stays authoritative;
 | `CollisionObjectPublisher`, `AttachedCollisionObjectListener`                                 | unchanged behaviour, moved; attach →`registry.Attach(id, link)`                                                                                                                                       | MoveIt plugin         |
 | `ObstacleCommands`, `EruptVerbBindings` take `CollisionObjectsListenerSimple`               | take`EnvironmentRegistry`; renamed `ObstacleVerbBindings`                                                                                                                                            | `Erupt.Environment` |
 
-Robot cut: `IRobotModel` (Erupt.Robot) = the existing public surface of `DirectArticulationIKController` (`Root`, `EndEffector`, `JointNames`, `TryGetJointAngle`, `GetJointStatePositions`, `ApplyJointState`, `TrySolveToTarget`, `TryNudgeJoint`, `FindLinkTransform`, `BeginInteraction/EndInteraction`). `DirectArticulationIKController : MonoBehaviour, IRobotModel`. Phase 5 adds `IIkSolver` so RADER's `UR5eAnalyticalIK` becomes a pluggable solver.
+Robot cut: `IRobotModel` (Erupt.Robot) = the existing public surface of `DirectArticulationIKController` (`Root`, `EndEffector`, `JointNames`, `TryGetJointAngle`, `GetJointStatePositions`, `ApplyJointState`, `TrySolveToTarget`, `TryNudgeJoint`, `FindLinkTransform`, `BeginInteraction/EndInteraction`). `DirectArticulationIKController : MonoBehaviour, IRobotModel`. Phase 5 drops RADER's transform-based solvers (`IKSolver`/`CCDIK`/`UR5eAnalyticalIK`) rather than adding an `IIkSolver` seam; the articulation-body controller is the only kinematics path.
 
 Verbs: `VerbRegistry` (instance, Erupt.Ui) seeded from the Guidelines Part 2 rows (`VerbTable` becomes the seed data only). `ContextualMenuModel` takes a `VerbRegistry`. Plugin-registered verbs carry `VerbOrigin.Plugin` + plugin id so the Part 8 review ("added a verb, not a menu") stays auditable. `SelectionKind` stays closed.
 
@@ -268,8 +268,9 @@ Goal: `xrviz.asmdef` is gone; every script lives in a package assembly; behaviou
 
 ### Phase 5 — RADER absorb, LfD template proven, rader plugin
 
-- Absorb into core (`Erupt.Robot`): `IIkSolver` abstraction (from RADER `IKSolver`), `UR5eAnalyticalIK` + `Runtime/Plugins/*` native libs as `AnalyticalIk/`, `CCDIK` as the fallback solver; `DirectArticulationIKController` gains an optional `IIkSolver`. `TargetSphere` → core `EndEffectorTargetWidget` (an `IWorldWidget`). `CollisionHaptics` → `Erupt.Interaction.Backends.OpenXR` (haptics are a capability). All moved code gets `Erupt.*` namespaces.
-- `com.erupt.plugin.rader`: `RaderPlugin : DemonstrationPlugin`; demonstration record/replay/publish ported from `SetupUI` onto `IRosBus` (`/{ns}/joint_trajectory`, `/{ns}/virtual_joint_state`, `/{ns}/interaction`, `/record_start`); `FERL`, `InfoLog`, `PointCloudPublisher` moved as-is onto `IRosBus`; `HandMirror`, `Robotiq2fGripperMirror` kept in the plugin. ArUco/AR scripts, `ProcessUrdf`, `SetupUI` menus, ur5e prefabs, `RosMessageTypes/Hri` dropped (recoverable from the tag and from parasollab/RADER).
+- Absorb into core: `CollisionHaptics` → `Erupt.Interaction.Backends.OpenXR` (haptics are a capability), with an `Erupt.*` namespace. Nothing else from RADER moves into core.
+- Drop RADER's transform-based kinematics layer outright: `IKSolver`, `CCDIK`, `CCDIKJoint`, `UR5eAnalyticalIK` + `Runtime/Plugins/*` native libs, `SetupIK`, `RobotManager`, `ProcessUrdf`, `TargetSphere`. The project moved to URDF-Importer articulation bodies; `DirectArticulationIKController` (`IRobotModel`) already does what these scripts did by hand, so no `IIkSolver` abstraction is added. Decision recorded 2026-09-11.
+- `com.erupt.plugin.rader`: `RaderPlugin : DemonstrationPlugin`; demonstration record/replay/publish ported from `SetupUI` onto `IRosBus` (`/{ns}/joint_trajectory`, `/{ns}/virtual_joint_state`, `/{ns}/interaction`, `/record_start`); `FERL`, `InfoLog`, `PointCloudPublisher` moved as-is onto `IRosBus`; `HandMirror`, `Robotiq2fGripperMirror` kept in the plugin, re-pointed from `RobotManager` (`SetTargetEEPose`, `SetGripperByJointName`, `GetJointAngles`) onto `IRobotModel` (`TrySolveToTarget`, `ApplyJointState`, `GetJointStatePositions`). ArUco/AR scripts, `SetupUI` menus, ur5e prefabs, `RosMessageTypes/Hri` dropped along with the kinematics layer above (all recoverable from the tag and from parasollab/RADER).
 - Remove `Packages/RADER` from `.gitmodules`; remove `CollisionHaptics` reference on the rig instance and re-add the core version.
 - Gate: compile; `DemonstrationPluginTests` with a fake recorder + `RaderPluginTests` against `FakeRosBus`; boundary test; Quest smoke: Teach mode records a demonstration and publishes.
 
