@@ -1,0 +1,36 @@
+<ui:UXML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" noNamespaceSchemaLocation="../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
+    <ui:VisualElement name="ferlSessionPanel" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0.65); padding: 6px; flex-direction: column; overflow: hidden;">
+        <ui:Label text="FERL Session" name="ferlSessionTitle" style="-unity-text-align: upper-center; color: rgb(255, 250, 250); -unity-font-style: bold; border-bottom-width: 2px; border-bottom-color: rgb(255, 250, 250); margin-bottom: 6px; font-size: 20px;" />
+        <ui:Label text="waiting for /ferl/status ..." name="ferlStatusLabel" style="white-space: normal; color: rgb(230, 230, 230); font-size: 12px; margin-bottom: 4px; flex-shrink: 0;" />
+        <ui:Label text="(no reward yet)" name="ferlFeaturesLabel" style="white-space: normal; color: rgb(180, 220, 255); font-size: 12px; margin-bottom: 4px; flex-shrink: 0;" />
+        <ui:Label text="" name="ferlResultLabel" style="white-space: normal; color: rgb(170, 255, 170); -unity-font-style: bold; font-size: 13px; margin-bottom: 4px; flex-shrink: 0;" />
+        <ui:Label text="" name="ferlHintLabel" style="white-space: normal; color: rgb(255, 220, 150); font-size: 11px; margin-bottom: 6px; flex-shrink: 0;" />
+        <ui:VisualElement style="flex-direction: row; flex-shrink: 0;">
+            <ui:Button text="Set start" name="ferlSetStart" selectable="false" focusable="false" style="-unity-font-style: bold; font-size: 14px; margin: 2px; padding: 5px 4px; flex-grow: 1; flex-basis: 0; min-width: 0; white-space: normal; -unity-text-align: middle-center;" />
+            <ui:Button text="Set goal" name="ferlSetGoal" selectable="false" focusable="false" style="-unity-font-style: bold; font-size: 14px; margin: 2px; padding: 5px 4px; flex-grow: 1; flex-basis: 0; min-width: 0; white-space: normal; -unity-text-align: middle-center;" />
+        </ui:VisualElement>
+        <ui:VisualElement style="flex-direction: row; flex-shrink: 0;">
+            <ui:Button text="IK endpoints" name="ferlIkEndpoints" selectable="false" focusable="false" style="-unity-font-style: bold; font-size: 14px; margin: 2px; padding: 5px 4px; flex-grow: 1; flex-basis: 0; min-width: 0; white-space: normal; -unity-text-align: middle-center;" />
+            <ui:Button text="Plan" name="ferlPlan" selectable="false" focusable="false" style="-unity-font-style: bold; font-size: 14px; margin: 2px; padding: 5px 4px; flex-grow: 1; flex-basis: 0; min-width: 0; white-space: normal; -unity-text-align: middle-center;" />
+            <ui:Button text="Play plan" name="ferlPlayStop" selectable="false" focusable="false" style="-unity-font-style: bold; font-size: 14px; margin: 2px; padding: 5px 4px; flex-grow: 1; flex-basis: 0; min-width: 0; white-space: normal; -unity-text-align: middle-center;" />
+        </ui:VisualElement>
+        <ui:VisualElement style="flex-direction: row; flex-shrink: 0;">
+            <ui:Button text="Record robot trace" name="ferlRecordRobotTrace" selectable="false" focusable="false" style="-unity-font-style: bold; font-size: 14px; margin: 2px; padding: 5px 4px; flex-grow: 1; flex-basis: 0; min-width: 0; white-space: normal; -unity-text-align: middle-center;" />
+            <ui:Button text="Record env trace" name="ferlRecordEnvTrace" selectable="false" focusable="false" style="-unity-font-style: bold; font-size: 14px; margin: 2px; padding: 5px 4px; flex-grow: 1; flex-basis: 0; min-width: 0; white-space: normal; -unity-text-align: middle-center;" />
+        </ui:VisualElement>
+        <ui:VisualElement style="flex-direction: row; flex-shrink: 0;">
+            <ui:Button text="Scene edit as correction" name="ferlEnvCorrection" selectable="false" focusable="false" style="-unity-font-style: bold; font-size: 14px; margin: 2px; padding: 5px 4px; flex-grow: 1; flex-basis: 0; min-width: 0; white-space: normal; -unity-text-align: middle-center;" />
+            <ui:Button text="Learn + replan" name="ferlLearn" selectable="false" focusable="false" style="-unity-font-style: bold; font-size: 14px; margin: 2px; padding: 5px 4px; flex-grow: 1; flex-basis: 0; min-width: 0; white-space: normal; -unity-text-align: middle-center;" />
+        </ui:VisualElement>
+        <ui:VisualElement style="flex-direction: row; flex-shrink: 0;">
+            <ui:Button text="Learn only" name="ferlLearnOnly" selectable="false" focusable="false" style="-unity-font-style: bold; font-size: 14px; margin: 2px; padding: 5px 4px; flex-grow: 1; flex-basis: 0; min-width: 0; white-space: normal; -unity-text-align: middle-center;" />
+            <ui:Button text="Replan" name="ferlReplan" selectable="false" focusable="false" style="-unity-font-style: bold; font-size: 14px; margin: 2px; padding: 5px 4px; flex-grow: 1; flex-basis: 0; min-width: 0; white-space: normal; -unity-text-align: middle-center;" />
+        </ui:VisualElement>
+        <ui:Button text="Reward map: off" name="ferlRewardMap" selectable="false" focusable="false" style="-unity-font-style: bold; font-size: 14px; margin: 2px; padding: 5px 4px; flex-grow: 1; flex-basis: 0; min-width: 0; white-space: normal; -unity-text-align: middle-center;" />
+        <ui:VisualElement style="flex-direction: row; flex-shrink: 0;">
+            <ui:Button text="Save" name="ferlSave" selectable="false" focusable="false" style="-unity-font-style: bold; font-size: 14px; margin: 2px; padding: 5px 4px; flex-grow: 1; flex-basis: 0; min-width: 0; white-space: normal; -unity-text-align: middle-center;" />
+            <ui:Button text="Sync" name="ferlSync" selectable="false" focusable="false" style="-unity-font-style: bold; font-size: 14px; margin: 2px; padding: 5px 4px; flex-grow: 1; flex-basis: 0; min-width: 0; white-space: normal; -unity-text-align: middle-center;" />
+            <ui:Button text="Reset" name="ferlReset" selectable="false" focusable="false" style="-unity-font-style: bold; font-size: 14px; margin: 2px; padding: 5px 4px; flex-grow: 1; flex-basis: 0; min-width: 0; white-space: normal; -unity-text-align: middle-center;" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

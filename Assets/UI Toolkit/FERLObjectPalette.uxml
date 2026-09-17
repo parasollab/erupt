@@ -1,0 +1,19 @@
+<ui:UXML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" noNamespaceSchemaLocation="../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
+    <ui:VisualElement name="palettePanel" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0.65); padding: 6px; flex-direction: column; overflow: hidden;">
+        <ui:Label text="Add object" name="paletteTitle" style="-unity-text-align: upper-center; color: rgb(255, 250, 250); -unity-font-style: bold; border-bottom-width: 2px; border-bottom-color: rgb(255, 250, 250); margin-bottom: 6px; font-size: 20px;" />
+        <ui:Label text="Spawns in front of you. Select an object to move it or edit it in the object panel." name="paletteHint" style="white-space: normal; -unity-text-align: upper-center; color: rgb(230, 230, 230); margin-bottom: 6px; font-size: 12px; flex-shrink: 0;" />
+        <ui:VisualElement style="flex-direction: row; flex-shrink: 0;">
+            <ui:Button text="Laptop" name="paletteAddLaptop" selectable="false" focusable="false" style="-unity-font-style: bold; font-size: 14px; margin: 2px; padding: 5px 4px; flex-grow: 1; flex-basis: 0; min-width: 0; white-space: normal; -unity-text-align: middle-center;" />
+            <ui:Button text="Cup" name="paletteAddCup" selectable="false" focusable="false" style="-unity-font-style: bold; font-size: 14px; margin: 2px; padding: 5px 4px; flex-grow: 1; flex-basis: 0; min-width: 0; white-space: normal; -unity-text-align: middle-center;" />
+        </ui:VisualElement>
+        <ui:VisualElement style="flex-direction: row; flex-shrink: 0;">
+            <ui:Button text="Table" name="paletteAddTable" selectable="false" focusable="false" style="-unity-font-style: bold; font-size: 14px; margin: 2px; padding: 5px 4px; flex-grow: 1; flex-basis: 0; min-width: 0; white-space: normal; -unity-text-align: middle-center;" />
+            <ui:Button text="Human" name="paletteAddHuman" selectable="false" focusable="false" style="-unity-font-style: bold; font-size: 14px; margin: 2px; padding: 5px 4px; flex-grow: 1; flex-basis: 0; min-width: 0; white-space: normal; -unity-text-align: middle-center;" />
+        </ui:VisualElement>
+        <ui:VisualElement style="flex-direction: row; flex-shrink: 0;">
+            <ui:Button text="Marker" name="paletteAddMarker" selectable="false" focusable="false" style="-unity-font-style: bold; font-size: 14px; margin: 2px; padding: 5px 4px; flex-grow: 1; flex-basis: 0; min-width: 0; white-space: normal; -unity-text-align: middle-center;" />
+            <ui:Button text="Other" name="paletteAddOther" selectable="false" focusable="false" style="-unity-font-style: bold; font-size: 14px; margin: 2px; padding: 5px 4px; flex-grow: 1; flex-basis: 0; min-width: 0; white-space: normal; -unity-text-align: middle-center;" />
+        </ui:VisualElement>
+        <ui:Button text="Delete selected" name="paletteDeleteSelected" selectable="false" focusable="false" style="-unity-font-style: bold; margin: 8px 2px 2px 2px; padding: 5px 4px; font-size: 14px; color: rgb(255, 120, 120); flex-shrink: 0;" />
+    </ui:VisualElement>
+</ui:UXML>

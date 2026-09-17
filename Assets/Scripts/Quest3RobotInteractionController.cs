@@ -25,6 +25,12 @@ public class Quest3RobotInteractionController : MonoBehaviour
 
     public Transform Handle => handle;
 
+    // Raised when a grip/mouse drag of the end-effector handle begins and ends (panel drags
+    // excluded). FERLTrajectoryPlayer pauses playback on the first and reads the corrected
+    // joint state on the second.
+    public event System.Action HandleDragStarted;
+    public event System.Action HandleDragEnded;
+
     private void Awake()
     {
         if (handle != null && handleRenderer == null)
@@ -119,6 +125,7 @@ public class Quest3RobotInteractionController : MonoBehaviour
         dragOffset = handle.position - ray.GetPoint(dragDistance);
         ikController.BeginInteraction();
         SetHandleActive(true);
+        HandleDragStarted?.Invoke();
         ClearSelection();
         // Grabbing the EE handle also drops the current shape selection, matching the
         // trigger-click behavior in SelectionManager.IsDeselectSurface.
@@ -180,6 +187,7 @@ public class Quest3RobotInteractionController : MonoBehaviour
         }
 
         ikController.EndInteraction();
+        HandleDragEnded?.Invoke();
         if (endEffector != null && handle != null)
         {
             // Log before snapping the handle marker back to endEffector -- they should already

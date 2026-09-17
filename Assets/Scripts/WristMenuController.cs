@@ -733,64 +733,11 @@ public class WristMenuController : MonoBehaviour
             ? Camera.main.transform.position + Camera.main.transform.forward * shapeSpawnDistance
             : Vector3.forward * shapeSpawnDistance;
 
-        // Physics
-        Rigidbody rb = shape.AddComponent<Rigidbody>();
-        rb.useGravity = false;
-        rb.isKinematic = true;
-
-        // Allow a second controller to join the grab so the multiple-grab scale transformer
-        // can run. One-handed push/pull remains available whenever only one hand is attached.
-        shape.AddComponent<XRGrabInteractable>();
-        var gi = shape.GetComponent<XRGrabInteractable>();
-        gi.selectMode = InteractableSelectMode.Multiple;
-        // Keep the object where it's grabbed instead of snapping it to the controller
-        gi.useDynamicAttach = true;
-        // Don't match the ray hit point's position for the attach anchor — keep it at the
-        // object's own pivot so joystick rotation spins the object about its own center
-        // instead of orbiting around wherever the ray happened to hit its surface.
-        gi.matchAttachPosition = false;
-        // Don't apply release velocity, object should stop moving as soon as it's let go
-        gi.throwOnDetach = false;
-
-        // Controls grabbing based on SelectionManager selection state
-        shape.AddComponent<SelectableGrabController>();
-
         shape.transform.localScale = Vector3.one * 0.25f;
-        shape.tag = "Selectable";
 
-        shape.AddComponent<XRGrabTransformerScaleAxisLock>();
-        shape.AddComponent<XRGrabTransformerLockPose>();
-        // Don't freeze rotation by default — joystick manipulation should be able to spin
-        // the object about its own center. SnapSelectedToSurface() still re-syncs this via
-        // SyncInitialRotation() in case freezePose is turned back on elsewhere.
-        shape.GetComponent<XRGrabTransformerLockPose>().freezePose = false;
-
-        shape.AddComponent<XRGeneralGrabTransformer>();
-        shape.GetComponent<XRGeneralGrabTransformer>().allowTwoHandedScaling = false;
-        shape.GetComponent<XRGeneralGrabTransformer>().clampScaling = false;
-
-        shape.AddComponent<XRTwoHandedScaleTransformer>();
-        shape.AddComponent<XRUIScaleTransformer>();
-
-        gi.AddMultipleGrabTransformer(shape.GetComponent<XRGeneralGrabTransformer>());
-        gi.AddMultipleGrabTransformer(shape.GetComponent<XRTwoHandedScaleTransformer>());
-        gi.AddMultipleGrabTransformer(shape.GetComponent<XRGrabTransformerScaleAxisLock>());
-        gi.AddMultipleGrabTransformer(shape.GetComponent<XRGrabTransformerLockPose>());
-        gi.AddMultipleGrabTransformer(shape.GetComponent<XRUIScaleTransformer>());
-
-        var meshRenderer = shape.GetComponent<MeshRenderer>();
-        if (meshRenderer != null && litMaterial != null)
-        {
-            // .material instantiates a per-renderer copy, so making it transparent here
-            // leaves the shared litMaterial asset (also used by CollisionObjectsListenerSimple
-            // for RViz-synced objects) opaque.
-            meshRenderer.material = litMaterial;
-            MakeMaterialTransparent(meshRenderer.material, spawnedShapeAlpha);
-        }
-
-        Collider collider = shape.GetComponent<Collider>();
-        if (collider != null)
-            collider.enabled = true;
+        // Physics, grab/scale transformers, selection gating, tag and transparent material:
+        // shared with the FERL object factory (Assets/Scripts/FERL/GrabbableShapeSetup.cs).
+        GrabbableShapeSetup.Configure(shape, litMaterial, spawnedShapeAlpha);
 
         CollisionObjectPublisher publisher = shape.AddComponent<CollisionObjectPublisher>();
         publisher.isMesh = false;
