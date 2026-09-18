@@ -1,13 +1,110 @@
 > **Provenance.** Written as `mtc_connector.md` at the repo root while the MTC UI was being built on the
-> legacy wrist menu; moved here in Phase 6 of the plugin refactor (2026-09-14). Sections 1, 2 and 4–7 (the
-> ROS interfaces, message fields and node start-up order) remain the reference for `MtcClient`,
-> `PickPlaceActionClient` and `MtcSolutionPlayer`. Section 3 describes the original panel design; in the
-> shipped plugin those components are the tier 3 `SolutionsTab` plus the `preview` / `execute` trajectory
-> verbs (see `README.md`).
+> legacy wrist menu; moved here in Phase 6 of the plugin refactor (2026-09-14). **Section 0 (2026-09-18) is
+> the current protocol**, served by `mtc_pick_place_server` and spoken by `PickPlaceClient`. Sections 1–7
+> describe the earlier `pick_place_dynamic_demo` protocol (`MtcClient`, `/execute_task_solution`,
+> `/get_solution_<task_id>`), kept as the reference for the MTC message fields, the attach/detach
+> topics and the legacy client. Where they disagree with Section 0, Section 0 wins.
 
 # MTC Unity VR Interface — Component & Message Reference
 
 This document defines every ROS topic, service, action, and message field required to build a Unity VR interface for MoveIt Task Constructor (MTC). It is structured as a specification for UI generation: each UI component lists exactly which ROS interface drives it and how the data maps to visual state.
+
+---
+
+## 0. Current protocol — `mtc_pick_place_server`
+
+Tested end-to-end on the ROS side through ROS-TCP-Endpoint (`action-support` branch of
+parasollab/ROS-TCP-Endpoint). On the wire the endpoint names types `package/Type`, e.g.
+`study_interfaces/PickPlace`.
+
+| Interface | Type | Unity |
+| --- | --- | --- |
+| ACT `/pick_place` | `study_interfaces/PickPlace` | `PickPlaceClient.PlanAsync` / `PlanAndExecuteAsync` |
+| ACT `/execute_solution` | `study_interfaces/ExecuteSolution` | `PickPlaceClient.ExecuteAsync(solutionId)` |
+| SRV `/get_solution` | `study_interfaces/GetSolution` | `PickPlaceClient.FetchSolution` |
+| SUB `/pick_place/description` | `moveit_task_constructor_msgs/TaskDescription` | `PickPlaceClient.Description` |
+| SUB `/pick_place/statistics` | `moveit_task_constructor_msgs/TaskStatistics` | `PickPlaceClient.SolutionIds` |
+
+```
+# action/PickPlace.action — server: /pick_place
+string object_id
+geometry_msgs/PoseStamped place_pose
+moveit_msgs/PlanningScene start_scene_diff   # optional; empty = no-op
+bool execute true                            # false = plan only (what the browser uses)
+uint32 max_solutions 0                       # 0 = server default
+---
+bool success
+string message
+string task_id
+uint32 solution_id                           # executed solution, 0 if none
+moveit_msgs/MoveItErrorCodes error_code
+---
+string task_id                               # empty on the first message, set from then on
+string stage                                 # "initializing" | "planning" | "executing"
+uint32 solutions_found
+float32 best_cost                            # +Infinity until a solution is found
+
+# action/ExecuteSolution.action — server: /execute_solution
+string task_id
+uint32 solution_id
+---
+bool success
+string message
+moveit_msgs/MoveItErrorCodes error_code
+---
+uint32 sub_id                                # index of the finished sub-trajectory
+uint32 sub_no                                # total number of sub-trajectories
+uint32 stage_id                              # introspection stage id
+
+# srv/GetSolution.srv — server: /get_solution
+string task_id
+uint32 solution_id
+bool include_start_scene false
+---
+bool success
+string message
+moveit_task_constructor_msgs/Solution solution
+```
+
+### Flow
+
+1. **On connect, before any goal**: subscribe to both topics, then register the two actions and
+   the service (`PickPlaceClient.Start`). The endpoint subscribes volatile: a late subscriber
+   gets no replay.
+2. **Plan**: `PickPlace` with `execute: false`, `max_solutions: 3`. `task_id` is taken from the
+   first feedback that carries one (about 0.06 s after the goal). Topic messages that arrive
+   before it are held and matched once it is known.
+3. **List**: the executable ids are `solved[]` of the statistics stage with `id == 1` (the root
+   container; stage 0 is the Task wrapper and is never published). Topic `task_id` is compared
+   to ours with everything after the last `:` removed.
+4. **Show**: `/get_solution` on selection (20–40 ms, 60–70 KB), cached per task;
+   `sub_trajectory[i].info.stage_id` → stage name from the description.
+5. **Execute**: `ExecuteSolution` with `task_id` (verbatim) + `solution_id`. Feedback arrives as
+   each sub-trajectory finishes; the tab ticks `sub_id` and highlights step `sub_id + 1` and its
+   stage as the one now running.
+6. **Cancel**: cancels the active goal, planning or executing. Status CANCELED (5) / error code
+   PREEMPTED (-7) is `PickPlaceOutcome.Canceled`, not an error.
+
+### Rules the server enforces
+
+- One task at a time: a `PickPlace` goal sent while busy is **rejected**. The plan button is
+  disabled while a goal is active and a rejection is a status line (`REJECTED: …`).
+- A new plan invalidates every earlier `task_id` and `solution_id`: `PickPlaceClient` drops all
+  task state when a plan starts and refuses ids outside `SolutionIds` without sending them.
+- Stale or unknown ids: `/execute_solution` rejects the goal, `/get_solution` answers
+  `success: false` with a message; both reach the status line.
+- Disconnecting does not cancel a goal: the client cancels on destroy, pause and quit.
+- One connection at a time: everything goes through the shared `RosBus`.
+
+### Running the ROS side
+
+```bash
+ros2 launch moveit_task_constructor_demo demo.launch.py        # MoveIt + Panda + RViz
+ros2 launch mtc_pick_place_server pick_place_server.launch.py  # spawns table + "object"
+ros2 launch ros_tcp_endpoint endpoint.py                       # default port 10000
+```
+
+The demo object is `object` at `(0.5, -0.25, 0.0)` in `world`; `(0.6, -0.15, 0.0)` is a known-good place pose.
 
 ---
 

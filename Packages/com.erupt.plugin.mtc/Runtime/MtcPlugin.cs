@@ -8,21 +8,22 @@ using RosMessageTypes.MoveitTaskConstructorMsgs;
 
 /// <summary>
 /// MoveIt Task Constructor as an ERUPT planning plugin. MTC plans on the ROS side from a
-/// recorded task; here "plan" means "take the best solution", preview plays it on
-/// <see cref="MtcSolutionPlayer"/>, execute sends it to /execute_task_solution through
-/// <see cref="MtcClient"/>. The pick/place recorder is the Teach-mode entry (Part 5).
+/// recorded task (<see cref="PickPlaceClient"/> → mtc_pick_place_server); here "plan" means
+/// "take the best solution", preview plays it on <see cref="MtcSolutionPlayer"/>, execute
+/// sends its id to /execute_solution. The pick/place recorder is the Teach-mode entry (Part 5).
 /// Depends on the MoveIt plugin for the planning scene.
 /// </summary>
 public class MtcPlugin : PlanningPlugin
 {
     [Tooltip("Sibling components by default; found in the scene if empty.")]
-    [SerializeField] private MtcClient client;
     [SerializeField] private MtcSolutionPlayer player;
     [SerializeField] private PickPlaceTaskRecorder recorder;
-    [SerializeField] private PickPlaceActionClient pickPlace;
+    [SerializeField] private PickPlaceClient pickPlace;
 
     private static readonly string[] Deps = { "moveit" };
-    private readonly Dictionary<SolutionMsg, PlanResult> resultBySolution = new();
+    // Per task: both are dropped when a new plan starts, so a handle can never execute a dead id.
+    private readonly Dictionary<uint, PlanResult> resultById = new();
+    private readonly Dictionary<PlanResult, uint> idByResult = new();
     private SolutionsTab tab;
 
     public override string Id => "mtc";
@@ -31,45 +32,41 @@ public class MtcPlugin : PlanningPlugin
     /// <summary>MTC plans from the recorded task; the end-effector goal verbs belong to MoveIt.</summary>
     public override bool AcceptsGoals => false;
 
-    public MtcClient Client => client;
     public MtcSolutionPlayer Player => player;
     public PickPlaceTaskRecorder Recorder => recorder;
-    public PickPlaceActionClient PickPlace => pickPlace;
+    public PickPlaceClient PickPlace => pickPlace;
     public SolutionsTab Tab => tab;
     public bool InTeachMode { get; private set; }
+
+    /// <summary>The solution shown in the browser; null until its fetch returns.</summary>
     public SolutionMsg SelectedSolution { get; private set; }
+    public uint? SelectedSolutionId { get; private set; }
 
     public event Action SelectedSolutionChanged;
     public event Action TeachModeChanged;
 
-    /// <summary>Solutions by ascending total cost.</summary>
-    public IEnumerable<(SolutionMsg sol, double cost)> RankedSolutions =>
-        client == null ? Enumerable.Empty<(SolutionMsg, double)>() :
-        client.Solutions.Select(s => (s, (double)s.sub_trajectory.Sum(t => t.info.cost))).OrderBy(x => x.Item2);
-
     private void Awake()
     {
-        if (client == null) client = GetComponent<MtcClient>();
         if (player == null) player = GetComponent<MtcSolutionPlayer>();
         if (recorder == null) recorder = GetComponent<PickPlaceTaskRecorder>();
-        if (pickPlace == null) pickPlace = GetComponent<PickPlaceActionClient>();
+        if (pickPlace == null) pickPlace = GetComponent<PickPlaceClient>();
     }
 
     protected override void OnRegister(IEruptContext context)
     {
-        if (client == null) client = FindFirstObjectByType<MtcClient>(FindObjectsInactive.Include);
+        if (pickPlace == null) pickPlace = FindFirstObjectByType<PickPlaceClient>(FindObjectsInactive.Include);
         if (player == null) player = FindFirstObjectByType<MtcSolutionPlayer>(FindObjectsInactive.Include);
         if (recorder == null) recorder = FindFirstObjectByType<PickPlaceTaskRecorder>(FindObjectsInactive.Include);
-        if (client == null) Debug.LogError("[mtc] No MtcClient in the scene.", this);
+        if (pickPlace == null) Debug.LogError("[mtc] No PickPlaceClient in the scene.", this);
         if (player != null && context.Robot != null) player.SetRobot(context.Robot);
 
-        try { client?.Initialise(context.Ros); }
+        try { pickPlace?.Initialise(context.Ros); }
         catch (InvalidOperationException) { /* already started on RosBus.Instance, the same bus */ }
 
-        if (client != null)
+        if (pickPlace != null)
         {
-            client.OnSolutionReceived += OnSolution;
-            client.OnTaskReset += OnTaskReset;
+            pickPlace.OnSolutionIdsChanged += OnSolutionIds;
+            pickPlace.OnTaskReset += OnTaskReset;
         }
         InTeachMode = context.Modes != null && context.Modes.Is(AppMode.Teach);
         base.OnRegister(context);
@@ -77,16 +74,18 @@ public class MtcPlugin : PlanningPlugin
 
     protected override void OnUnregister(IEruptContext context)
     {
-        if (client != null)
+        if (pickPlace != null)
         {
-            client.OnSolutionReceived -= OnSolution;
-            client.OnTaskReset -= OnTaskReset;
+            pickPlace.OnSolutionIdsChanged -= OnSolutionIds;
+            pickPlace.OnTaskReset -= OnTaskReset;
         }
         tab?.Dispose();
         tab = null;
         StopPreview();
-        resultBySolution.Clear();
+        resultById.Clear();
+        idByResult.Clear();
         SelectedSolution = null;
+        SelectedSolutionId = null;
         base.OnUnregister(context);
     }
 
@@ -107,39 +106,69 @@ public class MtcPlugin : PlanningPlugin
 
     // --- solutions ----------------------------------------------------------------
 
-    private void OnSolution(SolutionMsg solution)
+    private void OnSolutionIds()
     {
-        var result = PublishResult(ToResult(solution));
-        resultBySolution[solution] = result;
         // The first solution of a task is selected so its handle exists in the world.
-        if (SelectedSolution == null) SelectSolution(solution);
+        if (SelectedSolutionId == null && pickPlace.SolutionIds.Count > 0)
+            SelectSolution(pickPlace.SolutionIds[0]);
     }
 
     private void OnTaskReset()
     {
+        StopPreview();
         ClearResults();
-        resultBySolution.Clear();
+        resultById.Clear();
+        idByResult.Clear();
+        SelectedSolution = null;
+        SelectedSolutionId = null;
+        SelectedSolutionChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// Make one solution the current plan: fetched on selection (a /get_solution round trip
+    /// is 20–40 ms), then its handle appears at the end effector and the others hide.
+    /// </summary>
+    public void SelectSolution(uint solutionId, Action<PlanResult> done = null)
+    {
+        if (pickPlace == null) { done?.Invoke(null); return; }
+        SelectedSolutionId = solutionId;
         SelectedSolution = null;
         SelectedSolutionChanged?.Invoke();
-    }
 
-    /// <summary>Make one solution the current plan: its handle appears at the end effector, others hide.</summary>
-    public void SelectSolution(SolutionMsg solution)
-    {
-        if (solution == null || !resultBySolution.TryGetValue(solution, out var result)) return;
-        SelectedSolution = solution;
-        Transform ee = Context?.Robot?.EndEffector;
-        PlaceHandle(result, ee != null ? ee.position : transform.position, ee);
-        ShowOnlyHandle(result);
-        if (Context?.Selection != null)
+        pickPlace.FetchSolution(solutionId, solution =>
         {
-            var selectable = Results.FirstOrDefault(r => r != null && r.Result == result);
-            if (selectable != null) Context.Selection.Select(selectable);
-        }
-        SelectedSolutionChanged?.Invoke();
+            // A later selection wins over a slower fetch.
+            if (SelectedSolutionId != solutionId) { done?.Invoke(null); return; }
+            if (!resultById.TryGetValue(solutionId, out var result))
+            {
+                result = PublishResult(ToResult(solutionId, solution));
+                resultById[solutionId] = result;
+                idByResult[result] = solutionId;
+            }
+            SelectedSolution = solution;
+            Transform ee = Context?.Robot?.EndEffector;
+            PlaceHandle(result, ee != null ? ee.position : transform.position, ee);
+            ShowOnlyHandle(result);
+            if (Context?.Selection != null)
+            {
+                var selectable = Results.FirstOrDefault(r => r != null && r.Result == result);
+                if (selectable != null) Context.Selection.Select(selectable);
+            }
+            SelectedSolutionChanged?.Invoke();
+            done?.Invoke(result);
+        },
+        _ =>
+        {
+            if (SelectedSolutionId == solutionId)
+            {
+                SelectedSolutionId = null;
+                SelectedSolutionChanged?.Invoke();
+            }
+            done?.Invoke(null);
+        });
     }
 
-    private PlanResult ToResult(SolutionMsg solution)
+    private PlanResult ToResult(uint solutionId, SolutionMsg solution)
     {
         var first = solution.sub_trajectory?.FirstOrDefault(s => s.trajectory?.joint_trajectory?.points?.Length > 0);
         return new PlanResult
@@ -147,7 +176,7 @@ public class MtcPlugin : PlanningPlugin
             Trajectory = first?.trajectory?.joint_trajectory,
             PlannerPayload = solution,
             PlannerId = Id,
-            Label = $"MTC solution {MtcClient.TopLevelId(solution)}"
+            Label = $"MTC solution {solutionId}"
         };
     }
 
@@ -156,13 +185,11 @@ public class MtcPlugin : PlanningPlugin
         InteractionRefusal.Refuse("MTC plans from the recorded task; record a pick & place in Teach mode instead.",
             endEffector?.GameObject != null ? endEffector.GameObject.transform.position : Vector3.zero);
 
-    /// <summary>"Plan" for MTC selects the best-cost solution.</summary>
+    /// <summary>"Plan" for MTC selects the best-cost solution (the server lists them by ascending cost).</summary>
     public override void RequestPlan(PlanPreferences preferences, Action<PlanResult> done)
     {
-        var best = RankedSolutions.Select(x => x.sol).FirstOrDefault();
-        if (best == null) { done?.Invoke(null); return; }
-        SelectSolution(best);
-        done?.Invoke(resultBySolution[best]);
+        if (pickPlace == null || pickPlace.SolutionIds.Count == 0) { done?.Invoke(null); return; }
+        SelectSolution(pickPlace.SolutionIds[0], done);
     }
 
     public override void Preview(PlanResult plan)
@@ -178,32 +205,40 @@ public class MtcPlugin : PlanningPlugin
 
     public override async void Execute(PlanResult plan, Action<ExecutionStatus> status)
     {
-        if (plan?.PlannerPayload is not SolutionMsg solution || client == null)
+        if (plan == null || pickPlace == null || !idByResult.TryGetValue(plan, out uint solutionId))
         {
-            status?.Invoke(new ExecutionStatus(ExecutionPhase.Unavailable, "No MTC solution to execute."));
+            status?.Invoke(new ExecutionStatus(ExecutionPhase.Unavailable,
+                "This solution is not part of the current plan. Plan again."));
+            return;
+        }
+        if (pickPlace.Busy)
+        {
+            status?.Invoke(new ExecutionStatus(ExecutionPhase.Unavailable, "The server is busy with another goal."));
             return;
         }
         StopPreview();
         status?.Invoke(new ExecutionStatus(ExecutionPhase.Sending));
         try
         {
-            await client.ExecuteSolutionAsync(solution);
-            status?.Invoke(new ExecutionStatus(Map(client.LastExecutionStatus), client.LastExecutionStatus));
+            await pickPlace.ExecuteAsync(solutionId);
+            status?.Invoke(new ExecutionStatus(Map(pickPlace.LastOutcome), pickPlace.LastStatus));
         }
         catch (Exception e)
         {
-            status?.Invoke(new ExecutionStatus(Map(client.LastExecutionStatus), e.Message));
+            status?.Invoke(new ExecutionStatus(Map(pickPlace.LastOutcome), e.Message));
         }
     }
 
-    private static ExecutionPhase Map(string mtcStatus)
+    private static ExecutionPhase Map(PickPlaceOutcome outcome)
     {
-        if (string.IsNullOrEmpty(mtcStatus)) return ExecutionPhase.Failed;
-        if (mtcStatus.StartsWith("SUCCEEDED")) return ExecutionPhase.Succeeded;
-        if (mtcStatus.StartsWith("CANCEL")) return ExecutionPhase.Canceled;
-        if (mtcStatus.StartsWith("ABORTED")) return ExecutionPhase.Aborted;
-        if (mtcStatus.StartsWith("EXECUTING") || mtcStatus.StartsWith("SENDING")) return ExecutionPhase.Executing;
-        if (mtcStatus.StartsWith("UNAVAILABLE") || mtcStatus.StartsWith("ENDPOINT") || mtcStatus.StartsWith("REJECTED")) return ExecutionPhase.Unavailable;
-        return ExecutionPhase.Failed;
+        switch (outcome)
+        {
+            case PickPlaceOutcome.Succeeded: return ExecutionPhase.Succeeded;
+            case PickPlaceOutcome.Canceled: return ExecutionPhase.Canceled;
+            case PickPlaceOutcome.Aborted: return ExecutionPhase.Aborted;
+            case PickPlaceOutcome.Rejected:
+            case PickPlaceOutcome.Unavailable: return ExecutionPhase.Unavailable;
+            default: return ExecutionPhase.Failed;
+        }
     }
 }

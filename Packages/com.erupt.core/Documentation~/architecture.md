@@ -48,7 +48,7 @@ selection) · `SelectionHighlighter` · `SelectionRouterBinding` (router select 
   back into the registry. Removals carry an origin so a ROS-commanded removal is not echoed.
 - **Planning**: end-effector verbs → `PlanningPlugin` → `PlanResult` → `TrajectorySelectable`
   (+ world handle) → trajectory verbs → preview (`JointTrajectoryPlayer` / `MtcSolutionPlayer`)
-  / execute (`MoveItPlanningClient` / `MtcClient`).
+  / execute (`MoveItPlanningClient` / `PickPlaceClient`).
 - **ROS**: everything goes through `IRosBus` (`RosBus.Instance` → `LiveRosBus`; tests
   `RosBus.Override(new FakeRosBus())`).
 - **Demonstration (Teach)**: `DemonstrationPlugin` gates on Teach and feeds

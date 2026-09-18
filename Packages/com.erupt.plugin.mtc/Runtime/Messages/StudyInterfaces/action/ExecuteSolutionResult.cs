@@ -8,44 +8,35 @@ using Unity.Robotics.ROSTCPConnector.MessageGeneration;
 namespace RosMessageTypes.StudyInterfaces
 {
     [Serializable]
-    public class PickPlaceResult : Message
+    public class ExecuteSolutionResult : Message
     {
-        public const string k_RosMessageName = "study_interfaces/PickPlace";
+        public const string k_RosMessageName = "study_interfaces/ExecuteSolution";
         public override string RosMessageName => k_RosMessageName;
 
         public bool success;
         public string message;
-        public string task_id;
-        public uint solution_id;
-        //  executed solution, 0 if none
         public Moveit.MoveItErrorCodesMsg error_code;
 
-        public PickPlaceResult()
+        public ExecuteSolutionResult()
         {
             this.success = false;
             this.message = "";
-            this.task_id = "";
-            this.solution_id = 0;
             this.error_code = new Moveit.MoveItErrorCodesMsg();
         }
 
-        public PickPlaceResult(bool success, string message, string task_id, uint solution_id, Moveit.MoveItErrorCodesMsg error_code)
+        public ExecuteSolutionResult(bool success, string message, Moveit.MoveItErrorCodesMsg error_code)
         {
             this.success = success;
             this.message = message;
-            this.task_id = task_id;
-            this.solution_id = solution_id;
             this.error_code = error_code;
         }
 
-        public static PickPlaceResult Deserialize(MessageDeserializer deserializer) => new PickPlaceResult(deserializer);
+        public static ExecuteSolutionResult Deserialize(MessageDeserializer deserializer) => new ExecuteSolutionResult(deserializer);
 
-        private PickPlaceResult(MessageDeserializer deserializer)
+        private ExecuteSolutionResult(MessageDeserializer deserializer)
         {
             deserializer.Read(out this.success);
             deserializer.Read(out this.message);
-            deserializer.Read(out this.task_id);
-            deserializer.Read(out this.solution_id);
             this.error_code = Moveit.MoveItErrorCodesMsg.Deserialize(deserializer);
         }
 
@@ -53,18 +44,14 @@ namespace RosMessageTypes.StudyInterfaces
         {
             serializer.Write(this.success);
             serializer.Write(this.message);
-            serializer.Write(this.task_id);
-            serializer.Write(this.solution_id);
             serializer.Write(this.error_code);
         }
 
         public override string ToString()
         {
-            return "PickPlaceResult: " +
+            return "ExecuteSolutionResult: " +
             "\nsuccess: " + success.ToString() +
             "\nmessage: " + message.ToString() +
-            "\ntask_id: " + task_id.ToString() +
-            "\nsolution_id: " + solution_id.ToString() +
             "\nerror_code: " + error_code.ToString();
         }
 

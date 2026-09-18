@@ -15,12 +15,13 @@ public class PickPlaceTaskRecorder : MonoBehaviour
     [SerializeField] private GameObject worldOrigin;
 
     [Header("Task delivery")]
-    [Tooltip("When assigned, the captured task is sent as a /pick_place action goal " +
-             "instead of being published on /pick_place_task. Leave empty to keep the topic.")]
-    [SerializeField] private PickPlaceActionClient pickPlaceAction;
+    [Tooltip("The captured task is sent as a /pick_place action goal through this client " +
+             "(sibling component by default). Only without one is it published on the legacy /pick_place_task topic.")]
+    [SerializeField] private PickPlaceClient pickPlaceAction;
 
-    [Tooltip("Action goals only: false plans without executing.")]
-    [SerializeField] private bool executeOnServer = true;
+    [Tooltip("false plans only, so the solutions can be browsed and one executed from the MTC tab. " +
+             "true plans and executes in one goal, skipping the browser.")]
+    [SerializeField] private bool executeOnServer = false;
 
     public bool IsRecording { get; private set; }
 
@@ -47,8 +48,9 @@ public class PickPlaceTaskRecorder : MonoBehaviour
         // tapping input directly. Guidelines Part 3.
         InteractionSampleBus.Sample += OnInteractionSample;
 
+        if (pickPlaceAction == null) pickPlaceAction = GetComponent<PickPlaceClient>();
         ros = RosBus.Instance;
-        ros.RegisterPublisher<PickPlaceTaskMsg>(Topic);
+        if (pickPlaceAction == null) ros.RegisterPublisher<PickPlaceTaskMsg>(Topic);
     }
 
     public void StartRecording()
@@ -178,19 +180,24 @@ public class PickPlaceTaskRecorder : MonoBehaviour
     }
 
     // The action reports acceptance, per-stage feedback and a result, so failures are
-    // logged here rather than disappearing into a fire-and-forget topic.
+    // logged here rather than disappearing into a fire-and-forget topic. The client also
+    // puts them on its status line (rejected while busy, aborted, cancelled).
     private async void SendPickPlaceGoal(string objectId, PointMsg rosPos, QuaternionMsg rosRot)
     {
         Debug.Log($"PickPlaceTaskRecorder: sending {pickPlaceAction.ActionName} goal object_id={objectId} place_pose=({rosPos.x:F3}, {rosPos.y:F3}, {rosPos.z:F3})");
         try
         {
-            var result = await pickPlaceAction.SendGoalAsync(objectId, rosPos, rosRot, executeOnServer);
+            PoseStampedMsg placePose = pickPlaceAction.PlacePose(rosPos, rosRot);
+            var result = executeOnServer
+                ? await pickPlaceAction.PlanAndExecuteAsync(objectId, placePose)
+                : await pickPlaceAction.PlanAsync(objectId, placePose);
             Debug.Log($"PickPlaceTaskRecorder: {pickPlaceAction.ActionName} finished status={result.Status} " +
                       $"success={result.Result?.success} message='{result.Result?.message}'");
         }
         catch (System.Exception exception)
         {
-            Debug.LogError($"PickPlaceTaskRecorder: {pickPlaceAction.ActionName} goal failed — {exception.Message}");
+            // Rejected-while-busy and lost connections are expected outcomes, already on the status line.
+            Debug.LogWarning($"PickPlaceTaskRecorder: {pickPlaceAction.ActionName} goal failed — {exception.Message}");
         }
     }
 

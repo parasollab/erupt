@@ -10,9 +10,10 @@ using Erupt.Ui;
 using RosMessageTypes.MoveitTaskConstructorMsgs;
 
 /// <summary>
-/// Tier 3 "MTC" tab: stage tree with per-stage counts, the ranked solutions, the cost
-/// breakdown of the selected one, and the pick/place recorder entry (Teach mode only,
-/// Guidelines Part 5: demonstration lives in Teach). Replaces MTCDashboardPanel.
+/// Tier 3 "MTC" tab: the solution browser and the execution panel. Stage tree with per-stage
+/// counts, the current task's solution ids, the steps of the selected one (highlighted as
+/// execution feedback arrives), and the pick/place recorder entry, which is the plan button
+/// (Teach mode only, Guidelines Part 5: demonstration lives in Teach).
 /// Interactive elements: record + up to five solution buttons + cancel = 7 (Part 8).
 /// Preview and execute are tier 2 verbs on the selected solution's handle, not buttons here.
 /// </summary>
@@ -20,6 +21,10 @@ public sealed class SolutionsTab
 {
     public const int MaxSolutionButtons = 5;
     private static readonly Vector2 ButtonSize = new(300f, 56f);
+    private static readonly Color SelectedColor = new(0.18f, 0.32f, 0.18f, 0.94f);
+    private static readonly Color IdleColor = new(0.16f, 0.17f, 0.20f, 0.94f);
+    private const string ActiveMark = "<color=#7CFC7C><b>";
+    private const string ActiveEnd = "</b></color>";
 
     private readonly MtcPlugin plugin;
     private readonly RectTransform root;
@@ -27,7 +32,7 @@ public sealed class SolutionsTab
     private readonly TMPro.TextMeshProUGUI taskLabel, stagesLabel, statusLabel, breakdownLabel;
     private readonly Transform solutionsRow;
     private readonly List<Button> solutionButtons = new();
-    private readonly Dictionary<Button, SolutionMsg> solutionByButton = new();
+    private readonly Dictionary<Button, uint> idByButton = new();
 
     public SolutionsTab(MtcPlugin plugin, RectTransform content)
     {
@@ -44,11 +49,13 @@ public sealed class SolutionsTab
         stagesLabel = UiBuilder.CreateLabel("Stages", t, "", 18f);
         stagesLabel.alignment = TMPro.TextAlignmentOptions.TopLeft;
         stagesLabel.enableWordWrapping = true;
+        stagesLabel.richText = true;
         solutionsRow = UiBuilder.CreateColumn("Solutions", t, 4f).transform;
         breakdownLabel = UiBuilder.CreateLabel("Breakdown", t, "", 18f);
         breakdownLabel.alignment = TMPro.TextAlignmentOptions.TopLeft;
         breakdownLabel.enableWordWrapping = true;
-        cancelButton = UiBuilder.CreateButton("Cancel", t, "Cancel execution", ButtonSize, () => _ = plugin.Client?.CancelExecutionAsync());
+        breakdownLabel.richText = true;
+        cancelButton = UiBuilder.CreateButton("Cancel", t, "Cancel", ButtonSize, () => _ = plugin.PickPlace?.CancelAsync());
 
         Subscribe();
         RefreshAll();
@@ -57,124 +64,165 @@ public sealed class SolutionsTab
     public RectTransform Root => root;
     public int InteractiveElementCount => UiBuilder.CountInteractive(root);
     public IReadOnlyList<Button> SolutionButtons => solutionButtons;
+    public string StatusText => statusLabel.text;
+    public string StagesText => stagesLabel.text;
+    public string BreakdownText => breakdownLabel.text;
 
     public void Dispose()
     {
-        var c = plugin.Client;
+        var c = plugin.PickPlace;
         if (c != null)
         {
-            c.OnDescriptionReceived -= OnDescription;
-            c.OnStatisticsUpdated -= OnStatistics;
-            c.OnSolutionReceived -= OnSolution;
-            c.OnTaskReset -= OnTaskReset;
-            c.OnExecutionStatus -= OnExecutionStatus;
+            c.OnDescriptionChanged -= RefreshTaskAndStages;
+            c.OnStatisticsChanged -= RefreshStages;
+            c.OnSolutionIdsChanged -= RefreshSolutions;
+            c.OnTaskReset -= RefreshAll;
+            c.OnStatus -= OnStatus;
+            c.OnPhaseChanged -= RefreshBusy;
+            c.OnExecutionFeedback -= OnExecutionFeedback;
         }
         plugin.SelectedSolutionChanged -= RefreshSelection;
         plugin.TeachModeChanged -= RefreshRecord;
         if (plugin.Recorder != null) plugin.Recorder.OnRecordingComplete -= OnRecorded;
-        if (plugin.PickPlace != null) plugin.PickPlace.OnStatus -= OnPickPlaceStatus;
     }
 
     private void Subscribe()
     {
-        var c = plugin.Client;
+        var c = plugin.PickPlace;
         if (c != null)
         {
-            c.OnDescriptionReceived += OnDescription;
-            c.OnStatisticsUpdated += OnStatistics;
-            c.OnSolutionReceived += OnSolution;
-            c.OnTaskReset += OnTaskReset;
-            c.OnExecutionStatus += OnExecutionStatus;
+            c.OnDescriptionChanged += RefreshTaskAndStages;
+            c.OnStatisticsChanged += RefreshStages;
+            c.OnSolutionIdsChanged += RefreshSolutions;
+            c.OnTaskReset += RefreshAll;
+            c.OnStatus += OnStatus;
+            c.OnPhaseChanged += RefreshBusy;
+            c.OnExecutionFeedback += OnExecutionFeedback;
         }
         plugin.SelectedSolutionChanged += RefreshSelection;
         plugin.TeachModeChanged += RefreshRecord;
         if (plugin.Recorder != null) plugin.Recorder.OnRecordingComplete += OnRecorded;
-        if (plugin.PickPlace != null) plugin.PickPlace.OnStatus += OnPickPlaceStatus;
     }
 
-    // --- record (Teach mode) -----------------------------------------------------
+    // --- record = plan (Teach mode) -------------------------------------------------
 
     private void OnRecord()
     {
         var recorder = plugin.Recorder;
         if (recorder == null || !plugin.InTeachMode) return;
         if (!recorder.IsRecording) { recorder.StartRecording(); statusLabel.text = "Grab and place the object..."; }
-        else { recorder.StopRecording(); statusLabel.text = "Idle"; }
+        else { recorder.StopRecording(); if (!Busy) statusLabel.text = "Idle"; }
         RefreshRecord();
     }
 
     private void OnRecorded(string objectId)
     {
-        statusLabel.text = $"Sent: {objectId}";
+        if (!Busy) statusLabel.text = $"Sent: {objectId}";
         RefreshRecord();
     }
 
-    private void OnPickPlaceStatus(string status) => statusLabel.text = $"Pick & place: {status}";
+    private bool Busy => plugin.PickPlace != null && plugin.PickPlace.Busy;
 
     private void RefreshRecord()
     {
         var recorder = plugin.Recorder;
         bool teach = plugin.InTeachMode;
-        UiBuilder.SetInteractable(recordButton, teach && recorder != null);
+        // One task at a time: a goal sent while the server is busy is rejected, so no new plan until this one ends.
+        UiBuilder.SetInteractable(recordButton, teach && recorder != null && !Busy);
         UiBuilder.SetButtonText(recordButton,
             recorder == null ? "No recorder" :
             !teach ? "Record (Teach mode)" :
+            Busy ? "Busy..." :
             recorder.IsRecording ? "Stop recording" : "Record pick & place");
+    }
+
+    private void RefreshBusy()
+    {
+        RefreshRecord();
+        UiBuilder.SetInteractable(cancelButton, Busy);
+        UiBuilder.SetButtonText(cancelButton,
+            plugin.PickPlace?.Phase == PickPlacePhase.Planning ? "Cancel planning" :
+            plugin.PickPlace?.Phase == PickPlacePhase.Executing ? "Cancel execution" : "Cancel");
+        RefreshStages();
+        RefreshBreakdown();
     }
 
     // --- task / stages ------------------------------------------------------------
 
-    private void OnDescription(TaskDescriptionMsg desc) { RefreshTask(); RefreshStages(); }
-    private void OnStatistics(TaskStatisticsMsg stats) => RefreshStages();
-    private void OnTaskReset() { RefreshAll(); }
-    private void OnSolution(SolutionMsg _) => RefreshSolutions();
-    private void OnExecutionStatus(string status)
+    private void OnStatus(string status) => statusLabel.text = status;
+
+    private void OnExecutionFeedback(RosMessageTypes.StudyInterfaces.ExecuteSolutionFeedback _)
     {
-        statusLabel.text = status;
-        UiBuilder.SetInteractable(cancelButton, plugin.Client != null && plugin.Client.IsExecuting);
+        RefreshStages();
+        RefreshBreakdown();
     }
 
     private void RefreshAll()
     {
-        RefreshTask(); RefreshStages(); RefreshSolutions(); RefreshSelection(); RefreshRecord();
-        UiBuilder.SetInteractable(cancelButton, plugin.Client != null && plugin.Client.IsExecuting);
+        RefreshTask(); RefreshStages(); RefreshSolutions(); RefreshBusy();
     }
+
+    private void RefreshTaskAndStages() { RefreshTask(); RefreshStages(); }
 
     private void RefreshTask()
     {
-        string id = plugin.Client?.CurrentTaskId;
-        taskLabel.text = string.IsNullOrEmpty(id) ? "No task" : $"Task {id}";
+        string id = plugin.PickPlace?.TaskId;
+        string name = plugin.PickPlace?.Description?.stages?.FirstOrDefault(s => s.id == PickPlaceClient.RootStageId)?.name;
+        taskLabel.text = string.IsNullOrEmpty(id) ? "No task" : string.IsNullOrEmpty(name) ? $"Task {id}" : name;
     }
+
+    /// <summary>Stage being executed: the one after the last finished sub-trajectory, or null.</summary>
+    private uint? ActiveStageId()
+    {
+        var c = plugin.PickPlace;
+        if (c == null || c.Phase != PickPlacePhase.Executing) return null;
+        var steps = plugin.SelectedSolution?.sub_trajectory;
+        if (steps == null || steps.Length == 0 || c.ExecutingSolutionId != plugin.SelectedSolutionId)
+            return c.LastExecutionFeedback?.stage_id;
+        int current = ActiveStep(c, steps.Length);
+        return current < steps.Length ? steps[current].info.stage_id : (uint?)null;
+    }
+
+    // Feedback reports the step that just finished, so the running one is the next.
+    private static int ActiveStep(PickPlaceClient c, int stepCount) =>
+        c.LastExecutionFeedback == null ? 0 : (int)Math.Min(c.LastExecutionFeedback.sub_id + 1, (uint)stepCount);
 
     private void RefreshStages()
     {
-        var desc = plugin.Client?.LastDescription;
-        var stats = plugin.Client?.LastStatistics;
+        var desc = plugin.PickPlace?.Description;
+        var stats = plugin.PickPlace?.Statistics;
         if (desc?.stages == null || desc.stages.Length == 0) { stagesLabel.text = ""; return; }
 
         var statsById = new Dictionary<uint, StageStatisticsMsg>();
         if (stats?.stages != null) foreach (var s in stats.stages) statsById[s.id] = s;
         var children = new Dictionary<uint, List<StageDescriptionMsg>>();
-        StageDescriptionMsg rootStage = null;
+        var ids = new HashSet<uint>(desc.stages.Select(s => s.id));
+        var roots = new List<StageDescriptionMsg>();
         foreach (var stage in desc.stages)
         {
-            if (stage.id == stage.parent_id) { rootStage = stage; continue; }
+            // Stage 0 (the Task wrapper) is never published, so the root container's parent is absent.
+            if (stage.id == stage.parent_id || !ids.Contains(stage.parent_id)) { roots.Add(stage); continue; }
             if (!children.TryGetValue(stage.parent_id, out var list)) children[stage.parent_id] = list = new List<StageDescriptionMsg>();
             list.Add(stage);
         }
         var sb = new StringBuilder();
-        if (rootStage != null) AppendStage(sb, rootStage, children, statsById, 0);
+        uint? active = ActiveStageId();
+        foreach (var rootStage in roots) AppendStage(sb, rootStage, children, statsById, 0, active);
         stagesLabel.text = sb.ToString().TrimEnd();
     }
 
     private static void AppendStage(StringBuilder sb, StageDescriptionMsg stage, Dictionary<uint, List<StageDescriptionMsg>> children,
-                                    Dictionary<uint, StageStatisticsMsg> statsById, int depth)
+                                    Dictionary<uint, StageStatisticsMsg> statsById, int depth, uint? active)
     {
         statsById.TryGetValue(stage.id, out var s);
-        sb.Append(' ', depth * 2).Append(stage.name)
-          .Append($"  ✓{s?.solved?.Length ?? 0}  ✗{s?.num_failed ?? 0}  {s?.total_compute_time ?? 0:F1}s\n");
+        bool isActive = active == stage.id;
+        sb.Append(' ', depth * 2);
+        if (isActive) sb.Append(ActiveMark).Append("▶ ");
+        sb.Append(stage.name);
+        if (isActive) sb.Append(ActiveEnd);
+        sb.Append($"  ✓{s?.solved?.Length ?? 0}  ✗{s?.num_failed ?? 0}  {s?.total_compute_time ?? 0:F1}s\n");
         if (children.TryGetValue(stage.id, out var kids))
-            foreach (var k in kids) AppendStage(sb, k, children, statsById, depth + 1);
+            foreach (var k in kids) AppendStage(sb, k, children, statsById, depth + 1, active);
     }
 
     // --- solutions ----------------------------------------------------------------
@@ -183,17 +231,17 @@ public sealed class SolutionsTab
     {
         foreach (var b in solutionButtons) if (b != null) UnityEngine.Object.Destroy(b.gameObject);
         solutionButtons.Clear();
-        solutionByButton.Clear();
+        idByButton.Clear();
 
-        var ranked = plugin.RankedSolutions.Take(MaxSolutionButtons).ToList();
+        var ids = plugin.PickPlace?.SolutionIds ?? Array.Empty<uint>();
         int rank = 1;
-        foreach (var (sol, cost) in ranked)
+        foreach (uint id in ids.Take(MaxSolutionButtons))
         {
-            var captured = sol;
-            var button = UiBuilder.CreateButton($"Solution{rank}", solutionsRow, $"#{rank}  cost {cost:F3}  {sol.sub_trajectory.Length} segs", ButtonSize,
+            uint captured = id;
+            var button = UiBuilder.CreateButton($"Solution{rank}", solutionsRow, $"#{rank}  solution {id}", ButtonSize,
                 () => plugin.SelectSolution(captured));
             solutionButtons.Add(button);
-            solutionByButton[button] = sol;
+            idByButton[button] = id;
             rank++;
         }
         RefreshSelection();
@@ -201,33 +249,47 @@ public sealed class SolutionsTab
 
     private void RefreshSelection()
     {
-        var selected = plugin.SelectedSolution;
-        foreach (var (button, sol) in solutionByButton.Select(kv => (kv.Key, kv.Value)))
+        uint? selected = plugin.SelectedSolutionId;
+        foreach (var (button, id) in idByButton.Select(kv => (kv.Key, kv.Value)))
         {
             var image = button.GetComponent<Image>();
-            if (image != null) image.color = sol == selected ? new Color(0.18f, 0.32f, 0.18f, 0.94f) : new Color(0.16f, 0.17f, 0.20f, 0.94f);
+            if (image != null) image.color = id == selected ? SelectedColor : IdleColor;
         }
-        breakdownLabel.text = selected != null ? Breakdown(selected) : "";
+        RefreshBreakdown();
+        RefreshStages();
     }
 
+    private void RefreshBreakdown()
+    {
+        var selected = plugin.SelectedSolution;
+        breakdownLabel.text = selected != null ? Breakdown(selected) :
+            plugin.SelectedSolutionId != null ? $"Fetching solution {plugin.SelectedSolutionId}..." : "";
+    }
+
+    // One line per sub-trajectory, in execution order: sub_id from the feedback indexes this list.
     private string Breakdown(SolutionMsg sol)
     {
-        var stageNames = new Dictionary<uint, string>();
-        var desc = plugin.Client?.LastDescription;
-        if (desc?.stages != null) foreach (var s in desc.stages) stageNames[s.id] = s.name;
+        var c = plugin.PickPlace;
+        var steps = sol.sub_trajectory ?? Array.Empty<SubTrajectoryMsg>();
+        bool tracking = c != null && c.ExecutingSolutionId == plugin.SelectedSolutionId &&
+                        (c.Phase == PickPlacePhase.Executing || c.LastExecutionFeedback != null);
+        int done = !tracking || c.LastExecutionFeedback == null ? 0 : ActiveStep(c, steps.Length);
+        bool running = tracking && c.Phase == PickPlacePhase.Executing;
 
         var sb = new StringBuilder();
-        foreach (var group in sol.sub_trajectory.GroupBy(t => t.info.stage_id))
+        sb.Append($"Solution {plugin.SelectedSolutionId}  cost {steps.Sum(s => s.info.cost):F3}  {steps.Length} steps\n");
+        for (int i = 0; i < steps.Length; i++)
         {
-            stageNames.TryGetValue(group.Key, out var name);
-            sb.Append(name ?? $"Stage {group.Key}").Append('\n');
-            foreach (var seg in group)
-            {
-                int pts = seg.trajectory?.joint_trajectory?.points?.Length ?? 0;
-                sb.Append($"  id={seg.info.id}  cost={seg.info.cost:F3}  pts={pts}");
-                if (!string.IsNullOrEmpty(seg.info.planner_id)) sb.Append($"  [{seg.info.planner_id}]");
-                sb.Append('\n');
-            }
+            var info = steps[i].info;
+            string name = c?.StageName(info.stage_id) ?? $"Stage {info.stage_id}";
+            int pts = steps[i].trajectory?.joint_trajectory?.points?.Length ?? 0;
+            bool isActive = running && i == done;
+            if (isActive) sb.Append(ActiveMark);
+            sb.Append(tracking && i < done ? "✓ " : isActive ? "▶ " : "  ");
+            sb.Append($"{i + 1}. {name}  cost={info.cost:F3}  pts={pts}");
+            if (!string.IsNullOrEmpty(info.planner_id)) sb.Append($"  [{info.planner_id}]");
+            if (isActive) sb.Append(ActiveEnd);
+            sb.Append('\n');
         }
         return sb.ToString().TrimEnd();
     }
