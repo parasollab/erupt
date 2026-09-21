@@ -147,6 +147,133 @@ namespace Erupt.Ros.Tests
             Assert.That(RowText("mtcStage1"), Does.Contain("pick and place").And.Contain("✓2"));
         }
 
+        // ─── partial / failed stage solutions ─────────────────────────────────────
+
+        [UnityTest]
+        public IEnumerator PartialStageSolution_IsFetchedWithItsStartScene_Previewed_AndNeverExecutable()
+        {
+            var requests = RecordGetSolution(id => new GetSolutionResponse(true, "", Solution(id)));
+            var player = AddTrajectoryPlayer();
+            yield return Plan(7, 4);
+
+            panel.SelectStage(2);
+            Assert.Contains("mtcStageSolution100", Rows("mtcStageSolutionsContainer"));
+            Assert.That(RowText("mtcStageSolution100"), Does.Contain("preview"));
+
+            panel.PreviewStageSolution(100);
+
+            Assert.AreEqual(1, requests.Count);
+            Assert.AreEqual(100u, requests[0].solution_id);
+            Assert.IsTrue(requests[0].include_start_scene, "A partial solution starts mid-task; its start scene is needed.");
+            Assert.IsTrue(player.IsPlaying, "The tap must end in a preview.");
+            Assert.That(panel.StageSolutionStatus, Does.Contain("Previewing stage solution 100"));
+            Assert.IsNull(panel.SelectedSolutionId, "Partial solutions must never become the executable selection.");
+            Assert.IsFalse(ButtonNamed("mtcExecuteButton").enabledSelf);
+            player.Stop();
+        }
+
+        [UnityTest]
+        public IEnumerator SolutionFetchedWithoutStartScene_IsNotReusedWhenOneIsNeeded()
+        {
+            var requests = RecordGetSolution(id => new GetSolutionResponse(true, "", Solution(id)));
+            yield return Plan(7, 4);
+
+            client.FetchSolution(7, _ => { });
+            client.FetchSolution(7, _ => { }, null, includeStartScene: true);
+            Assert.AreEqual(2, requests.Count, "The cached no-scene solution must not answer a with-scene request.");
+            Assert.IsFalse(requests[0].include_start_scene);
+            Assert.IsTrue(requests[1].include_start_scene);
+
+            client.FetchSolution(7, _ => { }, null, includeStartScene: true);
+            client.FetchSolution(7, _ => { });
+            Assert.AreEqual(2, requests.Count, "Both variants are cached afterwards.");
+        }
+
+        [UnityTest]
+        public IEnumerator FailedStageSolution_ShowsWhyItFailed()
+        {
+            RecordGetSolution(id => new GetSolutionResponse(true, "", new SolutionMsg
+            {
+                sub_solution = new[] { new SubSolutionMsg { info = new SolutionInfoMsg { id = id, stage_id = 3, comment = "object in collision with table" } } },
+            }));
+            yield return Plan(7, 4);
+            var stats = PickPlaceClientTests.Statistics(k_TopicTask, 7, 4);
+            stats.stages[2].failed = new uint[] { 300 };
+            bus.Inbound("/pick_place/statistics", stats);
+
+            panel.SelectStage(3);
+            Assert.Contains("mtcStageFailed300", Rows("mtcStageSolutionsContainer"));
+
+            panel.PreviewStageSolution(300, failed: true);
+
+            Assert.That(panel.StageSolutionStatus, Does.Contain("object in collision with table"));
+            Assert.That(LabelNamed("mtcStageSolutionStatus").text, Does.Contain("object in collision with table"));
+            Assert.IsNull(panel.SelectedSolutionId);
+            Assert.IsFalse(ButtonNamed("mtcExecuteButton").enabledSelf);
+        }
+
+        [UnityTest]
+        public IEnumerator ServerRefusingAPartialSolution_IsShown_AndThePanelStaysUsable()
+        {
+            RecordGetSolution(id => id >= 100
+                ? new GetSolutionResponse(false, "unknown solution id 100 for task t", new SolutionMsg())
+                : new GetSolutionResponse(true, "", Solution(id)));
+            yield return Plan(7, 4);
+
+            panel.SelectStage(2);
+            panel.PreviewStageSolution(100);
+            Assert.That(panel.StageSolutionStatus, Does.Contain("unknown solution id 100"));
+
+            panel.SelectSolution(7);
+            Assert.IsNotNull(panel.SelectedSolution, "An older server rejecting partial ids must not break the browser.");
+            Assert.IsTrue(ButtonNamed("mtcExecuteButton").enabledSelf);
+        }
+
+        [UnityTest]
+        public IEnumerator NoStagePreviewWhileExecuting()
+        {
+            var requests = RecordGetSolution(id => new GetSolutionResponse(true, "", Solution(id)));
+            yield return Plan(7, 4);
+            panel.SelectSolution(7);
+            panel.ExecuteSelected();
+            execute.Accept();
+            yield return null;
+            int before = requests.Count;
+
+            panel.SelectStage(2);
+            panel.PreviewStageSolution(100);
+
+            Assert.AreEqual(before, requests.Count);
+            Assert.That(panel.StageSolutionStatus, Does.Contain("executing"));
+        }
+
+        System.Collections.Generic.List<GetSolutionRequest> RecordGetSolution(System.Func<uint, GetSolutionResponse> respond)
+        {
+            var requests = new System.Collections.Generic.List<GetSolutionRequest>();
+            bus.SetServiceHandler("/get_solution", request =>
+            {
+                var r = (GetSolutionRequest)request;
+                requests.Add(r);
+                return respond(r.solution_id);
+            });
+            return requests;
+        }
+
+        // A player with a joint-less controller: enough to tell that a preview started.
+        MTCTrajectoryPlayer AddTrajectoryPlayer()
+        {
+            var ik = panelGo.AddComponent<DirectArticulationIKController>();
+            ik.enabled = false;
+            var player = panelGo.AddComponent<MTCTrajectoryPlayer>();
+            SetPrivate(player, "ikController", ik);
+            SetPrivate(panel, "trajectoryPlayer", player);
+            return player;
+        }
+
+        static void SetPrivate(object target, string field, object value) =>
+            target.GetType().GetField(field, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                .SetValue(target, value);
+
         IEnumerator Plan(params uint[] ids)
         {
             Task goal = client.PlanAsync("object", new PoseStampedMsg());

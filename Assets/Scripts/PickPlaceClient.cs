@@ -110,6 +110,9 @@ public class PickPlaceClient : MonoBehaviour
 
     private readonly List<uint> solutionIds = new();
     private readonly Dictionary<uint, SolutionMsg> solutionCache = new();
+    // Solutions fetched with include_start_scene. Kept apart: one fetched without its start
+    // scene must never answer a request that needs it.
+    private readonly Dictionary<uint, SolutionMsg> solutionWithSceneCache = new();
     // Bumped per plan so a /get_solution response for a dead task is dropped.
     private int taskGeneration;
     // Latest topic messages since the plan started. The description can arrive before the
@@ -351,23 +354,32 @@ public class PickPlaceClient : MonoBehaviour
     // --- solutions ------------------------------------------------------------------
 
     /// <summary>
-    /// Fetch one of <see cref="SolutionIds"/> (cached per task). A response for a task that
-    /// has since been replaced is dropped. <paramref name="failed"/> gets the server's message.
+    /// Fetch a solution of the current task (cached per task): one of <see cref="SolutionIds"/>,
+    /// or any stage's partial or failed solution listed in <see cref="Statistics"/>. With
+    /// <paramref name="includeStartScene"/> the server also fills <c>start_scene</c>, the state
+    /// the solution starts from. A response for a task that has since been replaced is dropped.
+    /// <paramref name="failed"/> gets the server's message.
     /// </summary>
-    public void FetchSolution(uint solutionId, Action<SolutionMsg> fetched, Action<string> failed = null)
+    public void FetchSolution(uint solutionId, Action<SolutionMsg> fetched, Action<string> failed = null,
+        bool includeStartScene = false)
     {
-        if (string.IsNullOrEmpty(TaskId) || !solutionIds.Contains(solutionId))
+        if (string.IsNullOrEmpty(TaskId) || !IsKnownSolutionId(solutionId))
         {
             failed?.Invoke($"solution {solutionId} is not part of the current plan");
             return;
         }
-        if (solutionCache.TryGetValue(solutionId, out var cached)) { fetched?.Invoke(cached); return; }
+        if (solutionWithSceneCache.TryGetValue(solutionId, out var cached) ||
+            (!includeStartScene && solutionCache.TryGetValue(solutionId, out cached)))
+        {
+            fetched?.Invoke(cached);
+            return;
+        }
 
         int generation = taskGeneration;
         bool answered = false;
         ros.SendServiceMessage<GetSolutionResponse>(
             getSolutionService,
-            new GetSolutionRequest(TaskId, solutionId, false),
+            new GetSolutionRequest(TaskId, solutionId, includeStartScene),
             response =>
             {
                 answered = true;
@@ -380,7 +392,7 @@ public class PickPlaceClient : MonoBehaviour
                     failed?.Invoke(message);
                     return;
                 }
-                solutionCache[solutionId] = response.solution;
+                (includeStartScene ? solutionWithSceneCache : solutionCache)[solutionId] = response.solution;
                 fetched?.Invoke(response.solution);
             });
         if (!answered) FailFetchAfterTimeout();
@@ -397,6 +409,18 @@ public class PickPlaceClient : MonoBehaviour
             SetStatus("SOLUTION UNAVAILABLE: " + message);
             failed?.Invoke(message);
         }
+    }
+
+    /// <summary>True for executable solutions and for any stage's solved[] / failed[] id.</summary>
+    public bool IsKnownSolutionId(uint solutionId)
+    {
+        if (solutionIds.Contains(solutionId)) return true;
+        if (Statistics?.stages == null) return false;
+        foreach (var stage in Statistics.stages)
+            if ((stage.solved != null && Array.IndexOf(stage.solved, solutionId) >= 0) ||
+                (stage.failed != null && Array.IndexOf(stage.failed, solutionId) >= 0))
+                return true;
+        return false;
     }
 
     /// <summary>Stage name from the current description; null when unknown.</summary>
@@ -431,6 +455,7 @@ public class PickPlaceClient : MonoBehaviour
         cancelRequested = false;
         solutionIds.Clear();
         solutionCache.Clear();
+        solutionWithSceneCache.Clear();
         OnTaskReset?.Invoke();
     }
 

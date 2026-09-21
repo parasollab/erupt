@@ -45,6 +45,13 @@ public class MTCDashboardPanel : MonoBehaviour
 
     private bool hasSelectedStage;
     private uint selectedStageId;
+    private static readonly Color FailedColor = new(1f, 0.55f, 0.45f);
+    // Partial / failed stage solution being fetched for a preview; a later tap or a task
+    // reset replaces it, so a slower fetch is dropped. Never feeds SelectedSolutionId:
+    // only complete solutions may reach Execute.
+    private uint? pendingStageSolutionId;
+    /// <summary>What the last stage-solution tap led to; shown on the Stages tab.</summary>
+    public string StageSolutionStatus { get; private set; }
 
     /// <summary>Solution chosen in the browser; its message arrives with the /get_solution response.</summary>
     public uint? SelectedSolutionId { get; private set; }
@@ -332,12 +339,36 @@ public class MTCDashboardPanel : MonoBehaviour
         stageSolutionsContainer.Clear();
         if (!hasSelectedStage || Client == null) return;
 
-        var solved = Client.Statistics?.stages?.FirstOrDefault(s => s.id == selectedStageId)?.solved;
-        if (solved == null || solved.Length == 0)
+        if (SelectedSolution != null && TryGetStageSteps(selectedStageId, out int firstStep, out int lastStep))
+        {
+            uint stageId = selectedStageId;
+            var previewRow = Row(StageSelectedColor);
+            previewRow.name = "mtcPreviewStageRow";
+            string span = firstStep == lastStep ? $"step {firstStep + 1}" : $"steps {firstStep + 1}-{lastStep + 1}";
+            var previewLabel = Text($"▶ Preview this stage in solution {SelectedSolutionId} ({span})", new Color(0.55f, 0.75f, 1f), 11);
+            previewLabel.style.flexGrow = 1;
+            previewRow.Add(previewLabel);
+            previewRow.RegisterCallback<PointerDownEvent>(_ => PreviewStage(stageId));
+            stageSolutionsContainer.Add(previewRow);
+        }
+
+        if (!string.IsNullOrEmpty(StageSolutionStatus))
+        {
+            var status = Text(StageSolutionStatus, new Color(0.65f, 0.65f, 0.35f), 11);
+            status.name = "mtcStageSolutionStatus";
+            status.style.whiteSpace = WhiteSpace.Normal;
+            stageSolutionsContainer.Add(status);
+        }
+
+        var stageStats = Client.Statistics?.stages?.FirstOrDefault(s => s.id == selectedStageId);
+        var solved = stageStats?.solved;
+        var failedIds = stageStats?.failed ?? Array.Empty<uint>();
+        if ((solved == null || solved.Length == 0) && failedIds.Length == 0)
         {
             stageSolutionsContainer.Add(Text("No solutions for this stage yet.", MutedColor, 11));
             return;
         }
+        solved ??= Array.Empty<uint>();
 
         bool complete = selectedStageId == PickPlaceClient.RootStageId;
         int rank = 1;
@@ -346,14 +377,107 @@ public class MTCDashboardPanel : MonoBehaviour
             uint capturedId = id;
             var row = Row(Color.clear);
             row.Add(RankLabel(rank++));
-            var idLabel = Text($"solution id {id}", complete ? Color.white : MutedColor, 11);
+            row.name = $"mtcStageSolution{id}";
+            var idLabel = Text($"solution id {id}", Color.white, 11);
             idLabel.style.flexGrow = 1;
             row.Add(idLabel);
-            row.Add(Text(complete ? "tap to open" : "partial", complete ? new Color(0.55f, 0.75f, 1f) : MutedColor, 10));
+            row.Add(Text(complete ? "tap to open" : "partial · ▶ preview", new Color(0.55f, 0.75f, 1f), 10));
             if (complete)
                 row.RegisterCallback<PointerDownEvent>(_ => { SelectSolution(capturedId); ShowTab(panelSolutions); });
+            else
+                row.RegisterCallback<PointerDownEvent>(_ => PreviewStageSolution(capturedId));
             stageSolutionsContainer.Add(row);
         }
+
+        if (failedIds.Length == 0) return;
+        stageSolutionsContainer.Add(Text($"Failed attempts ({failedIds.Length})", FailedColor, 11));
+        foreach (uint id in failedIds)
+        {
+            uint capturedId = id;
+            var row = Row(Color.clear);
+            row.name = $"mtcStageFailed{id}";
+            var idLabel = Text($"✗ solution id {id}", FailedColor, 11);
+            idLabel.style.flexGrow = 1;
+            row.Add(idLabel);
+            row.Add(Text("failed · tap for reason", FailedColor, 10));
+            row.RegisterCallback<PointerDownEvent>(_ => PreviewStageSolution(capturedId, failed: true));
+            stageSolutionsContainer.Add(row);
+        }
+    }
+
+    /// <summary>
+    /// Fetch a stage's partial or failed solution with its start scene and preview it from
+    /// there. These are never executable, so the selected (executable) solution is untouched.
+    /// </summary>
+    public void PreviewStageSolution(uint solutionId, bool failed = false)
+    {
+        if (Client == null) return;
+        if (Client.Phase == PickPlacePhase.Executing)
+        {
+            SetStageSolutionStatus("Cannot preview while a solution is executing.");
+            return;
+        }
+
+        string kind = failed ? "failed solution" : "stage solution";
+        pendingStageSolutionId = solutionId;
+        SetStageSolutionStatus($"Fetching {kind} {solutionId}...");
+
+        Client.FetchSolution(solutionId,
+            solution =>
+            {
+                // A later tap (or a task reset) wins over a slower fetch.
+                if (pendingStageSolutionId != solutionId) return;
+                pendingStageSolutionId = null;
+
+                string comment = FirstComment(solution);
+                string reason = failed
+                    ? $"Solution {solutionId} failed: {(string.IsNullOrEmpty(comment) ? "no reason given by the planner" : comment)}"
+                    : null;
+
+                bool hasSteps = solution.sub_trajectory != null && solution.sub_trajectory.Length > 0;
+                if (!hasSteps || trajectoryPlayer == null || Client.Phase == PickPlacePhase.Executing)
+                {
+                    SetStageSolutionStatus(reason ?? (hasSteps
+                        ? "Preview unavailable right now."
+                        : $"Stage solution {solutionId} has no motion to preview."));
+                    return;
+                }
+
+                SetStageSolutionStatus(failed ? reason : $"Previewing stage solution {solutionId}...");
+                trajectoryPlayer.OnProblem -= OnPreviewProblem;
+                trajectoryPlayer.OnProblem -= OnStagePreviewProblem;
+                trajectoryPlayer.OnProblem += OnStagePreviewProblem;
+                trajectoryPlayer.PlaySolution(solution, useStartScene: true);
+            },
+            message =>
+            {
+                if (pendingStageSolutionId != solutionId) return;
+                pendingStageSolutionId = null;
+                SetStageSolutionStatus($"Solution {solutionId} unavailable: {message}");
+            },
+            includeStartScene: true);
+    }
+
+    private static string FirstComment(SolutionMsg solution)
+    {
+        foreach (var step in solution?.sub_trajectory ?? Array.Empty<SubTrajectoryMsg>())
+            if (!string.IsNullOrEmpty(step?.info?.comment)) return step.info.comment;
+        // A failure with no motion at all only carries its reason on the sub-solutions.
+        foreach (var sub in solution?.sub_solution ?? Array.Empty<SubSolutionMsg>())
+            if (!string.IsNullOrEmpty(sub?.info?.comment)) return sub.info.comment;
+        return null;
+    }
+
+    private void OnStagePreviewProblem(string problem)
+    {
+        SetStageSolutionStatus("Cannot preview: " + problem);
+    }
+
+    private void SetStageSolutionStatus(string text)
+    {
+        StageSolutionStatus = text;
+        if (execStatusLabel != null) execStatusLabel.text = text;
+        RefreshStageSolutions();
     }
 
     // ─── Solutions tab ────────────────────────────────────────────────────────
@@ -361,6 +485,8 @@ public class MTCDashboardPanel : MonoBehaviour
     private void OnTaskReset()
     {
         trajectoryPlayer?.Stop();
+        pendingStageSolutionId = null; // drops any partial fetch still in flight
+        StageSolutionStatus = null;
         SelectedSolutionId = null;
         SelectedSolution = null;
         hasSelectedStage = false;
@@ -417,6 +543,7 @@ public class MTCDashboardPanel : MonoBehaviour
                 if (SelectedSolutionId != solutionId) return;
                 SelectedSolution = solution;
                 RefreshSolutionList();
+                RefreshStageSolutions(); // the selected stage can now be previewed in it
             },
             message =>
             {
@@ -460,7 +587,15 @@ public class MTCDashboardPanel : MonoBehaviour
             if (!string.IsNullOrEmpty(info.planner_id)) text += $"  [{info.planner_id}]";
             var label = Text(text, isDone ? DoneColor : Color.white, 11);
             if (isActive) label.style.unityFontStyleAndWeight = FontStyle.Bold;
+            label.style.flexGrow = 1;
             row.Add(label);
+            if (!running)
+            {
+                // Tap a step to preview just that stage's part of the solution.
+                int capturedStep = i;
+                row.Add(Text("▶ preview", new Color(0.55f, 0.75f, 1f), 10));
+                row.RegisterCallback<PointerDownEvent>(_ => PreviewStep(capturedStep));
+            }
             breakdownContainer.Add(row);
 
             if (!string.IsNullOrEmpty(info.comment))
@@ -471,7 +606,59 @@ public class MTCDashboardPanel : MonoBehaviour
         }
     }
 
-    private void OnPreviewClicked()
+    private void OnPreviewClicked() => PreviewSteps(0, int.MaxValue, $"solution {SelectedSolutionId}");
+
+    /// <summary>Preview one sub-trajectory (a row of the breakdown) of the selected solution.</summary>
+    public void PreviewStep(int step)
+    {
+        var steps = SelectedSolution?.sub_trajectory;
+        if (steps == null || step < 0 || step >= steps.Length) return;
+        string stageName = Client?.StageName(steps[step].info.stage_id) ?? $"stage {steps[step].info.stage_id}";
+        PreviewSteps(step, step, $"step {step + 1} ({stageName})");
+    }
+
+    /// <summary>
+    /// Preview the part of the selected solution that belongs to a stage. A container stage
+    /// (e.g. "pick object") covers the steps of all the stages nested under it.
+    /// </summary>
+    public void PreviewStage(uint stageId)
+    {
+        if (!TryGetStageSteps(stageId, out int first, out int last))
+        {
+            if (execStatusLabel != null) execStatusLabel.text = "The selected solution has no steps from that stage.";
+            return;
+        }
+        PreviewSteps(first, last, Client?.StageName(stageId) ?? $"stage {stageId}");
+    }
+
+    private bool TryGetStageSteps(uint stageId, out int first, out int last)
+    {
+        first = last = -1;
+        var steps = SelectedSolution?.sub_trajectory;
+        if (steps == null) return false;
+
+        // The stage and everything nested under it.
+        var family = new HashSet<uint> { stageId };
+        var stages = Client?.Description?.stages;
+        if (stages != null)
+            for (bool grew = true; grew;)
+            {
+                grew = false;
+                foreach (var stage in stages)
+                    if (stage.id != stage.parent_id && family.Contains(stage.parent_id) && family.Add(stage.id))
+                        grew = true;
+            }
+
+        for (int i = 0; i < steps.Length; i++)
+        {
+            if (!family.Contains(steps[i].info.stage_id)) continue;
+            if (first < 0) first = i;
+            last = i;
+        }
+        return first >= 0;
+    }
+
+    private void PreviewSteps(int firstStep, int lastStep, string what)
     {
         if (SelectedSolution == null)
         {
@@ -483,10 +670,11 @@ public class MTCDashboardPanel : MonoBehaviour
             if (execStatusLabel != null) execStatusLabel.text = "Preview unavailable: no trajectory player assigned.";
             return;
         }
-        if (execStatusLabel != null) execStatusLabel.text = $"Previewing solution {SelectedSolutionId}...";
+        if (execStatusLabel != null) execStatusLabel.text = $"Previewing {what}...";
+        trajectoryPlayer.OnProblem -= OnStagePreviewProblem;
         trajectoryPlayer.OnProblem -= OnPreviewProblem;
         trajectoryPlayer.OnProblem += OnPreviewProblem;
-        trajectoryPlayer.PlaySolution(SelectedSolution);
+        trajectoryPlayer.PlaySolution(SelectedSolution, firstStep, lastStep);
     }
 
     private void OnPreviewProblem(string problem)

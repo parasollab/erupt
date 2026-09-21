@@ -488,6 +488,15 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
         return false;
     }
 
+    /// <summary>
+    /// Places a transform at a ROS world pose, with the same conversion inbound collision
+    /// objects get. For callers (the solution preview) that show objects at a planned pose.
+    /// </summary>
+    public void ApplyRosWorldPose(Transform t, PoseMsg rosPose)
+    {
+        if (t != null && rosPose != null) ApplyWorldPose(t, rosPose);
+    }
+
     // ---------- Pose helpers ----------
 
     // If array is null or wrong length, return identity local poses
