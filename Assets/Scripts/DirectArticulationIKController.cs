@@ -76,8 +76,23 @@ public class DirectArticulationIKController : MonoBehaviour
     public Transform FindLinkTransform(string linkName)
     {
         if (string.IsNullOrEmpty(linkName)) return endEffector;
+        if (TryFindLinkTransform(linkName, out var link)) return link;
 
-        if (linkByName.TryGetValue(linkName, out var cached) && cached) return cached;
+        Debug.LogWarning($"[IK] FindLinkTransform: no link named '{linkName}' under robot root; using end effector.");
+        return endEffector;
+    }
+
+    /// <summary>
+    /// As <see cref="FindLinkTransform"/> but without the end-effector fallback, for callers
+    /// that place things in the link's own frame and so need the exact link.
+    /// </summary>
+    public bool TryFindLinkTransform(string linkName, out Transform link)
+    {
+        link = null;
+        if (string.IsNullOrEmpty(linkName)) return false;
+
+        if (linkByName.TryGetValue(linkName, out var cached) && cached) { link = cached; return true; }
+        linkByName.Remove(linkName);
 
         if (robotRoot != null)
         {
@@ -86,15 +101,15 @@ public class DirectArticulationIKController : MonoBehaviour
                 if (string.Equals(t.name, linkName, StringComparison.OrdinalIgnoreCase))
                 {
                     linkByName[linkName] = t;
-                    return t;
+                    link = t;
+                    return true;
                 }
             }
         }
-
-        Debug.LogWarning($"[IK] FindLinkTransform: no link named '{linkName}' under robot root; using end effector.");
-        linkByName[linkName] = endEffector;
-        return endEffector;
+        return false;
     }
+
+    public void ClearLinkCache() => linkByName.Clear();
 
     private void Awake()
     {

@@ -37,9 +37,21 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
     public Dictionary<string, GameObject> objectsById = new();
 
     // Ids currently attached to the robot (maintained by AttachedCollisionObjectListener).
-    // While an id is in here, inbound REMOVEs for it are ignored — the object is being
-    // carried by the gripper, not deleted.
+    // While an id is in here, inbound REMOVE/MOVE/ADD for it are ignored — the object is
+    // being carried by the gripper, and /attached_collision_objects_ros owns its pose.
     public readonly HashSet<string> attachedIds = new();
+
+    // Ids just detached from the robot. The ADD that follows carries the authoritative place
+    // pose, which is applied even to Unity-owned objects (the robot moved it, not Unity).
+    public readonly HashSet<string> awaitingDetachPose = new();
+
+    // Fired when the registry is cleared (scene change / teardown).
+    // The argument is true when the listener itself is being destroyed.
+    public event System.Action<bool> OnRegistryCleared;
+
+    // id -> signature of the geometry its children were last built from, so a re-ADD with
+    // unchanged geometry only moves the object instead of destroying and respawning it.
+    private readonly Dictionary<string, string> _geometrySignatureById = new();
 
     // Fired after an inbound ADD/APPEND/MOVE has been applied to the GameObject for this id.
     public event System.Action<string> OnObjectUpdated;
@@ -74,6 +86,34 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
     {
         if (ros != null)
             ros.Unsubscribe<CollisionObjectMsg>(topic, OnCollisionObject);
+        ClearRegistry(destroyObjects: false, tearingDown: true);
+    }
+
+    /// <summary>
+    /// Forget every mirrored object (scene change / teardown). Listeners such as
+    /// AttachedCollisionObjectListener drop their attach state via OnRegistryCleared first,
+    /// so nothing is left orphaned under a robot link.
+    /// </summary>
+    public void ClearRegistry(bool destroyObjects = true, bool tearingDown = false)
+    {
+        OnRegistryCleared?.Invoke(tearingDown);
+
+        if (destroyObjects)
+        {
+            foreach (var kv in objectsById)
+            {
+                if (!kv.Value || _publisherOwnedIds.Contains(kv.Key)) continue;
+                foreach (var pub in kv.Value.GetComponentsInChildren<CollisionObjectPublisher>(true))
+                    pub.suppressRemoveOnDestroy = true;
+                Destroy(kv.Value);
+            }
+        }
+
+        objectsById.Clear();
+        _publisherOwnedIds.Clear();
+        _geometrySignatureById.Clear();
+        attachedIds.Clear();
+        awaitingDetachPose.Clear();
     }
 
     private void RequestInitialPlanningScene()
@@ -127,6 +167,7 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
         if (string.IsNullOrEmpty(id)) return;
         _publisherOwnedIds.Remove(id);
         objectsById.Remove(id);
+        awaitingDetachPose.Remove(id);
     }
 
     private bool TryGetUnityOwnedObject(string id, out GameObject unityObject)
@@ -152,6 +193,14 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
             return;
         }
 
+        // The robot is carrying this object. The fixed watcher stays quiet for it; this guards
+        // against message reordering and older watcher builds.
+        if (attachedIds.Contains(co.id))
+        {
+            Debug.Log($"[CO Listener] Ignoring op={co.operation} for attached object id={co.id}");
+            return;
+        }
+
         if (TryGetUnityOwnedObject(co.id, out GameObject unityOwnedObject))
         {
             if (co.operation == OP_REMOVE)
@@ -163,17 +212,23 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
                 return;
             }
 
+            if (awaitingDetachPose.Remove(co.id) && co.pose != null)
+            {
+                // Post-detach re-add: take the place pose, keep the Unity-owned geometry.
+                ApplyWorldPose(unityOwnedObject.transform, co.pose);
+                MarkPoseAsPublished(unityOwnedObject);
+                OnObjectUpdated?.Invoke(co.id);
+                return;
+            }
+
             Debug.Log($"[CO Listener] Skipping '{co.id}' — already managed by CollisionObjectPublisher.");
             return;
         }
 
         if (co.operation == OP_REMOVE)
         {
-            if (attachedIds.Contains(co.id))
-            {
-                Debug.Log($"[CO Listener] Ignoring REMOVE for attached object id={co.id}");
-                return;
-            }
+            awaitingDetachPose.Remove(co.id);
+            _geometrySignatureById.Remove(co.id);
             Debug.Log($"[CO Listener] Removing object id={co.id}");
             if (objectsById.TryGetValue(co.id, out var old) && old)
             {
@@ -188,7 +243,25 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
         }
 
         Debug.Log($"[CO Listener] Adding/Appending/Moving object id={co.id}");
+        awaitingDetachPose.Remove(co.id);
+        Upsert(co, applyWorldPose: true);
+        OnObjectUpdated?.Invoke(co.id);
+    }
 
+    /// <summary>
+    /// Builds the GameObject for an object first seen while already attached to the robot
+    /// (Unity joined mid-carry), through the same path as a world ADD. The message pose is
+    /// link-relative, so no world pose is applied — the caller places it under the link.
+    /// </summary>
+    public GameObject SpawnFromAttachedObject(CollisionObjectMsg co)
+    {
+        if (co == null || string.IsNullOrEmpty(co.id)) return null;
+        if (TryGetObject(co.id, out var existing)) return existing;
+        return Upsert(co, applyWorldPose: false);
+    }
+
+    GameObject Upsert(CollisionObjectMsg co, bool applyWorldPose)
+    {
         // ADD / APPEND / MOVE → upsert parent
         if (!objectsById.TryGetValue(co.id, out var parent) || !parent)
         {
@@ -200,10 +273,15 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
         Debug.Log($"[CO Listener] Processing object id={co.id} with {co.primitives?.Length ?? 0} primitives, {co.meshes?.Length ?? 0} meshes, {co.planes?.Length ?? 0} planes");
 
         // ----- Place parent in world using co.pose -----
-        var objPose = co.pose ?? new PoseMsg(new PointMsg(0, 0, 0), new QuaternionMsg(0, 0, 0, 1));
-        ApplyWorldPose(parent.transform, objPose);
+        if (applyWorldPose)
+        {
+            var objPose = co.pose ?? new PoseMsg(new PointMsg(0, 0, 0), new QuaternionMsg(0, 0, 0, 1));
+            ApplyWorldPose(parent.transform, objPose);
+            // ROS set this pose; the children's publishers must not echo it back as a MOVE.
+            MarkPoseAsPublished(parent);
 
-        Debug.Log($"[CO Listener] Applied world pose to '{co.id}': position=({objPose.position.x}, {objPose.position.y}, {objPose.position.z}), orientation=({objPose.orientation.x}, {objPose.orientation.y}, {objPose.orientation.z}, {objPose.orientation.w})");
+            Debug.Log($"[CO Listener] Applied world pose to '{co.id}': position=({objPose.position.x}, {objPose.position.y}, {objPose.position.z}), orientation=({objPose.orientation.x}, {objPose.orientation.y}, {objPose.orientation.z}, {objPose.orientation.w})");
+        }
 
         // MOVE (and any other geometry-less message) only updates the pose — rebuilding here
         // would destroy all visuals since there is no geometry to rebuild from.
@@ -213,9 +291,19 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
         if (!hasGeometry)
         {
             Debug.Log($"[CO Listener] No geometry in message for '{co.id}'; pose-only update.");
-            OnObjectUpdated?.Invoke(co.id);
-            return;
+            return parent;
         }
+
+        // Re-ADD of a known object with the geometry it already shows (e.g. the re-add after
+        // the gripper releases it): moving it is enough, a rebuild would only flicker.
+        string signature = GeometrySignature(co);
+        if (parent.transform.childCount > 0
+            && _geometrySignatureById.TryGetValue(co.id, out var builtFrom) && builtFrom == signature)
+        {
+            Debug.Log($"[CO Listener] Geometry of '{co.id}' unchanged; pose-only update.");
+            return parent;
+        }
+        _geometrySignatureById[co.id] = signature;
 
         // Rebuild children fresh for correctness
         for (int i = parent.transform.childCount - 1; i >= 0; i--)
@@ -356,7 +444,41 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
 
         // Optional: parent.SetActive(built > 0);
 
-        OnObjectUpdated?.Invoke(co.id);
+        return parent;
+    }
+
+    static void MarkPoseAsPublished(GameObject go)
+    {
+        foreach (var pub in go.GetComponentsInChildren<CollisionObjectPublisher>(true))
+            pub.MarkTransformAsPublished();
+    }
+
+    static string GeometrySignature(CollisionObjectMsg co)
+    {
+        var sb = new System.Text.StringBuilder();
+        foreach (var prim in co.primitives ?? System.Array.Empty<SolidPrimitiveMsg>())
+        {
+            sb.Append('P').Append(prim.type);
+            foreach (double d in prim.dimensions ?? System.Array.Empty<double>())
+                sb.Append(':').Append(d.ToString("F5", System.Globalization.CultureInfo.InvariantCulture));
+        }
+        foreach (var mesh in co.meshes ?? System.Array.Empty<MeshMsg>())
+            sb.Append('M').Append(mesh.vertices?.Length ?? 0).Append(':').Append(mesh.triangles?.Length ?? 0);
+        sb.Append("PL").Append(co.planes?.Length ?? 0);
+        AppendPoses(sb, co.primitive_poses);
+        AppendPoses(sb, co.mesh_poses);
+        AppendPoses(sb, co.plane_poses);
+        return sb.ToString();
+    }
+
+    static void AppendPoses(System.Text.StringBuilder sb, PoseMsg[] poses)
+    {
+        sb.Append('|');
+        foreach (var p in poses ?? System.Array.Empty<PoseMsg>())
+            sb.AppendFormat(System.Globalization.CultureInfo.InvariantCulture,
+                "{0:F5},{1:F5},{2:F5},{3:F5},{4:F5},{5:F5},{6:F5};",
+                p.position.x, p.position.y, p.position.z,
+                p.orientation.x, p.orientation.y, p.orientation.z, p.orientation.w);
     }
 
     public bool TryGetObject(string id, out GameObject go)

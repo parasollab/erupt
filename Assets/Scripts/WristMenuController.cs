@@ -78,6 +78,11 @@ public class WristMenuController : MonoBehaviour
         
         InitializeUIElements();
         SetupEventHandlers();
+        if (PickPlace != null)
+        {
+            PickPlace.OnStatus -= OnPickPlaceStatus;
+            PickPlace.OnStatus += OnPickPlaceStatus;
+        }
         SetupInputActions();
         
         // Initially hide the menu
@@ -770,6 +775,8 @@ public class WristMenuController : MonoBehaviour
             // -= first so repeated recordings never stack the handler
             pickPlaceRecorder.OnRecordingComplete -= OnPickPlaceRecorded;
             pickPlaceRecorder.OnRecordingComplete += OnPickPlaceRecorded;
+            pickPlaceRecorder.OnRecordingDiscarded -= OnPickPlaceDiscarded;
+            pickPlaceRecorder.OnRecordingDiscarded += OnPickPlaceDiscarded;
             pickPlaceRecorder.StartRecording();
             if (recordPickPlaceButton != null)
             {
@@ -781,16 +788,42 @@ public class WristMenuController : MonoBehaviour
         }
         else
         {
+            // StopRecording raises OnRecordingComplete or OnRecordingDiscarded, which set the label.
             pickPlaceRecorder.StopRecording();
-            ResetRecordUI();
+            ResetRecordUI(resetLabel: false);
         }
     }
 
+    // The goal has already been handed to PickPlaceClient by now, so show what the client
+    // reports (PLANNING..., REJECTED, UNAVAILABLE...) rather than claiming it was sent.
     private void OnPickPlaceRecorded(string objectId)
     {
+        var client = PickPlace;
         if (recordStatusLabel != null)
-            recordStatusLabel.text = $"Sent: {objectId}";
+            recordStatusLabel.text = client != null && !string.IsNullOrEmpty(client.LastStatus)
+                ? $"{objectId}: {client.LastStatus}"
+                : $"Sent: {objectId}";
         ResetRecordUI(resetLabel: false);
+    }
+
+    private void OnPickPlaceDiscarded(string reason)
+    {
+        if (recordStatusLabel != null)
+            recordStatusLabel.text = $"Not sent: {reason}";
+        ResetRecordUI(resetLabel: false);
+    }
+
+    private PickPlaceClient pickPlaceClient;
+    private PickPlaceClient PickPlace =>
+        pickPlaceClient != null ? pickPlaceClient
+            : pickPlaceClient = FindFirstObjectByType<PickPlaceClient>(FindObjectsInactive.Include);
+
+    // Follow the goal after the recording ends, so the wrist menu shows the server's answer.
+    private void OnPickPlaceStatus(string status)
+    {
+        if (recordStatusLabel == null || (pickPlaceRecorder != null && pickPlaceRecorder.IsRecording)) return;
+        if (PickPlace == null || !PickPlace.Busy && PickPlace.LastOutcome == PickPlaceOutcome.None) return;
+        recordStatusLabel.text = $"Pick & place: {status}";
     }
 
     private void ResetRecordUI(bool resetLabel = true)
@@ -866,6 +899,8 @@ public class WristMenuController : MonoBehaviour
     {
         if (interactionRouter != null)
             interactionRouter.Activate -= OnRouterActivate;
+        if (pickPlaceClient != null)
+            pickPlaceClient.OnStatus -= OnPickPlaceStatus;
 
         if (menuAction != null)
         {

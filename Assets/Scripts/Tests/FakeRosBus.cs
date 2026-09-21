@@ -181,7 +181,14 @@ namespace Erupt.Ros.Tests
                 RosGoalId = rosGoalId;
             }
 
-            public Task<RosActionCancelResponse> CancelAsync() => cancel.Task;
+            /// <summary>True once the client under test asked to cancel this goal.</summary>
+            public bool CancelRequested { get; private set; }
+
+            public Task<RosActionCancelResponse> CancelAsync()
+            {
+                CancelRequested = true;
+                return cancel.Task;
+            }
 
             public void Complete(RosActionGoalStatus status, TResult message)
             {

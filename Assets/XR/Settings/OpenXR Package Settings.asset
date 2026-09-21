@@ -1500,7 +1500,7 @@ MonoBehaviour:
   m_Name: VisionOS
   m_EditorClassIdentifier: Unity.XR.OpenXR::UnityEngine.XR.OpenXR.OpenXRSettings
   features:
-  - {fileID: -8254812388224071950}
+  - {fileID: -1307903305011841921}
   customLoaderName: 
   m_renderMode: 1
   m_latencyOptimization: 0

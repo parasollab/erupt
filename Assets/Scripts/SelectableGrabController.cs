@@ -14,6 +14,7 @@ public class SelectableGrabController : MonoBehaviour
     private XRGrabInteractable grabInteractable;
     private bool isSelected = false;
     private bool isGrabbed = false;
+    private bool locked = false;
 
     void Start()
     {
@@ -103,8 +104,20 @@ public class SelectableGrabController : MonoBehaviour
         if (grabInteractable != null)
         {
             // Keep enabled while selected OR while actively held by an XRI interactor
-            grabInteractable.enabled = isSelected || isGrabbed;
+            grabInteractable.enabled = !locked && (isSelected || isGrabbed);
         }
+    }
+
+    /// <summary>
+    /// While locked the object cannot be grabbed regardless of selection (the robot is
+    /// carrying it). Disabling the interactable also drops any grab in progress.
+    /// </summary>
+    public void SetLocked(bool value)
+    {
+        locked = value;
+        if (locked) isGrabbed = false;
+        if (grabInteractable == null) grabInteractable = GetComponent<XRGrabInteractable>();
+        UpdateGrabState();
     }
 
     // Public method to force update grab state (useful for external calls)

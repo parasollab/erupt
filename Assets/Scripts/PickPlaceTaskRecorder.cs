@@ -15,18 +15,28 @@ public class PickPlaceTaskRecorder : MonoBehaviour
     [SerializeField] private GameObject worldOrigin;
 
     [Header("Task delivery")]
-    [Tooltip("When assigned, the captured task is sent as a /pick_place action goal " +
-             "instead of being published on /pick_place_task. Leave empty to keep the topic.")]
-    [SerializeField] private PickPlaceActionClient pickPlaceAction;
+    [Tooltip("The captured task is sent as a /pick_place action goal through this client " +
+             "(found in the scene when empty). Only without one is it published on the legacy /pick_place_task topic.")]
+    [SerializeField] private PickPlaceClient pickPlaceAction;
 
-    [Tooltip("Action goals only: false plans without executing.")]
-    [SerializeField] private bool executeOnServer = true;
+    // Replaces executeOnServer (default true), deliberately without FormerlySerializedAs so
+    // existing scenes fall back to plan-only and the solutions can be browsed first.
+    [Tooltip("false plans only, so the solutions can be browsed and one executed from the MTC dashboard. " +
+             "true plans and executes in one goal, skipping the browser.")]
+    [SerializeField] private bool planAndExecute = false;
 
     public bool IsRecording { get; private set; }
 
     // Invoked when a task is successfully captured; passes the object_id.
     // Event so multiple UIs (wrist menu + MTC dashboard) can both observe completion.
     public event System.Action<string> OnRecordingComplete;
+
+    // Invoked when recording stops without sending anything; passes the reason, so the UI
+    // can say why instead of silently going back to idle.
+    public event System.Action<string> OnRecordingDiscarded;
+
+    // Why the last selected object could not be watched (missing components), if it couldn't.
+    private string watchProblem;
 
     private IRosBus ros;
     private XRGrabInteractable watchedInteractable;
@@ -47,8 +57,9 @@ public class PickPlaceTaskRecorder : MonoBehaviour
         // tapping input directly. Guidelines Part 3.
         InteractionSampleBus.Sample += OnInteractionSample;
 
+        if (pickPlaceAction == null) pickPlaceAction = FindFirstObjectByType<PickPlaceClient>(FindObjectsInactive.Include);
         ros = RosBus.Instance;
-        ros.RegisterPublisher<PickPlaceTaskMsg>(Topic);
+        if (pickPlaceAction == null) ros.RegisterPublisher<PickPlaceTaskMsg>(Topic);
     }
 
     public void StartRecording()
@@ -57,6 +68,7 @@ public class PickPlaceTaskRecorder : MonoBehaviour
 
         IsRecording = true;
         objectWasPlaced = false;
+        watchProblem = null;
         selectionManager.OnObjectSelected += OnObjectSelected;
 
         // Watch whatever is already selected
@@ -89,7 +101,12 @@ public class PickPlaceTaskRecorder : MonoBehaviour
         }
         else
         {
+            string reason = watchedPublisher != null
+                ? $"'{watchedPublisher.objectId}' was grabbed but never released"
+                : watchProblem ?? "no object was selected; point at the object, then grab and release it";
             ClearWatchedObject();
+            Debug.LogWarning($"PickPlaceTaskRecorder: nothing sent — {reason}");
+            OnRecordingDiscarded?.Invoke(reason);
         }
 
         Debug.Log("PickPlaceTaskRecorder: recording stopped");
@@ -105,7 +122,15 @@ public class PickPlaceTaskRecorder : MonoBehaviour
     {
         var gi = obj.GetComponent<XRGrabInteractable>();
         var pub = obj.GetComponent<CollisionObjectPublisher>();
-        if (gi == null || pub == null) return;
+        if (gi == null || pub == null)
+        {
+            // Only objects mirrored from the planning scene (/collision_objects_ros) carry both.
+            watchProblem = $"'{obj.name}' is not a planning-scene object (missing " +
+                (gi == null ? "XRGrabInteractable" : "CollisionObjectPublisher") + ")";
+            Debug.LogWarning($"PickPlaceTaskRecorder: cannot record {watchProblem}");
+            return;
+        }
+        watchProblem = null;
 
         watchedInteractable = gi;
         watchedPublisher = pub;
@@ -175,13 +200,17 @@ public class PickPlaceTaskRecorder : MonoBehaviour
         Debug.Log($"PickPlaceTaskRecorder: sending {pickPlaceAction.ActionName} goal object_id={objectId} place_pose=({rosPos.x:F3}, {rosPos.y:F3}, {rosPos.z:F3})");
         try
         {
-            var result = await pickPlaceAction.SendGoalAsync(objectId, rosPos, rosRot, executeOnServer);
+            PoseStampedMsg placePose = pickPlaceAction.PlacePose(rosPos, rosRot);
+            var result = planAndExecute
+                ? await pickPlaceAction.PlanAndExecuteAsync(objectId, placePose)
+                : await pickPlaceAction.PlanAsync(objectId, placePose);
             Debug.Log($"PickPlaceTaskRecorder: {pickPlaceAction.ActionName} finished status={result.Status} " +
                       $"success={result.Result?.success} message='{result.Result?.message}'");
         }
         catch (System.Exception exception)
         {
-            Debug.LogError($"PickPlaceTaskRecorder: {pickPlaceAction.ActionName} goal failed — {exception.Message}");
+            // Rejected-while-busy and lost connections are expected outcomes, already on the status line.
+            Debug.LogWarning($"PickPlaceTaskRecorder: {pickPlaceAction.ActionName} goal failed — {exception.Message}");
         }
     }
 

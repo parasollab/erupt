@@ -128,7 +128,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 244453}
-  - component: {fileID: 244452}
   - component: {fileID: 244454}
   m_Layer: 0
   m_Name: MTCManager
@@ -137,18 +136,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &244452
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 244451}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b7423a6ca712b4980a60990061e6c544, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: xrviz::MTCDataManager
 --- !u!4 &244453
 Transform:
   m_ObjectHideFlags: 0
@@ -178,6 +165,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: xrviz::PickPlaceActionClient
   actionName: /pick_place
   placeFrameId: world
+  executeActionName: /execute_solution
+  getSolutionService: /get_solution
+  descriptionTopic: /pick_place/description
+  statisticsTopic: /pick_place/statistics
+  maxSolutions: 3
+  cancelOnPause: 1
 --- !u!1 &7292625
 GameObject:
   m_ObjectHideFlags: 8
@@ -6233,6 +6226,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: xrviz::CollisionObjectsListenerSimple
   topic: /collision_objects_ros
+  planningSceneServiceTopic: /get_planning_scene
+  requestInitialPlanningScene: 1
   worldOrigin: {fileID: 1122808673}
   litMaterial: {fileID: 0}
 --- !u!114 &1001558312
@@ -8540,52 +8535,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Unity.Robotics.UrdfImporter::Unity.Robotics.UrdfImporter.UrdfLink
   IsBaseLink: 0
---- !u!1 &1325038034
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1325038036}
-  - component: {fileID: 1325038035}
-  m_Layer: 0
-  m_Name: ROS2 Action Demo
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 0
---- !u!114 &1325038035
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1325038034}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f1f969d0d00b64bc588495cc2677060c, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: xrviz::Ros2ActionClientDemo
-  m_SuccessOrder: 12
-  m_AutoRunOnReady: 1
---- !u!4 &1325038036
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1325038034}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -3.34206, y: 0, z: 0.09531}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &1342538851
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -11584,7 +11533,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: xrviz::MTCDashboardPanel
   uiDocument: {fileID: 1633403975}
-  dataManager: {fileID: 244452}
   pickPlaceRecorder: {fileID: 1482355975519924576}
   pickPlaceAction: {fileID: 244454}
   trajectoryPlayer: {fileID: 1228241013}
@@ -11888,6 +11836,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: xrviz::CollisionObjectsListenerSimple
   topic: /collision_objects_ros
+  planningSceneServiceTopic: /get_planning_scene
+  requestInitialPlanningScene: 1
   worldOrigin: {fileID: 1122808672}
   litMaterial: {fileID: 2100000, guid: fc226930e8fad4c499969204cecfbc05, type: 2}
 --- !u!4 &1697517153
@@ -14577,7 +14527,7 @@ MonoBehaviour:
   selectionManager: {fileID: 647391639}
   worldOrigin: {fileID: 1122808672}
   pickPlaceAction: {fileID: 0}
-  executeOnServer: 1
+  planAndExecute: 0
 --- !u!4 &1482355975519924577 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 3282372009203156751, guid: 48516d5ede86a4731b56a6e555864e5b, type: 3}
@@ -14795,4 +14745,3 @@ SceneRoots:
   - {fileID: 1228241012}
   - {fileID: 7862754869064648038}
   - {fileID: 244453}
-  - {fileID: 1325038036}

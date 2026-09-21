@@ -10,6 +10,13 @@ public class Quest3RobotInteractionController : MonoBehaviour
     [SerializeField] private Renderer handleRenderer;
     [SerializeField] private Color handleIdleColor = new Color(0.05f, 0.75f, 1f, 1f);
     [SerializeField] private Color handleActiveColor = new Color(1f, 0.75f, 0.05f, 1f);
+
+    [Header("Task solutions")]
+    [Tooltip("The end-effector handle is hidden while a solution executes or is previewed, so it " +
+             "does not block the view of the grasp. Found in the scene when left empty.")]
+    [SerializeField] private PickPlaceClient pickPlaceClient;
+    [SerializeField] private MTCTrajectoryPlayer trajectoryPlayer;
+    private bool handleHiddenForSolution;
     [SerializeField] private Color selectedJointColor = new Color(1f, 0.35f, 0.08f, 1f);
     [Header("Joint IK Handles")]
     [SerializeField] private bool createJointHandles = true;
@@ -58,8 +65,27 @@ public class Quest3RobotInteractionController : MonoBehaviour
         EnsureJointHandles();
     }
 
+    private void Start()
+    {
+        if (pickPlaceClient == null) pickPlaceClient = FindFirstObjectByType<PickPlaceClient>();
+        if (trajectoryPlayer == null) trajectoryPlayer = FindFirstObjectByType<MTCTrajectoryPlayer>();
+    }
+
+    private void UpdateHandleVisibilityForSolution()
+    {
+        if (handle == null) return;
+
+        bool hide = (pickPlaceClient != null && pickPlaceClient.Phase == PickPlacePhase.Executing)
+                 || (trajectoryPlayer != null && trajectoryPlayer.IsPlaying);
+        if (hide == handleHiddenForSolution) return;
+
+        handleHiddenForSolution = hide;
+        handle.gameObject.SetActive(!hide);
+    }
+
     private void LateUpdate()
     {
+        UpdateHandleVisibilityForSolution();
         EnsureJointHandles();
         SolveActiveDrags();
         UpdateJointHandleWorldPositions();
@@ -131,7 +157,8 @@ public class Quest3RobotInteractionController : MonoBehaviour
         }
 
         bool hitDragTarget = hitHandle || hitJointHandle || hitLink;
-        if (!hitDragTarget &&
+        // The near-miss assist must not grab a handle that is hidden for a solution.
+        if (!hitDragTarget && !handleHiddenForSolution &&
             Vector3.Cross(ray.direction, handle.position - ray.origin).magnitude <= 0.08f)
         {
             hitHandle = true;

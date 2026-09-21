@@ -18,6 +18,7 @@
             <ui:Label text="Selected object:" style="color: rgb(140, 140, 140); font-size: 12px;" />
             <ui:Label text="---" name="mtcPlanObjectIdLabel" style="color: rgb(100, 220, 100); font-size: 13px; margin-bottom: 12px;" />
             <ui:Button text="Start Recording" name="mtcPlanRecordButton" selectable="false" focusable="false" style="-unity-font-style: bold; margin-bottom: 8px;" />
+            <ui:Button text="Cancel Planning" name="mtcPlanCancelButton" selectable="false" focusable="false" style="-unity-font-style: bold; margin-bottom: 8px; color: rgb(255, 150, 120);" />
             <ui:Label text="Idle" name="mtcPlanStatusLabel" style="-unity-text-align: upper-center; color: rgb(190, 190, 190); font-size: 12px;" />
         </ui:VisualElement>
 

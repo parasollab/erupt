@@ -23,6 +23,10 @@ public class CollisionObjectPublisher : MonoBehaviour
     // Set before Destroy() when the destruction was commanded by ROS itself (inbound REMOVE) —
     // publishing our own REMOVE back would delete the object from MoveIt's live scene.
     public bool suppressRemoveOnDestroy = false;
+    // True while MoveIt has this object attached to the robot (set by
+    // AttachedCollisionObjectListener). Nothing may be published for the id meanwhile: a world
+    // object with the same id as an attached body corrupts MoveIt's scene.
+    [NonSerialized] public bool attachedToRobot = false;
     public GameObject worldOrigin; // Optional world origin for relative positioning
 
     private IRosBus ros;
@@ -83,7 +87,7 @@ public class CollisionObjectPublisher : MonoBehaviour
 
     void Update()
     {
-        if (pausePublishing) return;
+        if (pausePublishing || attachedToRobot) return;
 
         if (Time.time - lastPublishTime < 1.0f / publishRateHz)
             return;
@@ -98,6 +102,16 @@ public class CollisionObjectPublisher : MonoBehaviour
             hasBeenPublished = true;
             lastPublishTime = Time.time;
         }
+    }
+
+    /// <summary>
+    /// Treat the current transform as already known to ROS. Called after an inbound pose has
+    /// been applied so the change is not echoed straight back as a MOVE.
+    /// </summary>
+    public void MarkTransformAsPublished()
+    {
+        lastPosition = transform.position;
+        lastRotation = transform.rotation;
     }
 
     public void ForceRepublish()
@@ -370,7 +384,7 @@ public class CollisionObjectPublisher : MonoBehaviour
     void OnDestroy()
     {
         // Delete the collision object from the planning scene
-        if (ros != null && !suppressRemoveOnDestroy)
+        if (ros != null && !suppressRemoveOnDestroy && !attachedToRobot)
         {
             CollisionObjectMsg msg = new CollisionObjectMsg
             {
