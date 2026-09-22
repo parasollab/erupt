@@ -1,6 +1,8 @@
 using Erupt.Ros;
 using UnityEngine;
 using UnityEngine.UIElements;
+using UnityEngine.XR.Interaction.Toolkit;
+using UnityEngine.XR.Interaction.Toolkit.Interactables;
 using Unity.Robotics.ROSTCPConnector;
 using RosMessageTypes.Moveit;
 using RosMessageTypes.Geometry;
@@ -14,10 +16,19 @@ using System;
 
 public class MoveItPlanningRequestMenuUI : MonoBehaviour
 {
+    // Synthetic object_id tying together set_start_state/set_goal_state/send_planning_request/
+    // planning_request_result events in the ObjectEvent log -- there's no spawned GameObject
+    // behind these, just logical actions on this menu, same convention as CertifyPathMenuController's
+    // "path_certification".
+    private const string PlanningRequestObjectId = "planning_request";
+
     [Header("Robot")]
     [SerializeField] private DirectArticulationIKController ikController;
     [SerializeField] private string jointStateTopic = "/joint_states";
     [SerializeField] private string executeTrajectoryTopic = "/joint_trajectory_controller/joint_trajectory";
+    // Successful plans are republished here for the ROS-side planned_path_logger; a service
+    // response is only visible to this client, so nothing else could record the path.
+    [SerializeField] private string plannedPathTopic = "/study/planned_paths";
 
     [Header("UI Toolkit")]
     [SerializeField] private UIDocument uiDocument;
@@ -29,7 +40,20 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     [SerializeField] private int defaultNumPlanningAttempts = 10;
     [SerializeField] private float defaultAllowedPlanningTime = 5.0f;
     [SerializeField] private double goalTolerance = 0.01;
-    
+
+    // Per-scene study restrictions, overridden on the prefab instance by
+    // PlanningMenuRestrictionsSetup (Study/Planning Menu menu): Task2/3 lock the preset
+    // start/goal states, Task3 additionally has no planning in its task.
+    [Header("Study Restrictions")]
+    [Tooltip("Allow the Set Start/Goal State buttons. Off in Task2/3 scenes so participants can't change the preset states.")]
+    [SerializeField] private bool allowStartGoalEditing = true;
+    [Tooltip("Allow the Plan button. Off in Task3 scenes, where planning is not part of the task.")]
+    [SerializeField] private bool allowPlanning = true;
+    [Tooltip("Allow the Execute Trajectory button. Off in all study task scenes -- participants only plan, never drive the real robot.")]
+    [SerializeField] private bool allowExecution = true;
+    [Tooltip("Allow the Mirror Joint States button. Off in all study task scenes. Executing a trajectory still auto-starts mirroring regardless of this flag.")]
+    [SerializeField] private bool allowMirroring = true;
+
     [Header("ROS 2 Topics")]
     [SerializeField] private string motionPlanServiceName = "/plan_kinematic_path";
     [SerializeField] private string displayTrajectoryTopic = "";
@@ -79,7 +103,13 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     private bool hasStartState = false;
     private bool hasGoalState = false;
     private JointTrajectoryMsg lastPlannedTrajectory;
-    
+    public JointTrajectoryMsg LastPlannedTrajectory => lastPlannedTrajectory != null ? BuildLocalTrajectory(lastPlannedTrajectory) : null;
+    // Read by StudyController's advance gate: true once any plan has succeeded in this scene.
+    // Unlike lastPlannedTrajectory it is never cleared by a later failure -- the component is
+    // scene-local, so a scene load is the per-scene reset.
+    private bool hasPlannedSuccessfully;
+    public bool HasPlannedSuccessfully => hasPlannedSuccessfully;
+
     // Planner querying
     private bool isQueryingPlanners = false;
     private Dictionary<string, string[]> pipelineToPlanners = new Dictionary<string, string[]>();
@@ -110,6 +140,10 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         new Tuple<float, float>(-351f, 351f)   // wrist_3_joint
     };
 
+    // Grab interactable on the prefab root (the capsule move handle), cached for
+    // selection-clearing on grab.
+    private XRGrabInteractable moveGrabInteractable;
+
     private void Awake()
     {
         if (ikController == null)
@@ -127,6 +161,14 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
     private void OnEnable()
     {
+        // Grabbing the menu's move handle (the capsule on the prefab root) drops the
+        // current shape selection, matching the trigger-click behavior in
+        // SelectionManager.IsDeselectSurface.
+        if (moveGrabInteractable == null)
+            moveGrabInteractable = GetComponentInParent<XRGrabInteractable>(true);
+        if (moveGrabInteractable != null)
+            moveGrabInteractable.selectEntered.AddListener(OnMenuGrabbed);
+
         if (uiDocument == null)
             uiDocument = GetComponent<UIDocument>();
 
@@ -137,7 +179,8 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
             return;
         }
 
-        robotController = ikController;
+        EnsureRobotController();
+        EnsureGhostReferences();
 
         InitializeUIElements();
         SetupEventHandlers();
@@ -145,6 +188,46 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
         // Start planner querying immediately
         StartPlannerQuerying();
+    }
+
+    private bool EnsureRobotController()
+    {
+        if (robotController != null)
+        {
+            return true;
+        }
+
+        robotController = ikController;
+        if (robotController == null)
+        {
+            Debug.LogWarning("MoveItPlanningRequestMenuUI: DirectArticulationIKController is not assigned.");
+            return false;
+        }
+
+        return true;
+    }
+
+    private void EnsureGhostReferences()
+    {
+        if (ghostSpawner == null)
+        {
+            ghostSpawner = GetComponent<SpawnGhosts>() ??
+                FindFirstObjectByType<SpawnGhosts>(FindObjectsInactive.Include);
+            if (ghostSpawner != null)
+            {
+                Debug.LogWarning($"MoveItPlanningRequestMenuUI: ghostSpawner was not assigned; using '{ghostSpawner.name}'.");
+            }
+        }
+
+        if (trajectoryReplayer == null)
+        {
+            trajectoryReplayer = GetComponent<TrajectoryReplay>() ??
+                FindFirstObjectByType<TrajectoryReplay>(FindObjectsInactive.Include);
+            if (trajectoryReplayer != null)
+            {
+                Debug.LogWarning($"MoveItPlanningRequestMenuUI: trajectoryReplayer was not assigned; using '{trajectoryReplayer.name}'.");
+            }
+        }
     }
 
     private void StartPlannerQuerying()
@@ -200,6 +283,8 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
         stopReplayButton.SetEnabled(false);
         executeTrajectoryButton.SetEnabled(false);
+        planningRequestButton.SetEnabled(allowPlanning);
+        mirrorButton.SetEnabled(allowMirroring);
 
         // Update button states
         UpdateButtonStates();
@@ -229,7 +314,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
             }
         };
 
-        mirrorButton.clicked += ToggleMirroring;
+        mirrorButton.clicked += OnMirrorButtonClicked;
         executeTrajectoryButton.clicked += ExectuteTrajectory;
     }
 
@@ -363,6 +448,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         isConnected = true;
 
         ros.RegisterPublisher<JointTrajectoryMsg>(executeTrajectoryTopic);
+        ros.RegisterPublisher<JointTrajectoryMsg>(plannedPathTopic);
 
         ros.Subscribe<JointStateMsg>(jointStateTopic, MirrorJointStates);
 
@@ -390,9 +476,8 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     {
         if (!isMirroring) return;
 
-        if (robotController == null)
+        if (!EnsureRobotController())
         {
-            Debug.Log("MoveItPlanningRequestMenuUI: DirectArticulationIKController not assigned.");
             return;
         }
 
@@ -441,6 +526,15 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         return remapped;
     }
 
+    // Button-click wrapper: the restriction only guards the participant-facing button;
+    // ExectuteTrajectory still calls ToggleMirroring directly so execution can mirror.
+    private void OnMirrorButtonClicked()
+    {
+        if (!allowMirroring)
+            return;
+        ToggleMirroring();
+    }
+
     private void ToggleMirroring()
     {
         isMirroring = !isMirroring;
@@ -452,7 +546,15 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
     private void OnSetStartStateClicked()
     {
-        if (!startSet)
+        if (!allowStartGoalEditing) return;
+        ObjectMetricsLogger.Instance?.LogEvent("set_start_state", PlanningRequestObjectId);
+        EnsureGhostReferences();
+
+        if (ghostSpawner == null)
+        {
+            Debug.LogWarning("MoveItPlanningRequestMenuUI: ghostSpawner not assigned; start ghost not spawned.");
+        }
+        else if (!startSet)
         {
             ghostSpawner.SpawnStartGhost();
             startSet = true;
@@ -477,7 +579,15 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
     private void OnSetGoalStateClicked()
     {
-        if (!goalSet)
+        if (!allowStartGoalEditing) return;
+        ObjectMetricsLogger.Instance?.LogEvent("set_goal_state", PlanningRequestObjectId);
+        EnsureGhostReferences();
+
+        if (ghostSpawner == null)
+        {
+            Debug.LogWarning("MoveItPlanningRequestMenuUI: ghostSpawner not assigned; goal ghost not spawned.");
+        }
+        else if (!goalSet)
         {
             ghostSpawner.SpawnGoalGhost();
             goalSet = true;
@@ -502,6 +612,9 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
     public void SendPlanningRequest()
     {
+        if (!allowPlanning) return;
+        ObjectMetricsLogger.Instance?.LogEvent("send_planning_request", PlanningRequestObjectId);
+
         if (!isConnected)
         {
             Debug.LogWarning("MoveItPlanningRequestMenuUI: ROS 2 connection not available.");
@@ -524,6 +637,8 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
         // Disable replay button until we have a new trajectory
         StopPreview();
+        if (trajectoryReplayer != null)
+            trajectoryReplayer.StopReplay();
         stopReplayButton.SetEnabled(false);
         executeTrajectoryButton.SetEnabled(false);
         
@@ -605,7 +720,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
     private RobotStateMsg GetRobotStateMsgFromController()
     {
-        if (robotController == null) return new RobotStateMsg();
+        if (!EnsureRobotController()) return new RobotStateMsg();
 
         string[] names = RemapJointNamesToRos(robotController.GetJointStateNames());
         float[] positionsF = robotController.GetJointStatePositions();
@@ -626,7 +741,11 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
                     frame_id = "base_link",
                     stamp = new TimeMsg
                     {
+#if ROS2
                         sec = (int)Time.time,
+#else
+                        sec = (uint)Time.time,
+#endif
                         nanosec = (uint)((Time.time - (int)Time.time) * 1e9)
                     }
                 },
@@ -643,12 +762,100 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
     private RobotStateMsg GetGoalRobotState() => GetRobotStateMsgFromController();
 
+    // Populates start/goal state and ghosts from a pre-baked trajectory's first/last waypoint,
+    // instead of the live robot pose — used when a scene auto-plays a trajectory at Start().
+    public void SetStartAndGoalFromTrajectory(TrajectoryData trajectoryData)
+    {
+        if (trajectoryData == null || trajectoryData.waypoints == null || trajectoryData.waypoints.Length == 0)
+        {
+            Debug.LogWarning("MoveItPlanningRequestMenuUI: TrajectoryData has no waypoints.");
+            return;
+        }
+
+        if (!EnsureRobotController())
+        {
+            Debug.LogWarning("MoveItPlanningRequestMenuUI: robotController not available for trajectory ghosts.");
+            return;
+        }
+
+        EnsureGhostReferences();
+
+        if (ghostSpawner == null)
+        {
+            Debug.LogWarning("MoveItPlanningRequestMenuUI: ghostSpawner not assigned.");
+            return;
+        }
+
+        string[] names = trajectoryData.jointNames;
+        TrajectoryData.Waypoint first = trajectoryData.waypoints[0];
+        TrajectoryData.Waypoint last = trajectoryData.waypoints[trajectoryData.waypoints.Length - 1];
+
+        if (!startSet)
+        {
+            ghostSpawner.SpawnStartGhostFromPose(robotController, names, first.positions);
+            startSet = true;
+        }
+        else
+        {
+            ghostSpawner.UpdateStartGhostFromPose(robotController, names, first.positions);
+        }
+        currentStartState = BuildRobotStateMsgFromNamedPositions(names, first.positions);
+        hasStartState = true;
+
+        if (!goalSet)
+        {
+            ghostSpawner.SpawnGoalGhostFromPose(robotController, names, last.positions);
+            goalSet = true;
+        }
+        else
+        {
+            ghostSpawner.UpdateGoalGhostFromPose(robotController, names, last.positions);
+        }
+        currentGoalState = BuildRobotStateMsgFromNamedPositions(names, last.positions);
+        hasGoalState = true;
+
+        UpdateButtonStates();
+    }
+
+    private RobotStateMsg BuildRobotStateMsgFromNamedPositions(string[] unityNames, double[] positions)
+    {
+        string[] rosNames = RemapJointNamesToRos(unityNames);
+        double[] zeros = new double[rosNames.Length];
+
+        return new RobotStateMsg
+        {
+            joint_state = new JointStateMsg
+            {
+                header = new HeaderMsg
+                {
+                    frame_id = "base_link",
+                    stamp = new TimeMsg
+                    {
+#if ROS2
+                        sec = (int)Time.time,
+#else
+                        sec = (uint)Time.time,
+#endif
+                        nanosec = (uint)((Time.time - (int)Time.time) * 1e9)
+                    }
+                },
+                name = rosNames,
+                position = positions,
+                velocity = zeros,
+                effort = zeros
+            },
+            multi_dof_joint_state = new MultiDOFJointStateMsg()
+        };
+    }
+
     private void OnMotionPlanResponse(GetMotionPlanResponse response)
     {
         var motionPlanResponse = response.motion_plan_response;
         if (motionPlanResponse.error_code.val == 1) // SUCCESS
         {
             Debug.Log($"MoveItPlanningRequestMenuUI: Planning successful! Planning time: {motionPlanResponse.planning_time}s");
+            ObjectMetricsLogger.Instance?.LogEvent("planning_request_result", PlanningRequestObjectId, details: "success");
+            hasPlannedSuccessfully = true;
 
             // Handle the planned trajectory
             if (motionPlanResponse.trajectory?.joint_trajectory != null)
@@ -656,11 +863,17 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
                 lastPlannedTrajectory = motionPlanResponse.trajectory.joint_trajectory;
                 Debug.Log($"MoveItPlanningRequestMenuUI: Trajectory has {lastPlannedTrajectory.points.Length} waypoints");
 
+                // Raw trajectory (original ROS joint names), not the remapped local copy.
+                if (lastPlannedTrajectory.points.Length > 0)
+                {
+                    ros.Publish(plannedPathTopic, lastPlannedTrajectory);
+                }
+
                 planningResultLabel.text = $"Planning successful! Time: {motionPlanResponse.planning_time}s, Waypoints: {lastPlannedTrajectory.points.Length}";
 
                 // You can execute the trajectory here or store it for later execution
                 PreviewTrajectory(lastPlannedTrajectory);
-                executeTrajectoryButton.SetEnabled(true);
+                executeTrajectoryButton.SetEnabled(allowExecution);
             }
         }
         else
@@ -671,11 +884,14 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
             executeTrajectoryButton.SetEnabled(false);
 
             Debug.LogError($"MoveItPlanningRequestMenuUI: Planning failed with error code: {motionPlanResponse.error_code.val} - {motionPlanResponse.error_code.message}");
+            ObjectMetricsLogger.Instance?.LogEvent("planning_request_result", PlanningRequestObjectId,
+                details: $"failure:{motionPlanResponse.error_code.val}:{motionPlanResponse.error_code.message}");
         }
     }
 
     private void PreviewTrajectory(JointTrajectoryMsg trajectory)
     {
+        EnsureGhostReferences();
         if (trajectoryReplayer != null)
         {
             stopReplayButton.SetEnabled(true);
@@ -713,6 +929,9 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
     private void ExectuteTrajectory()
     {
+        if (!allowExecution)
+            return;
+
         if (!isConnected)
         {
             Debug.LogWarning("MoveItPlanningRequestMenuUI: ROS 2 connection not available.");
@@ -741,8 +960,8 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
         setGoalStateButton.text = hasGoalState ? "Goal State ✓" : "Set Goal State";
 
         // You could also change button colors or enable/disable them
-        setStartStateButton.SetEnabled(true);
-        setGoalStateButton.SetEnabled(true);
+        setStartStateButton.SetEnabled(allowStartGoalEditing);
+        setGoalStateButton.SetEnabled(allowStartGoalEditing);
     }
 
     public void ResetPlanningState()
@@ -766,6 +985,13 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
     private void OnDisable()
     {
+        if (moveGrabInteractable != null)
+            moveGrabInteractable.selectEntered.RemoveListener(OnMenuGrabbed);
+    }
+
+    private void OnMenuGrabbed(SelectEnterEventArgs args)
+    {
+        SelectionManager.Instance?.ClearSelection();
     }
 
     private void OnDestroy()

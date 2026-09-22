@@ -4,6 +4,8 @@ using UnityEngine;
 
 public class TranslucentOverride : MonoBehaviour
 {
+    private const string BuildSafeMaterialResource = "GhostOverlay";
+
     [Header("Overlay Color/Alpha")]
     public Color overlayColor = new Color(0f, 0.6f, 1f, 0.35f); // solid color with translucency
 
@@ -37,12 +39,28 @@ public class TranslucentOverride : MonoBehaviour
             }
             else
             {
-                // Try URP/HDRP/Standard in that order.
-                Shader shader =
-                    Shader.Find("Universal Render Pipeline/Lit") ??
-                    Shader.Find("HDRP/Lit") ??
-                    Shader.Find("Standard");
-                _runtimeMat = new Material(shader);
+                // A serialized material in Resources forces Unity's Android build pipeline to
+                // retain both the shader and its transparent variant. Shader.Find works in the
+                // Editor but can return a stripped shader/variant in a Quest player build.
+                Material buildSafeTemplate = Resources.Load<Material>(BuildSafeMaterialResource);
+                if (buildSafeTemplate != null)
+                {
+                    _runtimeMat = Instantiate(buildSafeTemplate);
+                }
+                else
+                {
+                    Shader shader =
+                        Shader.Find("Universal Render Pipeline/Lit") ??
+                        Shader.Find("HDRP/Lit") ??
+                        Shader.Find("Standard");
+                    if (shader == null)
+                    {
+                        Debug.LogError("TranslucentOverride: no ghost overlay material or compatible shader is available.");
+                        return;
+                    }
+
+                    _runtimeMat = new Material(shader);
+                }
             }
 
             ConfigureAsTransparent(_runtimeMat, overlayColor);
@@ -90,62 +108,70 @@ public class TranslucentOverride : MonoBehaviour
     /// </summary>
     private static void ConfigureAsTransparent(Material mat, Color color)
     {
-    var name = mat.shader ? mat.shader.name : "";
-    mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+        string name = mat.shader ? mat.shader.name : "";
+        mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
 
-    // Use a reasonable default alpha if someone passes 0 or 1
-    if (color.a <= 0f) color.a = 0.35f;
-    if (color.a >= 1f) color.a = 0.5f;
+        // Use a reasonable default alpha if someone passes 0 or 1
+        if (color.a <= 0f) color.a = 0.35f;
+        if (color.a >= 1f) color.a = 0.5f;
 
-    if (name.Contains("Universal Render Pipeline"))
+        bool isUrp = name.Contains("Universal") && name.Contains("Render") && name.Contains("Pipeline");
+
+        if (isUrp)
+        {
+            // URP Lit/Unlit
+            mat.SetFloat("_Surface", 1f);                 // Transparent
+            mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            mat.SetFloat("_AlphaClip", 0f);               // NO cutout
+            mat.DisableKeyword("_ALPHATEST_ON");
+
+            // Ensure standard alpha blending (not premultiplied)
+            mat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+            if (mat.HasProperty("_SrcBlend")) mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            if (mat.HasProperty("_DstBlend")) mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            if (mat.HasProperty("_ZWrite")) mat.SetInt("_ZWrite", 0);
+
+            mat.SetOverrideTag("RenderType", "Transparent");
+        }
+        else if (name.Contains("HDRP"))
+        {
+            // HDRP Lit
+            mat.SetFloat("_SurfaceType", 1f);             // Transparent
+            if (mat.HasProperty("_BlendMode")) mat.SetFloat("_BlendMode", 0f); // 0 = Alpha
+            if (mat.HasProperty("_AlphaCutoffEnable")) mat.SetFloat("_AlphaCutoffEnable", 0f);
+            if (mat.HasProperty("_ZWrite")) mat.SetInt("_ZWrite", 0);
+        }
+        else
+        {
+            // Built-in Standard: use Fade mode for smooth translucency.
+            mat.SetFloat("_Mode", 2f); // 2 = Fade
+            mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            mat.SetInt("_ZWrite", 0);
+            mat.DisableKeyword("_ALPHATEST_ON");
+            mat.EnableKeyword("_ALPHABLEND_ON");
+            mat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+        }
+
+        ApplyOverlayColor(mat, color);
+        mat.enableInstancing = true;
+    }
+
+    private static void ApplyOverlayColor(Material mat, Color color)
     {
-        // URP Lit/Unlit
-        mat.SetFloat("_Surface", 1f);                 // Transparent
-        mat.SetFloat("_AlphaClip", 0f);               // NO cutout
-        mat.DisableKeyword("_ALPHATEST_ON");
-
-        // Ensure standard alpha blending (not premultiplied)
-        mat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
-        if (mat.HasProperty("_SrcBlend")) mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-        if (mat.HasProperty("_DstBlend")) mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-        if (mat.HasProperty("_ZWrite"))   mat.SetInt("_ZWrite", 0);
-
         if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", color);
         if (mat.HasProperty("_BaseColorFactor")) mat.SetColor("_BaseColorFactor", color);
-    }
-    else if (name.Contains("HDRP"))
-    {
-        // HDRP Lit
-        mat.SetFloat("_SurfaceType", 1f);             // Transparent
-        if (mat.HasProperty("_BlendMode")) mat.SetFloat("_BlendMode", 0f); // 0 = Alpha
-        if (mat.HasProperty("_AlphaCutoffEnable")) mat.SetFloat("_AlphaCutoffEnable", 0f);
-        if (mat.HasProperty("_ZWrite")) mat.SetInt("_ZWrite", 0);
-
-        if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", color);
-
-        // Optional “flatter” look:
-        // if (mat.HasProperty("_EnableFogOnTransparent")) mat.SetFloat("_EnableFogOnTransparent", 0f);
-    }
-    else
-    {
-        // Built-in Standard — use FADE mode for smooth translucency
-        // (Transparent/premultiplied often causes “too invisible” look)
-        mat.SetFloat("_Mode", 2f); // 2 = Fade
-        mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-        mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-        mat.SetInt("_ZWrite", 0);
-        mat.DisableKeyword("_ALPHATEST_ON");
-        mat.EnableKeyword("_ALPHABLEND_ON");
-        mat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
         if (mat.HasProperty("_Color")) mat.SetColor("_Color", color);
+        if (mat.HasProperty("_EmissionColor"))
+        {
+            mat.SetColor("_EmissionColor", Color.black);
+            mat.DisableKeyword("_EMISSION");
+        }
     }
 
-    mat.enableInstancing = true;
+
+    public void Start()
+    {
+        SetTranslucent(true);
     }
-
-
-  public void Start()
-  {
-    SetTranslucent(true);
-  }
 }

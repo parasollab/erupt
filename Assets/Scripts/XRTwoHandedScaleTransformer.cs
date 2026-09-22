@@ -3,22 +3,80 @@ using UnityEngine;
 namespace UnityEngine.XR.Interaction.Toolkit.Transformers
 {
     /// <summary>
-    /// Two-handed grab transformer that scales an object based on the frame-to-frame
-    /// change in the minimum distance between the two controller forward rays.
-    /// Angling controllers toward each other (even without moving the grips) will
-    /// shrink the object; angling them away will grow it.
+    /// Two-handed grab transformer that uniformly scales an object based on the distance
+    /// between the two controllers. Moving the controllers together shrinks the object;
+    /// moving them apart grows it. The object's orientation is held at the rotation it had
+    /// when the second controller joined the grab.
     /// </summary>
     public class XRTwoHandedScaleTransformer : XRBaseGrabTransformer
     {
         [Tooltip("Minimum allowed local scale per axis")]
-        public float minScale = 0.01f;
+        public float minScale = 0.001f;
 
-        // Below this distance (meters), scale updates are frozen to avoid
-        // explosive ratios when controller rays are nearly intersecting.
-        private const float MinDist = 0.01f;
+        [Tooltip("Maximum scale increase allowed during one continuous two-handed grab")]
+        [Min(1f)]
+        public float maxScaleMultiplier = 10f;
+
+        [Tooltip("How quickly controller tracking changes are applied. Higher values are more responsive.")]
+        [Range(1f, 30f)]
+        public float distanceSmoothing = 20f;
+
+        // Ignore invalid/coincident controller samples rather than dividing by a nearly zero
+        // baseline. This is below the controllers' physical size and does not limit normal use.
+        private const float MinUsableControllerDistance = 0.01f;
 
         private bool _initialized = false;
-        private float _prevDist;
+        private float _startControllerDistance;
+        private float _filteredControllerDistance;
+        private Vector3 _scaleAtTwoHandStart;
+        private bool _orientationLocked;
+        private Quaternion _lockedOrientation;
+
+        /// <summary>
+        /// True while a two-handed scale gesture is in progress (the second controller has
+        /// joined and a baseline size was captured). XRI does not call OnGrabCountChanged
+        /// once the last controller lets go, so SelectableGrabController reads this from its
+        /// selectExited handler to log the gesture, then calls <see cref="EndGesture"/>.
+        /// </summary>
+        public bool IsGestureActive => _initialized;
+
+        /// <summary>The object's local scale when the current gesture began.</summary>
+        public Vector3 GestureStartScale => _scaleAtTwoHandStart;
+
+        /// <summary>Marks the current gesture as consumed so it is not reported twice.</summary>
+        public void EndGesture()
+        {
+            _initialized = false;
+            _orientationLocked = false;
+        }
+
+        public override void OnGrabCountChanged(
+            UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable grab,
+            Pose targetPose,
+            Vector3 localScale)
+        {
+            base.OnGrabCountChanged(grab, targetPose, localScale);
+
+            if (grab.interactorsSelecting.Count < 2)
+            {
+                // Multiple-grab transformers are not processed after the grab returns to one
+                // hand, so reset here instead of relying on Process to observe that transition.
+                _initialized = false;
+                _orientationLocked = false;
+                return;
+            }
+
+            // Treat the instant the second controller joins as the start of a new gesture.
+            // The object's current size is the fixed baseline, regardless of how close the
+            // controllers happen to be when the user begins scaling again.
+            _lockedOrientation = targetPose.rotation;
+            _orientationLocked = true;
+
+            if (TryGetControllerDistance(grab, out float controllerDistance))
+                CaptureScaleBaseline(controllerDistance, localScale);
+            else
+                _initialized = false;
+        }
 
         public override void Process(
             UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable grab,
@@ -26,80 +84,90 @@ namespace UnityEngine.XR.Interaction.Toolkit.Transformers
             ref Pose targetPose,
             ref Vector3 localScale)
         {
-            if (phase != XRInteractionUpdateOrder.UpdatePhase.Dynamic)
-                return;
-
             var interactors = grab.interactorsSelecting;
             if (interactors.Count < 2)
             {
                 _initialized = false;
+                _orientationLocked = false;
                 return;
             }
 
-            // Use the interactor's own transform (not attach transform) to get the
-            // live controller position and pointing direction.
-            Transform tfA = interactors[0].transform;
-            Transform tfB = interactors[1].transform;
-            float currentDist = RayClosestDistance(
-                tfA.position, tfA.forward,
-                tfB.position, tfB.forward);
+            // The general multiple-grab transformer runs before this transformer and would
+            // otherwise rotate the object as the controllers move relative to one another.
+            // Capture the visible orientation when two-hand scaling begins and override the
+            // target pose in every update phase until a controller releases.
+            if (!_orientationLocked)
+            {
+                _lockedOrientation = grab.transform.rotation;
+                _orientationLocked = true;
+            }
+            targetPose.rotation = _lockedOrientation;
+
+            if (phase != XRInteractionUpdateOrder.UpdatePhase.Dynamic)
+                return;
+
+            // Use controller positions rather than the minimum distance between their rays.
+            // Rays normally intersect at the object, making their closest distance approach
+            // zero and change discontinuously as they cross, which caused freezes and jumps.
+            if (!TryGetControllerDistance(grab, out float currentDistance))
+                return;
 
             if (!_initialized)
             {
-                _prevDist = currentDist;
-                _initialized = true;
+                CaptureScaleBaseline(currentDistance, localScale);
                 return;
             }
 
-            // Only update when both distances are above the minimum threshold
-            if (_prevDist >= MinDist && currentDist >= MinDist)
-            {
-                float ratio = currentDist / _prevDist;
-                localScale = new Vector3(
-                    Mathf.Max(minScale, localScale.x * ratio),
-                    Mathf.Max(minScale, localScale.y * ratio),
-                    Mathf.Max(minScale, localScale.z * ratio)
-                );
-            }
+            float smoothingFactor = 1f - Mathf.Exp(-distanceSmoothing * Time.unscaledDeltaTime);
+            _filteredControllerDistance = Mathf.Lerp(
+                _filteredControllerDistance,
+                currentDistance,
+                smoothingFactor);
 
-            _prevDist = currentDist;
+            // Calculate from the scale captured when the second hand joined rather than
+            // multiplying frame-to-frame ratios. This prevents tracking noise from compounding.
+            float scaleRatio = Mathf.Min(
+                _filteredControllerDistance / _startControllerDistance,
+                maxScaleMultiplier);
+
+            float minimumRatio = 0f;
+            minimumRatio = Mathf.Max(minimumRatio, MinimumRatioForAxis(_scaleAtTwoHandStart.x));
+            minimumRatio = Mathf.Max(minimumRatio, MinimumRatioForAxis(_scaleAtTwoHandStart.y));
+            minimumRatio = Mathf.Max(minimumRatio, MinimumRatioForAxis(_scaleAtTwoHandStart.z));
+            scaleRatio = Mathf.Max(scaleRatio, minimumRatio);
+
+            localScale = _scaleAtTwoHandStart * scaleRatio;
         }
 
-        /// <summary>
-        /// Minimum distance between two rays (p1+s*d1, s>=0) and (p2+t*d2, t>=0).
-        /// d1 and d2 must be unit vectors.
-        /// </summary>
-        private static float RayClosestDistance(Vector3 p1, Vector3 d1, Vector3 p2, Vector3 d2)
+        private static bool TryGetControllerDistance(
+            UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable grab,
+            out float distance)
         {
-            Vector3 w = p1 - p2;
-            float b = Vector3.Dot(d1, d2);
-            float d = Vector3.Dot(d1, w);
-            float e = Vector3.Dot(d2, w);
-            float denom = 1f - b * b;
-
-            float s, t;
-            if (denom < 1e-6f) // parallel or anti-parallel
+            var interactors = grab.interactorsSelecting;
+            if (interactors.Count < 2)
             {
-                s = 0f;
-                t = Mathf.Max(0f, e);
-            }
-            else
-            {
-                s = (b * e - d) / denom;
-                t = (e - b * d) / denom;
-                if (s < 0f)
-                {
-                    s = 0f;
-                    t = Mathf.Max(0f, e);
-                }
-                else if (t < 0f)
-                {
-                    t = 0f;
-                    s = Mathf.Max(0f, -d);
-                }
+                distance = 0f;
+                return false;
             }
 
-            return Vector3.Distance(p1 + d1 * s, p2 + d2 * t);
+            distance = Vector3.Distance(
+                interactors[0].transform.position,
+                interactors[1].transform.position);
+            return distance >= MinUsableControllerDistance;
+        }
+
+        private void CaptureScaleBaseline(float controllerDistance, Vector3 localScale)
+        {
+            _startControllerDistance = controllerDistance;
+            _filteredControllerDistance = controllerDistance;
+            _scaleAtTwoHandStart = localScale;
+            _initialized = true;
+        }
+
+        private float MinimumRatioForAxis(float startingAxisScale)
+        {
+            float magnitude = Mathf.Abs(startingAxisScale);
+            return magnitude > Mathf.Epsilon ? minScale / magnitude : 0f;
         }
     }
 }

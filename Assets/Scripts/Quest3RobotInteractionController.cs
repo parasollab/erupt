@@ -4,6 +4,11 @@ using UnityEngine;
 
 public class Quest3RobotInteractionController : MonoBehaviour
 {
+    // Fixed id -- EndEffectorHandle is a single static part of the Robot IK Manager prefab
+    // present in every scene, not a spawned/duplicated object, same convention as
+    // IndicatorSphereController's default "indicator_sphere" id.
+    private const string EndEffectorHandleObjectId = "end_effector_handle";
+
     [SerializeField] private DirectArticulationIKController ikController;
     [SerializeField] private Transform endEffector;
     [SerializeField] private Transform handle;
@@ -100,6 +105,19 @@ public class Quest3RobotInteractionController : MonoBehaviour
 
     public void SelectFromHit(RaycastHit hit)
     {
+        // The shared control panel is parented under whichever ghost currently owns it, so a hit
+        // on the panel would otherwise also resolve to that ghost's GhostSelectable via the parent
+        // lookup below. Exclude it so poking or grabbing any part of the panel cannot close it.
+        var ghostSelectable = hit.transform.GetComponentInParent<GhostSelectable>();
+        if (ghostSelectable != null && GetPanelFromHit(hit) != null)
+            ghostSelectable = null;
+
+        if (ghostSelectable != null)
+        {
+            ghostSelectable.OnSelected();
+            return;
+        }
+
         if (handle != null && (hit.transform == handle || hit.transform.IsChildOf(handle)))
         {
             ClearSelection();
@@ -126,7 +144,7 @@ public class Quest3RobotInteractionController : MonoBehaviour
         }
     }
 
-    public bool TryBeginHandleDrag(Quest3ControllerRayInteractor interactor, Ray ray, RaycastHit hit)
+    public bool TryBeginHandleDrag(object interactor, Ray ray, RaycastHit hit)
     {
         return TryBeginHandleDrag((object)interactor, ray, hit);
     }
@@ -204,10 +222,16 @@ public class Quest3RobotInteractionController : MonoBehaviour
             SelectJoint(ikController.Joints[jointIndex], hitRenderer);
         }
         else ClearSelection();
+        // Grabbing the EE handle also drops the current shape selection, matching the
+        // trigger-click behavior in SelectionManager.IsDeselectSurface.
+        SelectionManager.Instance?.ClearSelection();
+        ObjectMetricsLogger.Instance?.LogEvent("grab_start", EndEffectorHandleObjectId);
         return true;
     }
 
-    public void UpdateHandleDrag(Quest3ControllerRayInteractor interactor, Ray ray)
+    // Lets the thumbstick push/pull the handle's drag distance along the ray while it's held,
+    // mirroring the InteractionAttachController push/pull used for XRI far-grabbed objects.
+    public void AdjustHandleDragDistance(object interactor, float delta, float maxDistance)
     {
         UpdateHandleDrag((object)interactor, ray);
     }
@@ -227,6 +251,18 @@ public class Quest3RobotInteractionController : MonoBehaviour
         }
 
         drag.target = ray.GetPoint(drag.distance) + drag.offset;
+
+        if (draggedPanel != null)
+        {
+            draggedPanel.UpdateDrag(target);
+            return;
+        }
+
+        if (ikController == null || handle == null)
+        {
+            return;
+        }
+
         if (drag.body == null) handle.position = drag.target;
     }
 
@@ -265,10 +301,21 @@ public class Quest3RobotInteractionController : MonoBehaviour
 
     public void JogSelectedJoint(float deltaRadians)
     {
-        if (selectedJoint == null || ikController == null || Mathf.Approximately(deltaRadians, 0f))
+        if (selectedJoint == null || ikController == null)
         {
             return;
         }
+
+        if (Mathf.Approximately(deltaRadians, 0f))
+        {
+            if (isJoggingSelectedJoint)
+            {
+                LogJointJogEnd();
+            }
+            return;
+        }
+
+        isJoggingSelectedJoint = true;
 
         ikController.BeginInteraction();
         LastRefusal = ikController.TryNudgeJoint(selectedJoint, deltaRadians);
@@ -308,10 +355,20 @@ public class Quest3RobotInteractionController : MonoBehaviour
             originalColors[i] = GetColor(mat);
             SetColor(mat, selectedJointColor);
         }
+
+        ObjectMetricsLogger.Instance?.LogEvent("grab_start", JointObjectId(joint));
     }
 
     private void ClearSelection()
     {
+        // Flush a jog session that was still in progress when selection changed (e.g. the
+        // participant let go of the trigger or grabbed something else mid-jog), so grab_start
+        // never goes without a matching grab_end.
+        if (isJoggingSelectedJoint)
+        {
+            LogJointJogEnd();
+        }
+
         if (selectedRenderers != null && originalColors != null)
         {
             int count = Mathf.Min(selectedRenderers.Length, originalColors.Length);

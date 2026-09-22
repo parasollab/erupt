@@ -29,11 +29,14 @@ public class WristMenuController : MonoBehaviour
     public CollisionObjectsListenerSimple collisionObjectsListener;
     public GameObject worldOrigin;
 
-    [Header("Pick & Place Recording")]
+    [Header("MTC")]
+    [SerializeField] private bool enableMTC = false;
     [SerializeField] private PickPlaceTaskRecorder pickPlaceRecorder;
-
-    [Header("MTC Dashboard")]
     [SerializeField] private GameObject mtcDashboardPanel;
+
+    private float shapeSpawnDistance = 1.25f;
+    // Alpha applied to shapes spawned from the wrist menu (1 = opaque, 0 = invisible)
+    private float spawnedShapeAlpha = 0.75f;
     
     // UI Elements
     private VisualElement root;
@@ -63,6 +66,23 @@ public class WristMenuController : MonoBehaviour
     
     // State
     private bool isMenuVisible = false;
+
+    public void BindSceneDependencies(
+        SelectionManager manager,
+        CollisionObjectsListenerSimple listener,
+        GameObject origin)
+    {
+        selectionManager = manager;
+        collisionObjectsListener = listener;
+        worldOrigin = origin;
+
+        if (worldOrigin == null)
+        {
+            Debug.LogWarning("WristMenuController: no worldOrigin bound for this scene — spawned " +
+                "collision objects will publish absolute Unity coordinates instead of robot-base-relative " +
+                "positions. Add a 'BaseTransform' object under the robot root.");
+        }
+    }
     
     private void OnEnable()
     {
@@ -89,7 +109,7 @@ public class WristMenuController : MonoBehaviour
         SetMenuVisibility(false);
     }
     
-    public VisualElement CreateToggleStack(string shape, string label)
+    public VisualElement CreateToggleStack(string shape, string label, bool includeToggle = true)
     {
         // <ui:VisualElement name="toggle-stack" style="flex-direction: column; align-items: stretch;">
         var container = new VisualElement { name = "wristMenuEditScale" + label + "Stack" };
@@ -106,6 +126,11 @@ public class WristMenuController : MonoBehaviour
         toggle.style.paddingLeft = 10;
         toggle.style.paddingRight = 10;
         toggle.value = true; // Default to enabled
+        // The whole Toggle row is clickable by default; swallow presses on the
+        // text label so only the checkbox itself toggles the value.
+        toggle.labelElement.RegisterCallback<PointerDownEvent>((evt) => evt.StopPropagation());
+        toggle.labelElement.RegisterCallback<PointerUpEvent>((evt) => evt.StopPropagation());
+        toggle.labelElement.RegisterCallback<ClickEvent>((evt) => evt.StopPropagation());
         toggle.RegisterCallback<ChangeEvent<bool>>((evt) =>
         {
             var selected = selectionManager.SelectedObject;
@@ -168,8 +193,14 @@ public class WristMenuController : MonoBehaviour
         slider.style.paddingRight = 10;
 
         float prevValue = 100f;
-        int activePointerId = -1;
+        bool gestureActive = false;
+        float gestureStartValue = 100f;
+        IVisualElementScheduledItem gestureEndCheck = null;
         const float minScale = 0.01f;
+        const long gestureEndDebounceMs = 200;
+        // Scale applied per unit of slider travel: full throw from center (100 units) changes
+        // localScale by 100 * scaleSensitivity / 100 on the affected axes.
+        const float scaleSensitivity = 0.5f;
 
         void ResetToCenterDeferred()
         {
@@ -180,6 +211,38 @@ public class WristMenuController : MonoBehaviour
             }).ExecuteLater(0);
         }
 
+        // Logs the resize once the gesture is considered finished (see the debounce comment
+        // below), then recenters the slider for the next nudge.
+        void FinishGesture()
+        {
+            gestureActive = false;
+
+            float totalDeltaPercent = (slider.value - gestureStartValue) / 100f * scaleSensitivity;
+            if (!Mathf.Approximately(totalDeltaPercent, 0f))
+            {
+                GameObject selected = selectionManager.SelectedObject;
+                CollisionObjectPublisher publisher = selected != null ? selected.GetComponent<CollisionObjectPublisher>() : null;
+                if (publisher != null)
+                {
+                    string sign = totalDeltaPercent >= 0 ? "+" : "";
+                    ObjectMetricsLogger.Instance?.LogEvent("edit_operation", publisher.objectId,
+                        scale: selected.transform.localScale,
+                        details: $"resize:{shape}:{label}:{sign}{totalDeltaPercent:F3}");
+                    // A scale-only change doesn't trip CollisionObjectPublisher's transform
+                    // check, so push the new size to the planning scene explicitly -- otherwise
+                    // MoveIt keeps the old geometry until the object is next moved.
+                    publisher.ForceRepublish();
+                }
+                else
+                {
+                    Debug.LogWarning($"WristMenuController: resize on '{(selected != null ? selected.name : "null")}' " +
+                        "not logged -- no CollisionObjectPublisher component (only wrist-menu-spawned shapes have one).");
+                }
+            }
+
+            ResetToCenterDeferred();
+        }
+
         Vector3 MakeDelta(string shapeName, string axisLabel, float delta)
         {
             if (shapeName.Contains("Cube"))
@@ -187,6 +250,7 @@ public class WristMenuController : MonoBehaviour
                 if (axisLabel == "X") return new Vector3(delta, 0f, 0f);
                 if (axisLabel == "Y") return new Vector3(0f, delta, 0f);
                 if (axisLabel == "Z") return new Vector3(0f, 0f, delta);
+                if (axisLabel == "Uniform") return new Vector3(delta, delta, delta);
                 return Vector3.zero;
             }
             else if (shapeName.Contains("Cylinder"))
@@ -194,6 +258,7 @@ public class WristMenuController : MonoBehaviour
                 // Support your "Height" and "Radius" UI
                 if (axisLabel == "Height") return new Vector3(0f, delta, 0f);
                 if (axisLabel == "Radius") return new Vector3(delta, 0f, delta);
+                if (axisLabel == "Uniform") return new Vector3(delta, delta, delta);
                 // fallback uniform
                 return new Vector3(delta, delta, delta);
             }
@@ -204,19 +269,27 @@ public class WristMenuController : MonoBehaviour
             }
         }
 
-        slider.RegisterCallback<PointerDownEvent>(evt =>
-        {
-            activePointerId = evt.pointerId;
-            prevValue = slider.value;
-            slider.CapturePointer(activePointerId);
-        });
-
+        // Gesture start/end is detected purely from ValueChanged plus a debounce timer, not from
+        // Pointer{Down,Up,Cancel}Events -- confirmed via on-device logcat that the XR poke input
+        // bridge drives ValueChanged continuously and reliably during a drag, but never sends a
+        // terminating PointerUp (even registered on the capture/TrickleDown phase, which does fix
+        // PointerDown -- the thumb still swallows Up somewhere in the XR->UI Toolkit pipeline).
         slider.RegisterValueChangedCallback(evt =>
         {
             var selected = selectionManager.SelectedObject;
             if (selected == null) { prevValue = evt.newValue; return; }
 
-            float delta = (evt.newValue - prevValue) / 100f;
+            if (!gestureActive)
+            {
+                gestureActive = true;
+                gestureStartValue = prevValue;
+            }
+
+            gestureEndCheck?.Pause();
+            gestureEndCheck = slider.schedule.Execute(FinishGesture);
+            gestureEndCheck.ExecuteLater(gestureEndDebounceMs);
+
+            float delta = (evt.newValue - prevValue) / 100f * scaleSensitivity;
             prevValue = evt.newValue;
             if (Mathf.Approximately(delta, 0f)) return;
 
@@ -250,28 +323,19 @@ public class WristMenuController : MonoBehaviour
             }
         });
 
-        slider.RegisterCallback<PointerUpEvent>(evt =>
+        if (includeToggle)
         {
-            if (evt.pointerId == activePointerId)
-            {
-                ResetToCenterDeferred();
-                slider.ReleasePointer(activePointerId);
-                activePointerId = -1;
-            }
-        });
-        slider.RegisterCallback<PointerCancelEvent>(_ =>
+            container.Add(toggle);
+        }
+        else
         {
-            ResetToCenterDeferred();
-            activePointerId = -1;
-        });
-        slider.RegisterCallback<PointerCaptureOutEvent>(_ =>
-        {
-            // Safety: if capture is lost, still recenter
-            ResetToCenterDeferred();
-            activePointerId = -1;
-        });
-
-        container.Add(toggle);
+            // A uniform slider has no single axis to lock, so a plain caption stands in for
+            // the axis-lock toggle (per-axis locks still apply in the slider path above).
+            var caption = new Label("Scale " + label + ": ") { name = "wristMenuEditScale" + label + "Label" };
+            caption.style.paddingLeft = 10;
+            caption.style.paddingRight = 10;
+            container.Add(caption);
+        }
         container.Add(slider);
 
         return container;
@@ -295,6 +359,12 @@ public class WristMenuController : MonoBehaviour
         recordPickPlaceButton = root.Q<Button>("wristMenuRecordPickPlaceButton");
         recordStatusLabel = root.Q<Label>("wristMenuRecordStatusLabel");
         mtcButton = root.Q<Button>("wristMenuMTCButton");
+        if (mtcButton != null)
+            mtcButton.style.display = enableMTC ? DisplayStyle.Flex : DisplayStyle.None;
+        if (recordPickPlaceButton != null)
+            recordPickPlaceButton.style.display = enableMTC ? DisplayStyle.Flex : DisplayStyle.None;
+        if (recordStatusLabel != null)
+            recordStatusLabel.style.display = enableMTC ? DisplayStyle.Flex : DisplayStyle.None;
 
         // Get buttons from add shape panel
         addShapeBackButton = root.Q<Button>("wristMenuAddShapeBackButton");
@@ -336,9 +406,9 @@ public class WristMenuController : MonoBehaviour
         snapSurfaceButton.clicked += OnSnapSurfaceClicked;
         deleteShapeButton.clicked += OnDeleteShapeClicked;
         duplicateShapeButton.clicked += OnDuplicateShapeClicked;
-        if (recordPickPlaceButton != null)
+        if (recordPickPlaceButton != null && enableMTC)
             recordPickPlaceButton.clicked += OnRecordPickPlaceClicked;
-        if (mtcButton != null)
+        if (mtcButton != null && enableMTC)
             mtcButton.clicked += OnMTCClicked;
 
         // Add shape panel buttons
@@ -505,6 +575,7 @@ public class WristMenuController : MonoBehaviour
             wristMenuEditSliderPanel.Add(CreateToggleStack("Cube", "X"));
             wristMenuEditSliderPanel.Add(CreateToggleStack("Cube", "Y"));
             wristMenuEditSliderPanel.Add(CreateToggleStack("Cube", "Z"));
+            wristMenuEditSliderPanel.Add(CreateToggleStack("Cube", "Uniform", includeToggle: false));
         }
         else if (meshName.Contains("Sphere"))
         {
@@ -516,6 +587,7 @@ public class WristMenuController : MonoBehaviour
             Debug.Log("WristMenuController: Populating edit panel for Cylinder");
             wristMenuEditSliderPanel.Add(CreateToggleStack("Cylinder", "Height"));
             wristMenuEditSliderPanel.Add(CreateToggleStack("Cylinder", "Radius"));
+            wristMenuEditSliderPanel.Add(CreateToggleStack("Cylinder", "Uniform", includeToggle: false));
         }
         else if (meshName.Contains("Mesh"))
         {
@@ -534,12 +606,14 @@ public class WristMenuController : MonoBehaviour
     
     private void OnEditShapeClicked()
     {
-        // TODO: Implement edit functionality
+        if (selectionManager == null || selectionManager.SelectedObject == null)
+        {
+            Debug.LogWarning("WristMenuController: No object selected for editing.");
+            return;
+        }
 
         PopulateEditShapePanel(selectionManager.SelectedObject);
-
         ShowEditShapePanel();
-        Debug.Log("WristMenuController: Edit Shape functionality not yet implemented");
     }
     
     private void OnDeleteShapeClicked()
@@ -664,35 +738,65 @@ public class WristMenuController : MonoBehaviour
         ShowOptionsPanel(); // Return to main menu after adding shape
     }
     
+    // Converts a URP/Lit material instance to alpha-blended transparency at the given
+    // alpha. Mirrors what the URP shader GUI does when Surface Type is set to Transparent.
+    public static void MakeMaterialTransparent(Material mat, float alpha)
+    {
+        mat.SetFloat("_Surface", 1f); // 1 = Transparent
+        mat.SetFloat("_Blend", 0f);   // 0 = Alpha blend
+        mat.SetOverrideTag("RenderType", "Transparent");
+        mat.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+        mat.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+        mat.SetFloat("_ZWrite", 0f);
+        mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+        mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+
+        Color c = mat.color;
+        c.a = alpha;
+        mat.color = c;
+    }
+
     // Shape Creation Methods
     private void AddPrimitiveShape(PrimitiveType primitiveType)
     {
         GameObject shape = GameObject.CreatePrimitive(primitiveType);
 
-        // Position 2 m in front of the user
+        // Position in front of the user, within easy reach
         shape.transform.position = Camera.main != null
-            ? Camera.main.transform.position + Camera.main.transform.forward * 2f
-            : Vector3.forward * 2f;
+            ? Camera.main.transform.position + Camera.main.transform.forward * shapeSpawnDistance
+            : Vector3.forward * shapeSpawnDistance;
 
         // Physics
         Rigidbody rb = shape.AddComponent<Rigidbody>();
         rb.useGravity = false;
         rb.isKinematic = true;
 
-        // XR interaction — Single mode so only the NearFarInteractor (one hand) holds it.
-        // This keeps the InteractionAttachController's thumbstick push/pull working correctly.
+        // Allow a second controller to join the grab so the multiple-grab scale transformer
+        // can run. One-handed push/pull remains available whenever only one hand is attached.
         shape.AddComponent<XRGrabInteractable>();
         var gi = shape.GetComponent<XRGrabInteractable>();
-        gi.selectMode = InteractableSelectMode.Single;
+        gi.selectMode = InteractableSelectMode.Multiple;
+        // Keep the object where it's grabbed instead of snapping it to the controller
+        gi.useDynamicAttach = true;
+        // Don't match the ray hit point's position for the attach anchor — keep it at the
+        // object's own pivot so joystick rotation spins the object about its own center
+        // instead of orbiting around wherever the ray happened to hit its surface.
+        gi.matchAttachPosition = false;
+        // Don't apply release velocity, object should stop moving as soon as it's let go
+        gi.throwOnDetach = false;
 
         // Controls grabbing based on SelectionManager selection state
         shape.AddComponent<SelectableGrabController>();
 
-        shape.transform.localScale = Vector3.one;
+        shape.transform.localScale = Vector3.one * 0.25f;
         shape.tag = "Selectable";
 
         shape.AddComponent<XRGrabTransformerScaleAxisLock>();
         shape.AddComponent<XRGrabTransformerLockPose>();
+        // Don't freeze rotation by default — joystick manipulation should be able to spin
+        // the object about its own center. SnapSelectedToSurface() still re-syncs this via
+        // SyncInitialRotation() in case freezePose is turned back on elsewhere.
+        shape.GetComponent<XRGrabTransformerLockPose>().freezePose = false;
 
         shape.AddComponent<XRGeneralGrabTransformer>();
         shape.GetComponent<XRGeneralGrabTransformer>().allowTwoHandedScaling = false;
@@ -709,7 +813,13 @@ public class WristMenuController : MonoBehaviour
 
         var meshRenderer = shape.GetComponent<MeshRenderer>();
         if (meshRenderer != null && litMaterial != null)
+        {
+            // .material instantiates a per-renderer copy, so making it transparent here
+            // leaves the shared litMaterial asset (also used by CollisionObjectsListenerSimple
+            // for RViz-synced objects) opaque.
             meshRenderer.material = litMaterial;
+            MakeMaterialTransparent(meshRenderer.material, spawnedShapeAlpha);
+        }
 
         Collider collider = shape.GetComponent<Collider>();
         if (collider != null)
@@ -878,6 +988,17 @@ public class WristMenuController : MonoBehaviour
             if (lockPose != null) lockPose.SyncInitialRotation();
 
             Debug.Log($"WristMenuController: Snapped '{selected.name}' to '{h.collider.name}' normal={h.normal}");
+
+            CollisionObjectPublisher publisher = selected.GetComponent<CollisionObjectPublisher>();
+            if (publisher != null)
+            {
+                ObjectMetricsLogger.Instance?.LogEvent("edit_operation", publisher.objectId, details: "snap");
+            }
+            else
+            {
+                Debug.LogWarning($"WristMenuController: snap on '{selected.name}' not logged -- " +
+                    "no CollisionObjectPublisher component (only wrist-menu-spawned shapes have one).");
+            }
             return;
         }
 

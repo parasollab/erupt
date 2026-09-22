@@ -1,0 +1,10 @@
+<ui:UXML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" noNamespaceSchemaLocation="../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
+    <ui:VisualElement style="flex-grow: 1; background-color: rgba(30, 30, 30, 0.85); padding: 6px;">
+        <ui:Toggle label="Hide Start" name="hideStartToggle" style="-unity-font-style: bold; color: rgb(255, 255, 255);" />
+        <ui:Toggle label="Hide Goal" name="hideGoalToggle" style="-unity-font-style: bold; color: rgb(255, 255, 255);" />
+        <ui:VisualElement name="speedControlGroup">
+            <ui:Slider label="Speed" name="speedSlider" low-value="0.1" high-value="3" value="1" style="-unity-font-style: bold; color: rgb(255, 255, 255);" />
+            <ui:Label text="x1.0" name="speedLabel" style="-unity-text-align: upper-center; color: rgb(255, 255, 255);" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

@@ -1,5 +1,9 @@
 fileFormatVersion: 2
+<<<<<<< HEAD
 guid: 57ef3ba426e54b5bb6e9a4c6f5671485
+=======
+guid: 857d2bdeb97c543a0ac6464da2addc2f
+>>>>>>> workstation_demo
 folderAsset: yes
 DefaultImporter:
   externalObjects: {}

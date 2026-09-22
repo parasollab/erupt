@@ -8,6 +8,7 @@ public class Quest3ControllerRayInteractor : MonoBehaviour
     [SerializeField] private Quest3RobotInteractionController robotInteraction;
     [SerializeField] private float rayLength = 6f;
     [SerializeField] private float jointJogRadiansPerSecond = 0.8f;
+    [SerializeField] private float handlePushPullMetersPerSecond = 1.5f;
     [SerializeField] private float thumbstickDeadzone = 0.18f;
     [SerializeField] private LayerMask raycastLayers = ~0;
     [SerializeField] private Vector3 localRayDirection = Vector3.forward;
@@ -20,11 +21,33 @@ public class Quest3ControllerRayInteractor : MonoBehaviour
     private bool wasGripPressed;
     private bool isDraggingHandle;
 
+    private RaycastHit currentHit;
+    private bool hasCurrentHit;
+
+    public XRNode ControllerNode => controllerNode;
+
+    public bool TryGetCurrentHit(out RaycastHit hit)
+    {
+        hit = currentHit;
+        return hasCurrentHit;
+    }
+
     public void Configure(XRNode node, Quest3RobotInteractionController interactionController)
     {
         controllerNode = node;
-        robotInteraction = interactionController;
+        BindRobotInteraction(interactionController);
         RefreshDevice();
+    }
+
+    public void BindRobotInteraction(Quest3RobotInteractionController interactionController)
+    {
+        if (isDraggingHandle && robotInteraction != null && robotInteraction != interactionController)
+        {
+            robotInteraction.EndHandleDrag(this);
+            isDraggingHandle = false;
+        }
+
+        robotInteraction = interactionController;
     }
 
     private void Awake()
@@ -53,6 +76,9 @@ public class Quest3ControllerRayInteractor : MonoBehaviour
             raycastLayers,
             QueryTriggerInteraction.Collide);
 
+        hasCurrentHit = hasHit;
+        if (hasHit) currentHit = hit;
+
         UpdateLine(ray, hasHit ? hit.distance : rayLength, hasHit);
 
         bool triggerPressed = ReadButton(CommonUsages.triggerButton);
@@ -70,6 +96,15 @@ public class Quest3ControllerRayInteractor : MonoBehaviour
 
         if (isDraggingHandle && gripPressed && robotInteraction != null)
         {
+            if (device.TryGetFeatureValue(CommonUsages.primary2DAxis, out Vector2 pushPullAxis))
+            {
+                float pushPullY = Mathf.Abs(pushPullAxis.y) > thumbstickDeadzone ? pushPullAxis.y : 0f;
+                if (pushPullY != 0f)
+                {
+                    robotInteraction.AdjustHandleDragDistance(this, pushPullY * handlePushPullMetersPerSecond * Time.deltaTime, rayLength);
+                }
+            }
+
             robotInteraction.UpdateHandleDrag(this, ray);
         }
 

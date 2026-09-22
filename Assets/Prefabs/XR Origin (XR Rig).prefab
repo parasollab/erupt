@@ -3298,7 +3298,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: xrviz::WristMenuController
   uiDocument: {fileID: 4517080356610878557}
   inputActions: {fileID: -944628639613478452, guid: c348712bda248c246b8c49b3db54643f, type: 3}
-  litMaterial: {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
+  litMaterial: {fileID: 2100000, guid: a4e82194513f4b8ba38e1fe95f304c93, type: 2}
   selectionManager: {fileID: 0}
   collisionObjectsListener: {fileID: 0}
   worldOrigin: {fileID: 0}

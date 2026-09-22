@@ -11,6 +11,8 @@ public class MTCDataManager : MonoBehaviour
 {
     public static MTCDataManager Instance { get; private set; }
 
+    [SerializeField] private string topicPrefix = "erupt_pick_place";
+
     public string CurrentTaskId { get; private set; }
     public TaskDescriptionMsg LastDescription { get; private set; }
     public TaskStatisticsMsg LastStatistics { get; private set; }
@@ -243,7 +245,7 @@ public class MTCDataManager : MonoBehaviour
 
     private void RegisterService()
     {
-        string svcName = $"/get_solution_{CurrentTaskId}";
+        string svcName = $"/{topicPrefix}/get_solution_{CurrentTaskId}";
         if (svcName == registeredServiceName) return;
         ros.RegisterRosService<GetSolutionRequest, GetSolutionResponse>(svcName);
         registeredServiceName = svcName;

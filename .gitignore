@@ -11,6 +11,10 @@ Assets/Resources/ROSConnectionPrefab.prefab
 Assets/OpenCVForUnity*
 Assets/_Recovery*
 
+# Scratch output of StudySceneExporter -- copy into erupt_ws/src/study_scene_assets
+# manually, don't track it here (erupt and erupt_ws are separate repos).
+Assets/StudyExport/
+
 # This .gitignore file should be placed at the root of your Unity project directory
 #
 # Get latest from https://github.com/github/gitignore/blob/main/Unity.gitignore

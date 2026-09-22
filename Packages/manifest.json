@@ -26,6 +26,7 @@
     "com.unity.xr.interaction.toolkit": "3.3.1",
     "com.unity.xr.meta-openxr": "2.3.1",
     "com.unity.xr.openxr": "1.16.1",
+    "jp.keijiro.apriltag": "file:./AprilTag/Packages/jp.keijiro.apriltag",
     "com.unity.modules.accessibility": "1.0.0",
     "com.unity.modules.ai": "1.0.0",
     "com.unity.modules.androidjni": "1.0.0",

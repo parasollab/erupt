@@ -500,6 +500,14 @@
       },
       "url": "https://packages.unity.com"
     },
+    "jp.keijiro.apriltag": {
+      "version": "file:./AprilTag/Packages/jp.keijiro.apriltag",
+      "depth": 0,
+      "source": "local",
+      "dependencies": {
+        "com.unity.burst": "1.6.5"
+      }
+    },
     "com.unity.modules.accessibility": {
       "version": "1.0.0",
       "depth": 0,

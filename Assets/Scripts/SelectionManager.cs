@@ -1,7 +1,6 @@
 using Erupt.Interaction;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using UnityEngine.XR.Interaction.Toolkit.Interactors;
 using UnityEngine.EventSystems;
 using System.Collections.Generic;
 
@@ -12,7 +11,7 @@ public class SelectionManager : MonoBehaviour
     public InputActionReference selectAction;
 
     [Header("Ray Interactor")]
-    public XRRayInteractor rayInteractor; // Assign your controller's ray interactor in the Inspector
+    public Quest3ControllerRayInteractor rayInteractor;
 
     [Header("Interaction Router (opt-in)")]
     [Tooltip("When assigned, selection is driven by the router instead of a bound input " +
@@ -33,8 +32,13 @@ public class SelectionManager : MonoBehaviour
 
     [Header("Highlighting")]
     public Material highlightMaterial;
+    // Alpha applied to the selection highlight (1 = opaque, 0 = invisible)
+    private float highlightAlpha = 0.75f;
+    private Material transparentHighlightMaterial;
     private Material originalMaterial;
     private Renderer selectedRenderer;
+    private bool selectActionSubscribed;
+    private MoveItPlanningRequestMenuUI planningMenu;
 
     public GameObject SelectedObject { get; private set; }
     
@@ -44,10 +48,9 @@ public class SelectionManager : MonoBehaviour
 
     private void Awake()
     {
-        if (Instance != null && Instance != this)
-        {
-            Destroy(gameObject);
-        }
+        // Additive transitions briefly keep both content scenes alive. The newly loaded scene
+        // must take ownership immediately; destroying it here would leave no manager after the
+        // outgoing scene is retired.
         Instance = this;
     }
 
@@ -62,6 +65,29 @@ public class SelectionManager : MonoBehaviour
         if (rayInteractor == null)
         {
             Debug.LogError("Ray Interactor is not assigned in SelectionManager.");
+        }
+
+        SubscribeToSelectAction();
+    }
+
+    private void OnEnable()
+    {
+        SubscribeToSelectAction();
+    }
+
+    private void OnDisable()
+    {
+        UnsubscribeFromSelectAction();
+    }
+
+    public void BindRayInteractor(Quest3ControllerRayInteractor interactor)
+    {
+        rayInteractor = interactor;
+    }
+
+    private void SubscribeToSelectAction()
+    {
+        if (selectActionSubscribed || selectAction == null || selectAction.action == null)
             return;
         }
 
@@ -128,22 +154,34 @@ public class SelectionManager : MonoBehaviour
         if (IsInteractingWithUI())
             return;
 
-        if (rayInteractor == null || !rayInteractor.TryGetCurrent3DRaycastHit(out RaycastHit hit))
+        if (rayInteractor == null || !rayInteractor.TryGetCurrentHit(out RaycastHit hit))
         {
-            ClearSelection();
+            // Ray hitting nothing — could be UI interaction with misaligned physics ray; don't clear
             return;
         }
 
         GameObject hitObj = hit.collider.gameObject;
 
+        // Clicking the planning request menu, a robot link, or the end-effector handle
+        // drops the current selection outright. This must run before IsHittingWristUI:
+        // its name heuristic ("menu"/"ui"/"wrist") also matches those hierarchies
+        // (MoveItPlanningRequestMenu, XRI UIDocument, wrist_*_link) and would keep the
+        // selection alive instead.
+        if (IsDeselectSurface(hitObj))
+        {
+            ClearSelection();
+            return;
+        }
+
         if (IsHittingWristUI(hitObj))
             return;
 
-        if (hitObj.CompareTag("Selectable"))
+        GameObject selectableObject = FindSelectableObject(hitObj.transform);
+        if (selectableObject != null)
         {
-            if (SelectedObject == hitObj)
+            if (SelectedObject == selectableObject)
                 return; // Already selected — keep it so the user can grab it
-            SetSelectedObject(hitObj);
+            SetSelectedObject(selectableObject);
         }
         else
         {
@@ -151,25 +189,46 @@ public class SelectionManager : MonoBehaviour
         }
     }
 
+    private static GameObject FindSelectableObject(Transform hitTransform)
+    {
+        Transform current = hitTransform;
+        while (current != null)
+        {
+            if (current.CompareTag("Selectable"))
+                return current.gameObject;
+            current = current.parent;
+        }
+
+        return null;
+    }
+
     bool IsInteractingWithUI()
     {
-        if (rayInteractor == null) return false;
-        if (rayInteractor.TryGetCurrentUIRaycastResult(out RaycastResult uiHit))
-            return IsPartOfWristUIHierarchy(uiHit.gameObject);
         return false;
     }
 
-    bool IsPartOfWristUIHierarchy(GameObject obj)
+    bool IsDeselectSurface(GameObject hitObject)
     {
-        Transform current = obj.transform;
-        while (current != null)
+        // Any robot link: URDF-spawned links all carry ArticulationBody in their parent chain.
+        if (hitObject.GetComponentInParent<ArticulationBody>() != null)
+            return true;
+
+        // The end-effector handle (and anything else under the Robot IK Manager).
+        if (hitObject.GetComponentInParent<Quest3RobotInteractionController>() != null)
+            return true;
+
+        // The planning request menu: the UI script sits on the prefab's "XRI UIDocument"
+        // child, so its parent is the prefab root -- covering both the panel collider and
+        // the root grab bar.
+        if (planningMenu == null)
+            planningMenu = FindFirstObjectByType<MoveItPlanningRequestMenuUI>(FindObjectsInactive.Include);
+        if (planningMenu != null)
         {
-            if (current.GetComponent<WristMenuController>() != null)
-            {
+            Transform menuRoot = planningMenu.transform.parent != null ? planningMenu.transform.parent : planningMenu.transform;
+            if (hitObject.transform.IsChildOf(menuRoot))
                 return true;
-            }
-            current = current.parent;
         }
+
         return false;
     }
 
@@ -216,11 +275,19 @@ public class SelectionManager : MonoBehaviour
         }
 
         SelectedObject = newSelection;
-        selectedRenderer = SelectedObject.GetComponent<Renderer>();
+        selectedRenderer = SelectedObject.GetComponentInChildren<Renderer>();
         if (selectedRenderer != null)
         {
             originalMaterial = selectedRenderer.material;
-            selectedRenderer.material = highlightMaterial;
+            // One shared transparent copy of the highlight material, built lazily so the
+            // Teal asset itself stays opaque for its other users and repeated selections
+            // don't each instantiate a new material.
+            if (transparentHighlightMaterial == null && highlightMaterial != null)
+            {
+                transparentHighlightMaterial = new Material(highlightMaterial);
+                WristMenuController.MakeMaterialTransparent(transparentHighlightMaterial, highlightAlpha);
+            }
+            selectedRenderer.material = transparentHighlightMaterial != null ? transparentHighlightMaterial : highlightMaterial;
         }
         
         MirrorToService(SelectedObject);

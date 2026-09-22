@@ -10,15 +10,16 @@ public class MarkerRobotPlacement : MonoBehaviour
     [SerializeField] private GameObject leftRobot;
     [SerializeField] private GameObject rightRobot;
 
-#if OPENCV_FOR_UNITY
-    private ChArUcoTrackingManager _trackingManager;
-#endif
+    [SerializeField, Tooltip("Keep the AprilTag tracker running after the robot is placed. Required when the tracker " +
+                             "also tracks object tags (TagReachabilityIndicator). Off restores the old behaviour of " +
+                             "stopping passthrough reads once the robot is placed.")]
+    private bool keepTrackerRunningAfterPlacement = true;
+
+    private AprilTagTracker _tracker;
 
     void Start()
     {
-#if OPENCV_FOR_UNITY
-        _trackingManager = GetComponent<ChArUcoTrackingManager>();
-#endif
+        _tracker = GetComponent<AprilTagTracker>();
         placeRobotAction.action.performed += OnPlaceRobot;
     }
 
@@ -65,22 +66,37 @@ public class MarkerRobotPlacement : MonoBehaviour
         if (robotCount == 1)
         {
             GameObject robot = hasLeft ? leftRobot : rightRobot;
-            robot.transform.position = placementPosition;
-            robot.transform.rotation = newRotation;
+            MoveRobot(robot, placementPosition, newRotation);
         }
         else if (robotCount == 2)
         {
             float halfDist = Vector3.Distance(leftRobot.transform.position, rightRobot.transform.position) / 2f;
-            leftRobot.transform.position = placementPosition - projectedRight * halfDist;
-            rightRobot.transform.position = placementPosition + projectedRight * halfDist;
-            leftRobot.transform.rotation = newRotation;
-            rightRobot.transform.rotation = newRotation;
+            MoveRobot(leftRobot, placementPosition - projectedRight * halfDist, newRotation);
+            MoveRobot(rightRobot, placementPosition + projectedRight * halfDist, newRotation);
         }
 
-#if OPENCV_FOR_UNITY
-        if (_trackingManager != null)
-            _trackingManager.enabled = false;
-#endif
+        // Placement is done; stop reading passthrough frames unless other consumers still need tags.
+        if (!keepTrackerRunningAfterPlacement && _tracker != null)
+            _tracker.enabled = false;
+    }
+
+    /// <summary>
+    /// Moves a robot root. URDF-imported robots are ArticulationBody chains, and PhysX ignores
+    /// Transform writes on an articulation root: the pose shows for one frame and the next physics
+    /// step restores the old one. TeleportRoot moves the articulation itself; the Transform is set
+    /// first so the root body's world pose (and any non-articulated children) reflect the target.
+    /// </summary>
+    static void MoveRobot(GameObject robot, Vector3 position, Quaternion rotation)
+    {
+        robot.transform.SetPositionAndRotation(position, rotation);
+
+        foreach (var body in robot.GetComponentsInChildren<ArticulationBody>(true))
+        {
+            if (!body.isRoot) continue;
+            body.TeleportRoot(body.transform.position, body.transform.rotation);
+            body.linearVelocity = Vector3.zero;
+            body.angularVelocity = Vector3.zero;
+        }
     }
 
     void OnDestroy()

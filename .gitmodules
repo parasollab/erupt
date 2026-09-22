@@ -9,3 +9,6 @@
 [submodule "Packages/URDF-Importer"]
 	path = Packages/URDF-Importer
 	url = git@github.com:parasollab/URDF-Importer.git
+[submodule "Packages/AprilTag"]
+	path = Packages/AprilTag
+	url = git@github.com:courtneymcbeth/jp.keijiro.apriltag.git

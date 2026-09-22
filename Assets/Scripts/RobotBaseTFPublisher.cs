@@ -1,14 +1,14 @@
 using UnityEngine;
 
 /// <summary>
-/// Watches the robot base GameObject (positioned by the ArUco tracker) and forces all
+/// Watches the robot base GameObject (placed from the AprilTag marker) and forces all
 /// CollisionObjectPublishers and the SceneAnchorCollisionBridge to republish their poses
 /// whenever the base moves beyond the configured thresholds. This keeps MoveIt's planning
 /// scene consistent after the robot is physically repositioned.
 /// </summary>
 public class RobotBaseTFPublisher : MonoBehaviour
 {
-    [Tooltip("The GameObject positioned by the ArUco tracker (robot base).")]
+    [Tooltip("The GameObject placed from the AprilTag marker (robot base).")]
     public GameObject robotBase;
 
     [Tooltip("Minimum position change (meters) that triggers a republish.")]
