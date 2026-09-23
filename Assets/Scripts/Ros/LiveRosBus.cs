@@ -32,6 +32,8 @@ namespace Erupt.Ros
 
         public bool HasConnectionThread => Connection.HasConnectionThread;
 
+        public bool HasConnectionError => Connection.HasConnectionError;
+
         public void Subscribe<T>(string topic, Action<T> callback) where T : Message =>
             Connection.Subscribe(topic, callback);
 
@@ -40,6 +42,9 @@ namespace Erupt.Ros
 
         public void RegisterPublisher<T>(string topic) where T : Message =>
             Connection.RegisterPublisher<T>(topic);
+
+        public void RegisterPublisher<T>(string topic, int queueSize) where T : Message =>
+            Connection.RegisterPublisher<T>(topic, queueSize);
 
         public void RegisterRosService<TRequest, TResponse>(string serviceName)
             where TRequest : Message where TResponse : Message =>

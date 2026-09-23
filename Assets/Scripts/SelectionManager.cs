@@ -56,10 +56,18 @@ public class SelectionManager : MonoBehaviour
 
     private void Start()
     {
-        if (interactionRouter != null)
+        if (RouterDrivesSelection)
         {
             interactionRouter.Select += OnRouterSelect;
             return;
+        }
+
+        if (interactionRouter != null)
+        {
+            Debug.LogWarning($"SelectionManager: assigned InteractionRouter '{interactionRouter.name}' is " +
+                             "inactive, so selection falls back to the bound select action. This happens when " +
+                             "the router sits inside a scene's XR rig that is disabled or replaced by the " +
+                             "persistent rig at load time.");
         }
 
         if (rayInteractor == null)
@@ -85,21 +93,45 @@ public class SelectionManager : MonoBehaviour
         rayInteractor = interactor;
     }
 
+    // The router only drives selection when it can actually run. A router assigned in the
+    // Inspector but sitting under an inactive rig (KitchenFR3 keeps its XR Origin disabled,
+    // and PersistentXRInfrastructure disables duplicate rigs on load) never raises Select,
+    // and binding to it alone would leave objects unselectable and therefore ungrabbable.
+    private bool RouterDrivesSelection => interactionRouter != null && interactionRouter.isActiveAndEnabled;
+
     private void SubscribeToSelectAction()
     {
+        // Router mode resolves targets itself, so the raw action must stay unbound there or
+        // a single trigger pull would drive selection twice.
+        if (RouterDrivesSelection)
+            return;
+
         if (selectActionSubscribed || selectAction == null || selectAction.action == null)
             return;
-        }
 
         selectAction.action.performed += OnSelectPerformed;
+        selectActionSubscribed = true;
+    }
+
+    private void UnsubscribeFromSelectAction()
+    {
+        if (!selectActionSubscribed || selectAction == null || selectAction.action == null)
+            return;
+
+        selectAction.action.performed -= OnSelectPerformed;
+        selectActionSubscribed = false;
     }
 
     private void OnDestroy()
     {
         if (interactionRouter != null)
             interactionRouter.Select -= OnRouterSelect;
-        else if (selectAction != null && selectAction.action != null)
-            selectAction.action.performed -= OnSelectPerformed;
+        UnsubscribeFromSelectAction();
+
+        // Guarded so the outgoing scene's manager cannot clear the incoming one during an
+        // additive transition, where both are alive for a frame.
+        if (Instance == this)
+            Instance = null;
     }
 
     private void OnSelectPerformed(InputAction.CallbackContext _) => TrySelect();

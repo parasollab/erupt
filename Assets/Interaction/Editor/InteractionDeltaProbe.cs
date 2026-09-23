@@ -3,7 +3,6 @@ using System.Text;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
-using UnityEngine.XR.Interaction.Toolkit.Interactors;
 
 namespace Erupt.Interaction.EditorTools
 {
@@ -21,8 +20,9 @@ namespace Erupt.Interaction.EditorTools
             var ray = selection.rayInteractor;
             if (ray != null)
             {
-                sb.AppendLine($"OLD selection ray: '{ray.name}' maxRaycastDistance={ray.maxRaycastDistance} " +
-                              $"mask=0x{ray.raycastMask.value:X} hitDetection={ray.hitDetectionType}");
+                var raySo = new SerializedObject(ray);
+                sb.AppendLine($"OLD selection ray: '{ray.name}' rayLength={raySo.FindProperty("rayLength").floatValue} " +
+                              $"raycastLayers=0x{raySo.FindProperty("raycastLayers").intValue:X}");
             }
             else sb.AppendLine("OLD selection ray: NULL");
 

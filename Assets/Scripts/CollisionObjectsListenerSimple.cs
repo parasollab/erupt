@@ -242,6 +242,34 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
             return;
         }
 
+        // A detached object comes back from MoveIt as a fresh ADD under its existing id; that
+        // one must reach Upsert so the place pose is applied. Any other ADD for a known id is
+        // a duplicate and would re-instantiate the geometry.
+        if (co.operation == OP_ADD && objectsById.ContainsKey(co.id) && !awaitingDetachPose.Contains(co.id))
+        {
+            Debug.LogWarning($"[CO Listener] Ignoring ADD for existing id={co.id}; use APPEND or MOVE.");
+            return;
+        }
+
+        // planning_scene_watcher mirrors every planning-scene change back on this topic,
+        // including objects this app itself published (environment publishers, wrist-menu
+        // shapes). Instantiating such an echo would add a second CollisionObjectPublisher
+        // under the same id, and OnDestroy's live-publisher refcount would then suppress the
+        // REMOVE when the user deletes the original — leaving the object in the planning
+        // scene forever. The Unity-owned registry above only covers objects that registered
+        // with this listener; this covers every publisher and every listener instance.
+        if (!objectsById.ContainsKey(co.id) && CollisionObjectPublisher.HasLivePublisher(co.id))
+            return;
+
+        // Wrist-menu user shapes are always spawned by this app, never by RViz, so any
+        // ADD/MOVE echo for one is a mirror of a shape that already exists here — or one
+        // whose publishers just died in a scene transition, which the two guards above can't
+        // see: the echo then lands on the next scene's listener (empty objectsById, no live
+        // publisher) and resurrects the shape into the planning scene. REMOVE echoes are
+        // handled above and must stay live — they're how an RViz-side delete reaches Unity.
+        if (IsUserShapeId(co.id))
+            return;
+
         Debug.Log($"[CO Listener] Adding/Appending/Moving object id={co.id}");
         awaitingDetachPose.Remove(co.id);
         Upsert(co, applyWorldPose: true);
@@ -510,6 +538,22 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
     public void ApplyRosWorldPose(Transform t, PoseMsg rosPose)
     {
         if (t != null && rosPose != null) ApplyWorldPose(t, rosPose);
+    }
+
+    // Ids WristMenuController assigns to user-created shapes: "unity_{primitive}_{ticks}"
+    // from AddPrimitiveShape (PrimitiveType.ToString().ToLower()) and "unity_mesh_{ticks}"
+    // from DuplicateSelectedObject. Environment publishers ("unity_Gas_Stove", ...) never
+    // carry the trailing "_" + primitive-word form, and RViz-created objects ("Box_0")
+    // don't start with "unity_".
+    static bool IsUserShapeId(string id)
+    {
+        return id.StartsWith("unity_cube_") ||
+               id.StartsWith("unity_sphere_") ||
+               id.StartsWith("unity_cylinder_") ||
+               id.StartsWith("unity_capsule_") ||
+               id.StartsWith("unity_plane_") ||
+               id.StartsWith("unity_quad_") ||
+               id.StartsWith("unity_mesh_");
     }
 
     // ---------- Pose helpers ----------

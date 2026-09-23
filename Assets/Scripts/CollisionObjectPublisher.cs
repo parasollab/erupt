@@ -45,6 +45,76 @@ public class CollisionObjectPublisher : MonoBehaviour
     public GameObject worldOrigin; // Optional world origin for relative positioning
 
     private IRosBus ros;
+
+    // Live publishers per objectId. The streaming study flow loads the next scene additively
+    // and retires the old one afterwards, so the outgoing scene's OnDestroy REMOVEs arrive
+    // AFTER the incoming scene's ADDs for the same ids (scenes share environment prefabs and
+    // their ids). A REMOVE is only published when no other live publisher owns the id.
+    private static readonly System.Collections.Generic.Dictionary<string, int> s_LivePublishersById =
+        new System.Collections.Generic.Dictionary<string, int>();
+    private string liveRegistryId = null;
+
+    // Every id this app has ADDed to the planning scene (with its frame), cleared when a
+    // REMOVE for it is published. OnDestroy REMOVEs sent during scene teardown can be lost
+    // (transition races, reconnects); PublishRemovalsForOrphanedIds re-publishes REMOVEs for
+    // any id with no live publisher, from a running scene where delivery is reliable.
+    private static readonly System.Collections.Generic.Dictionary<string, string> s_AddedFrameById =
+        new System.Collections.Generic.Dictionary<string, string>();
+
+    // Outgoing /collision_object messages are paced across frames instead of bursting: a
+    // scene transition emits ~90 teardown REMOVEs + ~90 sweep REMOVEs + the next scene's
+    // ADDs within single frames, and bursts that size overflowed queues at multiple hops
+    // (the connector's sender logged "Queue full! Messages are getting dropped!", and
+    // move_group's /collision_object subscriber drops history overruns silently) — leaving
+    // stale objects in the planning scene. The outbox also holds messages while the
+    // connection is down, unlike the connector's own queues, which are wiped on disconnect.
+    private static readonly System.Collections.Generic.Queue<(CollisionObjectMsg msg, bool pad)> s_Outbox =
+        new System.Collections.Generic.Queue<(CollisionObjectMsg msg, bool pad)>();
+    private const int kOutboxMessagesPerFrame = 15;
+    private static int s_LastPumpFrame = -1;
+
+    private static void EnqueueOutgoing(CollisionObjectMsg msg, bool useTrailingPad = true)
+    {
+        IRosBus bus = RosBus.Instance;
+        if (bus == null)
+            return;
+        bus.RegisterPublisher<CollisionObjectMsg>("/collision_object", CollisionObjectQueueSize);
+        s_Outbox.Enqueue((msg, useTrailingPad));
+    }
+
+    // True while any live CollisionObjectPublisher owns this id. Used by
+    // CollisionObjectsListenerSimple to recognize /collision_objects_ros echoes of objects
+    // this app itself published (planning_scene_watcher mirrors every planning-scene change
+    // back on that topic) so it never instantiates a duplicate copy of them.
+    public static bool HasLivePublisher(string objectId)
+    {
+        return !string.IsNullOrEmpty(objectId) && s_LivePublishersById.ContainsKey(objectId);
+    }
+
+    // Sends up to kOutboxMessagesPerFrame queued messages. Called once per frame (guarded)
+    // from PersistentXRInfrastructure.Update and from every live publisher's Update, so the
+    // queue keeps draining even in scenes with no publishers of their own.
+    public static void PumpOutbox()
+    {
+        if (Time.frameCount == s_LastPumpFrame)
+            return;
+        s_LastPumpFrame = Time.frameCount;
+
+        if (s_Outbox.Count == 0)
+            return;
+
+        IRosBus bus = RosBus.Instance;
+        if (bus == null || bus.HasConnectionError)
+            return;
+
+        int budget = kOutboxMessagesPerFrame;
+        while (budget-- > 0 && s_Outbox.Count > 0)
+        {
+            (CollisionObjectMsg msg, bool pad) = s_Outbox.Dequeue();
+            bus.Publish("/collision_object", msg, pad);
+        }
+    }
+
     private float lastPublishTime = 0f;
     private Vector3 lastPosition;
     private Quaternion lastRotation;
@@ -135,7 +205,24 @@ public class CollisionObjectPublisher : MonoBehaviour
 
     void Update()
     {
+        // Drain the shared outbox even when this publisher itself is paused.
+        PumpOutbox();
+
         if (pausePublishing || attachedToRobot) return;
+
+        if (ros != null)
+        {
+            bool hasError = ros.HasConnectionError;
+            if (wasConnectionInError && !hasError)
+            {
+                hasBeenPublished = false;
+                lastPublishTime = 0f;
+                // The disconnect also discarded any queued REMOVEs; re-publish removals
+                // for dead ids too (debounced internally — one sweep per recovery).
+                PublishRemovalsForOrphanedIds();
+            }
+            wasConnectionInError = hasError;
+        }
 
         if (Time.time - lastPublishTime < 1.0f / publishRateHz)
             return;
@@ -515,8 +602,26 @@ public class CollisionObjectPublisher : MonoBehaviour
 
     void OnDestroy()
     {
-        // Delete the collision object from the planning scene
-        if (ros != null && !suppressRemoveOnDestroy && !attachedToRobot)
+        ObjectMetricsLogger.Instance?.LogEvent("object_deleted", objectId);
+
+        bool anotherLivePublisherOwnsId = false;
+        if (liveRegistryId != null)
+        {
+            int liveCount;
+            if (s_LivePublishersById.TryGetValue(liveRegistryId, out liveCount))
+            {
+                liveCount--;
+                if (liveCount <= 0)
+                    s_LivePublishersById.Remove(liveRegistryId);
+                else
+                    s_LivePublishersById[liveRegistryId] = liveCount;
+                anotherLivePublisherOwnsId = liveCount > 0;
+            }
+        }
+
+        // Delete the collision object from the planning scene — unless a publisher in the
+        // incoming scene owns the same id, in which case its ADD must survive this REMOVE.
+        if (ros != null && !suppressRemoveOnDestroy && !attachedToRobot && !anotherLivePublisherOwnsId)
         {
             CollisionObjectMsg msg = new CollisionObjectMsg
             {

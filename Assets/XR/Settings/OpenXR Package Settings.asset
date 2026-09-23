@@ -560,7 +560,9 @@ MonoBehaviour:
   openxrExtensionStrings: XR_EXT_performance_settings
   company: Unity
   priority: 0
+  targetOpenXRApiVersion: 
   required: 0
+  customRuntimeLoaderName: 
 --- !u!114 &-4271683267094799745
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1035,12 +1037,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9f0ebc320a151d3408ea1e9fce54d40e, type: 3}
   m_Name: OpenXR Package Settings
   m_EditorClassIdentifier: 
-  Keys: 01000000070000002400000024000000
+  Keys: 010000000700000024000000
   Values:
   - {fileID: 1480740558239653922}
   - {fileID: 5670176823469848052}
   - {fileID: 3222050423079762511}
-  - {fileID: 4118453763466792759}
 --- !u!114 &160760909776640819
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1521,7 +1522,7 @@ MonoBehaviour:
   m_Name: VisionOS
   m_EditorClassIdentifier: Unity.XR.OpenXR::UnityEngine.XR.OpenXR.OpenXRSettings
   features:
-  - {fileID: -1307903305011841921}
+  - {fileID: -4397161623939102539}
   customLoaderName: 
   m_renderMode: 1
   m_latencyOptimization: 0
@@ -1597,6 +1598,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Unity.XR.OpenXR::UnityEngine.XR.OpenXR.OpenXRSettings
   features:
   - {fileID: -4397161623939102539}
+  customLoaderName: 
   m_renderMode: 1
   m_latencyOptimization: 0
   m_autoColorSubmissionMode: 1

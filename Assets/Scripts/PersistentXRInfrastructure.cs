@@ -3,6 +3,7 @@ using Unity.XR.CoreUtils;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.XR;
+using UnityEngine.XR.Interaction.Toolkit.Attachment;
 
 /// <summary>
 /// Owns the XR/platform objects that must survive study-content changes. The generated
@@ -21,6 +22,12 @@ public sealed class PersistentXRInfrastructure : MonoBehaviour
         "XR UI Toolkit Manager",
         "OVRManager",
     };
+
+    /// <summary>Root of the Meta building-block camera rig the AR demo scenes track through.</summary>
+    public const string MetaCameraRigName = "[BuildingBlock] Camera Rig";
+
+    /// <summary>Name of the passive XROrigin created under the Meta rig by <see cref="CreateMetaRigXROrigin"/>.</summary>
+    public const string MetaRigXROriginName = "XR Origin (Meta Rig)";
 
     private static PersistentXRInfrastructure s_Instance;
     private readonly Dictionary<string, GameObject> _roots = new Dictionary<string, GameObject>();
@@ -133,9 +140,79 @@ public sealed class PersistentXRInfrastructure : MonoBehaviour
             _xrOrigin = FindFirstObjectByType<XROrigin>(FindObjectsInactive.Include);
         }
 
+        EnsureActiveXROrigin(scene);
         CachePersistentComponents();
         EnsureControllerRobotRays();
         BindSceneDependencies(scene);
+    }
+
+    /// <summary>
+    /// Gives a scene that tracks through the Meta building-block rig an active XROrigin. XRI's
+    /// InteractionAttachController (the Near-Far Interactor's far-grab anchor) skips its whole
+    /// per-frame update when it cannot find one, so a far grab selects the object but never
+    /// moves it. The AR demo scenes keep the XRI rig, and with it the only XROrigin, inactive.
+    /// </summary>
+    private void EnsureActiveXROrigin(Scene scene)
+    {
+        // FindAnyObjectByType skips inactive objects, so the disabled XRI rig does not count.
+        if (FindAnyObjectByType<XROrigin>() != null)
+            return;
+
+        GameObject rig = FindGameObjectInScene(scene, MetaCameraRigName);
+        if (rig == null || !rig.activeInHierarchy)
+            return;
+
+        XROrigin origin = CreateMetaRigXROrigin(rig);
+        if (origin == null)
+            return;
+
+        Debug.Log($"PersistentXRInfrastructure: scene '{scene.name}' had no active XROrigin; added " +
+                  $"'{MetaRigXROriginName}' under '{rig.name}' so XRI far grabs can move objects.");
+
+        // Attach controllers looked the origin up in their OnEnable during scene load and cached
+        // the miss; OnEnable is the only place they look again, so cycle them once.
+        List<InteractionAttachController> attachControllers = FindAllInScene<InteractionAttachController>(scene);
+        for (int i = 0; i < attachControllers.Count; i++)
+        {
+            InteractionAttachController attach = attachControllers[i];
+            if (!attach.isActiveAndEnabled)
+                continue;
+
+            attach.enabled = false;
+            attach.enabled = true;
+        }
+    }
+
+    /// <summary>
+    /// Creates a passive XROrigin under the Meta camera rig: origin = the rig root, camera = its
+    /// CenterEyeAnchor, tracking mode left as-is, and the floor-offset object is the new empty
+    /// child so nothing XROrigin might shift is part of the rig. Also used by the ARMTC scene
+    /// builder at edit time; nothing here needs play mode.
+    /// </summary>
+    public static XROrigin CreateMetaRigXROrigin(GameObject rig)
+    {
+        if (rig == null)
+            return null;
+
+        Transform centerEye = FindDescendantByName(rig.transform, "CenterEyeAnchor");
+        Camera camera = centerEye != null ? centerEye.GetComponent<Camera>() : null;
+        if (camera == null)
+            camera = rig.GetComponentInChildren<Camera>(true);
+
+        // Inactive while configuring so XROrigin.Awake (play mode) sees the final fields.
+        GameObject go = new GameObject(MetaRigXROriginName);
+        go.SetActive(false);
+        go.transform.SetParent(rig.transform, false);
+
+        XROrigin origin = go.AddComponent<XROrigin>();
+        origin.Origin = rig;
+        origin.CameraFloorOffsetObject = go;
+        origin.Camera = camera;
+        origin.CameraYOffset = 0f;
+        origin.RequestedTrackingOriginMode = XROrigin.TrackingOriginMode.NotSpecified;
+
+        go.SetActive(true);
+        return origin;
     }
 
     private void CachePersistentComponents()
@@ -289,6 +366,23 @@ public sealed class PersistentXRInfrastructure : MonoBehaviour
         if (_wristMenu != null)
             _wristMenu.BindSceneDependencies(selectionManager, collisionObjectsListener, worldOrigin);
 
+        // The AR demo scenes keep the persistent XRI rig inactive and run a second wrist menu
+        // under the Meta camera rig's LeftHandAnchor, which the binding above never reaches.
+        // Bind every wrist menu the scene brought with it too, keeping whatever the scene had
+        // serialized wherever this lookup came up empty.
+        List<WristMenuController> sceneWristMenus = FindAllInScene<WristMenuController>(scene);
+        for (int i = 0; i < sceneWristMenus.Count; i++)
+        {
+            WristMenuController wrist = sceneWristMenus[i];
+            if (wrist == _wristMenu)
+                continue;
+
+            wrist.BindSceneDependencies(
+                selectionManager != null ? selectionManager : wrist.selectionManager,
+                collisionObjectsListener != null ? collisionObjectsListener : wrist.collisionObjectsListener,
+                worldOrigin != null ? worldOrigin : wrist.worldOrigin);
+        }
+
         if (robotInteraction != null && selectionManager == null)
         {
             Debug.LogWarning(
@@ -324,6 +418,19 @@ public sealed class PersistentXRInfrastructure : MonoBehaviour
         }
 
         return null;
+    }
+
+    private static List<T> FindAllInScene<T>(Scene scene) where T : Component
+    {
+        var results = new List<T>();
+        if (!scene.IsValid() || !scene.isLoaded)
+            return results;
+
+        GameObject[] roots = scene.GetRootGameObjects();
+        for (int i = 0; i < roots.Length; i++)
+            results.AddRange(roots[i].GetComponentsInChildren<T>(true));
+
+        return results;
     }
 
     private static GameObject FindGameObjectInScene(Scene scene, string objectName)

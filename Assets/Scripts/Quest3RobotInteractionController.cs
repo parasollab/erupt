@@ -45,6 +45,9 @@ public class Quest3RobotInteractionController : MonoBehaviour
         public float distance;
         public Vector3 offset;
         public Vector3 target;
+        // Set when the interactor grabbed a ghost control panel instead of the robot. Such a
+        // drag occupies the interactor like any other but never touches the IK controller.
+        public GhostControlPanel panel;
     }
 
     private readonly Dictionary<object, ActiveDrag> activeDrags =
@@ -144,11 +147,6 @@ public class Quest3RobotInteractionController : MonoBehaviour
         }
     }
 
-    public bool TryBeginHandleDrag(object interactor, Ray ray, RaycastHit hit)
-    {
-        return TryBeginHandleDrag((object)interactor, ray, hit);
-    }
-
     /// <summary>Router-driven equivalent of TryBeginHandleDrag. Guidelines Part 3.</summary>
     public bool TryBeginHandleDrag(InteractionIntent intent)
     {
@@ -156,10 +154,32 @@ public class Quest3RobotInteractionController : MonoBehaviour
             intent.Sample.SourceId ?? "default", intent.Ray, intent.HasHit ? intent.Hit : default);
     }
 
-    private bool TryBeginHandleDrag(object interactor, Ray ray, RaycastHit hit)
+    // Direct entry for ray interactors (Quest3 controller, mouse); keyed by interactor identity.
+    public bool TryBeginHandleDrag(object interactor, Ray ray, RaycastHit hit)
     {
-        if (ikController == null || handle == null || interactor == null ||
-            activeDrags.ContainsKey(interactor) || activeDrags.Count >= maximumConcurrentDrags)
+        if (interactor == null || activeDrags.ContainsKey(interactor) ||
+            activeDrags.Count >= maximumConcurrentDrags)
+        {
+            return false;
+        }
+
+        // Ghost control panels take priority: dragging one to reposition it shouldn't also
+        // try to drag the IK handle underneath it.
+        GhostControlPanel panel = GetPanelFromHit(hit);
+        if (panel != null)
+        {
+            activeDrags.Add(interactor, new ActiveDrag
+            {
+                panel = panel,
+                distance = hit.distance,
+                offset = panel.ShellPosition - ray.GetPoint(hit.distance),
+                target = panel.ShellPosition
+            });
+            panel.BeginDrag();
+            return true;
+        }
+
+        if (ikController == null || handle == null)
         {
             return false;
         }
@@ -175,8 +195,11 @@ public class Quest3RobotInteractionController : MonoBehaviour
         }
 
         bool hitDragTarget = hitHandle || hitJointHandle || hitLink;
-        // The near-miss assist must not grab a handle that is hidden for a solution.
-        if (!hitDragTarget && !handleHiddenForSolution &&
+        // The near-miss assist must not grab a handle that is hidden for a solution, and it
+        // must not fire when the grip is aimed at a grabbable object: the same grip press
+        // starts the XRI grab on that object, and stealing it for the handle would drag the
+        // robot along with the object and clear the selection mid-grab.
+        if (!hitDragTarget && !handleHiddenForSolution && !HitsGrabbableObject(hit) &&
             Vector3.Cross(ray.direction, handle.position - ray.origin).magnitude <= 0.08f)
         {
             hitHandle = true;
@@ -210,7 +233,7 @@ public class Quest3RobotInteractionController : MonoBehaviour
             target = draggedPoint
         };
 
-        if (activeDrags.Count == 0) ikController.BeginInteraction();
+        if (!HasIkDrag()) ikController.BeginInteraction();
         activeDrags.Add(interactor, drag);
         if (hitHandle) SetHandleActive(true);
         if (hitJointHandle) SelectJoint(joint, jointHandle.GetComponent<Renderer>());
@@ -225,7 +248,9 @@ public class Quest3RobotInteractionController : MonoBehaviour
         // Grabbing the EE handle also drops the current shape selection, matching the
         // trigger-click behavior in SelectionManager.IsDeselectSurface.
         SelectionManager.Instance?.ClearSelection();
-        ObjectMetricsLogger.Instance?.LogEvent("grab_start", EndEffectorHandleObjectId);
+        // Joint and link drags already logged their own grab_start via SelectJoint.
+        if (grabbedBody == null)
+            ObjectMetricsLogger.Instance?.LogEvent("grab_start", EndEffectorHandleObjectId);
         return true;
     }
 
@@ -233,7 +258,13 @@ public class Quest3RobotInteractionController : MonoBehaviour
     // mirroring the InteractionAttachController push/pull used for XRI far-grabbed objects.
     public void AdjustHandleDragDistance(object interactor, float delta, float maxDistance)
     {
-        UpdateHandleDrag((object)interactor, ray);
+        if (interactor == null || !activeDrags.TryGetValue(interactor, out ActiveDrag drag) ||
+            drag.panel != null)
+        {
+            return;
+        }
+
+        drag.distance = Mathf.Clamp(drag.distance + delta, 0.1f, maxDistance);
     }
 
     /// <summary>Router-driven equivalent of UpdateHandleDrag.</summary>
@@ -242,19 +273,18 @@ public class Quest3RobotInteractionController : MonoBehaviour
         UpdateHandleDrag(intent.Sample.SourceId ?? "default", intent.Ray);
     }
 
-    private void UpdateHandleDrag(object interactor, Ray ray)
+    public void UpdateHandleDrag(object interactor, Ray ray)
     {
-        if (interactor == null || ikController == null || handle == null ||
-            !activeDrags.TryGetValue(interactor, out ActiveDrag drag))
+        if (interactor == null || !activeDrags.TryGetValue(interactor, out ActiveDrag drag))
         {
             return;
         }
 
         drag.target = ray.GetPoint(drag.distance) + drag.offset;
 
-        if (draggedPanel != null)
+        if (drag.panel != null)
         {
-            draggedPanel.UpdateDrag(target);
+            drag.panel.UpdateDrag(drag.target);
             return;
         }
 
@@ -266,27 +296,35 @@ public class Quest3RobotInteractionController : MonoBehaviour
         if (drag.body == null) handle.position = drag.target;
     }
 
-    public void EndHandleDrag(Quest3ControllerRayInteractor interactor)
-    {
-        EndHandleDrag((object)interactor);
-    }
-
     /// <summary>Router-driven equivalent of EndHandleDrag.</summary>
     public void EndHandleDrag(InteractionIntent intent)
     {
         EndHandleDrag(intent.Sample.SourceId ?? "default");
     }
 
-    private void EndHandleDrag(object interactor)
+    public void EndHandleDrag(object interactor)
     {
         if (interactor == null || !activeDrags.TryGetValue(interactor, out ActiveDrag drag))
         {
             return;
         }
 
-        bool draggedEndEffector = drag.body == null;
         activeDrags.Remove(interactor);
-        if (activeDrags.Count == 0) ikController.EndInteraction();
+
+        if (drag.panel != null)
+        {
+            drag.panel.EndDrag();
+            return;
+        }
+
+        bool draggedEndEffector = drag.body == null;
+        if (!HasIkDrag()) ikController.EndInteraction();
+
+        // Log before snapping the handle marker back to endEffector -- they should already
+        // coincide (IK solves toward the drag target continuously), but endEffector is the
+        // real robot pose, so that's the one worth logging.
+        if (draggedEndEffector && endEffector != null)
+            ObjectMetricsLogger.Instance?.LogEvent("grab_end", EndEffectorHandleObjectId, endEffector.position, endEffector.rotation);
 
         if (endEffector != null && handle != null && !HasEndEffectorDrag())
             handle.position = endEffector.position;
@@ -298,6 +336,35 @@ public class Quest3RobotInteractionController : MonoBehaviour
     {
         EndHandleDrag(sourceId ?? "default");
     }
+
+    // True when the ray landed on an object the user can grab through XRI (spawned shapes,
+    // planning-scene props): anything under a "Selectable"-tagged or XRGrabInteractable parent.
+    private static bool HitsGrabbableObject(RaycastHit hit)
+    {
+        if (hit.transform == null) return false;
+        if (hit.transform.GetComponentInParent<UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable>() != null)
+            return true;
+        for (Transform t = hit.transform; t != null; t = t.parent)
+        {
+            if (t.CompareTag("Selectable")) return true;
+        }
+        return false;
+    }
+
+    // The panel's grabbable BoxCollider lives on the shell root while the GhostControlPanel
+    // component lives on its child UIDocument object, so a raycast hit can land on either.
+    private static GhostControlPanel GetPanelFromHit(RaycastHit hit)
+    {
+        if (hit.transform == null) return null;
+        return hit.transform.GetComponentInChildren<GhostControlPanel>()
+            ?? hit.transform.GetComponentInParent<GhostControlPanel>();
+    }
+
+    // JogSelectedJoint is called every frame regardless of thumbstick position (with
+    // deltaRadians == 0 while centered/idle -- see Quest3ControllerRayInteractor.Update), so the
+    // moving/idle transition can be detected entirely in here: log "grab_end" the frame jogging
+    // stops rather than needing every-frame logging while the joystick is held.
+    private bool isJoggingSelectedJoint = false;
 
     public void JogSelectedJoint(float deltaRadians)
     {
@@ -321,6 +388,21 @@ public class Quest3RobotInteractionController : MonoBehaviour
         LastRefusal = ikController.TryNudgeJoint(selectedJoint, deltaRadians);
         ikController.EndInteraction();
     }
+
+    private void LogJointJogEnd()
+    {
+        isJoggingSelectedJoint = false;
+        if (selectedJoint == null)
+        {
+            return;
+        }
+
+        float angleRad = selectedJoint.jointPosition[0];
+        ObjectMetricsLogger.Instance?.LogEvent("grab_end", JointObjectId(selectedJoint),
+            selectedJoint.transform.position, selectedJoint.transform.rotation, details: $"angle_rad:{angleRad:F4}");
+    }
+
+    private static string JointObjectId(ArticulationBody joint) => $"joint_{joint.name}";
 
     /// <summary>Router-driven selection. Target resolution already happened upstream.</summary>
     public void SelectFromIntent(InteractionIntent intent)
@@ -401,7 +483,11 @@ public class Quest3RobotInteractionController : MonoBehaviour
 
         orderedDrags.Clear();
         foreach (ActiveDrag drag in activeDrags.Values)
-            orderedDrags.Add(drag);
+        {
+            if (drag.panel == null) orderedDrags.Add(drag);
+        }
+        if (orderedDrags.Count == 0)
+            return;
 
         orderedDrags.Sort((a, b) => GetEffectorIndex(a).CompareTo(GetEffectorIndex(b)));
 
@@ -446,7 +532,18 @@ public class Quest3RobotInteractionController : MonoBehaviour
     {
         foreach (ActiveDrag drag in activeDrags.Values)
         {
-            if (drag.body == body)
+            if (drag.panel == null && drag.body == body)
+                return true;
+        }
+
+        return false;
+    }
+
+    private bool HasIkDrag()
+    {
+        foreach (ActiveDrag drag in activeDrags.Values)
+        {
+            if (drag.panel == null)
                 return true;
         }
 
@@ -457,7 +554,7 @@ public class Quest3RobotInteractionController : MonoBehaviour
     {
         foreach (ActiveDrag drag in activeDrags.Values)
         {
-            if (drag.body == null)
+            if (drag.panel == null && drag.body == null)
                 return true;
         }
 

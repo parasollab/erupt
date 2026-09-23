@@ -17,11 +17,24 @@ namespace Erupt.Ros
     {
         bool HasConnectionThread { get; }
 
+        /// <summary>
+        /// True while the connector is in its error/backoff state. Publishers that pace
+        /// their own outbox hold messages until it clears.
+        /// </summary>
+        bool HasConnectionError { get; }
+
         void Subscribe<T>(string topic, Action<T> callback) where T : Message;
 
         void Unsubscribe<T>(string topic, Action<T> callback) where T : Message;
 
         void RegisterPublisher<T>(string topic) where T : Message;
+
+        /// <summary>
+        /// Registers with an explicit outgoing queue size. The connector keeps the first
+        /// registration's size for a topic, so every registrant of a shared topic must
+        /// pass the same value (see CollisionObjectPublisher.CollisionObjectQueueSize).
+        /// </summary>
+        void RegisterPublisher<T>(string topic, int queueSize) where T : Message;
 
         void RegisterRosService<TRequest, TResponse>(string serviceName)
             where TRequest : Message where TResponse : Message;

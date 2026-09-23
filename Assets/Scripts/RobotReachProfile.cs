@@ -24,4 +24,13 @@ public class RobotReachProfile : MonoBehaviour
 
     [Tooltip("Optional explicit Unity transform that corresponds to planningFrameId.")]
     public Transform baseAnchor;
+
+    [Tooltip("Joint-name prefix used by the Unity robot (e.g. \"fr3_\"). Together with rosJointNamePrefix this " +
+             "rewrites the IK seed's joint names for a MoveIt config that models the same arm under another name " +
+             "(the MTC demo plans for \"panda_*\" while the scene shows \"fr3_*\"). Leave both empty when the " +
+             "names already match. Mirrors MTCTrajectoryPlayer's inbound remap.")]
+    public string unityJointNamePrefix = "";
+
+    [Tooltip("Joint-name prefix used by the ROS robot model (e.g. \"panda_\"). See unityJointNamePrefix.")]
+    public string rosJointNamePrefix = "";
 }

@@ -30,6 +30,8 @@ namespace Erupt.Ros.Tests
 
         public bool HasConnectionThread { get; set; } = true;
 
+        public bool HasConnectionError { get; set; } = false;
+
         public void Subscribe<T>(string topic, Action<T> callback) where T : Message
         {
             Subscriptions.Add(topic);
@@ -46,6 +48,9 @@ namespace Erupt.Ros.Tests
         }
 
         public void RegisterPublisher<T>(string topic) where T : Message =>
+            RegisteredPublishers.Add(topic);
+
+        public void RegisterPublisher<T>(string topic, int queueSize) where T : Message =>
             RegisteredPublishers.Add(topic);
 
         public void RegisterRosService<TRequest, TResponse>(string serviceName)
