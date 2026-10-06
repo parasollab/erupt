@@ -3,6 +3,13 @@
 All notable changes to `com.erupt.plugin.moveit` are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Changed
+
+- Goal constraints cover the robot's IK chain (`IRobotModel.JointNames`) only. The joint state
+  now also carries gripper joints; the start state keeps them, the goal no longer pins them.
+
 ## [1.0.0-preview.1] - 2026-09-14
 
 First release as an ERUPT plugin (Planning family).

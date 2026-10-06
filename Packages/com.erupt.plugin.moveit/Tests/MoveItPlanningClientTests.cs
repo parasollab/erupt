@@ -113,6 +113,27 @@ namespace Erupt.Plugins.MoveIt.Tests
         }
 
         [Test]
+        public void RequestPlan_LeavesGripperJointsOutOfTheGoalConstraints()
+        {
+            robot = new FakeRobot(new[] { "fr3_joint1", "fr3_joint2", "fr3_finger_joint1" }, new[] { 0.1f, 0.2f, 0.04f })
+            {
+                ArmNames = new[] { "fr3_joint1", "fr3_joint2" }
+            };
+            client = new MoveItPlanningClient(bus, robot, settings);
+            GetMotionPlanRequest sent = null;
+            bus.SetServiceHandler("/plan_kinematic_path", req => { sent = (GetMotionPlanRequest)req; return Failure(); });
+
+            client.RequestPlan(client.CaptureRobotState(), client.CaptureRobotState(), null, _ => { });
+
+            var r = sent.motion_plan_request;
+            Assert.AreEqual(new[] { "panda_joint1", "panda_joint2", "panda_finger_joint1" }, r.start_state.joint_state.name,
+                "The start state still tells MoveIt where the fingers are.");
+            Assert.AreEqual(new[] { "panda_joint1", "panda_joint2" },
+                System.Array.ConvertAll(r.goal_constraints[0].joint_constraints, c => c.joint_name),
+                "The arm group cannot move the fingers, so the goal must not constrain them.");
+        }
+
+        [Test]
         public void RequestPlan_Success_YieldsAUnityNamedTrajectory()
         {
             bus.SetServiceHandler("/plan_kinematic_path", _ => new GetMotionPlanResponse
@@ -181,7 +202,9 @@ namespace Erupt.Plugins.MoveIt.Tests
             public FakeRobot(string[] names, float[] positions) { this.names = names; this.positions = positions; }
             public Transform Root => null;
             public Transform EndEffector => null;
-            public IReadOnlyList<string> JointNames => names;
+            /// <summary>The IK chain when it is shorter than the joint state (a robot with a gripper).</summary>
+            public string[] ArmNames;
+            public IReadOnlyList<string> JointNames => ArmNames ?? names;
             public bool TryGetJointAngle(string jointName, out float positionRadians) { positionRadians = 0; return false; }
             public string[] GetJointStateNames() => names;
             public float[] GetJointStatePositions() => positions;

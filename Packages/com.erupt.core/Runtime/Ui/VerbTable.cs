@@ -47,7 +47,7 @@ namespace Erupt.Ui
             [SelectionKind.EndEffector] = new[]
             {
                 Available("set-goal",      "Set Goal"),
-                Pending  ("gripper",       "Open/Close Gripper"),
+                Available("gripper",       "Open/Close Gripper"),
                 Pending  ("preview-grasp", "Preview Grasp")
             },
 

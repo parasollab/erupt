@@ -283,18 +283,26 @@ public sealed class MoveItPlanningClient : IDisposable
     {
         var js = state?.joint_state;
         if (js?.name == null || js.position == null) return Array.Empty<JointConstraintMsg>();
+
+        // The joint state also carries the gripper, which the planning group cannot move:
+        // a goal that pinned the fingers would be unreachable whenever they differ from the start.
+        string[] arm = robot != null ? ToRosNames(robot.JointNames.ToArray()) : Array.Empty<string>();
+
         int n = Math.Min(js.name.Length, js.position.Length);
-        var constraints = new JointConstraintMsg[n];
+        var constraints = new List<JointConstraintMsg>(n);
         for (int i = 0; i < n; i++)
-            constraints[i] = new JointConstraintMsg
+        {
+            if (arm.Length > 0 && Array.IndexOf(arm, js.name[i]) < 0) continue;
+            constraints.Add(new JointConstraintMsg
             {
                 joint_name = js.name[i],
                 position = js.position[i],
                 tolerance_above = settings.goalTolerance,
                 tolerance_below = settings.goalTolerance,
                 weight = 1.0
-            };
-        return constraints;
+            });
+        }
+        return constraints.ToArray();
     }
 
     private static TimeMsg Now()

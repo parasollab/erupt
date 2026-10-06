@@ -59,7 +59,7 @@ Design rules the UI follows: [`design-guidelines.md`](Packages/com.erupt.core/Do
 
 - **Tier 1** (wrist bar): mode indicator (Build / Plan / Teach), Undo, Redo.
 - **Tier 2** (contextual menu on the selected thing): obstacle → resize, delete, snap, duplicate;
-  end effector → set goal, plan; trajectory → preview, execute (and `correct` in Teach).
+  end effector → set goal, plan, open/close gripper; trajectory → preview, execute (and `correct` in Teach).
 - **Tier 3** (summoned with the controller Menu button or the hand menu gesture, one panel at a time): the **Scene** tab
   (place cube / sphere / cylinder), **Planner settings** (MoveIt), **MTC** (stage tree, ranked
   solutions, pick/place recorder) and **RADER** (record / replay / publish demonstrations).

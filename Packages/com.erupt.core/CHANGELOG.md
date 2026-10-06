@@ -14,11 +14,28 @@ All notable changes to `com.erupt.core` are documented here. The format follows
   space to world space, which the stub did not do.
 - `WristAnchor` (OpenXR backend): keeps the tier 1 anchor on the left controller or the left
   wrist, whichever is in use.
+- Gripper support in `DirectArticulationIKController`: `SetGripperWidth`, `OpenGripper`,
+  `CloseGripper`, `ToggleGripper`, `GripperWidth`, `GripperOpenWidth`, `HasGripper`. A width is
+  split evenly across the finger joints and clamped to their limits; open/close move at
+  `gripperMaxSpeed` (0.1 m/s by default).
+- The end effector's `gripper` verb (Open/Close Gripper) is available and bound by `PluginHost`
+  when the robot has finger joints.
 
 ### Changed
 
+- Hands keep their XRI far ray on regardless of finger pose: the demo's `PokeGestureDetector`
+  is disabled on the rig, since it turned the ray off in the pointing pose users adopt to aim
+  at menus while the ERUPT ray kept drawing.
 - `XriInteractableAdapter` tags XRI grab samples with the active modality instead of always
   `Controller`.
+- `IRobotModel.GetJointStateNames` / `GetJointStatePositions` now end with the gripper's finger
+  joints (metres) on `DirectArticulationIKController`; `JointNames` stays the IK chain only.
+
+### Fixed
+
+- The FR3's prismatic finger joints were not registered with the controller, so nothing held
+  them and finger positions in joint states and trajectories were dropped with a warning. They
+  are now held at their commanded travel every physics step and follow `ApplyJointState`.
 
 ## [1.0.0-preview.1] - 2026-09-14
 

@@ -14,10 +14,13 @@ namespace Erupt.Robot
         /// <summary>Root of the articulated hierarchy.</summary>
         Transform Root { get; }
         Transform EndEffector { get; }
+        /// <summary>The joints IK drives (the arm), base to tip. Gripper joints are not in this list.</summary>
         IReadOnlyList<string> JointNames { get; }
 
         bool TryGetJointAngle(string jointName, out float positionRadians);
+        /// <summary>Every joint in the joint state: <see cref="JointNames"/>, then any gripper joints.</summary>
         string[] GetJointStateNames();
+        /// <summary>Positions matching <see cref="GetJointStateNames"/>: radians, or metres for a prismatic gripper joint.</summary>
         float[] GetJointStatePositions();
         void ApplyJointState(string[] names, double[] positions);
         void ApplyJointState(IList<string> names, IList<float> positions);

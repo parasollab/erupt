@@ -82,6 +82,11 @@ namespace Erupt.Plugins
             if (modes != null) modes.ModeChanged += OnModeChanged;
             else if (context.Modes != null) context.Modes.ModeChanged += OnModeChanged;
 
+            // The gripper belongs to the core robot, not to a plugin. A robot without
+            // finger joints leaves the verb unbound, which renders it disabled.
+            if (robot != null && robot.HasGripper && ui != null && ui.TierTwo != null)
+                ui.BindVerb("gripper", _ => robot.ToggleGripper());
+
             if (!discoverInScene) return;
 
             var found = FindObjectsByType<EruptPluginBehaviour>(FindObjectsInactive.Include, FindObjectsSortMode.InstanceID)

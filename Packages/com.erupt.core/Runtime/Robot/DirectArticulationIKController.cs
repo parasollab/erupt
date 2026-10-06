@@ -20,6 +20,8 @@ public class DirectArticulationIKController : MonoBehaviour, Erupt.Robot.IRobotM
     [SerializeField] private float maxAngleStepDegrees = 4f;
     [SerializeField] private float solveWeight = 0.85f;
     [SerializeField] private JointInitialPosition[] initialPose;
+    [Tooltip("Rate (m/s) at which OpenGripper, CloseGripper and ToggleGripper change the gap between the fingertips.")]
+    [SerializeField] private float gripperMaxSpeed = 0.1f;
 
     private readonly HashSet<string> warnedMissingJoints = new HashSet<string>();
 
@@ -42,10 +44,65 @@ public class DirectArticulationIKController : MonoBehaviour, Erupt.Robot.IRobotM
     private readonly List<float> heldJointPositions = new List<float>();
     private bool isInteracting;
 
+    // Prismatic finger joints. They are outside the IK chain: each keeps a commanded travel
+    // in metres that is re-applied every physics step, so the fingers cannot slide on their own.
+    private readonly List<ArticulationBody> gripperJoints = new List<ArticulationBody>();
+    private readonly List<string> gripperJointNames = new List<string>();
+    private readonly List<float> gripperJointPositions = new List<float>();
+    private float? gripperWidthGoal;
+
     public Transform Root => robotRoot;
     public Transform EndEffector => endEffector;
     public IReadOnlyList<string> JointNames => jointNames;
     public IReadOnlyList<ArticulationBody> Joints => joints;
+
+    public bool HasGripper => gripperJoints.Count > 0;
+
+    /// <summary>Commanded gap between the fingertips in metres: the finger joints' travel added up.</summary>
+    public float GripperWidth
+    {
+        get
+        {
+            float width = 0f;
+            foreach (float travel in gripperJointPositions)
+                width += travel;
+            return width;
+        }
+    }
+
+    /// <summary>Widest gap the finger joint limits allow, in metres.</summary>
+    public float GripperOpenWidth => GripperLimitWidth(open: true);
+
+    /// <summary>
+    /// Sets the gap between the fingertips (metres) at once. The width is split evenly
+    /// across the finger joints and clamped to their limits, so the fingers stay symmetric.
+    /// </summary>
+    public void SetGripperWidth(float width)
+    {
+        gripperWidthGoal = null;
+        ApplyGripperWidth(width);
+    }
+
+    /// <summary>Opens the gripper at <see cref="gripperMaxSpeed"/>.</summary>
+    public void OpenGripper()
+    {
+        if (HasGripper) gripperWidthGoal = GripperLimitWidth(open: true);
+    }
+
+    /// <summary>Closes the gripper at <see cref="gripperMaxSpeed"/>.</summary>
+    public void CloseGripper()
+    {
+        if (HasGripper) gripperWidthGoal = GripperLimitWidth(open: false);
+    }
+
+    /// <summary>Closes a gripper that is (or is on its way to being) more than half open; opens it otherwise.</summary>
+    public void ToggleGripper()
+    {
+        float open = GripperLimitWidth(open: true);
+        float closed = GripperLimitWidth(open: false);
+        if ((gripperWidthGoal ?? GripperWidth) > (open + closed) * 0.5f) CloseGripper();
+        else OpenGripper();
+    }
 
     public int GetJointIndex(ArticulationBody joint)
     {
@@ -329,9 +386,12 @@ public class DirectArticulationIKController : MonoBehaviour, Erupt.Robot.IRobotM
         return InteractionRefusal.None;
     }
 
+    /// <summary>The IK chain's joints followed by the gripper's finger joints.</summary>
     public string[] GetJointStateNames()
     {
-        return jointNames.ToArray();
+        var names = new List<string>(jointNames);
+        names.AddRange(gripperJointNames);
+        return names.ToArray();
     }
 
     public void LogJointDriveLimits()
@@ -349,18 +409,26 @@ public class DirectArticulationIKController : MonoBehaviour, Erupt.Robot.IRobotM
 
     public float[] GetJointStatePositions()
     {
-        float[] positions = new float[joints.Count];
+        float[] positions = new float[joints.Count + gripperJoints.Count];
         for (int i = 0; i < joints.Count; i++)
         {
             positions[i] = ClampedRosPosition(joints[i]);
         }
 
+        gripperJointPositions.CopyTo(positions, joints.Count);
         return positions;
     }
 
     public bool TryGetJointAngle(string jointName, out float positionRadians)
     {
         positionRadians = 0f;
+        int gripperIndex = gripperJointNames.IndexOf(jointName);
+        if (gripperIndex >= 0)
+        {
+            positionRadians = gripperJointPositions[gripperIndex];
+            return true;
+        }
+
         if (!jointByName.TryGetValue(jointName, out ArticulationBody joint))
         {
             return false;
@@ -420,12 +488,28 @@ public class DirectArticulationIKController : MonoBehaviour, Erupt.Robot.IRobotM
         ZeroJointVelocities();
     }
 
+    private void Update()
+    {
+        if (gripperWidthGoal == null)
+            return;
+
+        float goal = gripperWidthGoal.Value;
+        float width = Mathf.MoveTowards(GripperWidth, goal, gripperMaxSpeed * Time.deltaTime);
+        ApplyGripperWidth(width);
+        if (Mathf.Approximately(width, goal))
+            gripperWidthGoal = null;
+    }
+
     private void FixedUpdate()
     {
         if (!isInteracting)
         {
             ApplyHeldPose();
         }
+
+        // IK never drives the fingers, so they are held during an interaction as well.
+        for (int i = 0; i < gripperJoints.Count; i++)
+            ApplyJointPosition(gripperJoints[i], gripperJointPositions[i]);
     }
 
     private void StabilizeRobot(Transform robotRoot)
@@ -459,6 +543,10 @@ public class DirectArticulationIKController : MonoBehaviour, Erupt.Robot.IRobotM
         joints.Clear();
         jointNames.Clear();
         jointByName.Clear();
+        gripperJoints.Clear();
+        gripperJointNames.Clear();
+        gripperJointPositions.Clear();
+        gripperWidthGoal = null;
         if (robotRoot == null)
             return;
 
@@ -468,19 +556,37 @@ public class DirectArticulationIKController : MonoBehaviour, Erupt.Robot.IRobotM
                 continue;
 
             ArticulationBody body = component.GetComponent<ArticulationBody>();
-            if (body == null || body.jointType != ArticulationJointType.RevoluteJoint)
+            if (body == null)
+                continue;
+
+            // A prismatic joint the end effector does not hang off is a gripper finger;
+            // one it does hang off (a lift axis) stays outside this controller.
+            bool isFinger = body.jointType == ArticulationJointType.PrismaticJoint &&
+                (endEffector == null || !endEffector.IsChildOf(body.transform));
+            if (body.jointType != ArticulationJointType.RevoluteJoint && !isFinger)
                 continue;
 
             bool gotName = TryGetUrdfJointName(component, out string name);
             string resolvedName = !string.IsNullOrWhiteSpace(name) ? name : component.name;
             if (!gotName || string.IsNullOrWhiteSpace(name))
                 Debug.LogWarning($"[IK] BuildJointChain: could not read joint name from UrdfJoint on '{component.name}', falling back to GameObject name '{resolvedName}'");
-            AddJoint(body, resolvedName);
+            if (isFinger)
+            {
+                gripperJoints.Add(body);
+                gripperJointNames.Add(resolvedName);
+                gripperJointPositions.Add(ClampGripperTravel(body, body.jointPosition[0]));
+            }
+            else
+            {
+                AddJoint(body, resolvedName);
+            }
         }
 
         var sb = new System.Text.StringBuilder("[IK] BuildJointChain discovered joints:");
         for (int i = 0; i < jointNames.Count; i++)
             sb.Append($"\n  [{i}] name='{jointNames[i]}' go='{joints[i].name}'");
+        for (int i = 0; i < gripperJointNames.Count; i++)
+            sb.Append($"\n  [gripper {i}] name='{gripperJointNames[i]}' go='{gripperJoints[i].name}'");
         Debug.Log(sb.ToString());
 
         // Fallback for robots not imported via the URDF importer.
@@ -649,14 +755,54 @@ public class DirectArticulationIKController : MonoBehaviour, Erupt.Robot.IRobotM
 
     private void ApplyNamedJointPosition(string jointName, float positionRadians)
     {
+        int gripperIndex = string.IsNullOrWhiteSpace(jointName) ? -1 : gripperJointNames.IndexOf(jointName);
+        if (gripperIndex >= 0)
+        {
+            // An explicit finger position (a joint state, a trajectory) overrides an open/close in progress.
+            gripperWidthGoal = null;
+            SetGripperJointPosition(gripperIndex, positionRadians);
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(jointName) || !jointByName.TryGetValue(jointName, out ArticulationBody joint))
         {
             if (!string.IsNullOrWhiteSpace(jointName) && warnedMissingJoints.Add(jointName))
-                Debug.LogWarning($"[IK] ApplyNamedJointPosition: joint '{jointName}' not found (known: {string.Join(", ", jointNames)})");
+                Debug.LogWarning($"[IK] ApplyNamedJointPosition: joint '{jointName}' not found (known: {string.Join(", ", GetJointStateNames())})");
             return;
         }
 
         ApplyJointPosition(joint, positionRadians);
+    }
+
+    private void ApplyGripperWidth(float width)
+    {
+        // Every finger gets the same share, which is what keeps a two-finger hand centred.
+        for (int i = 0; i < gripperJoints.Count; i++)
+            SetGripperJointPosition(i, width / gripperJoints.Count);
+    }
+
+    private void SetGripperJointPosition(int index, float travelMetres)
+    {
+        ArticulationBody joint = gripperJoints[index];
+        gripperJointPositions[index] = ClampGripperTravel(joint, travelMetres);
+        ApplyJointPosition(joint, gripperJointPositions[index]);
+    }
+
+    // Prismatic drive limits are metres already, unlike the degrees ClampJointPosition converts.
+    private static float ClampGripperTravel(ArticulationBody joint, float travelMetres)
+    {
+        ArticulationDrive drive = joint.xDrive;
+        return drive.upperLimit > drive.lowerLimit
+            ? Mathf.Clamp(travelMetres, drive.lowerLimit, drive.upperLimit)
+            : travelMetres;
+    }
+
+    private float GripperLimitWidth(bool open)
+    {
+        float width = 0f;
+        foreach (ArticulationBody joint in gripperJoints)
+            width += open ? joint.xDrive.upperLimit : joint.xDrive.lowerLimit;
+        return width;
     }
 
     private static void SetDriveTarget(ArticulationBody joint, float positionRadians)
