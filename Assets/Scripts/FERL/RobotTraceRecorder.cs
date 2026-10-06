@@ -8,6 +8,9 @@ using UnityEngine;
 // Records the person dragging the end effector (through the IK controller) as a joint-space
 // path and publishes it on /ferl/robot_trace. FERL's protocol: start where the feature is
 // expressed (e.g. right over the laptop) and move away from it, then stop.
+// With NoPreference set the same drag is sent as a no-preference trace (frame_id
+// "no_preference"): "in this scene, e.g. with the cup closed, everywhere along this drag is
+// equally fine". The bridge ties its states together instead of ordering them.
 public class RobotTraceRecorder : MonoBehaviour
 {
     [SerializeField] private DirectArticulationIKController ikController;
@@ -15,6 +18,11 @@ public class RobotTraceRecorder : MonoBehaviour
     [SerializeField] private float sampleHz = 15f;
     [SerializeField] private string traceTopic = "/ferl/robot_trace";
 
+    public const string OrderedFrameId = "ferl_robot_trace";
+    public const string NoPreferenceFrameId = "no_preference";
+
+    // Read when the recording stops, so it can still be flipped while dragging.
+    public bool NoPreference { get; set; }
     public bool IsRecording { get; private set; }
     public int SampleCount => samples.Count;
     public int PublishedTraces { get; private set; }
@@ -48,7 +56,9 @@ public class RobotTraceRecorder : MonoBehaviour
         stamps.Clear();
         IsRecording = true;
         sampling = StartCoroutine(Sample());
-        LastMessage = "recording robot trace: drag the end effector from where the feature is strongest to where it is absent, then stop";
+        LastMessage = NoPreference
+            ? "recording NO-PREFERENCE robot trace: make the drag you would make to show the feature, in a scene where it does not matter (e.g. cup closed), then stop"
+            : "recording robot trace: drag the end effector from where the feature is strongest to where it is absent, then stop";
         Debug.Log("[RobotTraceRecorder] " + LastMessage);
         return true;
     }
@@ -74,7 +84,8 @@ public class RobotTraceRecorder : MonoBehaviour
             joint_names = FerlJointNames.RosArmNames,
             points = new JointTrajectoryPointMsg[samples.Count],
         };
-        msg.header.frame_id = "ferl_robot_trace";
+        bool flat = NoPreference;
+        msg.header.frame_id = flat ? NoPreferenceFrameId : OrderedFrameId;
         for (int i = 0; i < samples.Count; i++)
         {
             float t = stamps[i] - stamps[0];
@@ -87,7 +98,7 @@ public class RobotTraceRecorder : MonoBehaviour
         }
         ros.Publish(traceTopic, msg);
         PublishedTraces++;
-        LastMessage = $"robot trace #{PublishedTraces} sent ({samples.Count} samples over {stamps[stamps.Count - 1] - stamps[0]:F1} s)";
+        LastMessage = $"{(flat ? "no-preference robot trace" : "robot trace")} #{PublishedTraces} sent ({samples.Count} samples over {stamps[stamps.Count - 1] - stamps[0]:F1} s)";
         Debug.Log("[RobotTraceRecorder] " + LastMessage);
         return true;
     }

@@ -34,6 +34,7 @@ public class FERLSessionMenuController : MonoBehaviour
         public string scene_state = "";
         public int n_robot_traces;
         public int n_env_traces;
+        public int n_flat_traces;  // no-preference traces among the two counts above
         public int n_corrections;
         public int traces_since_learn;
         public string[] round_trip_errors = Array.Empty<string>();
@@ -64,8 +65,13 @@ public class FERLSessionMenuController : MonoBehaviour
 
     private ROSConnection ros;
     private Button setStartButton, setGoalButton, ikEndpointsButton, planButton, playStopButton;
-    private Button robotTraceButton, envTraceButton, envCorrectionButton, learnButton, learnOnlyButton, replanButton, resetButton, saveButton, syncButton, rewardMapButton;
+    private Button robotTraceButton, envTraceButton, tracePreferenceButton, envCorrectionButton, learnButton, learnOnlyButton, replanButton, resetButton, saveButton, syncButton, rewardMapButton;
     private string rewardMapFeature = "off";
+
+    // What the next recorded trace (robot or env) means. Ordered: "this is bad, that is fine".
+    // No preference: "in this scene (e.g. cup closed) all of it is equally fine", the evidence
+    // that lets a learned feature depend on an attribute.
+    public bool NoPreferenceTraces { get; private set; }
     private Label statusLabel, featuresLabel, hintLabel, resultLabel;
     private string lastResultMessage = "";
     private bool loggedHomeEe;
@@ -110,6 +116,7 @@ public class FERLSessionMenuController : MonoBehaviour
         playStopButton = Bind(root, "ferlPlayStop", TogglePlay);
         robotTraceButton = Bind(root, "ferlRecordRobotTrace", ToggleRobotTrace);
         envTraceButton = Bind(root, "ferlRecordEnvTrace", ToggleEnvTrace);
+        tracePreferenceButton = Bind(root, "ferlTracePreference", ToggleTracePreference);
         envCorrectionButton = Bind(root, "ferlEnvCorrection", EnvCorrection);
         learnButton = Bind(root, "ferlLearn", Learn);
         learnOnlyButton = Bind(root, "ferlLearnOnly", LearnOnly);
@@ -280,10 +287,29 @@ public class FERLSessionMenuController : MonoBehaviour
         player.TogglePlay();
     }
 
+    public void ToggleTracePreference()
+    {
+        NoPreferenceTraces = !NoPreferenceTraces;
+        ApplyTracePreference();
+        ShowResult(NoPreferenceTraces
+            ? "traces: NO PREFERENCE. Put the scene in the state where the feature should not matter (e.g. close the cup), then record the same drag or edits; they are taught as all equally fine."
+            : "traces: ordered (from most unacceptable to acceptable)", false);
+        RefreshButtons();
+    }
+
+    private void ApplyTracePreference()
+    {
+        if (robotTraceRecorder != null)
+            robotTraceRecorder.NoPreference = NoPreferenceTraces;
+        if (envTraceRecorder != null)
+            envTraceRecorder.NoPreference = NoPreferenceTraces;
+    }
+
     public void ToggleRobotTrace()
     {
         if (robotTraceRecorder == null)
             return;
+        ApplyTracePreference();
         bool wasRecording = robotTraceRecorder.IsRecording;
         bool ok = wasRecording ? robotTraceRecorder.StopRecording() : robotTraceRecorder.StartRecording();
         ShowResult(robotTraceRecorder.LastMessage, !ok, pending: !wasRecording && ok);
@@ -296,6 +322,7 @@ public class FERLSessionMenuController : MonoBehaviour
     {
         if (envTraceRecorder == null)
             return;
+        ApplyTracePreference();
         bool wasRecording = envTraceRecorder.IsRecording;
         if (!wasRecording)
         {
@@ -454,6 +481,11 @@ public class FERLSessionMenuController : MonoBehaviour
             robotTraceButton.text = robotTraceRecorder != null && robotTraceRecorder.IsRecording ? "Stop robot trace" : "Record robot trace";
         if (envTraceButton != null)
             envTraceButton.text = envTraceRecorder != null && envTraceRecorder.IsRecording ? "Stop env trace" : "Record env trace";
+        if (tracePreferenceButton != null)
+        {
+            tracePreferenceButton.text = NoPreferenceTraces ? "Traces: NO PREFERENCE" : "Traces: ordered";
+            tracePreferenceButton.style.color = NoPreferenceTraces ? new StyleColor(new Color(1f, 0.86f, 0.6f)) : new StyleColor(StyleKeyword.Null);
+        }
         if (rewardMapButton != null)
             rewardMapButton.text = rewardMapFeature == "off" ? "Reward map: off" : $"Reward map: {rewardMapFeature}";
 
@@ -462,7 +494,8 @@ public class FERLSessionMenuController : MonoBehaviour
         string phase = s.busy ? $"{s.phase} ({s.elapsed:F0}s)" : s.phase;
         string plan = s.plan_seq > 0 ? $"plan {s.plan_seq}: {(s.plan_usable ? $"{s.plan_length} waypoints" : "unusable")}" : "no plan";
         string endpoints = $"{(s.has_start ? "start" : "-")}/{(s.has_goal ? "goal" : "-")}";
-        string counts = $"traces {s.n_robot_traces}r/{s.n_env_traces}e ({s.traces_since_learn} new), corrections {s.n_corrections}";
+        string flatCount = s.n_flat_traces > 0 ? $", {s.n_flat_traces} no-pref" : "";
+        string counts = $"traces {s.n_robot_traces}r/{s.n_env_traces}e{flatCount} ({s.traces_since_learn} new), corrections {s.n_corrections}";
         string conf = s.confidence >= 0f ? $"confidence {s.confidence:F2}/{s.confidence_threshold:F1}{(s.needs_traces ? " NEEDS TRACES" : "")}" : "";
         string error = string.IsNullOrEmpty(s.error) ? "" : $"\nERROR: {s.error}";
         SetText(statusLabel, $"[{phase}] {s.message}\n{plan} | {endpoints} | scene {s.scene_state}\n{counts}\n{conf}{error}");

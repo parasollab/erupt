@@ -11,6 +11,9 @@ using UnityEngine;
 // A single long grab yields several waypoints: while recording, an object being dragged is
 // snapshotted as a new displacement edit every sampleDistance metres (or sampleTurnDegrees)
 // of travel, so there is no need to let go at each waypoint, though that still works too.
+// With NoPreference set the trace is sent with "preference": "none": "in this scene, e.g. with
+// the cup closed, none of these edits matters to me". Make the same edits you would make for
+// an ordinary trace; the bridge ties the scenes together instead of ordering them.
 public class EnvTraceRecorder : MonoBehaviour
 {
     [SerializeField] private SceneGraphPublisher publisher;
@@ -24,6 +27,8 @@ public class EnvTraceRecorder : MonoBehaviour
     [Tooltip("... or turned this much (degrees about ROS z) since the last snapshot.")]
     [SerializeField] private float sampleTurnDegrees = 15f;
 
+    // Read when the recording stops, so it can still be flipped while editing.
+    public bool NoPreference { get; set; }
     public bool IsRecording { get; private set; }
     public int SnapshotCount => snapshots.Count;
     public int PublishedTraces { get; private set; }
@@ -88,7 +93,9 @@ public class EnvTraceRecorder : MonoBehaviour
         stamps.Add(Time.timeSinceLevelLoad);
         publisher.Edited += OnEdited;
         IsRecording = true;
-        LastMessage = $"recording env trace: edit the scene from most unacceptable toward acceptable (a drag is sampled every {sampleDistance * 100f:F0} cm; toggles count too), then stop";
+        LastMessage = NoPreference
+            ? $"recording NO-PREFERENCE env trace: make the edits you would make to fix the plan, in a scene where they do not matter (e.g. cup closed; a drag is sampled every {sampleDistance * 100f:F0} cm), then stop. Do not toggle the attribute that makes them not matter."
+            : $"recording env trace: edit the scene from most unacceptable toward acceptable (a drag is sampled every {sampleDistance * 100f:F0} cm; toggles count too), then stop";
         Debug.Log("[EnvTraceRecorder] " + LastMessage);
         return true;
     }
@@ -119,6 +126,8 @@ public class EnvTraceRecorder : MonoBehaviour
         writer.BeginObject();
         writer.Key("user_id").Value(userId ?? "");
         writer.Key("direction").Value("decreasing");
+        bool flat = NoPreference;
+        writer.Key("preference").Value(flat ? "none" : "ordered");
         writer.Key("plan_seq").Value(player != null ? player.PlanSeq : 0);
         writer.Key("timestamps").BeginArray();
         for (int i = 0; i < stamps.Count; i++)
@@ -138,7 +147,7 @@ public class EnvTraceRecorder : MonoBehaviour
         writer.EndObject();
         ros.Publish(traceTopic, new StringMsg(writer.ToString()));
         PublishedTraces++;
-        LastMessage = $"env trace #{PublishedTraces} sent ({snapshots.Count} scenes, {edits.Count} edits)";
+        LastMessage = $"{(flat ? "no-preference env trace" : "env trace")} #{PublishedTraces} sent ({snapshots.Count} scenes, {edits.Count} edits)";
         Debug.Log("[EnvTraceRecorder] " + LastMessage);
         return true;
     }

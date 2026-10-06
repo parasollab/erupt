@@ -18,6 +18,7 @@
             <ui:Button text="Record robot trace" name="ferlRecordRobotTrace" selectable="false" focusable="false" style="-unity-font-style: bold; font-size: 14px; margin: 2px; padding: 5px 4px; flex-grow: 1; flex-basis: 0; min-width: 0; white-space: normal; -unity-text-align: middle-center;" />
             <ui:Button text="Record env trace" name="ferlRecordEnvTrace" selectable="false" focusable="false" style="-unity-font-style: bold; font-size: 14px; margin: 2px; padding: 5px 4px; flex-grow: 1; flex-basis: 0; min-width: 0; white-space: normal; -unity-text-align: middle-center;" />
         </ui:VisualElement>
+        <ui:Button text="Traces: ordered" name="ferlTracePreference" selectable="false" focusable="false" style="-unity-font-style: bold; font-size: 14px; margin: 2px; padding: 5px 4px; flex-shrink: 0; min-width: 0; white-space: normal; -unity-text-align: middle-center;" />
         <ui:VisualElement style="flex-direction: row; flex-shrink: 0;">
             <ui:Button text="Scene edit as correction" name="ferlEnvCorrection" selectable="false" focusable="false" style="-unity-font-style: bold; font-size: 14px; margin: 2px; padding: 5px 4px; flex-grow: 1; flex-basis: 0; min-width: 0; white-space: normal; -unity-text-align: middle-center;" />
             <ui:Button text="Learn + replan" name="ferlLearn" selectable="false" focusable="false" style="-unity-font-style: bold; font-size: 14px; margin: 2px; padding: 5px 4px; flex-grow: 1; flex-basis: 0; min-width: 0; white-space: normal; -unity-text-align: middle-center;" />

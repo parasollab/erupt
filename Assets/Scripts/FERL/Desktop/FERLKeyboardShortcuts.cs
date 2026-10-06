@@ -14,6 +14,7 @@ public class FERLKeyboardShortcuts : MonoBehaviour
     [SerializeField] private KeyCode playStop = KeyCode.Space;
     [SerializeField] private KeyCode robotTrace = KeyCode.R;
     [SerializeField] private KeyCode envTrace = KeyCode.T;
+    [SerializeField] private KeyCode tracePreference = KeyCode.G;
     [SerializeField] private KeyCode envCorrection = KeyCode.C;
     [SerializeField] private KeyCode learn = KeyCode.L;
     [SerializeField] private KeyCode learnOnly = KeyCode.K;
@@ -53,6 +54,7 @@ public class FERLKeyboardShortcuts : MonoBehaviour
         else if (Input.GetKeyDown(playStop)) menu.TogglePlay();
         else if (Input.GetKeyDown(robotTrace)) menu.ToggleRobotTrace();
         else if (Input.GetKeyDown(envTrace)) menu.ToggleEnvTrace();
+        else if (Input.GetKeyDown(tracePreference)) menu.ToggleTracePreference();
         else if (Input.GetKeyDown(envCorrection)) menu.EnvCorrection();
         else if (Input.GetKeyDown(learn)) menu.Learn();
         else if (Input.GetKeyDown(learnOnly)) menu.LearnOnly();

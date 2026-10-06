@@ -88,6 +88,18 @@ The scene also runs in the editor without a headset: WASD/QE + right mouse to fl
 left-click to select and drag objects (Ctrl: ground plane, Alt: rotate, wheel:
 push/pull, Delete: remove), drag the end-effector handle with the mouse, and keys
 `1`/`2` set start/goal, `I` IK endpoints, `P` plan, `Space` play, `R`/`T` record a
-robot/env trace, `C` scene edit as correction, `L` learn, `M` cycle the reward map, `F5` save, `F9` reset.
+robot/env trace, `G` switch traces between ordered and no preference, `C` scene edit as correction, `L` learn, `M` cycle the reward map, `F5` save, `F9` reset.
+
+**No-preference traces.** An ordinary trace says "this is bad, that is fine". To teach a
+preference that depends on an attribute ("stay away from the laptop only while the cup is
+open"), the learner also needs to be told when the geometry does *not* matter. Press
+**Traces: ordered** (key `G`) so it reads **Traces: NO PREFERENCE**, put the scene in the
+state where the feature should not apply (close the cup), and record the same kind of drag
+or the same scene edits as before; the trace is sent as "all of this is equally fine"
+(`header.frame_id = "no_preference"` on `/ferl/robot_trace`, `"preference": "none"` on
+`/ferl/env_trace`). Do not toggle the deciding attribute inside a no-preference env trace,
+and switch back to ordered afterwards. One or two of these beside the ordinary open-cup
+traces is what makes the learned feature conditional (see "No-preference traces" in
+`preference_rl/README_scenecorr.md`). The status line counts them as `no-pref`.
 
 The **Reward map** button asks the bridge to sample reachable end-effector positions and draws them in the robot frame coloured by the weighted total cost or by one feature (blue low, red high); it refreshes automatically after each Learn. Every plan also draws its end-effector path as a green line with waypoint dots; the previous plan's path stays in faded red so a replan is easy to compare.
