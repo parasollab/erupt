@@ -4,6 +4,22 @@ All notable changes to `com.erupt.core` are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/) with Unity's `-preview.N` pre-release tag.
 
+## [Unreleased]
+
+### Added
+
+- Hand tracking as a full stand-in for the controllers. `OpenXrHandBackend` is no longer a
+  stub: pinch selects and drags (`PinchTracker`), thumb-middle pinch emits the thumbstick
+  axis, and the Meta menu gesture emits `Activate`. Joint poses are converted from XR Origin
+  space to world space, which the stub did not do.
+- `WristAnchor` (OpenXR backend): keeps the tier 1 anchor on the left controller or the left
+  wrist, whichever is in use.
+
+### Changed
+
+- `XriInteractableAdapter` tags XRI grab samples with the active modality instead of always
+  `Controller`.
+
 ## [1.0.0-preview.1] - 2026-09-14
 
 First release of ERUPT (Extended Reality Universal Programming Toolkit) as a core package with

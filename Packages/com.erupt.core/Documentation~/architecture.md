@@ -36,11 +36,19 @@ selection) · `SelectionHighlighter` · `SelectionRouterBinding` (router select 
 `TierUiRig` (tiers 1–3, the `IUiHost`) · `ObstacleVerbBindings` · `ScenePlacementTab` ·
 `XrUiRaycastInstaller` (OpenXR).
 
+On the XR rig (`KitchenFR3`): an `XriControllerBackend` under each controller, an
+`OpenXrHandBackend` per hand under the Camera Offset, and `WristAnchor`, which keeps the tier 1
+anchor on the left controller or the left wrist. XRI's `XRInputModalityManager` swaps the
+controller and hand objects as the user picks controllers up or puts them down.
+
 ## Flows
 
-- **Input**: backend (`XriControllerBackend`, …) → `InteractionRouter` (filtering, target
+- **Input**: backend (`XriControllerBackend`, `OpenXrHandBackend`, …) → `InteractionRouter` (filtering, target
   resolution, UI rejection by layer) → intents (`Select`, `Drag`, `Activate`…) → bindings
   (`SelectionRouterBinding`, `RobotInteractionRouterBinding`, `TierUiRig` for tier 3 summon).
+  The hand backend maps gestures onto the same intents (`PinchTracker`: pinch selects, a held
+  or moved pinch drags; thumb-middle pinch is the axis; the Meta menu gesture is `Activate`),
+  so nothing downstream of the router knows which is in use.
 - **Selection**: `SelectionService.Current` (typed by `SelectionKind`) → tier 2
   (`ContextualMenuModel` over `VerbRegistry`) → verb handlers (core bindings or plugins).
 - **Environment**: `ObstacleFactory` → `EnvironmentRegistry.Added` → `MoveItPlanningSceneSync`

@@ -60,13 +60,32 @@ Design rules the UI follows: [`design-guidelines.md`](Packages/com.erupt.core/Do
 - **Tier 1** (wrist bar): mode indicator (Build / Plan / Teach), Undo, Redo.
 - **Tier 2** (contextual menu on the selected thing): obstacle → resize, delete, snap, duplicate;
   end effector → set goal, plan; trajectory → preview, execute (and `correct` in Teach).
-- **Tier 3** (summoned with the controller Menu button, one panel at a time): the **Scene** tab
+- **Tier 3** (summoned with the controller Menu button or the hand menu gesture, one panel at a time): the **Scene** tab
   (place cube / sphere / cylinder), **Planner settings** (MoveIt), **MTC** (stage tree, ranked
   solutions, pick/place recorder) and **RADER** (record / replay / publish demonstrations).
 
 The core flow is: place an obstacle → select the end effector → set goal → plan → preview
 the ghost → execute. MTC adds record a pick/place task → browse solutions → preview → execute.
 Teach mode adds record a demonstration → replay → publish.
+
+### Controllers and hands
+
+Put the controllers down and the rig switches to tracked hands; pick one up and it switches
+back. Both are backends behind the same `InteractionRouter`, so every feature works with either.
+
+| Action | Controller | Hand |
+|---|---|---|
+| Select what the ray points at | Trigger | Pinch thumb and index |
+| Drag the end-effector handle, a joint handle or a link | Hold grip | Pinch, then hold or move |
+| Jog the selected joint | Thumbstick up / down | Pinch thumb and middle finger, then raise or lower the hand |
+| Grab the selected obstacle | Grip | Pinch, near or at a distance |
+| Press tier UI | Ray + trigger | Ray + pinch, or poke with the index finger |
+| Summon tier 3 | Menu button | Left palm toward your face, then pinch |
+
+Tier 1 follows the left controller, or the left wrist while hands are in use. Hands have no
+locomotion (walk instead) and no haptics. Hand input needs the **Hand Tracking Subsystem**,
+**Meta Hand Tracking Aim** and **Hand Interaction Profile** OpenXR features, which the project
+enables for Android.
 
 ## ROS 2 host
 

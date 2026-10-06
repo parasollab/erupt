@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit;
+using UnityEngine.XR.Interaction.Toolkit.Inputs;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
 using Erupt.Interaction;
 
@@ -44,8 +45,14 @@ namespace Erupt.Interaction.Backends
         {
             if (!isHeld) return;
             InteractionSampleBus.Publish(new InteractionSample(
-                Modality.Controller, 1f, Time.unscaledTimeAsDouble,
+                CurrentModality(), 1f, Time.unscaledTimeAsDouble,
                 new Pose(transform.position, transform.rotation), sourceId));
         }
+
+        // XRI grabs work the same from a controller or a pinch; the sample must say which.
+        private static Modality CurrentModality() =>
+            XRInputModalityManager.currentInputMode.Value == XRInputModalityManager.InputMode.TrackedHand
+                ? Modality.Hand
+                : Modality.Controller;
     }
 }

@@ -2,6 +2,7 @@
   "dependencies": {
     "com.github-glitchenzo.nugetforunity": "https://github.com/GlitchEnzo/NuGetForUnity.git?path=/src/NuGetForUnity",
     "com.meta.xr.mrutilitykit": "201.0.0",
+    "com.meta.xr.sdk.all": "207.0.0",
     "com.meta.xr.sdk.core": "85.0.0",
     "com.unity.2d.enhancers": "1.0.0",
     "com.unity.2d.sprite": "1.0.0",
