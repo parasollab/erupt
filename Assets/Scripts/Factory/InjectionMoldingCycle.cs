@@ -19,6 +19,10 @@ namespace Factory
         public float dropDistance = 0.9f;
         public float dropTime = 0.7f;
 
+        [Tooltip("Raised once per cycle after the moulded part has been ejected and the visual part hidden; " +
+                 "a MoldedPartSpawner turns this into a real grabbable part on the station tray.")]
+        public event System.Action Ejected;
+
         Vector3 partRest;
         bool captured;
 
@@ -44,7 +48,11 @@ namespace Factory
 
         IEnumerator Eject()
         {
-            if (moldedPart == null || !captured) yield break;
+            if (moldedPart == null || !captured)
+            {
+                Ejected?.Invoke();
+                yield break;
+            }
             moldedPart.localPosition = partRest;
             moldedPart.gameObject.SetActive(true);
             yield return Dwell(0.4f);
@@ -57,6 +65,7 @@ namespace Factory
                 yield return null;
             }
             moldedPart.gameObject.SetActive(false);
+            Ejected?.Invoke();
         }
     }
 }

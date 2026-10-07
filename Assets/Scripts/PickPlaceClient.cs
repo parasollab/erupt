@@ -44,6 +44,12 @@ public class PickPlaceClient : MonoBehaviour
     [Tooltip("Frame the place pose is expressed in.")]
     [SerializeField] private string placeFrameId = "world";
 
+    [Tooltip("Added to the ROS z of every place pose built by PlacePose(). The MTC server treats the " +
+             "requested pose as a point on the support surface and raises the object centre by " +
+             "0.5 * object_dimensions[0] + place_surface_offset (0.1251 m with the Panda demo config), " +
+             "so -0.1251 makes the object land where the user released it.")]
+    [SerializeField] private float placeHeightOffsetMeters = 0f;
+
     [SerializeField] private string executeActionName = "/execute_solution";
     [SerializeField] private string getSolutionService = "/get_solution";
     [SerializeField] private string descriptionTopic = "/pick_place/description";
@@ -177,7 +183,7 @@ public class PickPlaceClient : MonoBehaviour
     public PoseStampedMsg PlacePose(PointMsg position, QuaternionMsg orientation) =>
         new PoseStampedMsg(
             new RosMessageTypes.Std.HeaderMsg(new RosMessageTypes.BuiltinInterfaces.TimeMsg(), placeFrameId),
-            new PoseMsg(position, orientation));
+            new PoseMsg(new PointMsg(position.x, position.y, position.z + placeHeightOffsetMeters), orientation));
 
     private async Task<RosActionResult<PickPlaceResult>> SendPickPlaceAsync(
         string objectId, PoseStampedMsg placePose, bool execute, uint max, PlanningSceneMsg startSceneDiff)

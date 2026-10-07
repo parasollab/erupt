@@ -353,67 +353,9 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
             ApplyLocalPose(child.transform, primPosesLocal[i]);      // local to parent
             built++;
 
-            // Add physics components
-            Rigidbody rb = child.AddComponent<Rigidbody>();
-            rb.useGravity = false;
-            rb.isKinematic = true;
-
-            // Add XR interaction (will be controlled by SelectableGrabController)
-            child.AddComponent<XRGrabInteractable>();
-            child.GetComponent<XRGrabInteractable>().selectMode = InteractableSelectMode.Multiple;
-            // Keep the object where it's grabbed instead of snapping it to the controller
-            child.GetComponent<XRGrabInteractable>().useDynamicAttach = true;
-            // Don't match the ray hit point's position for the attach anchor — keep it at the
-            // object's own pivot so joystick rotation spins the object about its own center
-            // instead of orbiting around wherever the ray happened to hit its surface.
-            child.GetComponent<XRGrabInteractable>().matchAttachPosition = false;
-            // Don't apply release velocity, object should stop moving as soon as it's let go
-            child.GetComponent<XRGrabInteractable>().throwOnDetach = false;
-
-            // Add component to control grabbing based on selection state
-            child.AddComponent<SelectableGrabController>();
-
-            // Add tag for selection
-            child.tag = "Selectable";
-
-            child.AddComponent<XRGrabTransformerScaleAxisLock>();
-            child.AddComponent<XRGrabTransformerLockPose>();
-            // Don't freeze rotation by default — joystick manipulation should be able to
-            // spin the object about its own center instead of being locked in place.
-            child.GetComponent<XRGrabTransformerLockPose>().freezePose = false;
-
-            // Add an XR General Grab Transformer
-            child.AddComponent<XRGeneralGrabTransformer>();
-            child.GetComponent<XRGeneralGrabTransformer>().allowTwoHandedScaling = false;
-            child.GetComponent<XRGeneralGrabTransformer>().clampScaling = false;
-
-            child.AddComponent<XRTwoHandedScaleTransformer>();
-            child.AddComponent<XRUIScaleTransformer>();
-
-            child.GetComponent<XRGrabInteractable>().AddMultipleGrabTransformer(child.GetComponent<XRGeneralGrabTransformer>());
-
-            child.GetComponent<XRGrabInteractable>().AddMultipleGrabTransformer(child.GetComponent<XRTwoHandedScaleTransformer>());
-
-            child.GetComponent<XRGrabInteractable>().AddMultipleGrabTransformer(child.GetComponent<XRGrabTransformerScaleAxisLock>());
-
-            child.GetComponent<XRGrabInteractable>().AddMultipleGrabTransformer(child.GetComponent<XRGrabTransformerLockPose>());
-
-            child.GetComponent<XRGrabInteractable>().AddMultipleGrabTransformer(child.GetComponent<XRUIScaleTransformer>());
-
-            // Ensure collider is enabled (should already be there from CreatePrimitive)
-            Collider collider = child.GetComponent<Collider>();
-            if (collider != null)
-            {
-                collider.enabled = true;
-            }
-
-            // Add CollisionObjectPublisher to automatically publish to ROS
-            CollisionObjectPublisher publisher = child.AddComponent<CollisionObjectPublisher>();
-            publisher.isMesh = false;
-            // Generate unique ID for each object
-            publisher.objectId = name;
-            publisher.hasBeenPublished = true;
-            publisher.worldOrigin = worldOrigin;
+            // Grab / publish stack shared with the wrist menu and the factory spawner. The
+            // planning scene already holds this object, so the publisher starts as published.
+            GrabbableCollisionObjectFactory.Configure(child, name, worldOrigin, markAlreadyPublished: true);
         }
 
         // ---- MESHES (local to parent) ----

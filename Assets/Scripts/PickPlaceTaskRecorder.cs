@@ -35,6 +35,10 @@ public class PickPlaceTaskRecorder : MonoBehaviour
     // can say why instead of silently going back to idle.
     public event System.Action<string> OnRecordingDiscarded;
 
+    // Invoked with the captured task before it is sent: object_id and the demonstrated place
+    // pose in world space, so a station controller can repeat the task for later objects.
+    public event System.Action<string, Vector3, Quaternion> OnTaskCaptured;
+
     // Why the last selected object could not be watched (missing components), if it couldn't.
     private string watchProblem;
 
@@ -94,6 +98,7 @@ public class PickPlaceTaskRecorder : MonoBehaviour
             Vector3 relPos = origin != null ? origin.InverseTransformPoint(worldPos) : worldPos;
             Quaternion relRot = origin != null ? Quaternion.Inverse(origin.rotation) * worldRot : worldRot;
 
+            OnTaskCaptured?.Invoke(objectId, worldPos, worldRot);
             SendPickPlaceTask(objectId, relPos, relRot);
             ResetWatchedObjectToPickPose();
             ClearWatchedObject();
