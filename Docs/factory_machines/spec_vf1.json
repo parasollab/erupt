@@ -1,0 +1,12 @@
+{"name":"HaasVF1","blend":"prep/vf1.blend","objects_json":"prep/vf1_objects.json","budget":150000,
+ "parts":[
+  {"name":"DoorLeft","cuts":[{"from":"Body10:1","min":[-0.56,-1.30,0.315],"max":[-0.003,-0.99,1.215]}]},
+  {"name":"DoorRight","cuts":[{"from":"Body10:1","min":[0.003,-1.30,0.315],"max":[0.57,-0.99,1.215]}]},
+  {"name":"Head","select":[{"type":"box","min":[-0.3,-0.75,0.95],"max":[0.3,0.0,2.45],"maxsize":[0.7,0.9,1.0]}],"pivot":[0.003,-0.48,1.0],
+   "children":[{"name":"Spindle","select":["Body9:2","Body8:2","Body7:2"],"pivot":[0.003,-0.48,1.0],
+     "extras":[{"type":"cylinder","name":"ToolHolder","center":[0.003,-0.48,0.945],"radius":0.035,"depth":0.05,"axis":"z","color":[0.75,0.75,0.78]},
+               {"type":"cylinder","name":"EndMill","center":[0.003,-0.48,0.87],"radius":0.008,"depth":0.10,"axis":"z","color":[0.85,0.8,0.5]}]}]},
+  {"name":"Saddle","select":["Body1:26"],"children":[{"name":"Table","select":["Body1:25"],
+     "extras":[{"type":"box","name":"Workpiece","center":[-0.25,-0.69,0.385],"size":[0.24,0.14,0.06],"color":[0.55,0.57,0.6]}]}]},
+  {"name":"Carousel","select":["Body23:1"],"pivot":[-0.52,-0.48,0.81]}
+ ]}

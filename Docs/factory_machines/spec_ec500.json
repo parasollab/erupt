@@ -1,0 +1,6 @@
+{"name":"HaasEC500","blend":"prep/ec500.blend","objects_json":"prep/ec500_objects.json","budget":150000,"glass":["Body1:49"],
+ "parts":[
+  {"name":"Door","select":["Body1:48","Body1:49","Body1:129","Body1:130"]},
+  {"name":"PalletChanger","select":["Body1:217","Body1:139","Body1:138","Body1:158","Body1:140","Body1:146","Body1:143","Body1:145"],"pivot":[0.0,-1.29,1.0]},
+  {"name":"Carousel","select":["Body4:21"],"pivot":[-1.46,0.89,1.42]}
+ ]}

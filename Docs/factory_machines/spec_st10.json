@@ -1,0 +1,8 @@
+{"name":"HaasST10","blend":"prep/st10.blend","objects_json":"prep/st10_objects.json","budget":150000,
+ "parts":[
+  {"name":"Door","select":["Body1:2"]},
+  {"name":"Chuck","select":["Body1:17","Body1:40"],"pivot":[0.12,-0.013,-0.034],
+   "extras":[{"type":"hex","name":"BarStock","center":[0.33,-0.013,-0.034],"radius":0.035,"depth":0.26,"axis":"x","color":[0.8,0.8,0.82]}]},
+  {"name":"TurretSlide","select":[{"type":"box","min":[0.40,0.15,-0.35],"max":[1.12,0.75,0.75],"maxsize":[0.98,0.98,0.98]}],"pivot":[0.85,0.42,0.3],
+   "children":[{"name":"Turret","select":[{"type":"cyl","axis":"x","a":0.285,"b":0.285,"rad":0.3,"lo":0.40,"hi":0.70,"maxsize":0.6}],"pivot":[0.6,0.285,0.285]}]}
+ ]}

@@ -1,0 +1,401 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using UnityEditor;
+using UnityEditor.SceneManagement;
+using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.SceneManagement;
+using Factory;
+
+// Throwaway builder for the animated factory demo: configures the machine FBX imports, bakes the
+// Factory.* animation components into prefab variants, lays out the FactoryDemo scene from the
+// ReachabilityVR demo scene, and optionally renders check images. Run once, then delete.
+public static class FactorySceneBuilder
+{
+    const string ModelsFolder = "Assets/Models/Factory Machines";
+    const string PrefabFolder = "Assets/Prefabs/Factory";
+    const string MaterialFolder = "Assets/Materials/Factory";
+    const string BaseScene = "Assets/Scenes/Demo Scenes/ReachabilityVR.unity";
+    const string ScenePath = "Assets/Scenes/Demo Scenes/FactoryDemo.unity";
+
+    static string ShotDir => Environment.GetEnvironmentVariable("FACTORY_SHOT_DIR");
+
+    // Maps Blender-frame vectors (x right, y back, z up as exported) into the prefab's local frame.
+    class AxisMap
+    {
+        public Vector3 x, y, z;
+        public Vector3 V(float bx, float by, float bz) => bx * x + by * y + bz * z;
+        public Vector3 V(Vector3 b) => V(b.x, b.y, b.z);
+    }
+
+    public static void Run()
+    {
+        int rc = 0;
+        try { Build(); }
+        catch (Exception e) { Debug.LogError("[FACTORY] FAILED: " + e); rc = 1; }
+        if (Application.isBatchMode) EditorApplication.Exit(rc);
+    }
+
+    [MenuItem("Factory/Build Demo Scene")]
+    public static void Build()
+    {
+        ConfigureImports();
+        Material glass = MakeMaterial("MachineGlass", new Color(0.75f, 0.85f, 0.95f, 0.35f), 0.9f, 0f, transparent: true);
+        RemapGlass(ModelsFolder + "/HaasEC500.fbx", glass);
+        AssetDatabase.SaveAssets();
+
+        var vf1 = BuildVF1();
+        var st10 = BuildST10();
+        var ec500 = BuildEC500();
+        var imm = BuildIMM();
+        AssetDatabase.SaveAssets();
+
+        BuildScene(vf1, st10, ec500, imm);
+        Debug.Log("[FACTORY] build complete");
+    }
+
+    // ---------------------------------------------------------------- imports
+    static void ConfigureImports()
+    {
+        foreach (string file in Directory.GetFiles(ModelsFolder, "*.fbx"))
+        {
+            string path = file.Replace('\\', '/');
+            var imp = AssetImporter.GetAtPath(path) as ModelImporter;
+            if (imp == null) throw new Exception("No ModelImporter for " + path);
+            imp.materialImportMode = ModelImporterMaterialImportMode.ImportStandard;
+            imp.materialLocation = ModelImporterMaterialLocation.InPrefab;
+            imp.importAnimation = false;
+            imp.animationType = ModelImporterAnimationType.None;
+            imp.importCameras = false;
+            imp.importLights = false;
+            imp.isReadable = false;
+            imp.meshCompression = ModelImporterMeshCompression.Off;
+            imp.importNormals = ModelImporterNormals.Import;
+            imp.weldVertices = true;
+            imp.generateSecondaryUV = false;
+            imp.importBlendShapes = false;
+            imp.useFileScale = true;
+            imp.globalScale = 1f;
+            imp.SaveAndReimport();
+            Debug.Log("[FACTORY] imported " + path);
+        }
+    }
+
+    static void RemapGlass(string fbxPath, Material glass)
+    {
+        var imp = AssetImporter.GetAtPath(fbxPath) as ModelImporter;
+        var id = new AssetImporter.SourceAssetIdentifier(typeof(Material), "Glass");
+        imp.AddRemap(id, glass);
+        imp.SaveAndReimport();
+    }
+
+    static Material MakeMaterial(string name, Color color, float smoothness, float metallic, bool transparent = false)
+    {
+        string path = $"{MaterialFolder}/{name}.mat";
+        var mat = AssetDatabase.LoadAssetAtPath<Material>(path);
+        if (mat == null)
+        {
+            Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+            if (shader == null) throw new Exception("URP Lit shader not found");
+            mat = new Material(shader);
+            AssetDatabase.CreateAsset(mat, path);
+        }
+        mat.SetColor("_BaseColor", color);
+        mat.SetFloat("_Smoothness", smoothness);
+        mat.SetFloat("_Metallic", metallic);
+        if (transparent)
+        {
+            mat.SetFloat("_Surface", 1f); // Transparent
+            mat.SetFloat("_Blend", 0f);   // Alpha
+            mat.SetOverrideTag("RenderType", "Transparent");
+            mat.SetInt("_SrcBlend", (int)BlendMode.SrcAlpha);
+            mat.SetInt("_DstBlend", (int)BlendMode.OneMinusSrcAlpha);
+            mat.SetInt("_ZWrite", 0);
+            mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            mat.renderQueue = (int)RenderQueue.Transparent;
+        }
+        EditorUtility.SetDirty(mat);
+        return mat;
+    }
+
+    // ---------------------------------------------------------------- prefab helpers
+    class MachineBuild
+    {
+        public GameObject prefab;
+        public Vector3 frontLocal;  // local-space direction the machine's operator side faces
+        public AxisMap map;
+    }
+
+    static GameObject Instantiate(string fbxName, out AxisMap map)
+    {
+        var model = AssetDatabase.LoadAssetAtPath<GameObject>($"{ModelsFolder}/{fbxName}.fbx");
+        if (model == null) throw new Exception("model missing " + fbxName);
+        var inst = (GameObject)PrefabUtility.InstantiatePrefab(model);
+        PrefabUtility.UnpackPrefabInstance(inst, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
+        map = new AxisMap
+        {
+            x = Find(inst, "Axis_X").localPosition,
+            y = Find(inst, "Axis_Y").localPosition,
+            z = Find(inst, "Axis_Z").localPosition,
+        };
+        Debug.Log($"[FACTORY] {fbxName} axis map X={map.x} Y={map.y} Z={map.z}");
+        foreach (string a in new[] { "Axis_X", "Axis_Y", "Axis_Z" }) UnityEngine.Object.DestroyImmediate(Find(inst, a).gameObject);
+        return inst;
+    }
+
+    static Transform Find(GameObject root, string name)
+    {
+        foreach (Transform t in root.GetComponentsInChildren<Transform>(true))
+            if (t.name == name) return t;
+        throw new Exception($"child '{name}' not found under {root.name}");
+    }
+
+    // Parts are exported as siblings under the root (Blender's FBX exporter mangles nested pivots with
+    // the Unity space transform baked in); axes that ride on other axes are nested here instead.
+    static void Nest(GameObject root, string child, string parent)
+    {
+        Transform c = Find(root, child), p = Find(root, parent);
+        c.SetParent(p, true);
+    }
+
+    static T Add<T>(GameObject root, string child) where T : Component
+    {
+        var go = Find(root, child).gameObject;
+        var c = go.GetComponent<T>();
+        return c != null ? c : go.AddComponent<T>();
+    }
+
+    static MachineBuild Save(GameObject inst, string name, AxisMap map)
+    {
+        string path = $"{PrefabFolder}/{name}.prefab";
+        var prefab = PrefabUtility.SaveAsPrefabAsset(inst, path, out bool ok);
+        if (!ok) throw new Exception("prefab save failed " + path);
+        UnityEngine.Object.DestroyImmediate(inst);
+        Debug.Log("[FACTORY] saved " + path);
+        return new MachineBuild { prefab = prefab, frontLocal = map.V(0f, -1f, 0f).normalized, map = map };
+    }
+
+    // ---------------------------------------------------------------- machines
+    static MachineBuild BuildVF1()
+    {
+        var go = Instantiate("HaasVF1", out AxisMap m);
+        Nest(go, "Spindle", "Head");
+        Nest(go, "Table", "Saddle");
+        var doorL = Add<SlidingPart>(go, "DoorLeft"); doorL.openOffset = m.V(-0.55f, 0f, 0f); doorL.travelTime = 1.6f;
+        var doorR = Add<SlidingPart>(go, "DoorRight"); doorR.openOffset = m.V(0.55f, 0f, 0f); doorR.travelTime = 1.6f;
+        var spindle = Add<RotatingPart>(go, "Spindle"); spindle.axis = m.V(0f, 0f, 1f); spindle.rpm = 900f; spindle.spinUpTime = 1.5f;
+        var head = Add<LinearAxis>(go, "Head"); head.speed = 0.3f;
+        var saddle = Add<LinearAxis>(go, "Saddle"); saddle.speed = 0.3f;
+        var table = Add<LinearAxis>(go, "Table"); table.speed = 0.3f;
+        var carousel = Add<IndexingPart>(go, "Carousel"); carousel.axis = m.V(0f, 0f, 1f); carousel.stepDegrees = 18f; carousel.stepTime = 0.5f;
+
+        var cycle = go.AddComponent<VerticalMillCycle>();
+        cycle.doorLeft = doorL; cycle.doorRight = doorR; cycle.spindle = spindle;
+        cycle.head = head; cycle.saddle = saddle; cycle.table = table; cycle.toolCarousel = carousel;
+        cycle.headCutOffset = m.V(0f, 0f, -0.40f);
+        cycle.saddleCentreOffset = m.V(0f, 0.21f, 0f);
+        cycle.tableCentreOffset = m.V(0.253f, 0f, 0f);
+        cycle.tablePassVector = m.V(0.08f, 0f, 0f);
+        cycle.saddleStepVector = m.V(0f, 0.035f, 0f);
+        cycle.passes = 3; cycle.idleBetweenCycles = 5f;
+        return Save(go, "HaasVF1", m);
+    }
+
+    static MachineBuild BuildST10()
+    {
+        var go = Instantiate("HaasST10", out AxisMap m);
+        Nest(go, "Turret", "TurretSlide");
+        var door = Add<SlidingPart>(go, "Door"); door.openOffset = m.V(-0.9f, 0f, 0f); door.travelTime = 1.8f;
+        var chuck = Add<RotatingPart>(go, "Chuck"); chuck.axis = m.V(1f, 0f, 0f); chuck.rpm = 700f; chuck.spinUpTime = 1.5f;
+        var slide = Add<LinearAxis>(go, "TurretSlide"); slide.speed = 0.3f;
+        var turret = Add<IndexingPart>(go, "Turret"); turret.axis = m.V(1f, 0f, 0f); turret.stepDegrees = 30f; turret.stepTime = 0.5f;
+
+        // Lathe X axis: from the turret axis toward the spindle axis along the slant bed.
+        Vector3 slantIn = m.V(0f, -0.683f, -0.731f).normalized;
+        var cycle = go.AddComponent<LatheCycle>();
+        cycle.door = door; cycle.chuck = chuck; cycle.turretSlide = slide; cycle.turret = turret;
+        cycle.cutDepthOffset = slantIn * 0.06f;
+        cycle.turnPassVector = m.V(-0.15f, 0f, 0f);
+        cycle.faceStartOffset = m.V(-0.02f, 0f, 0f) + slantIn * 0.02f;
+        cycle.facePassVector = slantIn * 0.06f;
+        cycle.idleBetweenCycles = 5f;
+        return Save(go, "HaasST10", m);
+    }
+
+    static MachineBuild BuildEC500()
+    {
+        var go = Instantiate("HaasEC500", out AxisMap m);
+        var door = Add<SlidingPart>(go, "Door"); door.openOffset = m.V(-0.86f, 0f, 0f); door.travelTime = 2f;
+        var changer = Add<IndexingPart>(go, "PalletChanger"); changer.axis = m.V(0f, 0f, 1f); changer.stepDegrees = 180f; changer.stepTime = 4f;
+        var carousel = Add<IndexingPart>(go, "Carousel"); carousel.axis = m.V(1f, 0f, 0f); carousel.stepDegrees = 7.2f; carousel.stepTime = 0.6f;
+
+        var cycle = go.AddComponent<HorizontalMillCycle>();
+        cycle.loadDoor = door; cycle.palletChanger = changer; cycle.toolCarousel = carousel;
+        cycle.machiningTime = 9f; cycle.toolChanges = 3; cycle.idleBetweenCycles = 6f;
+        return Save(go, "HaasEC500", m);
+    }
+
+    static MachineBuild BuildIMM()
+    {
+        var go = Instantiate("InjectionMolder", out AxisMap m);
+        var platen = Add<SlidingPart>(go, "MovingPlaten"); platen.openOffset = m.V(0f, -0.27f, 0f); platen.travelTime = 2.2f;
+        var toggle = Add<SlidingPart>(go, "ToggleLinks"); toggle.openOffset = m.V(0f, -0.135f, 0f); toggle.travelTime = 2.2f;
+
+        // Moulded part: a small block at the parting line that drops through the chute when ejected.
+        var part = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        part.name = "MoldedPart";
+        UnityEngine.Object.DestroyImmediate(part.GetComponent<Collider>());
+        part.transform.SetParent(go.transform, false);
+        part.transform.localPosition = m.V(-0.01f, -0.62f, 1.09f);
+        part.transform.localScale = new Vector3(0.14f, 0.1f, 0.05f);
+        part.GetComponent<MeshRenderer>().sharedMaterial = MakeMaterial("MoldedPart", new Color(0.9f, 0.45f, 0.15f), 0.6f, 0f);
+
+        var cycle = go.AddComponent<InjectionMoldingCycle>();
+        cycle.movingPlaten = platen; cycle.toggleLinks = toggle; cycle.moldedPart = part.transform;
+        cycle.injectionTime = 2.5f; cycle.coolingTime = 3.5f; cycle.idleBetweenCycles = 1.5f;
+        var mb = Save(go, "InjectionMolder", m);
+        mb.frontLocal = m.V(1f, 0f, 0f).normalized; // operator panel is on the Blender +X side
+        return mb;
+    }
+
+    // ---------------------------------------------------------------- scene
+    static GameObject Place(MachineBuild mb, string name, Vector3 position, Vector3 faceDirection, Transform parent)
+    {
+        var inst = (GameObject)PrefabUtility.InstantiatePrefab(mb.prefab);
+        inst.name = name;
+        inst.transform.SetParent(parent, false);
+        Vector3 f = mb.frontLocal; f.y = 0f; f.Normalize();
+        faceDirection.y = 0f; faceDirection.Normalize();
+        float yaw = Vector3.SignedAngle(f, faceDirection, Vector3.up);
+        inst.transform.rotation = Quaternion.AngleAxis(yaw, Vector3.up);
+        inst.transform.position = position;
+        Debug.Log($"[FACTORY] placed {name} at {position} facing {faceDirection} (front local {mb.frontLocal})");
+        return inst;
+    }
+
+    static void BuildScene(MachineBuild vf1, MachineBuild st10, MachineBuild ec500, MachineBuild imm)
+    {
+        Scene scene = EditorSceneManager.OpenScene(BaseScene, OpenSceneMode.Single);
+        if (!EditorSceneManager.SaveScene(scene, ScenePath)) throw new Exception("save-as failed");
+        scene = SceneManager.GetActiveScene();
+
+        // Floor: bigger, concrete-like.
+        var floor = GameObject.Find("Floor");
+        if (floor != null)
+        {
+            floor.transform.localScale = new Vector3(2.6f, 1f, 2.6f);
+            floor.transform.position = new Vector3(0f, 0f, 3f);
+            floor.GetComponent<MeshRenderer>().sharedMaterial = MakeMaterial("FactoryFloor", new Color(0.33f, 0.34f, 0.36f), 0.25f, 0f);
+        }
+
+        // The demo table becomes a compact robot pedestal; the robot stays where the base scene put it.
+        var table = GameObject.Find("Table");
+        if (table != null)
+        {
+            table.name = "RobotPedestal";
+            table.transform.localScale = new Vector3(0.7f, 0.75f, 0.7f);
+            table.GetComponent<MeshRenderer>().sharedMaterial = MakeMaterial("Pedestal", new Color(0.2f, 0.22f, 0.25f), 0.5f, 0.6f);
+        }
+
+        var machines = new GameObject("Machines").transform;
+        Place(vf1, "Haas VF-1", new Vector3(-4.2f, 0f, 2.2f), Vector3.right, machines);
+        Place(st10, "Haas ST-10", new Vector3(4.2f, 0f, 2.6f), Vector3.left, machines);
+        Place(ec500, "Haas EC-500", new Vector3(0.3f, 0f, 7.6f), Vector3.back, machines);
+        Place(imm, "Injection Molder", new Vector3(-5.8f, 0f, 8.4f), Vector3.back, machines);
+
+        EditorSceneManager.MarkSceneDirty(scene);
+        if (!EditorSceneManager.SaveScene(scene)) throw new Exception("scene save failed");
+        Debug.Log("[FACTORY] saved " + ScenePath);
+
+        RenderShots();
+    }
+
+    // ---------------------------------------------------------------- verification renders
+    static void RenderShots()
+    {
+        string dir = ShotDir;
+        if (string.IsNullOrEmpty(dir)) return;
+        Directory.CreateDirectory(dir);
+        var camGo = new GameObject("ShotCam");
+        var cam = camGo.AddComponent<Camera>();
+        cam.clearFlags = CameraClearFlags.SolidColor;
+        cam.backgroundColor = new Color(0.16f, 0.18f, 0.22f);
+        cam.fieldOfView = 70f;
+        var rt = new RenderTexture(1600, 1000, 24);
+        var shots = new (string, Vector3, Vector3)[]
+        {
+            ("overview", new Vector3(0f, 6f, -6f), new Vector3(0f, 0.5f, 4f)),
+            ("user_view", new Vector3(0f, 1.6f, 0f), new Vector3(0f, 1.2f, 6f)),
+            ("vf1", new Vector3(-1f, 1.7f, 1.2f), new Vector3(-4.2f, 1.2f, 2.2f)),
+            ("st10", new Vector3(1f, 1.7f, 1.5f), new Vector3(4.2f, 1.2f, 2.6f)),
+            ("ec500", new Vector3(0.3f, 1.7f, 2.5f), new Vector3(0.3f, 1.2f, 7.6f)),
+            ("imm", new Vector3(-2f, 1.7f, 4f), new Vector3(-5.8f, 1.2f, 8.4f)),
+            ("top", new Vector3(0f, 18f, 4.5f), new Vector3(0f, 0f, 4.6f)),
+        };
+        try
+        {
+            Shoot(cam, rt, dir, shots);
+            PoseOpen();
+            Shoot(cam, rt, dir, new (string, Vector3, Vector3)[]
+            {
+                ("vf1_open", new Vector3(-1.2f, 1.6f, 1.6f), new Vector3(-4.2f, 1.0f, 2.2f)),
+                ("vf1_open_close", new Vector3(-2.3f, 1.3f, 2.2f), new Vector3(-4.2f, 0.9f, 2.2f)),
+                ("st10_open", new Vector3(1.0f, 1.6f, 2.0f), new Vector3(4.2f, 1.0f, 2.6f)),
+                ("ec500_open", new Vector3(0.3f, 1.6f, 3.5f), new Vector3(0.3f, 1.2f, 7.6f)),
+                ("imm_open", new Vector3(-4.5f, 1.6f, 4.5f), new Vector3(-5.8f, 1.1f, 8.4f)),
+            });
+        }
+        catch (Exception e) { Debug.LogWarning("[FACTORY] shots failed: " + e.Message); }
+        finally
+        {
+            cam.targetTexture = null;
+            UnityEngine.Object.DestroyImmediate(camGo);
+            UnityEngine.Object.DestroyImmediate(rt);
+        }
+    }
+
+    // Poses every machine mid-cycle (doors open, axes at their cut offsets) for the check renders.
+    // The scene has already been saved, so this never persists.
+    static void PoseOpen()
+    {
+        foreach (var vm in UnityEngine.Object.FindObjectsByType<VerticalMillCycle>(FindObjectsSortMode.None))
+        {
+            vm.doorLeft.Set(1f); vm.doorRight.Set(1f);
+            vm.head.Set(vm.headCutOffset); vm.saddle.Set(vm.saddleCentreOffset); vm.table.Set(vm.tableCentreOffset);
+        }
+        foreach (var lc in UnityEngine.Object.FindObjectsByType<LatheCycle>(FindObjectsSortMode.None))
+        {
+            lc.door.Set(1f); lc.turretSlide.Set(lc.cutDepthOffset + lc.turnPassVector);
+        }
+        foreach (var hm in UnityEngine.Object.FindObjectsByType<HorizontalMillCycle>(FindObjectsSortMode.None))
+            hm.loadDoor.Set(1f);
+        foreach (var im in UnityEngine.Object.FindObjectsByType<InjectionMoldingCycle>(FindObjectsSortMode.None))
+        {
+            im.movingPlaten.Set(1f); im.toggleLinks.Set(1f);
+            if (im.moldedPart != null) im.moldedPart.gameObject.SetActive(true);
+        }
+    }
+
+    static void Shoot(Camera cam, RenderTexture rt, string dir, (string, Vector3, Vector3)[] shots)
+    {
+        var camGo = cam.gameObject;
+        {
+            foreach (var (name, pos, look) in shots)
+            {
+                camGo.transform.position = pos;
+                camGo.transform.LookAt(look);
+                cam.targetTexture = rt;
+                cam.Render();
+                RenderTexture.active = rt;
+                var tex = new Texture2D(rt.width, rt.height, TextureFormat.RGB24, false);
+                tex.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
+                tex.Apply();
+                File.WriteAllBytes(Path.Combine(dir, name + ".png"), tex.EncodeToPNG());
+                RenderTexture.active = null;
+                UnityEngine.Object.DestroyImmediate(tex);
+                Debug.Log("[FACTORY] shot " + name);
+            }
+        }
+    }
+}
