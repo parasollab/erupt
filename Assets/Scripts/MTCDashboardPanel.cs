@@ -1,40 +1,65 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.UIElements;
 using RosMessageTypes.MoveitTaskConstructorMsgs;
+using RosMessageTypes.StudyInterfaces;
 
+/// <summary>
+/// MTC dashboard for mtc_pick_place_server, driven by <see cref="PickPlaceClient"/>.
+/// Plan: the pick/place recorder sends a plan-only goal; progress and cancel.
+/// Stages: stage tree with per-stage counts, the running stage highlighted during execution.
+/// Solutions: the current task's solution ids (server order = ascending cost); tapping one
+/// fetches it (/get_solution) and lists its steps; Execute sends its id to /execute_solution
+/// and the steps tick off as feedback arrives. A new plan clears everything: the server
+/// invalidates every earlier task and solution id.
+/// </summary>
 public class MTCDashboardPanel : MonoBehaviour
 {
     [SerializeField] private UIDocument uiDocument;
-    [SerializeField] private MTCDataManager dataManager;
     [SerializeField] private PickPlaceTaskRecorder pickPlaceRecorder;
+    [Tooltip("Found in the scene when empty.")]
+    [SerializeField] private PickPlaceClient pickPlaceAction;
     [SerializeField] private MTCTrajectoryPlayer trajectoryPlayer;
 
-    // Root
+    private static readonly Color RowColor = new(0.08f, 0.08f, 0.08f);
+    private static readonly Color SelectedColor = new(0.18f, 0.32f, 0.18f);
+    private static readonly Color ActiveColor = new(0.10f, 0.40f, 0.10f);
+    private static readonly Color StageSelectedColor = new(0.15f, 0.20f, 0.30f);
+    private static readonly Color DoneColor = new(0.55f, 0.85f, 0.55f);
+    private static readonly Color MutedColor = new(0.6f, 0.6f, 0.6f);
+
     private VisualElement root;
+    private VisualElement panelPlan, panelStages, panelSolutions;
 
-    // Tab panels
-    private VisualElement panelPlan;
-    private VisualElement panelStages;
-    private VisualElement panelSolutions;
+    private Button recordButton, planCancelButton;
+    private Label planObjectIdLabel, planStatusLabel, taskIdLabel;
 
-    // Plan tab
-    private Button recordButton;
-    private Label planObjectIdLabel;
-    private Label planStatusLabel;
+    private VisualElement stageTreeContainer, stageSolutionsContainer;
 
-    // Stages tab
-    private VisualElement stageTreeContainer;
+    private VisualElement solutionListContainer, breakdownContainer;
+    private Button executeButton, cancelExecuteButton;
+    private ProgressBar executionProgress;
+    private Label execStatusLabel;
 
-    // Solutions tab
-    private VisualElement solutionListContainer;
-    private VisualElement breakdownContainer;
+    private bool hasSelectedStage;
+    private uint selectedStageId;
+    private static readonly Color FailedColor = new(1f, 0.55f, 0.45f);
+    // Partial / failed stage solution being fetched for a preview; a later tap or a task
+    // reset replaces it, so a slower fetch is dropped. Never feeds SelectedSolutionId:
+    // only complete solutions may reach Execute.
+    private uint? pendingStageSolutionId;
+    /// <summary>What the last stage-solution tap led to; shown on the Stages tab.</summary>
+    public string StageSolutionStatus { get; private set; }
 
-    // Shared
-    private Label taskIdLabel;
+    /// <summary>Solution chosen in the browser; its message arrives with the /get_solution response.</summary>
+    public uint? SelectedSolutionId { get; private set; }
+    public SolutionMsg SelectedSolution { get; private set; }
+    public VisualElement Root => root;
 
-    private SolutionMsg selectedSolution;
+    private PickPlaceClient Client => pickPlaceAction;
+    private bool Busy => Client != null && Client.Busy;
 
     private void OnEnable()
     {
@@ -42,28 +67,56 @@ public class MTCDashboardPanel : MonoBehaviour
         root = uiDocument?.rootVisualElement;
         if (root == null) { Debug.LogError("[MTCDashboardPanel] No root visual element."); return; }
 
+        if (pickPlaceAction == null) pickPlaceAction = FindFirstObjectByType<PickPlaceClient>(FindObjectsInactive.Include);
+        if (pickPlaceRecorder == null) pickPlaceRecorder = FindFirstObjectByType<PickPlaceTaskRecorder>(FindObjectsInactive.Include);
+
         BindUI();
         ShowTab(panelPlan);
 
-        if (dataManager == null) dataManager = MTCDataManager.Instance;
-        if (dataManager != null)
+        if (Client != null)
         {
-            dataManager.OnDescriptionReceived += RefreshStages;
-            dataManager.OnStatisticsUpdated += RefreshStats;
-            dataManager.OnSolutionReceived += OnSolutionArrived;
-
-            if (dataManager.LastDescription != null) RefreshStages(dataManager.LastDescription);
-            if (dataManager.LastStatistics != null) RefreshStats(dataManager.LastStatistics);
+            Client.OnStatus += OnStatus;
+            Client.OnPhaseChanged += RefreshControls;
+            Client.OnTaskReset += OnTaskReset;
+            Client.OnDescriptionChanged += RefreshStages;
+            Client.OnStatisticsChanged += RefreshStages;
+            Client.OnSolutionIdsChanged += RefreshSolutionList;
+            Client.OnExecutionFeedback += OnExecutionFeedback;
+            if (!string.IsNullOrEmpty(Client.LastStatus)) OnStatus(Client.LastStatus);
         }
+        else
+        {
+            Debug.LogWarning("[MTCDashboardPanel] No PickPlaceClient in the scene.");
+        }
+
+        if (pickPlaceRecorder != null)
+        {
+            pickPlaceRecorder.OnRecordingComplete -= OnPickPlaceRecorded;
+            pickPlaceRecorder.OnRecordingComplete += OnPickPlaceRecorded;
+            pickPlaceRecorder.OnRecordingDiscarded -= OnPickPlaceDiscarded;
+            pickPlaceRecorder.OnRecordingDiscarded += OnPickPlaceDiscarded;
+        }
+
+        RefreshAll();
     }
 
     private void OnDisable()
     {
-        if (dataManager != null)
+        if (Client != null)
         {
-            dataManager.OnDescriptionReceived -= RefreshStages;
-            dataManager.OnStatisticsUpdated -= RefreshStats;
-            dataManager.OnSolutionReceived -= OnSolutionArrived;
+            Client.OnStatus -= OnStatus;
+            Client.OnPhaseChanged -= RefreshControls;
+            Client.OnTaskReset -= OnTaskReset;
+            Client.OnDescriptionChanged -= RefreshStages;
+            Client.OnStatisticsChanged -= RefreshStages;
+            Client.OnSolutionIdsChanged -= RefreshSolutionList;
+            Client.OnExecutionFeedback -= OnExecutionFeedback;
+        }
+
+        if (pickPlaceRecorder != null)
+        {
+            pickPlaceRecorder.OnRecordingComplete -= OnPickPlaceRecorded;
+            pickPlaceRecorder.OnRecordingDiscarded -= OnPickPlaceDiscarded;
         }
     }
 
@@ -74,21 +127,37 @@ public class MTCDashboardPanel : MonoBehaviour
         panelStages = root.Q<VisualElement>("mtcPanelStages");
         panelSolutions = root.Q<VisualElement>("mtcPanelSolutions");
 
-        root.Q<Button>("mtcTabPlan").clicked += () => ShowTab(panelPlan);
-        root.Q<Button>("mtcTabStages").clicked += () => ShowTab(panelStages);
-        root.Q<Button>("mtcTabSolutions").clicked += () => { ShowTab(panelSolutions); RefreshSolutionList(); };
+        BindButton("mtcTabPlan", () => ShowTab(panelPlan));
+        BindButton("mtcTabStages", () => ShowTab(panelStages));
+        BindButton("mtcTabSolutions", () => ShowTab(panelSolutions));
 
         planObjectIdLabel = root.Q<Label>("mtcPlanObjectIdLabel");
         planStatusLabel = root.Q<Label>("mtcPlanStatusLabel");
         recordButton = root.Q<Button>("mtcPlanRecordButton");
-        recordButton.clicked += OnRecordClicked;
+        if (recordButton != null) recordButton.clicked += OnRecordClicked;
+        planCancelButton = root.Q<Button>("mtcPlanCancelButton");
+        if (planCancelButton != null) planCancelButton.clicked += Cancel;
 
         stageTreeContainer = root.Q<VisualElement>("mtcStageTreeContainer");
+        stageSolutionsContainer = root.Q<VisualElement>("mtcStageSolutionsContainer");
         solutionListContainer = root.Q<VisualElement>("mtcSolutionListContainer");
         breakdownContainer = root.Q<VisualElement>("mtcBreakdownContainer");
+        executeButton = root.Q<Button>("mtcExecuteButton");
+        cancelExecuteButton = root.Q<Button>("mtcCancelExecuteButton");
+        executionProgress = root.Q<ProgressBar>("mtcExecProgress");
+        execStatusLabel = root.Q<Label>("mtcExecStatusLabel");
 
-        root.Q<Button>("mtcPreviewButton").clicked += OnPreviewClicked;
-        root.Q<Button>("mtcStopPreviewButton").clicked += () => trajectoryPlayer?.Stop();
+        BindButton("mtcPreviewButton", OnPreviewClicked);
+        BindButton("mtcStopPreviewButton", () => trajectoryPlayer?.Stop());
+        if (executeButton != null) executeButton.clicked += ExecuteSelected;
+        if (cancelExecuteButton != null) cancelExecuteButton.clicked += Cancel;
+    }
+
+    private void BindButton(string name, Action onClick)
+    {
+        var button = root.Q<Button>(name);
+        if (button == null) { Debug.LogWarning($"[MTCDashboardPanel] Missing UI element '{name}'."); return; }
+        button.clicked += onClick;
     }
 
     private void ShowTab(VisualElement active)
@@ -97,233 +166,607 @@ public class MTCDashboardPanel : MonoBehaviour
             if (p != null) p.style.display = p == active ? DisplayStyle.Flex : DisplayStyle.None;
     }
 
+    // The solution list refreshes the controls, which refresh the stages, breakdown and progress.
+    private void RefreshAll() => RefreshSolutionList();
+
     // ─── Plan tab ─────────────────────────────────────────────────────────────
 
     private void OnRecordClicked()
     {
-        if (pickPlaceRecorder == null) return;
+        if (pickPlaceRecorder == null || Busy) return;
 
         if (!pickPlaceRecorder.IsRecording)
         {
-            pickPlaceRecorder.OnRecordingComplete = id =>
-            {
-                planStatusLabel.text = $"Sent: {id}";
-                recordButton.text = "Start Recording";
-                recordButton.style.color = new StyleColor(StyleKeyword.Null);
-            };
             pickPlaceRecorder.StartRecording();
-            recordButton.text = "Stop Recording";
-            recordButton.style.color = new StyleColor(Color.yellow);
-            planStatusLabel.text = "Grab and place the object...";
+            if (planStatusLabel != null) planStatusLabel.text = "Grab and place the object...";
         }
         else
         {
+            // StopRecording raises OnRecordingComplete or OnRecordingDiscarded, which set the status.
             pickPlaceRecorder.StopRecording();
-            recordButton.text = "Start Recording";
-            recordButton.style.color = new StyleColor(StyleKeyword.Null);
-            planStatusLabel.text = "Idle";
         }
+        RefreshControls();
+    }
+
+    private void OnPickPlaceRecorded(string objectId)
+    {
+        if (planObjectIdLabel != null) planObjectIdLabel.text = objectId;
+        RefreshControls();
+    }
+
+    private void OnPickPlaceDiscarded(string reason)
+    {
+        if (planStatusLabel != null) planStatusLabel.text = $"Not sent: {reason}";
+        RefreshControls();
+    }
+
+    private void OnStatus(string status)
+    {
+        if (planStatusLabel != null) planStatusLabel.text = status;
+        if (execStatusLabel != null) execStatusLabel.text = status;
+        RefreshControls();
+    }
+
+    /// <summary>Cancel the active goal, planning or executing. It ends as CANCELED, not as an error.</summary>
+    public async void Cancel()
+    {
+        if (!Busy) return;
+        try { await Client.CancelAsync(); }
+        catch (Exception exception)
+        {
+            Debug.LogException(exception);
+            if (execStatusLabel != null) execStatusLabel.text = $"Cancel failed: {exception.Message}";
+        }
+    }
+
+    // Button states follow the client: one task at a time, so nothing new starts while a goal is active.
+    private void RefreshControls()
+    {
+        bool busy = Busy;
+        bool recording = pickPlaceRecorder != null && pickPlaceRecorder.IsRecording;
+        if (recordButton != null)
+        {
+            recordButton.SetEnabled(pickPlaceRecorder != null && !busy);
+            recordButton.text = pickPlaceRecorder == null ? "No recorder" :
+                busy ? "Busy..." :
+                recording ? "Stop Recording" : "Start Recording";
+            recordButton.style.color = recording ? new StyleColor(Color.yellow) : new StyleColor(StyleKeyword.Null);
+        }
+        planCancelButton?.SetEnabled(busy);
+        if (planCancelButton != null)
+            planCancelButton.text = Client?.Phase == PickPlacePhase.Executing ? "Cancel Execution" : "Cancel Planning";
+        cancelExecuteButton?.SetEnabled(busy);
+        executeButton?.SetEnabled(!busy && SelectedSolutionId != null && Client != null && Client.ExecutionAvailable);
+        RefreshProgress();
+        RefreshStages();
+        RefreshBreakdown();
     }
 
     // ─── Stages tab ───────────────────────────────────────────────────────────
 
-    private void RefreshStages(TaskDescriptionMsg desc)
+    private void RefreshTask()
     {
-        if (taskIdLabel != null) taskIdLabel.text = $"Task: {desc.task_id}";
-        RebuildStageTree(desc, dataManager?.LastStatistics);
+        if (taskIdLabel == null) return;
+        string id = Client?.TaskId;
+        taskIdLabel.text = string.IsNullOrEmpty(id) ? "Task: ---" : $"Task: {id}";
     }
 
-    private void RefreshStats(TaskStatisticsMsg stats)
+    /// <summary>Stage running now: the one after the last finished sub-trajectory, or null when idle.</summary>
+    private uint? ActiveStageId()
     {
-        if (dataManager?.LastDescription != null)
-            RebuildStageTree(dataManager.LastDescription, stats);
+        if (Client == null || Client.Phase != PickPlacePhase.Executing) return null;
+        var steps = SelectedSolution?.sub_trajectory;
+        if (steps == null || steps.Length == 0 || Client.ExecutingSolutionId != SelectedSolutionId)
+            return Client.LastExecutionFeedback?.stage_id;
+        int current = ActiveStep(steps.Length);
+        return current < steps.Length ? steps[current].info.stage_id : (uint?)null;
     }
 
-    private void RebuildStageTree(TaskDescriptionMsg desc, TaskStatisticsMsg stats)
+    // Feedback reports the step that just finished, so the running one is the next.
+    private int ActiveStep(int stepCount) =>
+        Client?.LastExecutionFeedback == null ? 0 : (int)Math.Min(Client.LastExecutionFeedback.sub_id + 1, (uint)stepCount);
+
+    private void RefreshStages()
     {
+        RefreshTask();
         if (stageTreeContainer == null) return;
         stageTreeContainer.Clear();
-        if (desc.stages == null || desc.stages.Length == 0) return;
+        var desc = Client?.Description;
+        if (desc?.stages == null || desc.stages.Length == 0) { stageSolutionsContainer?.Clear(); return; }
 
         var statsById = new Dictionary<uint, StageStatisticsMsg>();
-        if (stats != null)
-            foreach (var s in stats.stages) statsById[s.id] = s;
+        if (Client.Statistics?.stages != null)
+            foreach (var s in Client.Statistics.stages) statsById[s.id] = s;
 
+        var ids = new HashSet<uint>(desc.stages.Select(s => s.id));
         var children = new Dictionary<uint, List<StageDescriptionMsg>>();
-        StageDescriptionMsg rootStage = null;
+        var roots = new List<StageDescriptionMsg>();
         foreach (var stage in desc.stages)
         {
-            if (stage.id == stage.parent_id) { rootStage = stage; continue; }
+            // Stage 0 (the Task wrapper) is never published, so the root container's parent is absent.
+            if (stage.id == stage.parent_id || !ids.Contains(stage.parent_id)) { roots.Add(stage); continue; }
             if (!children.TryGetValue(stage.parent_id, out var list))
                 children[stage.parent_id] = list = new List<StageDescriptionMsg>();
             list.Add(stage);
         }
 
-        if (rootStage != null)
-            AddStageRow(stageTreeContainer, rootStage, children, statsById, 0);
+        uint? active = ActiveStageId();
+        foreach (var stage in roots)
+            AddStageRow(stageTreeContainer, stage, children, statsById, 0, active);
+        RefreshStageSolutions();
     }
 
-    private void AddStageRow(
-        VisualElement container,
-        StageDescriptionMsg stage,
-        Dictionary<uint, List<StageDescriptionMsg>> children,
-        Dictionary<uint, StageStatisticsMsg> statsById,
-        int depth)
+    private void AddStageRow(VisualElement container, StageDescriptionMsg stage,
+        Dictionary<uint, List<StageDescriptionMsg>> children, Dictionary<uint, StageStatisticsMsg> statsById,
+        int depth, uint? active)
     {
         statsById.TryGetValue(stage.id, out var s);
-        int solved = s?.solved?.Length ?? 0;
-        uint failed = s?.num_failed ?? 0;
-        double time = s?.total_compute_time ?? 0;
+        bool isActive = active == stage.id;
 
-        var row = new VisualElement();
-        row.style.flexDirection = FlexDirection.Row;
+        var row = Row(isActive ? ActiveColor : hasSelectedStage && selectedStageId == stage.id ? StageSelectedColor : Color.clear);
+        row.name = $"mtcStage{stage.id}";
         row.style.paddingLeft = depth * 12 + 4;
-        row.style.paddingTop = 2;
-        row.style.paddingBottom = 2;
 
-        var nameLabel = new Label(stage.name);
+        var nameLabel = Text((isActive ? "▶ " : "") + stage.name, Color.white, 12);
         nameLabel.style.flexGrow = 1;
-        nameLabel.style.color = new StyleColor(Color.white);
-        nameLabel.style.fontSize = 12;
-
-        var statsLabel = new Label($"✓{solved}  ✗{failed}  {time:F1}s");
-        statsLabel.style.color = new StyleColor(new Color(0.65f, 0.65f, 0.65f));
-        statsLabel.style.fontSize = 11;
+        if (isActive) nameLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
+        var statsLabel = Text($"✓{s?.solved?.Length ?? 0}  ✗{s?.num_failed ?? 0}  {s?.total_compute_time ?? 0:F1}s", new Color(0.65f, 0.65f, 0.65f), 11);
         statsLabel.style.unityTextAlign = TextAnchor.MiddleRight;
-
         row.Add(nameLabel);
         row.Add(statsLabel);
+
+        uint capturedId = stage.id;
+        row.RegisterCallback<PointerDownEvent>(_ => SelectStage(capturedId));
         container.Add(row);
 
         if (children.TryGetValue(stage.id, out var childList))
             foreach (var child in childList)
-                AddStageRow(container, child, children, statsById, depth + 1);
+                AddStageRow(container, child, children, statsById, depth + 1, active);
+    }
+
+    public void SelectStage(uint stageId)
+    {
+        hasSelectedStage = true;
+        selectedStageId = stageId;
+        RefreshStages();
+    }
+
+    // The selected stage's solved[] ids. Only the root container's are complete, executable
+    // solutions that /get_solution serves; the others are partial and shown for reference.
+    private void RefreshStageSolutions()
+    {
+        if (stageSolutionsContainer == null) return;
+        stageSolutionsContainer.Clear();
+        if (!hasSelectedStage || Client == null) return;
+
+        if (SelectedSolution != null && TryGetStageSteps(selectedStageId, out int firstStep, out int lastStep))
+        {
+            uint stageId = selectedStageId;
+            var previewRow = Row(StageSelectedColor);
+            previewRow.name = "mtcPreviewStageRow";
+            string span = firstStep == lastStep ? $"step {firstStep + 1}" : $"steps {firstStep + 1}-{lastStep + 1}";
+            var previewLabel = Text($"▶ Preview this stage in solution {SelectedSolutionId} ({span})", new Color(0.55f, 0.75f, 1f), 11);
+            previewLabel.style.flexGrow = 1;
+            previewRow.Add(previewLabel);
+            previewRow.RegisterCallback<PointerDownEvent>(_ => PreviewStage(stageId));
+            stageSolutionsContainer.Add(previewRow);
+        }
+
+        if (!string.IsNullOrEmpty(StageSolutionStatus))
+        {
+            var status = Text(StageSolutionStatus, new Color(0.65f, 0.65f, 0.35f), 11);
+            status.name = "mtcStageSolutionStatus";
+            status.style.whiteSpace = WhiteSpace.Normal;
+            stageSolutionsContainer.Add(status);
+        }
+
+        var stageStats = Client.Statistics?.stages?.FirstOrDefault(s => s.id == selectedStageId);
+        var solved = stageStats?.solved;
+        var failedIds = stageStats?.failed ?? Array.Empty<uint>();
+        if ((solved == null || solved.Length == 0) && failedIds.Length == 0)
+        {
+            stageSolutionsContainer.Add(Text("No solutions for this stage yet.", MutedColor, 11));
+            return;
+        }
+        solved ??= Array.Empty<uint>();
+
+        bool complete = selectedStageId == PickPlaceClient.RootStageId;
+        int rank = 1;
+        foreach (uint id in solved)
+        {
+            uint capturedId = id;
+            var row = Row(Color.clear);
+            row.Add(RankLabel(rank++));
+            row.name = $"mtcStageSolution{id}";
+            var idLabel = Text($"solution id {id}", Color.white, 11);
+            idLabel.style.flexGrow = 1;
+            row.Add(idLabel);
+            row.Add(Text(complete ? "tap to open" : "partial · ▶ preview", new Color(0.55f, 0.75f, 1f), 10));
+            if (complete)
+                row.RegisterCallback<PointerDownEvent>(_ => { SelectSolution(capturedId); ShowTab(panelSolutions); });
+            else
+                row.RegisterCallback<PointerDownEvent>(_ => PreviewStageSolution(capturedId));
+            stageSolutionsContainer.Add(row);
+        }
+
+        if (failedIds.Length == 0) return;
+        stageSolutionsContainer.Add(Text($"Failed attempts ({failedIds.Length})", FailedColor, 11));
+        foreach (uint id in failedIds)
+        {
+            uint capturedId = id;
+            var row = Row(Color.clear);
+            row.name = $"mtcStageFailed{id}";
+            var idLabel = Text($"✗ solution id {id}", FailedColor, 11);
+            idLabel.style.flexGrow = 1;
+            row.Add(idLabel);
+            row.Add(Text("failed · tap for reason", FailedColor, 10));
+            row.RegisterCallback<PointerDownEvent>(_ => PreviewStageSolution(capturedId, failed: true));
+            stageSolutionsContainer.Add(row);
+        }
+    }
+
+    /// <summary>
+    /// Fetch a stage's partial or failed solution with its start scene and preview it from
+    /// there. These are never executable, so the selected (executable) solution is untouched.
+    /// </summary>
+    public void PreviewStageSolution(uint solutionId, bool failed = false)
+    {
+        if (Client == null) return;
+        if (Client.Phase == PickPlacePhase.Executing)
+        {
+            SetStageSolutionStatus("Cannot preview while a solution is executing.");
+            return;
+        }
+
+        string kind = failed ? "failed solution" : "stage solution";
+        pendingStageSolutionId = solutionId;
+        SetStageSolutionStatus($"Fetching {kind} {solutionId}...");
+
+        Client.FetchSolution(solutionId,
+            solution =>
+            {
+                // A later tap (or a task reset) wins over a slower fetch.
+                if (pendingStageSolutionId != solutionId) return;
+                pendingStageSolutionId = null;
+
+                string comment = FirstComment(solution);
+                string reason = failed
+                    ? $"Solution {solutionId} failed: {(string.IsNullOrEmpty(comment) ? "no reason given by the planner" : comment)}"
+                    : null;
+
+                bool hasSteps = solution.sub_trajectory != null && solution.sub_trajectory.Length > 0;
+                if (!hasSteps || trajectoryPlayer == null || Client.Phase == PickPlacePhase.Executing)
+                {
+                    SetStageSolutionStatus(reason ?? (hasSteps
+                        ? "Preview unavailable right now."
+                        : $"Stage solution {solutionId} has no motion to preview."));
+                    return;
+                }
+
+                SetStageSolutionStatus(failed ? reason : $"Previewing stage solution {solutionId}...");
+                trajectoryPlayer.OnProblem -= OnPreviewProblem;
+                trajectoryPlayer.OnProblem -= OnStagePreviewProblem;
+                trajectoryPlayer.OnProblem += OnStagePreviewProblem;
+                trajectoryPlayer.PlaySolution(solution, useStartScene: true);
+            },
+            message =>
+            {
+                if (pendingStageSolutionId != solutionId) return;
+                pendingStageSolutionId = null;
+                SetStageSolutionStatus($"Solution {solutionId} unavailable: {message}");
+            },
+            includeStartScene: true);
+    }
+
+    private static string FirstComment(SolutionMsg solution)
+    {
+        foreach (var step in solution?.sub_trajectory ?? Array.Empty<SubTrajectoryMsg>())
+            if (!string.IsNullOrEmpty(step?.info?.comment)) return step.info.comment;
+        // A failure with no motion at all only carries its reason on the sub-solutions.
+        foreach (var sub in solution?.sub_solution ?? Array.Empty<SubSolutionMsg>())
+            if (!string.IsNullOrEmpty(sub?.info?.comment)) return sub.info.comment;
+        return null;
+    }
+
+    private void OnStagePreviewProblem(string problem)
+    {
+        SetStageSolutionStatus("Cannot preview: " + problem);
+    }
+
+    private void SetStageSolutionStatus(string text)
+    {
+        StageSolutionStatus = text;
+        if (execStatusLabel != null) execStatusLabel.text = text;
+        RefreshStageSolutions();
     }
 
     // ─── Solutions tab ────────────────────────────────────────────────────────
 
-    private void OnSolutionArrived(SolutionMsg _)
+    private void OnTaskReset()
     {
-        if (panelSolutions?.resolvedStyle.display == DisplayStyle.Flex)
-            RefreshSolutionList();
+        trajectoryPlayer?.Stop();
+        pendingStageSolutionId = null; // drops any partial fetch still in flight
+        StageSolutionStatus = null;
+        SelectedSolutionId = null;
+        SelectedSolution = null;
+        hasSelectedStage = false;
+        stageSolutionsContainer?.Clear();
+        RefreshAll();
     }
 
     private void RefreshSolutionList()
     {
-        if (solutionListContainer == null || dataManager == null) return;
+        if (solutionListContainer == null) return;
         solutionListContainer.Clear();
-
-        var ranked = dataManager.Solutions
-            .Select(s => (sol: s, cost: (double)s.sub_trajectory.Sum(t => t.info.cost)))
-            .OrderBy(x => x.cost)
-            .ToList();
+        var ids = Client?.SolutionIds ?? Array.Empty<uint>();
 
         int rank = 1;
-        foreach (var (sol, cost) in ranked)
+        foreach (uint id in ids)
         {
-            var capturedSol = sol;
-            bool isSelected = capturedSol == selectedSolution;
-
-            var row = new VisualElement();
-            row.style.flexDirection = FlexDirection.Row;
+            uint capturedId = id;
+            bool isSelected = SelectedSolutionId == id;
+            var row = Row(isSelected ? SelectedColor : RowColor);
+            row.name = $"mtcSolution{id}";
             row.style.paddingLeft = 6;
             row.style.paddingRight = 6;
             row.style.paddingTop = 4;
             row.style.paddingBottom = 4;
-            row.style.borderBottomWidth = 1;
-            row.style.borderBottomColor = new StyleColor(new Color(0.2f, 0.2f, 0.2f));
-            row.style.backgroundColor = new StyleColor(isSelected
-                ? new Color(0.18f, 0.32f, 0.18f)
-                : new Color(0.08f, 0.08f, 0.08f));
+            row.Add(RankLabel(rank++));
 
-            var rankLabel = new Label($"#{rank}");
-            rankLabel.style.width = 28;
-            rankLabel.style.color = new StyleColor(new Color(1f, 0.8f, 0.2f));
-            rankLabel.style.fontSize = 12;
-            rankLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
+            var idLabel = Text($"solution {id}", Color.white, 12);
+            idLabel.style.flexGrow = 1;
+            row.Add(idLabel);
 
-            var costLabel = new Label($"cost {cost:F3}");
-            costLabel.style.flexGrow = 1;
-            costLabel.style.color = new StyleColor(Color.white);
-            costLabel.style.fontSize = 12;
+            string detail = isSelected && SelectedSolution != null
+                ? $"cost {SelectedSolution.sub_trajectory.Sum(t => t.info.cost):F3}  {SelectedSolution.sub_trajectory.Length} steps"
+                : isSelected ? "fetching..." : "tap to show";
+            row.Add(Text(detail, new Color(0.55f, 0.75f, 1f), 11));
 
-            int segs = capturedSol.sub_trajectory.Length;
-            var segLabel = new Label($"{segs} segs");
-            segLabel.style.color = new StyleColor(new Color(0.55f, 0.75f, 1f));
-            segLabel.style.fontSize = 11;
-            segLabel.style.unityTextAlign = TextAnchor.MiddleRight;
-
-            row.Add(rankLabel);
-            row.Add(costLabel);
-            row.Add(segLabel);
-            row.RegisterCallback<PointerDownEvent>(_ => SelectSolution(capturedSol));
+            row.RegisterCallback<PointerDownEvent>(_ => SelectSolution(capturedId));
             solutionListContainer.Add(row);
-            rank++;
         }
+        RefreshControls();
     }
 
-    private void SelectSolution(SolutionMsg sol)
+    /// <summary>Show one of the current task's solutions: fetched with /get_solution (20–40 ms), cached per task.</summary>
+    public void SelectSolution(uint solutionId)
     {
-        selectedSolution = sol;
+        if (Client == null) return;
+        SelectedSolutionId = solutionId;
+        SelectedSolution = null;
         RefreshSolutionList();
-        RefreshBreakdown(sol);
+
+        Client.FetchSolution(solutionId,
+            solution =>
+            {
+                // A later selection wins over a slower fetch.
+                if (SelectedSolutionId != solutionId) return;
+                SelectedSolution = solution;
+                RefreshSolutionList();
+                RefreshStageSolutions(); // the selected stage can now be previewed in it
+            },
+            message =>
+            {
+                if (SelectedSolutionId != solutionId) return;
+                SelectedSolutionId = null;
+                if (execStatusLabel != null) execStatusLabel.text = $"Solution {solutionId} unavailable: {message}";
+                RefreshSolutionList();
+            });
     }
 
-    private void RefreshBreakdown(SolutionMsg sol)
+    // One row per sub-trajectory, in execution order: sub_id from the feedback indexes this list.
+    private void RefreshBreakdown()
     {
         if (breakdownContainer == null) return;
         breakdownContainer.Clear();
-
-        var stageNames = new Dictionary<uint, string>();
-        if (dataManager?.LastDescription != null)
-            foreach (var s in dataManager.LastDescription.stages)
-                stageNames[s.id] = s.name;
-
-        var grouped = sol.sub_trajectory.GroupBy(t => t.info.stage_id).ToList();
-        foreach (var group in grouped)
+        if (SelectedSolutionId == null) return;
+        if (SelectedSolution == null)
         {
-            stageNames.TryGetValue(group.Key, out var stageName);
-            stageName ??= $"Stage {group.Key}";
+            breakdownContainer.Add(Text($"Fetching solution {SelectedSolutionId}...", MutedColor, 11));
+            return;
+        }
 
-            var header = new Label(stageName);
-            header.style.color = new StyleColor(new Color(0.55f, 0.85f, 1f));
-            header.style.fontSize = 12;
-            header.style.unityFontStyleAndWeight = FontStyle.Bold;
-            header.style.paddingTop = 5;
-            breakdownContainer.Add(header);
+        var steps = SelectedSolution.sub_trajectory ?? Array.Empty<SubTrajectoryMsg>();
+        bool tracking = Client != null && Client.ExecutingSolutionId == SelectedSolutionId &&
+                        (Client.Phase == PickPlacePhase.Executing || Client.LastExecutionFeedback != null);
+        int done = tracking ? ActiveStep(steps.Length) : 0;
+        bool running = tracking && Client.Phase == PickPlacePhase.Executing;
 
-            foreach (var seg in group)
+        for (int i = 0; i < steps.Length; i++)
+        {
+            var info = steps[i].info;
+            bool isActive = running && i == done;
+            bool isDone = tracking && i < done;
+            string stageName = Client?.StageName(info.stage_id) ?? $"Stage {info.stage_id}";
+            int pts = steps[i].trajectory?.joint_trajectory?.points?.Length ?? 0;
+
+            var row = Row(isActive ? ActiveColor : Color.clear);
+            row.name = $"mtcStep{i}";
+            string mark = isDone ? "✓ " : isActive ? "▶ " : "   ";
+            string text = $"{mark}{i + 1}. {stageName}  cost={info.cost:F3}  pts={pts}";
+            if (!string.IsNullOrEmpty(info.planner_id)) text += $"  [{info.planner_id}]";
+            var label = Text(text, isDone ? DoneColor : Color.white, 11);
+            if (isActive) label.style.unityFontStyleAndWeight = FontStyle.Bold;
+            label.style.flexGrow = 1;
+            row.Add(label);
+            if (!running)
             {
-                int pts = seg.trajectory?.joint_trajectory?.points?.Length ?? 0;
-                var detailText = $"  id={seg.info.id}  cost={seg.info.cost:F3}  pts={pts}";
-                if (!string.IsNullOrEmpty(seg.info.planner_id))
-                    detailText += $"  [{seg.info.planner_id}]";
+                // Tap a step to preview just that stage's part of the solution.
+                int capturedStep = i;
+                row.Add(Text("▶ preview", new Color(0.55f, 0.75f, 1f), 10));
+                row.RegisterCallback<PointerDownEvent>(_ => PreviewStep(capturedStep));
+            }
+            breakdownContainer.Add(row);
 
-                var detail = new Label(detailText);
-                detail.style.color = new StyleColor(new Color(0.75f, 0.75f, 0.75f));
-                detail.style.fontSize = 11;
-                detail.style.paddingLeft = 10;
-                breakdownContainer.Add(detail);
-
-                if (!string.IsNullOrEmpty(seg.info.comment))
-                {
-                    var comment = new Label($"  // {seg.info.comment}");
-                    comment.style.color = new StyleColor(new Color(0.65f, 0.65f, 0.35f));
-                    comment.style.fontSize = 10;
-                    comment.style.paddingLeft = 10;
-                    breakdownContainer.Add(comment);
-                }
+            if (!string.IsNullOrEmpty(info.comment))
+            {
+                var comment = Text($"      // {info.comment}", new Color(0.65f, 0.65f, 0.35f), 10);
+                breakdownContainer.Add(comment);
             }
         }
     }
 
-    private void OnPreviewClicked()
+    private void OnPreviewClicked() => PreviewSteps(0, int.MaxValue, $"solution {SelectedSolutionId}");
+
+    /// <summary>Preview one sub-trajectory (a row of the breakdown) of the selected solution.</summary>
+    public void PreviewStep(int step)
     {
-        if (selectedSolution == null)
+        var steps = SelectedSolution?.sub_trajectory;
+        if (steps == null || step < 0 || step >= steps.Length) return;
+        string stageName = Client?.StageName(steps[step].info.stage_id) ?? $"stage {steps[step].info.stage_id}";
+        PreviewSteps(step, step, $"step {step + 1} ({stageName})");
+    }
+
+    /// <summary>
+    /// Preview the part of the selected solution that belongs to a stage. A container stage
+    /// (e.g. "pick object") covers the steps of all the stages nested under it.
+    /// </summary>
+    public void PreviewStage(uint stageId)
+    {
+        if (!TryGetStageSteps(stageId, out int first, out int last))
         {
-            Debug.LogWarning("[MTCDashboardPanel] No solution selected for preview.");
+            if (execStatusLabel != null) execStatusLabel.text = "The selected solution has no steps from that stage.";
             return;
         }
-        trajectoryPlayer?.PlaySolution(selectedSolution);
+        PreviewSteps(first, last, Client?.StageName(stageId) ?? $"stage {stageId}");
+    }
+
+    private bool TryGetStageSteps(uint stageId, out int first, out int last)
+    {
+        first = last = -1;
+        var steps = SelectedSolution?.sub_trajectory;
+        if (steps == null) return false;
+
+        // The stage and everything nested under it.
+        var family = new HashSet<uint> { stageId };
+        var stages = Client?.Description?.stages;
+        if (stages != null)
+            for (bool grew = true; grew;)
+            {
+                grew = false;
+                foreach (var stage in stages)
+                    if (stage.id != stage.parent_id && family.Contains(stage.parent_id) && family.Add(stage.id))
+                        grew = true;
+            }
+
+        for (int i = 0; i < steps.Length; i++)
+        {
+            if (!family.Contains(steps[i].info.stage_id)) continue;
+            if (first < 0) first = i;
+            last = i;
+        }
+        return first >= 0;
+    }
+
+    private void PreviewSteps(int firstStep, int lastStep, string what)
+    {
+        if (SelectedSolution == null)
+        {
+            if (execStatusLabel != null) execStatusLabel.text = "Select a solution first.";
+            return;
+        }
+        if (trajectoryPlayer == null)
+        {
+            if (execStatusLabel != null) execStatusLabel.text = "Preview unavailable: no trajectory player assigned.";
+            return;
+        }
+        if (execStatusLabel != null) execStatusLabel.text = $"Previewing {what}...";
+        trajectoryPlayer.OnProblem -= OnStagePreviewProblem;
+        trajectoryPlayer.OnProblem -= OnPreviewProblem;
+        trajectoryPlayer.OnProblem += OnPreviewProblem;
+        trajectoryPlayer.PlaySolution(SelectedSolution, firstStep, lastStep);
+    }
+
+    private void OnPreviewProblem(string problem)
+    {
+        if (execStatusLabel != null) execStatusLabel.text = "Cannot preview: " + problem;
+    }
+
+    // ─── Execute ──────────────────────────────────────────────────────────────
+
+    private void OnExecutionFeedback(ExecuteSolutionFeedback feedback)
+    {
+        RefreshProgress();
+        RefreshStages();
+        RefreshBreakdown();
+    }
+
+    private void RefreshProgress()
+    {
+        if (executionProgress == null) return;
+        var feedback = Client?.LastExecutionFeedback;
+        bool executingSolution = Client != null && Client.Phase == PickPlacePhase.Executing && Client.ExecutingSolutionId != 0;
+        if (!executingSolution && feedback == null)
+        {
+            executionProgress.style.display = DisplayStyle.None;
+            return;
+        }
+
+        executionProgress.style.display = DisplayStyle.Flex;
+        if (feedback == null || feedback.sub_no == 0)
+        {
+            executionProgress.value = 0;
+            executionProgress.title = "Starting execution";
+            return;
+        }
+        executionProgress.value = Mathf.Clamp01((feedback.sub_id + 1f) / feedback.sub_no) * 100f;
+        string stageName = Client.StageName(feedback.stage_id);
+        executionProgress.title = string.IsNullOrEmpty(stageName)
+            ? $"{feedback.sub_id + 1}/{feedback.sub_no} steps done"
+            : $"{feedback.sub_id + 1}/{feedback.sub_no} done ({stageName})";
+    }
+
+    /// <summary>Execute the selected solution by id on /execute_solution.</summary>
+    public async void ExecuteSelected()
+    {
+        if (Client == null || Busy) return;
+        if (SelectedSolutionId == null)
+        {
+            if (execStatusLabel != null) execStatusLabel.text = "Select a solution first.";
+            return;
+        }
+
+        trajectoryPlayer?.Stop();
+        try
+        {
+            await Client.ExecuteAsync(SelectedSolutionId.Value);
+        }
+        catch (Exception exception)
+        {
+            // Rejections, cancels and lost connections are already on the status line.
+            Debug.LogWarning($"[MTCDashboardPanel] execution ended: {exception.Message}");
+        }
+        RefreshControls();
+    }
+
+    // ─── Helpers ──────────────────────────────────────────────────────────────
+
+    private static VisualElement Row(Color background)
+    {
+        var row = new VisualElement();
+        row.style.flexDirection = FlexDirection.Row;
+        row.style.paddingLeft = 6;
+        row.style.paddingTop = 3;
+        row.style.paddingBottom = 3;
+        row.style.borderBottomWidth = 1;
+        row.style.borderBottomColor = new StyleColor(new Color(0.2f, 0.2f, 0.2f));
+        row.style.backgroundColor = new StyleColor(background);
+        return row;
+    }
+
+    private static Label Text(string text, Color color, int size)
+    {
+        var label = new Label(text);
+        label.style.color = new StyleColor(color);
+        label.style.fontSize = size;
+        return label;
+    }
+
+    private static Label RankLabel(int rank)
+    {
+        var label = Text($"#{rank}", new Color(1f, 0.8f, 0.2f), 12);
+        label.style.width = 28;
+        label.style.unityFontStyleAndWeight = FontStyle.Bold;
+        return label;
     }
 }

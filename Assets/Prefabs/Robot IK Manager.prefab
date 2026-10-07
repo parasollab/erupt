@@ -72,6 +72,11 @@ MonoBehaviour:
   handleIdleColor: {r: 0.05, g: 0.75, b: 1, a: 1}
   handleActiveColor: {r: 1, g: 0.75, b: 0.05, a: 1}
   selectedJointColor: {r: 1, g: 0.35, b: 0.08, a: 1}
+  createJointHandles: 1
+  jointHandleDiameter: 0.075
+  jointHandleColor: {r: 0.1, g: 0.85, b: 1, a: 0.8}
+  maximumConcurrentDrags: 2
+  allowLinkGrabbing: 1
 --- !u!1 &8364499036000214473
 GameObject:
   m_ObjectHideFlags: 0

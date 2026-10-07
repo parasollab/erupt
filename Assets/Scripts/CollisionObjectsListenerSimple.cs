@@ -1,3 +1,4 @@
+using Erupt.Ros;
 using System.Collections.Generic;
 using UnityEngine;
 using Unity.Robotics.ROSTCPConnector;
@@ -19,6 +20,12 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
     [Header("ROS")]
     public string topic = "/collision_objects_ros";
 
+    [Tooltip("MoveIt service used to fetch objects that existed before this subscriber connected.")]
+    public string planningSceneServiceTopic = "/get_planning_scene";
+
+    [Tooltip("Request a full world-object snapshot after subscribing to live updates.")]
+    public bool requestInitialPlanningScene = true;
+
     [Header("Frame Root (ROS world frame)")]
     public GameObject worldOrigin; // If null, uses this.transform
     private Transform worldOriginTransform => worldOrigin ? worldOrigin.transform : this.transform;
@@ -26,8 +33,32 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
     [Header("Materials")]
     public Material litMaterial;
 
-    private ROSConnection ros;
+    private IRosBus ros;
     public Dictionary<string, GameObject> objectsById = new();
+
+    // Ids currently attached to the robot (maintained by AttachedCollisionObjectListener).
+    // While an id is in here, inbound REMOVE/MOVE/ADD for it are ignored — the object is
+    // being carried by the gripper, and /attached_collision_objects_ros owns its pose.
+    public readonly HashSet<string> attachedIds = new();
+
+    // Ids just detached from the robot. The ADD that follows carries the authoritative place
+    // pose, which is applied even to Unity-owned objects (the robot moved it, not Unity).
+    public readonly HashSet<string> awaitingDetachPose = new();
+
+    // Fired when the registry is cleared (scene change / teardown).
+    // The argument is true when the listener itself is being destroyed.
+    public event System.Action<bool> OnRegistryCleared;
+
+    // id -> signature of the geometry its children were last built from, so a re-ADD with
+    // unchanged geometry only moves the object instead of destroying and respawning it.
+    private readonly Dictionary<string, string> _geometrySignatureById = new();
+
+    // Fired after an inbound ADD/APPEND/MOVE has been applied to the GameObject for this id.
+    public event System.Action<string> OnObjectUpdated;
+
+    // IDs represented by Unity-owned GameObjects. Echoes from planning_scene_watcher must
+    // not create a second renderer at the same pose.
+    private readonly HashSet<string> _publisherOwnedIds = new();
 
     // MoveIt op codes (per message spec)
     const byte OP_ADD = 0;
@@ -37,16 +68,121 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
 
     void Start()
     {
-        ros = ROSConnection.GetOrCreateInstance();
+        ros = RosBus.Instance;
+
+        foreach (var pub in FindObjectsByType<CollisionObjectPublisher>(FindObjectsSortMode.None))
+            if (!string.IsNullOrEmpty(pub.objectId))
+                RegisterUnityOwnedObject(pub.objectId, pub.gameObject);
+
+        // Subscribe before requesting the snapshot so an update that occurs while the
+        // service request is in flight cannot be missed.
         ros.Subscribe<CollisionObjectMsg>(topic, OnCollisionObject);
+
+        if (requestInitialPlanningScene)
+            RequestInitialPlanningScene();
     }
 
     void OnDestroy()
     {
-        // ROSConnection persists across scene loads; without this, the dead listener keeps
-        // receiving messages and throws when instantiating under its destroyed transform.
         if (ros != null)
             ros.Unsubscribe<CollisionObjectMsg>(topic, OnCollisionObject);
+        ClearRegistry(destroyObjects: false, tearingDown: true);
+    }
+
+    /// <summary>
+    /// Forget every mirrored object (scene change / teardown). Listeners such as
+    /// AttachedCollisionObjectListener drop their attach state via OnRegistryCleared first,
+    /// so nothing is left orphaned under a robot link.
+    /// </summary>
+    public void ClearRegistry(bool destroyObjects = true, bool tearingDown = false)
+    {
+        OnRegistryCleared?.Invoke(tearingDown);
+
+        if (destroyObjects)
+        {
+            foreach (var kv in objectsById)
+            {
+                if (!kv.Value || _publisherOwnedIds.Contains(kv.Key)) continue;
+                foreach (var pub in kv.Value.GetComponentsInChildren<CollisionObjectPublisher>(true))
+                    pub.suppressRemoveOnDestroy = true;
+                Destroy(kv.Value);
+            }
+        }
+
+        objectsById.Clear();
+        _publisherOwnedIds.Clear();
+        _geometrySignatureById.Clear();
+        attachedIds.Clear();
+        awaitingDetachPose.Clear();
+    }
+
+    private void RequestInitialPlanningScene()
+    {
+        try
+        {
+            ros.RegisterRosService<GetPlanningSceneRequest, GetPlanningSceneResponse>(planningSceneServiceTopic);
+
+            uint components = PlanningSceneComponentsMsg.WORLD_OBJECT_NAMES
+                            | PlanningSceneComponentsMsg.WORLD_OBJECT_GEOMETRY;
+            var request = new GetPlanningSceneRequest(new PlanningSceneComponentsMsg(components));
+            ros.SendServiceMessage<GetPlanningSceneResponse>(
+                planningSceneServiceTopic, request, OnInitialPlanningSceneReceived);
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[CO Listener] Could not request the initial planning scene: {e.Message}");
+        }
+    }
+
+    private void OnInitialPlanningSceneReceived(GetPlanningSceneResponse response)
+    {
+        CollisionObjectMsg[] objects = response?.scene?.world?.collision_objects;
+        if (objects == null)
+        {
+            Debug.LogWarning("[CO Listener] Initial planning-scene response contained no world object list.");
+            return;
+        }
+
+        Debug.Log($"[CO Listener] Applying initial planning-scene snapshot ({objects.Length} objects).");
+        foreach (CollisionObjectMsg collisionObject in objects)
+            OnCollisionObject(collisionObject);
+    }
+
+    /// <summary>
+    /// Registers a GameObject whose ROS id originated in Unity. The watcher will echo
+    /// that id back, but the listener must keep the existing object rather than rebuild
+    /// coincident geometry on top of it.
+    /// </summary>
+    public void RegisterUnityOwnedObject(string id, GameObject unityObject)
+    {
+        if (string.IsNullOrEmpty(id)) return;
+
+        _publisherOwnedIds.Add(id);
+        if (unityObject != null)
+            objectsById[id] = unityObject;
+    }
+
+    public void UnregisterUnityOwnedObject(string id)
+    {
+        if (string.IsNullOrEmpty(id)) return;
+        _publisherOwnedIds.Remove(id);
+        objectsById.Remove(id);
+        awaitingDetachPose.Remove(id);
+    }
+
+    private bool TryGetUnityOwnedObject(string id, out GameObject unityObject)
+    {
+        unityObject = null;
+        if (!_publisherOwnedIds.Contains(id)) return false;
+
+        if (objectsById.TryGetValue(id, out unityObject) && unityObject != null)
+            return true;
+
+        // The owner may have been destroyed locally before the watcher echoed REMOVE.
+        _publisherOwnedIds.Remove(id);
+        objectsById.Remove(id);
+        unityObject = null;
+        return false;
     }
 
     void OnCollisionObject(CollisionObjectMsg co)
@@ -57,15 +193,59 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
             return;
         }
 
+        // The robot is carrying this object. The fixed watcher stays quiet for it; this guards
+        // against message reordering and older watcher builds.
+        if (attachedIds.Contains(co.id))
+        {
+            Debug.Log($"[CO Listener] Ignoring op={co.operation} for attached object id={co.id}");
+            return;
+        }
+
+        if (TryGetUnityOwnedObject(co.id, out GameObject unityOwnedObject))
+        {
+            if (co.operation == OP_REMOVE)
+            {
+                foreach (var pub in unityOwnedObject.GetComponentsInChildren<CollisionObjectPublisher>(true))
+                    pub.suppressRemoveOnDestroy = true;
+                Destroy(unityOwnedObject);
+                UnregisterUnityOwnedObject(co.id);
+                return;
+            }
+
+            if (awaitingDetachPose.Remove(co.id) && co.pose != null)
+            {
+                // Post-detach re-add: take the place pose, keep the Unity-owned geometry.
+                ApplyWorldPose(unityOwnedObject.transform, co.pose);
+                MarkPoseAsPublished(unityOwnedObject);
+                OnObjectUpdated?.Invoke(co.id);
+                return;
+            }
+
+            Debug.Log($"[CO Listener] Skipping '{co.id}' — already managed by CollisionObjectPublisher.");
+            return;
+        }
+
         if (co.operation == OP_REMOVE)
         {
+            awaitingDetachPose.Remove(co.id);
+            _geometrySignatureById.Remove(co.id);
             Debug.Log($"[CO Listener] Removing object id={co.id}");
-            if (objectsById.TryGetValue(co.id, out var old) && old) Destroy(old);
+            if (objectsById.TryGetValue(co.id, out var old) && old)
+            {
+                // This destroy was commanded by ROS — don't let the object's own publisher
+                // echo a REMOVE back to /collision_object and erase it from MoveIt's scene.
+                foreach (var pub in old.GetComponentsInChildren<CollisionObjectPublisher>(true))
+                    pub.suppressRemoveOnDestroy = true;
+                Destroy(old);
+            }
             objectsById.Remove(co.id);
             return;
         }
 
-        if (co.operation == OP_ADD && objectsById.ContainsKey(co.id))
+        // A detached object comes back from MoveIt as a fresh ADD under its existing id; that
+        // one must reach Upsert so the place pose is applied. Any other ADD for a known id is
+        // a duplicate and would re-instantiate the geometry.
+        if (co.operation == OP_ADD && objectsById.ContainsKey(co.id) && !awaitingDetachPose.Contains(co.id))
         {
             Debug.LogWarning($"[CO Listener] Ignoring ADD for existing id={co.id}; use APPEND or MOVE.");
             return;
@@ -76,8 +256,8 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
         // shapes). Instantiating such an echo would add a second CollisionObjectPublisher
         // under the same id, and OnDestroy's live-publisher refcount would then suppress the
         // REMOVE when the user deletes the original — leaving the object in the planning
-        // scene forever. objectsById pre-registration only covers the one listener the wrist
-        // menu is bound to; this covers every publisher and every listener instance.
+        // scene forever. The Unity-owned registry above only covers objects that registered
+        // with this listener; this covers every publisher and every listener instance.
         if (!objectsById.ContainsKey(co.id) && CollisionObjectPublisher.HasLivePublisher(co.id))
             return;
 
@@ -91,7 +271,25 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
             return;
 
         Debug.Log($"[CO Listener] Adding/Appending/Moving object id={co.id}");
+        awaitingDetachPose.Remove(co.id);
+        Upsert(co, applyWorldPose: true);
+        OnObjectUpdated?.Invoke(co.id);
+    }
 
+    /// <summary>
+    /// Builds the GameObject for an object first seen while already attached to the robot
+    /// (Unity joined mid-carry), through the same path as a world ADD. The message pose is
+    /// link-relative, so no world pose is applied — the caller places it under the link.
+    /// </summary>
+    public GameObject SpawnFromAttachedObject(CollisionObjectMsg co)
+    {
+        if (co == null || string.IsNullOrEmpty(co.id)) return null;
+        if (TryGetObject(co.id, out var existing)) return existing;
+        return Upsert(co, applyWorldPose: false);
+    }
+
+    GameObject Upsert(CollisionObjectMsg co, bool applyWorldPose)
+    {
         // ADD / APPEND / MOVE → upsert parent
         if (!objectsById.TryGetValue(co.id, out var parent) || !parent)
         {
@@ -103,10 +301,37 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
         Debug.Log($"[CO Listener] Processing object id={co.id} with {co.primitives?.Length ?? 0} primitives, {co.meshes?.Length ?? 0} meshes, {co.planes?.Length ?? 0} planes");
 
         // ----- Place parent in world using co.pose -----
-        var objPose = co.pose ?? new PoseMsg(new PointMsg(0, 0, 0), new QuaternionMsg(0, 0, 0, 1));
-        ApplyWorldPose(parent.transform, objPose);
+        if (applyWorldPose)
+        {
+            var objPose = co.pose ?? new PoseMsg(new PointMsg(0, 0, 0), new QuaternionMsg(0, 0, 0, 1));
+            ApplyWorldPose(parent.transform, objPose);
+            // ROS set this pose; the children's publishers must not echo it back as a MOVE.
+            MarkPoseAsPublished(parent);
 
-        Debug.Log($"[CO Listener] Applied world pose to '{co.id}': position=({objPose.position.x}, {objPose.position.y}, {objPose.position.z}), orientation=({objPose.orientation.x}, {objPose.orientation.y}, {objPose.orientation.z}, {objPose.orientation.w})");
+            Debug.Log($"[CO Listener] Applied world pose to '{co.id}': position=({objPose.position.x}, {objPose.position.y}, {objPose.position.z}), orientation=({objPose.orientation.x}, {objPose.orientation.y}, {objPose.orientation.z}, {objPose.orientation.w})");
+        }
+
+        // MOVE (and any other geometry-less message) only updates the pose — rebuilding here
+        // would destroy all visuals since there is no geometry to rebuild from.
+        bool hasGeometry = (co.primitives?.Length ?? 0) > 0
+                        || (co.meshes?.Length ?? 0) > 0
+                        || (co.planes?.Length ?? 0) > 0;
+        if (!hasGeometry)
+        {
+            Debug.Log($"[CO Listener] No geometry in message for '{co.id}'; pose-only update.");
+            return parent;
+        }
+
+        // Re-ADD of a known object with the geometry it already shows (e.g. the re-add after
+        // the gripper releases it): moving it is enough, a rebuild would only flicker.
+        string signature = GeometrySignature(co);
+        if (parent.transform.childCount > 0
+            && _geometrySignatureById.TryGetValue(co.id, out var builtFrom) && builtFrom == signature)
+        {
+            Debug.Log($"[CO Listener] Geometry of '{co.id}' unchanged; pose-only update.");
+            return parent;
+        }
+        _geometrySignatureById[co.id] = signature;
 
         // Rebuild children fresh for correctness
         for (int i = parent.transform.childCount - 1; i >= 0; i--)
@@ -189,9 +414,6 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
             publisher.objectId = name;
             publisher.hasBeenPublished = true;
             publisher.worldOrigin = worldOrigin;
-
-            // Register the new object
-            objectsById.Add(publisher.objectId, child);
         }
 
         // ---- MESHES (local to parent) ----
@@ -248,9 +470,6 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
                 publisher.objectId = name;
                 publisher.hasBeenPublished = true;
                 publisher.worldOrigin = worldOrigin;
-
-                // Register the new object
-                objectsById.Add(publisher.objectId, child);
             }
         }
 
@@ -267,6 +486,58 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
         }
 
         // Optional: parent.SetActive(built > 0);
+
+        return parent;
+    }
+
+    static void MarkPoseAsPublished(GameObject go)
+    {
+        foreach (var pub in go.GetComponentsInChildren<CollisionObjectPublisher>(true))
+            pub.MarkTransformAsPublished();
+    }
+
+    static string GeometrySignature(CollisionObjectMsg co)
+    {
+        var sb = new System.Text.StringBuilder();
+        foreach (var prim in co.primitives ?? System.Array.Empty<SolidPrimitiveMsg>())
+        {
+            sb.Append('P').Append(prim.type);
+            foreach (double d in prim.dimensions ?? System.Array.Empty<double>())
+                sb.Append(':').Append(d.ToString("F5", System.Globalization.CultureInfo.InvariantCulture));
+        }
+        foreach (var mesh in co.meshes ?? System.Array.Empty<MeshMsg>())
+            sb.Append('M').Append(mesh.vertices?.Length ?? 0).Append(':').Append(mesh.triangles?.Length ?? 0);
+        sb.Append("PL").Append(co.planes?.Length ?? 0);
+        AppendPoses(sb, co.primitive_poses);
+        AppendPoses(sb, co.mesh_poses);
+        AppendPoses(sb, co.plane_poses);
+        return sb.ToString();
+    }
+
+    static void AppendPoses(System.Text.StringBuilder sb, PoseMsg[] poses)
+    {
+        sb.Append('|');
+        foreach (var p in poses ?? System.Array.Empty<PoseMsg>())
+            sb.AppendFormat(System.Globalization.CultureInfo.InvariantCulture,
+                "{0:F5},{1:F5},{2:F5},{3:F5},{4:F5},{5:F5},{6:F5};",
+                p.position.x, p.position.y, p.position.z,
+                p.orientation.x, p.orientation.y, p.orientation.z, p.orientation.w);
+    }
+
+    public bool TryGetObject(string id, out GameObject go)
+    {
+        if (objectsById.TryGetValue(id, out go) && go) return true;
+        go = null;
+        return false;
+    }
+
+    /// <summary>
+    /// Places a transform at a ROS world pose, with the same conversion inbound collision
+    /// objects get. For callers (the solution preview) that show objects at a planned pose.
+    /// </summary>
+    public void ApplyRosWorldPose(Transform t, PoseMsg rosPose)
+    {
+        if (t != null && rosPose != null) ApplyWorldPose(t, rosPose);
     }
 
     // Ids WristMenuController assigns to user-created shapes: "unity_{primitive}_{ticks}"
@@ -405,7 +676,10 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
         var mr = go.AddComponent<MeshRenderer>();
         mr.material = litMaterial;
 
-        var uMesh = new Mesh();
+        // Named so downstream shape sniffing can identify it. An unnamed mesh reports
+        // name "" and matches nothing, which left the wrist menu's edit panel empty for
+        // every mesh-type collision object.
+        var uMesh = new Mesh { name = $"Mesh_{name}" };
         var verts = new Vector3[meshMsg.vertices.Length];
         for (int i = 0; i < verts.Length; i++)
         {

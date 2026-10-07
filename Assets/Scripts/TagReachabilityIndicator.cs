@@ -57,6 +57,13 @@ public class TagReachabilityIndicator : MonoBehaviour
     [SerializeField, Tooltip("ROS frame the query pose is expressed in. Must be a link of the robot.")]
     private string planningFrameId = "base_link";
 
+    [SerializeField, Tooltip("Joint-name prefix of the Unity robot, rewritten to rosJointNamePrefix in the IK seed. " +
+                             "Empty = send joint names unchanged.")]
+    private string unityJointNamePrefix = "";
+
+    [SerializeField, Tooltip("Joint-name prefix of the ROS robot model (e.g. \"panda_\"). See unityJointNamePrefix.")]
+    private string rosJointNamePrefix = "";
+
     [SerializeField, Tooltip("Yaw about Unity Y from the robot root to the Unity transform matching planningFrameId, " +
                              "used only when no BaseTransform child exists. -90 matches the study scenes' convention.")]
     private float baseYawOffsetDegrees = -90f;
@@ -168,6 +175,7 @@ public class TagReachabilityIndicator : MonoBehaviour
     }
 
     private readonly Dictionary<int, TagEntry> _entries = new Dictionary<int, TagEntry>();
+    private readonly HashSet<string> _warnedSeedJoints = new HashSet<string>();
     private ROSConnection _ros;
     private RobotReachProfile _profile;
     private Transform _baseTransform;
@@ -183,6 +191,8 @@ public class TagReachabilityIndicator : MonoBehaviour
     private string IkLinkName => _profile != null ? (_profile.ikLinkName ?? "") : (ikLinkName ?? "");
     private string FrameId => _profile != null && !string.IsNullOrEmpty(_profile.planningFrameId) ? _profile.planningFrameId : planningFrameId;
     private float BaseYawOffset => _profile != null ? _profile.baseYawOffsetDegrees : baseYawOffsetDegrees;
+    private string UnityJointPrefix => _profile != null ? (_profile.unityJointNamePrefix ?? "") : (unityJointNamePrefix ?? "");
+    private string RosJointPrefix => _profile != null ? (_profile.rosJointNamePrefix ?? "") : (rosJointNamePrefix ?? "");
 
     /// <summary>Current state for a tag ID, if it has ever been observed.</summary>
     public bool TryGetState(int id, out ReachState state)
@@ -226,7 +236,7 @@ public class TagReachabilityIndicator : MonoBehaviour
             Debug.LogWarning($"{LogTag} Could not register {ikServiceName}: {e.Message}");
         }
         if (verboseLogging)
-            Debug.Log($"{LogTag} group={GroupName} frame={FrameId} ikLink='{IkLinkName}' profile={(_profile != null ? "yes" : "none")} seed={(seedController != null ? seedController.name : "move_group current state")}");
+            Debug.Log($"{LogTag} group={GroupName} frame={FrameId} ikLink='{IkLinkName}' profile={(_profile != null ? "yes" : "none")} seed={(seedController != null ? seedController.name : "move_group current state")} jointPrefix='{UnityJointPrefix}'->'{RosJointPrefix}'");
     }
 
     private void OnEnable()
@@ -624,19 +634,60 @@ public class TagReachabilityIndicator : MonoBehaviour
         if (seedController == null)
             return state;
 
-        string[] names = seedController.GetJointStateNames();
-        float[] positions = seedController.GetJointStatePositions();
-        if (names == null || positions == null || names.Length == 0 || names.Length != positions.Length)
+        string[] unityNames = seedController.GetJointStateNames();
+        float[] unityPositions = seedController.GetJointStatePositions();
+        if (unityNames == null || unityPositions == null || unityNames.Length == 0 || unityNames.Length != unityPositions.Length)
+            return state;
+
+        // A joint name the ROS model does not know is not an IK error: move_group's IK service
+        // throws on it and the whole process aborts. Only send names we can vouch for.
+        var names = new List<string>(unityNames.Length);
+        var positions = new List<double>(unityNames.Length);
+        for (int i = 0; i < unityNames.Length; i++)
+        {
+            if (TryMapJointName(unityNames[i], out string rosName))
+            {
+                names.Add(rosName);
+                positions.Add(unityPositions[i]);
+            }
+            else if (_warnedSeedJoints.Add(unityNames[i]))
+            {
+                Debug.LogWarning($"{LogTag} seed joint '{unityNames[i]}' does not carry the Unity prefix '{UnityJointPrefix}'; left out of the IK seed.");
+            }
+        }
+        if (names.Count == 0)
             return state;
 
         state.joint_state = new JointStateMsg
         {
-            name = names,
-            position = Array.ConvertAll(positions, p => (double)p),
-            velocity = new double[names.Length],
-            effort = new double[names.Length]
+            name = names.ToArray(),
+            position = positions.ToArray(),
+            velocity = new double[names.Count],
+            effort = new double[names.Count]
         };
         return state;
+    }
+
+    /// <summary>
+    /// Rewrites a Unity joint name to the ROS model's name. With no prefixes configured the name
+    /// passes through. With a Unity prefix configured, a name that does not carry it cannot be
+    /// mapped and is rejected rather than sent as-is.
+    /// </summary>
+    private bool TryMapJointName(string unityName, out string rosName)
+    {
+        string unityPrefix = UnityJointPrefix;
+        if (string.IsNullOrEmpty(unityPrefix))
+        {
+            rosName = unityName;
+            return !string.IsNullOrEmpty(unityName);
+        }
+        if (!string.IsNullOrEmpty(unityName) && unityName.StartsWith(unityPrefix, StringComparison.Ordinal))
+        {
+            rosName = RosJointPrefix + unityName.Substring(unityPrefix.Length);
+            return true;
+        }
+        rosName = null;
+        return false;
     }
 
     /// <summary>Quaternion (ROS axes) that points the tool's +z along <paramref name="toolDirectionRos"/>.</summary>

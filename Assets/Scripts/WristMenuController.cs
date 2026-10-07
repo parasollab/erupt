@@ -1,3 +1,4 @@
+using Erupt.Interaction;
 using UnityEngine;
 using UnityEngine.UIElements;
 using UnityEngine.InputSystem;
@@ -11,6 +12,12 @@ public class WristMenuController : MonoBehaviour
     
     [Header("Input Actions")]
     public InputActionAsset inputActions;
+
+    [Header("Interaction Router (opt-in)")]
+    [Tooltip("When assigned, the menu toggle comes from the router's Activate intent " +
+             "instead of a hardcoded action-map lookup. Leave empty to keep the " +
+             "pre-refactor behavior.")]
+    [SerializeField] private InteractionRouter interactionRouter;
     
     [Header("Materials")]
     public Material litMaterial;
@@ -112,6 +119,11 @@ public class WristMenuController : MonoBehaviour
         
         InitializeUIElements();
         SetupEventHandlers();
+        if (PickPlace != null)
+        {
+            PickPlace.OnStatus -= OnPickPlaceStatus;
+            PickPlace.OnStatus += OnPickPlaceStatus;
+        }
         SetupInputActions();
         
         // Initially hide the menu
@@ -461,6 +473,14 @@ public class WristMenuController : MonoBehaviour
 
     private void SetupInputActions()
     {
+        // Router path: the menu is an Activate intent, so it is no longer bound to a
+        // specific action map — or to a specific hand.
+        if (interactionRouter != null)
+        {
+            interactionRouter.Activate += OnRouterActivate;
+            return;
+        }
+
         if (inputActions == null)
         {
             Debug.LogError("WristMenuController: InputActionAsset is not assigned.");
@@ -480,6 +500,11 @@ public class WristMenuController : MonoBehaviour
     }
     
     private void OnMenuToggle(InputAction.CallbackContext context)
+    {
+        ToggleMenu();
+    }
+
+    private void OnRouterActivate(InteractionIntent intent)
     {
         ToggleMenu();
     }
@@ -642,6 +667,10 @@ public class WristMenuController : MonoBehaviour
         MeshFilter meshFilter = selectedObject.GetComponent<MeshFilter>();
         if (meshFilter == null || meshFilter.sharedMesh == null)
         {
+            // Listener-spawned collision objects put geometry on children, so a selection
+            // that resolved to the parent has no mesh of its own.
+            Debug.LogWarning($"WristMenuController: '{selectedObject.name}' has no mesh; " +
+                             "nothing to edit. Select the geometry itself.");
             return;
         }
 
@@ -674,7 +703,11 @@ public class WristMenuController : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning($"WristMenuController: Unsupported shape '{meshName}' for editing.");
+            // Anything unrecognised still gets a uniform scale control. Previously this
+            // branch added nothing, so objects built from MoveIt meshes or planes - whose
+            // mesh names are "Mesh_<id>", "Quad" or empty - produced an empty edit panel.
+            Debug.Log($"WristMenuController: Unrecognised shape '{meshName}'; offering uniform scale.");
+            wristMenuEditSliderPanel.Add(CreateToggleStack("Mesh", "Scale"));
         }
     }
     
@@ -770,7 +803,7 @@ public class WristMenuController : MonoBehaviour
                 publisher.hasBeenPublished = false;
                 publisher.worldOrigin = worldOrigin;
                 if (collisionObjectsListener != null)
-                    collisionObjectsListener.objectsById.Add(newId, duplicate);
+                    collisionObjectsListener.RegisterUnityOwnedObject(newId, duplicate);
             }
 
             if (selectionManager != null)
@@ -907,7 +940,7 @@ public class WristMenuController : MonoBehaviour
         if (selectionManager != null)
             selectionManager.SetSelectedObject(shape);
         if (collisionObjectsListener != null)
-            collisionObjectsListener.objectsById.Add(publisher.objectId, shape);
+            collisionObjectsListener.RegisterUnityOwnedObject(publisher.objectId, shape);
     }
     
     // Public convenience methods for external access
@@ -956,7 +989,11 @@ public class WristMenuController : MonoBehaviour
 
         if (!pickPlaceRecorder.IsRecording)
         {
-            pickPlaceRecorder.OnRecordingComplete = OnPickPlaceRecorded;
+            // -= first so repeated recordings never stack the handler
+            pickPlaceRecorder.OnRecordingComplete -= OnPickPlaceRecorded;
+            pickPlaceRecorder.OnRecordingComplete += OnPickPlaceRecorded;
+            pickPlaceRecorder.OnRecordingDiscarded -= OnPickPlaceDiscarded;
+            pickPlaceRecorder.OnRecordingDiscarded += OnPickPlaceDiscarded;
             pickPlaceRecorder.StartRecording();
             if (recordPickPlaceButton != null)
             {
@@ -968,16 +1005,42 @@ public class WristMenuController : MonoBehaviour
         }
         else
         {
+            // StopRecording raises OnRecordingComplete or OnRecordingDiscarded, which set the label.
             pickPlaceRecorder.StopRecording();
-            ResetRecordUI();
+            ResetRecordUI(resetLabel: false);
         }
     }
 
+    // The goal has already been handed to PickPlaceClient by now, so show what the client
+    // reports (PLANNING..., REJECTED, UNAVAILABLE...) rather than claiming it was sent.
     private void OnPickPlaceRecorded(string objectId)
     {
+        var client = PickPlace;
         if (recordStatusLabel != null)
-            recordStatusLabel.text = $"Sent: {objectId}";
+            recordStatusLabel.text = client != null && !string.IsNullOrEmpty(client.LastStatus)
+                ? $"{objectId}: {client.LastStatus}"
+                : $"Sent: {objectId}";
         ResetRecordUI(resetLabel: false);
+    }
+
+    private void OnPickPlaceDiscarded(string reason)
+    {
+        if (recordStatusLabel != null)
+            recordStatusLabel.text = $"Not sent: {reason}";
+        ResetRecordUI(resetLabel: false);
+    }
+
+    private PickPlaceClient pickPlaceClient;
+    private PickPlaceClient PickPlace =>
+        pickPlaceClient != null ? pickPlaceClient
+            : pickPlaceClient = FindFirstObjectByType<PickPlaceClient>(FindObjectsInactive.Include);
+
+    // Follow the goal after the recording ends, so the wrist menu shows the server's answer.
+    private void OnPickPlaceStatus(string status)
+    {
+        if (recordStatusLabel == null || (pickPlaceRecorder != null && pickPlaceRecorder.IsRecording)) return;
+        if (PickPlace == null || !PickPlace.Busy && PickPlace.LastOutcome == PickPlaceOutcome.None) return;
+        recordStatusLabel.text = $"Pick & place: {status}";
     }
 
     private void ResetRecordUI(bool resetLabel = true)
@@ -1062,6 +1125,11 @@ public class WristMenuController : MonoBehaviour
     // Cleanup
     private void OnDisable()
     {
+        if (interactionRouter != null)
+            interactionRouter.Activate -= OnRouterActivate;
+        if (pickPlaceClient != null)
+            pickPlaceClient.OnStatus -= OnPickPlaceStatus;
+
         if (menuAction != null)
         {
             menuAction.performed -= OnMenuToggle;
@@ -1071,6 +1139,9 @@ public class WristMenuController : MonoBehaviour
     
     private void OnDestroy()
     {
+        if (interactionRouter != null)
+            interactionRouter.Activate -= OnRouterActivate;
+
         if (menuAction != null)
         {
             menuAction.performed -= OnMenuToggle;

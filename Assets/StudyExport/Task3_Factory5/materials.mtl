@@ -1,0 +1,103 @@
+newmtl Mat_Pegboard
+Kd 0.7353569 0.7353569 0.7353569
+d 1
+
+newmtl mug03
+Kd 0.8 0.8 0.8
+d 1
+map_Kd mug03.png
+
+newmtl Mat_Tool_Cabinet
+Kd 0.8 0.8 0.8
+d 1
+map_Kd Tool_Cabinet_Base_Color.png
+
+newmtl Mat_Vice
+Kd 0.8 0.8 0.8
+d 1
+map_Kd Vice_Base_Color.png
+
+newmtl Light_Fixture
+Kd 1 1 1
+d 1
+map_Kd Light_Fixture_Base_Color.png
+
+newmtl Mat_Tools
+Kd 0.8 0.8 0.8
+d 1
+map_Kd Tools_Composite_Base_Color_1.png
+
+newmtl Mat_Workbench
+Kd 0.8 0.8 0.8
+d 1
+map_Kd Workbench_Base_Color.png
+
+newmtl Lit
+Kd 0.5 0.5 0.5
+d 1
+
+newmtl gray_metallic
+Kd 0.2666599 0.2666599 0.2666599
+d 1
+
+newmtl gray
+Kd 0.9262451 0.9399938 0.8883185
+d 1
+
+newmtl vintage_2
+Kd 0.7066601 0.6652777 0.5665891
+d 1
+
+newmtl white_001
+Kd 0.982069 1 0.88608
+d 1
+
+newmtl screen
+Kd 1 1 1
+d 1
+map_Kd screen_face_uv.png
+
+newmtl black
+Kd 0.03332683 0.03332683 0.03332683
+d 1
+
+newmtl vintage_1
+Kd 0.60666 0.5711339 0.4864113
+d 1
+
+newmtl Pegboard
+Kd 1 1 1
+d 1
+map_Kd Pegboard_Base_Color.png
+
+newmtl screen_1
+Kd 1 1 1
+d 1
+map_Kd subface.png
+
+newmtl Material_001
+Kd 1 1 1
+d 1
+map_Kd Box_Diffuse.png
+
+newmtl white
+Kd 0.9820682 1 0.8860802
+d 1
+
+newmtl metallic
+Kd 0.66666 0.66666 0.66666
+d 1
+
+newmtl green
+Kd 0.9063317 0.9063317 0.9063317
+d 1
+
+newmtl gray_stiker
+Kd 0.7733268 0.7733268 0.7733268
+d 1
+
+newmtl Material512px
+Kd 1 1 1
+d 1
+map_Kd Material_Base_Color_512px_.png
+

@@ -1,0 +1,72 @@
+newmtl M_Jar
+Kd 1 1 1
+d 1
+map_Kd T_Jar_AlbedoTransparency.png
+
+newmtl Lit
+Kd 0.5 0.5 0.5
+d 1
+
+newmtl Material256px
+Kd 1 1 1
+d 1
+map_Kd Material_Base_Color_256px_.png
+
+newmtl mug02
+Kd 1 1 1
+d 1
+
+newmtl M_Pot
+Kd 1 1 1
+d 1
+map_Kd T_Pot_AlbedoTransparency.png
+
+newmtl Toaster__Material
+Kd 1 1 1
+d 1
+map_Kd Toster_Material_AlbedoTransparency.png
+
+newmtl bowl03
+Kd 0.8 0.8 0.8
+d 1
+map_Kd bowl03.png
+
+newmtl Kitchen_set03_mat
+Kd 1 1 1
+d 1
+map_Kd Kitchen_Set03_BaseColor.png
+
+newmtl Kitchen_metal_mat
+Kd 1 1 1
+d 1
+
+newmtl bowl02
+Kd 1 1 1
+d 1
+
+newmtl TableWood
+Kd 0.4078431 0.3294117 0.3098039
+d 1
+
+newmtl mug01
+Kd 0.8 0.8 0.8
+d 1
+map_Kd mug01.png
+
+newmtl Kettle_Material
+Kd 1 1 1
+d 1
+map_Kd kettle_Material_001_AlbedoTransparency.png
+
+newmtl light1_1
+Kd 0.06221732 0.06221732 0.06221732
+d 1
+
+newmtl light2_1
+Kd 0.5111066 0.4416117 0.3567391
+d 1
+
+newmtl light3_1
+Kd 0.9063317 0.9063317 0.9063317
+d 1
+

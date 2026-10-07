@@ -1,3 +1,4 @@
+using Erupt.Ros;
 using UnityEngine;
 using UnityEngine.UIElements;
 using UnityEngine.XR.Interaction.Toolkit;
@@ -91,7 +92,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     private bool isReplaying = false;
 
     // ROS Connection
-    private ROSConnection ros;
+    private IRosBus ros;
     private bool isConnected = false;
 
     // Planning state
@@ -436,7 +437,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     {
         isConnected = false;
 
-        ros = ROSConnection.GetOrCreateInstance();
+        ros = RosBus.Instance;
 
         if (ros == null)
         {

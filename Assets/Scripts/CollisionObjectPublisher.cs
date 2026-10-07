@@ -1,3 +1,4 @@
+using Erupt.Ros;
 using UnityEngine;
 using Unity.Robotics.ROSTCPConnector;
 using RosMessageTypes.Moveit;
@@ -34,7 +35,16 @@ public class CollisionObjectPublisher : MonoBehaviour
     [Tooltip("Benchmark-only: append serialized size / mesh density / object type to /latency_data rows and report only this object's pongs. Leave off for the study.")]
     public bool extendedLatencyMetrics = false;
     public bool pausePublishing = false;
+    // Set before Destroy() when the destruction was commanded by ROS itself (inbound REMOVE) —
+    // publishing our own REMOVE back would delete the object from MoveIt's live scene.
+    public bool suppressRemoveOnDestroy = false;
+    // True while MoveIt has this object attached to the robot (set by
+    // AttachedCollisionObjectListener). Nothing may be published for the id meanwhile: a world
+    // object with the same id as an attached body corrupts MoveIt's scene.
+    [NonSerialized] public bool attachedToRobot = false;
     public GameObject worldOrigin; // Optional world origin for relative positioning
+
+    private IRosBus ros;
 
     // Live publishers per objectId. The streaming study flow loads the next scene additively
     // and retires the old one afterwards, so the outgoing scene's OnDestroy REMOVEs arrive
@@ -65,10 +75,10 @@ public class CollisionObjectPublisher : MonoBehaviour
 
     private static void EnqueueOutgoing(CollisionObjectMsg msg, bool useTrailingPad = true)
     {
-        ROSConnection rosConnection = ROSConnection.GetOrCreateInstance();
-        if (rosConnection == null)
+        IRosBus bus = RosBus.Instance;
+        if (bus == null)
             return;
-        rosConnection.RegisterPublisher<CollisionObjectMsg>("/collision_object", CollisionObjectQueueSize);
+        bus.RegisterPublisher<CollisionObjectMsg>("/collision_object", CollisionObjectQueueSize);
         s_Outbox.Enqueue((msg, useTrailingPad));
     }
 
@@ -93,19 +103,18 @@ public class CollisionObjectPublisher : MonoBehaviour
         if (s_Outbox.Count == 0)
             return;
 
-        ROSConnection rosConnection = ROSConnection.GetOrCreateInstance();
-        if (rosConnection == null || rosConnection.HasConnectionError)
+        IRosBus bus = RosBus.Instance;
+        if (bus == null || bus.HasConnectionError)
             return;
 
         int budget = kOutboxMessagesPerFrame;
         while (budget-- > 0 && s_Outbox.Count > 0)
         {
             (CollisionObjectMsg msg, bool pad) = s_Outbox.Dequeue();
-            rosConnection.Publish("/collision_object", msg, pad);
+            bus.Publish("/collision_object", msg, pad);
         }
     }
 
-    private ROSConnection ros;
     private float lastPublishTime = 0f;
     private Vector3 lastPosition;
     private Quaternion lastRotation;
@@ -133,7 +142,7 @@ public class CollisionObjectPublisher : MonoBehaviour
     void Start()
     {
         // Use existing ROS connection if available (pre-warmed by SystemPrewarmer)
-        ros = ROSConnection.GetOrCreateInstance();
+        ros = RosBus.Instance;
         
         // Validate ROS connection
         if (ros == null)
@@ -199,7 +208,7 @@ public class CollisionObjectPublisher : MonoBehaviour
         // Drain the shared outbox even when this publisher itself is paused.
         PumpOutbox();
 
-        if (pausePublishing) return;
+        if (pausePublishing || attachedToRobot) return;
 
         if (ros != null)
         {
@@ -228,6 +237,16 @@ public class CollisionObjectPublisher : MonoBehaviour
             hasBeenPublished = true;
             lastPublishTime = Time.time;
         }
+    }
+
+    /// <summary>
+    /// Treat the current transform as already known to ROS. Called after an inbound pose has
+    /// been applied so the change is not echoed straight back as a MOVE.
+    /// </summary>
+    public void MarkTransformAsPublished()
+    {
+        lastPosition = transform.position;
+        lastRotation = transform.rotation;
     }
 
     public void ForceRepublish()
@@ -564,7 +583,8 @@ public class CollisionObjectPublisher : MonoBehaviour
         // Debug.Log("Local Scale: " + transform.localScale);
         
         return Vector3.Distance(transform.position, lastPosition) > epsilon ||
-               Quaternion.Angle(transform.rotation, lastRotation) > epsilon;
+               Quaternion.Angle(transform.rotation, lastRotation) > epsilon ||
+               HasScaleChanged();
     }
 
     bool HasScaleChanged()
@@ -601,7 +621,7 @@ public class CollisionObjectPublisher : MonoBehaviour
 
         // Delete the collision object from the planning scene — unless a publisher in the
         // incoming scene owns the same id, in which case its ADD must survive this REMOVE.
-        if (ros != null && !anotherLivePublisherOwnsId)
+        if (ros != null && !suppressRemoveOnDestroy && !attachedToRobot && !anotherLivePublisherOwnsId)
         {
             CollisionObjectMsg msg = new CollisionObjectMsg
             {

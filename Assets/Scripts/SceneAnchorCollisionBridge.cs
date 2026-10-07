@@ -1,3 +1,4 @@
+using Erupt.Ros;
 using System;
 using System.Collections.Generic;
 using Meta.XR.MRUtilityKit;
@@ -44,7 +45,7 @@ public class SceneAnchorCollisionBridge : MonoBehaviour
              "If null, Unity world space is used directly.")]
     public GameObject worldOrigin;
 
-    private ROSConnection _ros;
+    private IRosBus _ros;
     private Mesh _cubeMesh;
     private Mesh _quadMesh;
     private readonly List<string> _publishedIds = new();
@@ -91,7 +92,7 @@ public class SceneAnchorCollisionBridge : MonoBehaviour
     {
         Debug.Log("[SceneAnchorCollisionBridge] Start() — build is current.");
 
-        _ros = ROSConnection.GetOrCreateInstance();
+        _ros = RosBus.Instance;
         _ros.RegisterPublisher<CollisionObjectMsg>("/collision_object", CollisionObjectPublisher.CollisionObjectQueueSize);
 
         var tmp = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -295,8 +296,7 @@ public class SceneAnchorCollisionBridge : MonoBehaviour
 
         // Register with the listener so it ignores this ID when the planning_scene_watcher
         // bounces it back via /collision_objects_ros — same pattern as WristMenuController.
-        if (collisionObjectsListener != null && !collisionObjectsListener.objectsById.ContainsKey(id))
-            collisionObjectsListener.objectsById[id] = visual;
+        collisionObjectsListener?.RegisterUnityOwnedObject(id, visual);
 
         Debug.Log($"[SceneAnchorCollisionBridge] Published {anchor.Label} as '{id}', size={size}");
     }
@@ -312,7 +312,7 @@ public class SceneAnchorCollisionBridge : MonoBehaviour
                 header = new HeaderMsg { frame_id = frameId, stamp = RosTimestamp() },
                 operation = CollisionObjectMsg.REMOVE
             });
-            collisionObjectsListener?.objectsById.Remove(id);
+            collisionObjectsListener?.UnregisterUnityOwnedObject(id);
         }
         _publishedIds.Clear();
 
@@ -336,6 +336,7 @@ public class SceneAnchorCollisionBridge : MonoBehaviour
                 header = new HeaderMsg { frame_id = frameId, stamp = RosTimestamp() },
                 operation = CollisionObjectMsg.REMOVE
             });
+            collisionObjectsListener?.UnregisterUnityOwnedObject(id);
         }
     }
 

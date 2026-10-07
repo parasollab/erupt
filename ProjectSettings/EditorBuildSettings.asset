@@ -5,6 +5,9 @@ EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Scenes:
+  - enabled: 1
+    path: Assets/Scenes/Demo Scenes/FactoryDemo.unity
+    guid: 16684f91dd1214e23a880500bb3aa22d
   - enabled: 0
     path: Assets/Scenes/Old Scenes/LoadingScene.unity
     guid: c61f66821d1414771933d256a6b2bcad
@@ -176,6 +179,12 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/Demo Scenes/ReachabilityVR.unity
     guid: 51c919462024d4df08c8c27361f8cb98
+  - enabled: 1
+    path: Assets/Scenes/Demo Scenes/ARMTCLoading.unity
+    guid: cfa439c7b086d4ef1bbcefdce343e225
+  - enabled: 1
+    path: Assets/Scenes/Demo Scenes/ARMTC.unity
+    guid: 1a8cb73ca490241cca68d784602db50e
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: c348712bda248c246b8c49b3db54643f, type: 3}
     com.unity.xr.arfoundation.simulation_settings: {fileID: 11400000, guid: e5d25a27610f74c049fefa1b04bb0f96, type: 2}

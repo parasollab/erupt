@@ -1,3 +1,4 @@
+using Erupt.Interaction;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.EventSystems;
@@ -11,6 +12,23 @@ public class SelectionManager : MonoBehaviour
 
     [Header("Ray Interactor")]
     public Quest3ControllerRayInteractor rayInteractor;
+
+    [Header("Interaction Router (opt-in)")]
+    [Tooltip("When assigned, selection is driven by the router instead of a bound input " +
+             "action, and target resolution happens there. Leave empty to keep the " +
+             "pre-refactor behavior.")]
+    [SerializeField] private InteractionRouter interactionRouter;
+
+    [Tooltip("Only accept select intents from this source id (\"left\", \"right\"). Empty " +
+             "means any source. Set to \"right\" on migration because the pre-refactor " +
+             "binding was right-trigger only; Guidelines Part 3's busy-hand rule argues " +
+             "for allowing both, which is a Phase 2 change.")]
+    [SerializeField] private string selectionSourceId = "";
+
+    [Tooltip("When assigned, selection is mirrored into the shared SelectionService so " +
+             "tier 2 menus can key off the selected object's kind. Leave empty to keep " +
+             "the pre-refactor behavior.")]
+    [SerializeField] private SelectionService selectionService;
 
     [Header("Highlighting")]
     public Material highlightMaterial;
@@ -38,6 +56,20 @@ public class SelectionManager : MonoBehaviour
 
     private void Start()
     {
+        if (RouterDrivesSelection)
+        {
+            interactionRouter.Select += OnRouterSelect;
+            return;
+        }
+
+        if (interactionRouter != null)
+        {
+            Debug.LogWarning($"SelectionManager: assigned InteractionRouter '{interactionRouter.name}' is " +
+                             "inactive, so selection falls back to the bound select action. This happens when " +
+                             "the router sits inside a scene's XR rig that is disabled or replaced by the " +
+                             "persistent rig at load time.");
+        }
+
         if (rayInteractor == null)
         {
             Debug.LogError("Ray Interactor is not assigned in SelectionManager.");
@@ -61,26 +93,24 @@ public class SelectionManager : MonoBehaviour
         rayInteractor = interactor;
     }
 
+    // The router only drives selection when it can actually run. A router assigned in the
+    // Inspector but sitting under an inactive rig (KitchenFR3 keeps its XR Origin disabled,
+    // and PersistentXRInfrastructure disables duplicate rigs on load) never raises Select,
+    // and binding to it alone would leave objects unselectable and therefore ungrabbable.
+    private bool RouterDrivesSelection => interactionRouter != null && interactionRouter.isActiveAndEnabled;
+
     private void SubscribeToSelectAction()
     {
+        // Router mode resolves targets itself, so the raw action must stay unbound there or
+        // a single trigger pull would drive selection twice.
+        if (RouterDrivesSelection)
+            return;
+
         if (selectActionSubscribed || selectAction == null || selectAction.action == null)
             return;
 
         selectAction.action.performed += OnSelectPerformed;
         selectActionSubscribed = true;
-    }
-
-    private void OnSelectPerformed(InputAction.CallbackContext context)
-    {
-        TrySelect();
-    }
-
-    private void OnDestroy()
-    {
-        UnsubscribeFromSelectAction();
-
-        if (Instance == this)
-            Instance = null;
     }
 
     private void UnsubscribeFromSelectAction()
@@ -90,6 +120,65 @@ public class SelectionManager : MonoBehaviour
 
         selectAction.action.performed -= OnSelectPerformed;
         selectActionSubscribed = false;
+    }
+
+    private void OnDestroy()
+    {
+        if (interactionRouter != null)
+            interactionRouter.Select -= OnRouterSelect;
+        UnsubscribeFromSelectAction();
+
+        // Guarded so the outgoing scene's manager cannot clear the incoming one during an
+        // additive transition, where both are alive for a frame.
+        if (Instance == this)
+            Instance = null;
+    }
+
+    private void OnSelectPerformed(InputAction.CallbackContext _) => TrySelect();
+
+    // Bridges the legacy tag-based selection onto the typed SelectionService. Objects
+    // without a SelectableMarker are reported as Obstacle, which is what everything
+    // tagged "Selectable" was before kinds existed.
+    private void MirrorToService(GameObject selected)
+    {
+        if (selectionService == null) return;
+
+        if (selected == null)
+        {
+            selectionService.ClearSelection();
+            return;
+        }
+
+        ISelectable selectable = SelectionService.Resolve(selected);
+        if (selectable == null)
+        {
+            var marker = selected.AddComponent<SelectableMarker>();
+            marker.SetKind(SelectionKind.Obstacle);
+            selectable = marker;
+        }
+
+        selectionService.Select(selectable);
+    }
+
+    // Target resolution and UI rejection already happened in the router, so this is the
+    // selection rule only — no raycasting and no name matching.
+    private void OnRouterSelect(InteractionIntent intent)
+    {
+        if (!string.IsNullOrEmpty(selectionSourceId) && intent.Sample.SourceId != selectionSourceId)
+            return;
+
+        GameObject hitObj = intent.Target;
+
+        if (hitObj == null || !hitObj.CompareTag("Selectable"))
+        {
+            ClearSelection();
+            return;
+        }
+
+        if (SelectedObject == hitObj)
+            return; // Already selected — keep it so the user can grab it
+
+        SetSelectedObject(hitObj);
     }
 
     void TrySelect()
@@ -233,6 +322,8 @@ public class SelectionManager : MonoBehaviour
             selectedRenderer.material = transparentHighlightMaterial != null ? transparentHighlightMaterial : highlightMaterial;
         }
         
+        MirrorToService(SelectedObject);
+
         // Notify listeners that an object was selected
         OnObjectSelected?.Invoke(SelectedObject);
     }
@@ -246,7 +337,9 @@ public class SelectionManager : MonoBehaviour
 
         selectedRenderer = null;
         SelectedObject = null;
-        
+
+        MirrorToService(null);
+
         // Notify listeners that selection was cleared
         OnSelectionCleared?.Invoke();
     }
