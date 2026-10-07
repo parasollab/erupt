@@ -1,0 +1,153 @@
+{
+  "summary": {
+    "frame_id": "base_link",
+    "origin": [
+      -1.1,
+      -1.1,
+      -0.9
+    ],
+    "resolution": 0.08,
+    "dims": [
+      29,
+      29,
+      28
+    ],
+    "max_radius": 0.0,
+    "n_dirs": 15,
+    "directions": {
+      "down": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "down30_+x": [
+        0.5,
+        0.0,
+        -0.8660253882408142
+      ],
+      "down30_+y": [
+        0.0,
+        0.5,
+        -0.8660253882408142
+      ],
+      "down30_-x": [
+        -0.5,
+        0.0,
+        -0.8660253882408142
+      ],
+      "down30_-y": [
+        0.0,
+        -0.5,
+        -0.8660253882408142
+      ],
+      "down60_+x": [
+        0.8660253882408142,
+        0.0,
+        -0.5
+      ],
+      "down60_+y": [
+        0.0,
+        0.8660253882408142,
+        -0.5
+      ],
+      "down60_-x": [
+        -0.8660253882408142,
+        0.0,
+        -0.5
+      ],
+      "down60_-y": [
+        0.0,
+        -0.8660253882408142,
+        -0.5
+      ],
+      "horiz_+x": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "horiz_+y": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "horiz_-x": [
+        -1.0,
+        0.0,
+        0.0
+      ],
+      "horiz_-y": [
+        0.0,
+        -1.0,
+        0.0
+      ],
+      "up": [
+        -0.0,
+        -0.0,
+        1.0
+      ],
+      "radial_out": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "voxels_total": 23548,
+    "voxels_sampled": 23548,
+    "voxels_reachable": 7275,
+    "reachable_fraction_of_sampled": 0.3089434346865976,
+    "reachable_per_direction": {
+      "down": 4920,
+      "down30_+x": 4959,
+      "down30_+y": 4839,
+      "down30_-x": 4993,
+      "down30_-y": 4841,
+      "down60_+x": 4924,
+      "down60_+y": 4713,
+      "down60_-x": 4870,
+      "down60_-y": 4678,
+      "horiz_+x": 4575,
+      "horiz_+y": 3831,
+      "horiz_-x": 4517,
+      "horiz_-y": 3318,
+      "up": 4989,
+      "radial_out": 5413
+    },
+    "dexterity_histogram": {
+      "0.0-0.1": 16461,
+      "0.1-0.2": 244,
+      "0.2-0.3": 544,
+      "0.3-0.4": 277,
+      "0.4-0.5": 695,
+      "0.5-0.6": 447,
+      "0.6-0.7": 1182,
+      "0.7-0.8": 779,
+      "0.8-0.9": 1848,
+      "0.9-1.0": 1071
+    },
+    "size_bytes": 94429
+  },
+  "generator": {
+    "group": "ur_manipulator",
+    "ik_link": "",
+    "frame_id": "base_link",
+    "extent_xy": 1.1,
+    "z_min": -0.9,
+    "z_max": 1.25,
+    "resolution": 0.08,
+    "max_radius": 1.05,
+    "clip_center": [
+      0.0,
+      0.0,
+      0.1625
+    ],
+    "ik_timeout": 0.01,
+    "avoid_collisions": false,
+    "seed_joint_names": [],
+    "seed_joint_positions": [
+      0.0
+    ],
+    "ik_calls_done": 141840,
+    "ik_calls_total": 141840,
+    "elapsed_seconds": 498.94234117499946
+  }
+}

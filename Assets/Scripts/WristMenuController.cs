@@ -27,6 +27,11 @@ public class WristMenuController : MonoBehaviour
     [SerializeField] private PickPlaceTaskRecorder pickPlaceRecorder;
     [SerializeField] private GameObject mtcDashboardPanel;
 
+    [Header("Reachability")]
+    [SerializeField, Tooltip("Optional. When bound, the options panel shows a 'Reachability' button that opens the " +
+                             "workspace-visualization controls (shell, height slice, top-down filter).")]
+    private ReachabilityVolumeVisualizer reachabilityVisualizer;
+
     private float shapeSpawnDistance = 1.25f;
     // Alpha applied to shapes spawned from the wrist menu (1 = opaque, 0 = invisible)
     private float spawnedShapeAlpha = 0.75f;
@@ -38,6 +43,7 @@ public class WristMenuController : MonoBehaviour
     private VisualElement wristMenuAddShapePanel;
     private VisualElement wristMenuEditShapePanel;
     private VisualElement wristMenuEditSliderPanel;
+    private VisualElement wristMenuReachabilityPanel;
 
     // Buttons
     private Button addShapeButton;
@@ -53,6 +59,14 @@ public class WristMenuController : MonoBehaviour
     private Button recordPickPlaceButton;
     private Label recordStatusLabel;
     private Button mtcButton;
+    private Button reachabilityButton;
+    private Button reachabilityBackButton;
+    private Toggle reachShellToggle;
+    private Toggle reachSliceToggle;
+    private Toggle reachTopDownToggle;
+    private Slider reachSliceHeightSlider;
+    private Label reachSliceHeightLabel;
+    private Label reachStatusLabel;
     
     // Input Actions
     private InputAction menuAction;
@@ -63,11 +77,18 @@ public class WristMenuController : MonoBehaviour
     public void BindSceneDependencies(
         SelectionManager manager,
         CollisionObjectsListenerSimple listener,
-        GameObject origin)
+        GameObject origin,
+        ReachabilityVolumeVisualizer reachability = null)
     {
         selectionManager = manager;
         collisionObjectsListener = listener;
         worldOrigin = origin;
+        if (reachability != null)
+        {
+            reachabilityVisualizer = reachability;
+            if (reachabilityButton != null)
+                reachabilityButton.style.display = DisplayStyle.Flex;
+        }
 
         if (worldOrigin == null)
         {
@@ -354,6 +375,19 @@ public class WristMenuController : MonoBehaviour
         if (recordStatusLabel != null)
             recordStatusLabel.style.display = enableMTC ? DisplayStyle.Flex : DisplayStyle.None;
 
+        // Reachability button is shown only when a visualizer is bound (serialized or via BindSceneDependencies).
+        reachabilityButton = root.Q<Button>("wristMenuReachabilityButton");
+        if (reachabilityButton != null)
+            reachabilityButton.style.display = reachabilityVisualizer != null ? DisplayStyle.Flex : DisplayStyle.None;
+        wristMenuReachabilityPanel = root.Q<VisualElement>("wristMenuReachabilityPanel");
+        reachabilityBackButton = root.Q<Button>("wristMenuReachabilityBackButton");
+        reachShellToggle = root.Q<Toggle>("wristMenuReachShellToggle");
+        reachSliceToggle = root.Q<Toggle>("wristMenuReachSliceToggle");
+        reachTopDownToggle = root.Q<Toggle>("wristMenuReachTopDownToggle");
+        reachSliceHeightSlider = root.Q<Slider>("wristMenuReachSliceHeightSlider");
+        reachSliceHeightLabel = root.Q<Label>("wristMenuReachSliceHeightLabel");
+        reachStatusLabel = root.Q<Label>("wristMenuReachStatusLabel");
+
         // Get buttons from add shape panel
         addShapeBackButton = root.Q<Button>("wristMenuAddShapeBackButton");
         addCubeButton = root.Q<Button>("wristMenuAddCubeButton");
@@ -407,6 +441,22 @@ public class WristMenuController : MonoBehaviour
 
         // Edit shape panel buttons
         editShapeBackButton.clicked += OnEditShapeBackClicked;
+
+        // Reachability panel
+        if (reachabilityButton != null)
+            reachabilityButton.clicked += OnReachabilityClicked;
+        if (reachabilityBackButton != null)
+            reachabilityBackButton.clicked += ShowOptionsPanel;
+        reachShellToggle?.RegisterValueChangedCallback(evt => reachabilityVisualizer?.SetShellVisible(evt.newValue));
+        reachSliceToggle?.RegisterValueChangedCallback(evt => reachabilityVisualizer?.SetSliceVisible(evt.newValue));
+        reachTopDownToggle?.RegisterValueChangedCallback(evt => reachabilityVisualizer?.SetOrientationFilter(evt.newValue));
+        reachSliceHeightSlider?.RegisterValueChangedCallback(evt =>
+        {
+            // Applied directly: a slice rebuild is a small texture update, and PointerUp does not
+            // reliably arrive through the XR poke bridge, so no gesture-end debounce.
+            reachabilityVisualizer?.SetSliceHeight(evt.newValue);
+            UpdateReachSliceHeightLabel(reachabilityVisualizer != null ? reachabilityVisualizer.SliceHeight : evt.newValue);
+        });
     }
 
     private void SetupInputActions()
@@ -476,6 +526,63 @@ public class WristMenuController : MonoBehaviour
             wristMenuEditShapePanel.style.display = DisplayStyle.None;
             wristMenuEditShapePanel.SetEnabled(false);
         }
+
+        if (wristMenuReachabilityPanel != null)
+        {
+            wristMenuReachabilityPanel.style.display = DisplayStyle.None;
+            wristMenuReachabilityPanel.SetEnabled(false);
+        }
+    }
+
+    private void ShowReachabilityPanel()
+    {
+        if (wristMenuOptionsPanel != null)
+        {
+            wristMenuOptionsPanel.style.display = DisplayStyle.None;
+            wristMenuOptionsPanel.SetEnabled(false);
+        }
+
+        if (wristMenuReachabilityPanel != null)
+        {
+            wristMenuReachabilityPanel.style.display = DisplayStyle.Flex;
+            wristMenuReachabilityPanel.SetEnabled(true);
+        }
+
+        SyncReachabilityControls();
+    }
+
+    /// <summary>Mirror the visualizer's current state into the controls without firing callbacks.</summary>
+    private void SyncReachabilityControls()
+    {
+        var vis = reachabilityVisualizer;
+        if (vis == null)
+            return;
+        reachShellToggle?.SetValueWithoutNotify(vis.ShellVisible);
+        reachSliceToggle?.SetValueWithoutNotify(vis.SliceVisible);
+        reachTopDownToggle?.SetValueWithoutNotify(vis.TopDownOnly);
+        if (reachSliceHeightSlider != null)
+        {
+            reachSliceHeightSlider.lowValue = vis.SliceMinHeight;
+            reachSliceHeightSlider.highValue = vis.SliceMaxHeight;
+            reachSliceHeightSlider.SetValueWithoutNotify(vis.SliceHeight);
+        }
+        UpdateReachSliceHeightLabel(vis.SliceHeight);
+        if (reachStatusLabel != null)
+            reachStatusLabel.text = vis.HasMap ? $"Map: {vis.MapSource}" : "No reachability map loaded";
+    }
+
+    private void UpdateReachSliceHeightLabel(float height)
+    {
+        if (reachSliceHeightLabel != null)
+            reachSliceHeightLabel.text = $"Slice height: {height:F2} m";
+    }
+
+    private void OnReachabilityClicked()
+    {
+        if (reachabilityVisualizer == null)
+            return;
+        ShowReachabilityPanel();
+        Debug.Log("WristMenuController: Reachability panel opened");
     }
     
     private void ShowAddShapePanel()

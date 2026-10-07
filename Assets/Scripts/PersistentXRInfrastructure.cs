@@ -287,7 +287,8 @@ public sealed class PersistentXRInfrastructure : MonoBehaviour
         SetRayActive(_rightRobotRay, showRobotRays);
 
         if (_wristMenu != null)
-            _wristMenu.BindSceneDependencies(selectionManager, collisionObjectsListener, worldOrigin);
+            _wristMenu.BindSceneDependencies(selectionManager, collisionObjectsListener, worldOrigin,
+                FindFirstInScene<ReachabilityVolumeVisualizer>(scene));
 
         if (robotInteraction != null && selectionManager == null)
         {

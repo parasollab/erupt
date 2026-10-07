@@ -4767,3 +4767,6 @@ MonoBehaviour:
   planningFrameId: base_link
   baseYawOffsetDegrees: -90
   baseAnchor: {fileID: 0}
+  reachabilityMap: {fileID: 4900000, guid: 3450ce5d46556454f863ab53b09a677f, type: 3}
+  reachabilityMapResource: 
+  defaultSliceHeight: 0.3

@@ -24,4 +24,15 @@ public class RobotReachProfile : MonoBehaviour
 
     [Tooltip("Optional explicit Unity transform that corresponds to planningFrameId.")]
     public Transform baseAnchor;
+
+    [Header("Reachability map")]
+    [Tooltip("Baked reachability map (.bytes written by planning_scene_utils reachability_map_generator) for this " +
+             "robot's planning group, rendered by ReachabilityVolumeVisualizer. Grid is in planningFrameId axes.")]
+    public TextAsset reachabilityMap;
+
+    [Tooltip("Fallback name under Resources/ReachabilityMaps (no extension) used when reachabilityMap is empty.")]
+    public string reachabilityMapResource = "";
+
+    [Tooltip("Initial height of the reachability slice above planningFrameId, in metres.")]
+    public float defaultSliceHeight = 0.3f;
 }
