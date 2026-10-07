@@ -9,6 +9,27 @@ Client for `mtc_pick_place_server` (replaces the `pick_place_dynamic_demo` proto
 
 ### Added
 
+- Stage previews (ported from the `mtc` branch's dashboard). `MtcPlugin.PreviewStageId` scopes
+  the preview verb to one stage of the selected solution (`SetPreviewStage`,
+  `PreviewableStages`, `TryGetStageSteps`; a container stage covers its children's steps);
+  `MtcSolutionPlayer.PlaySolution(solution, firstStep, lastStep)` fast-forwards the earlier
+  steps and holds the end state for `stagePreviewHoldSeconds`.
+- Stage attempts: `MtcPlugin.AttemptsOf(stage)` lists a stage's partial and failed solutions
+  from the statistics; `PreviewStageSolution(id, failed)` fetches one with `include_start_scene`
+  and previews it from that state (`MtcSolutionPlayer.PlaySolution(solution, useStartScene)`:
+  robot joints, world object poses and attachments applied, then restored). A failed attempt
+  reports the planner's comment. Refused while a solution executes; never executable.
+- `SolutionsTab`: **Preview** (scope) and **Attempt** cycle buttons; `MaxSolutionButtons` is 3
+  (a default plan asks for `max_solutions` 3) so the tab stays at seven interactive elements.
+  `MtcPlugin.PreviewStatus` lands on the status line.
+- `MtcSolutionPlayer`: ROS → Unity joint and link name mapping (`rosNamePrefix` /
+  `unityNamePrefix`, `panda_` → `fr3_`), gripper-only segments skipped, `LastProblem` /
+  `OnProblem` when nothing can play, `IsPlaying`; attachments are placed at the message's
+  link-relative pose (`AttachedObjectPlacement`, exact link only) and objects the live robot is
+  carrying (`EnvironmentObject.AttachedTo`) are left alone.
+- `PickPlaceClient`: `FetchSolution(..., includeStartScene)` with a separate cache,
+  `IsKnownSolutionId` (any stage's `solved[]` / `failed[]`), and `getSolutionTimeoutSeconds`
+  so a response that never deserialises is reported instead of waited for forever.
 - `PickPlaceClient` — plan (`/pick_place`, plan-only or plan-and-execute), solution ids from
   `/pick_place/statistics` stage 1, `/get_solution`, `/execute_solution` by id, cancel while
   planning or executing, cancel on destroy / pause / quit.

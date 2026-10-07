@@ -13,6 +13,13 @@ using RosMessageTypes.MoveitTaskConstructorMsgs;
 /// sends its id to /execute_solution. The pick/place recorder is the Teach-mode entry (Part 5).
 /// Depends on the MoveIt plugin for the planning scene.
 /// </summary>
+/// <remarks>
+/// Preview has a scope (<see cref="PreviewStageId"/>): the whole solution, or one stage's
+/// steps of it, so a container stage like "pick object" can be watched on its own. A stage's
+/// partial or failed attempts (<see cref="AttemptsOf"/>) can be previewed from their own
+/// start scene with <see cref="PreviewStageSolution"/>; those are never executable and never
+/// become the selected solution.
+/// </remarks>
 public class MtcPlugin : PlanningPlugin
 {
     [Tooltip("Sibling components by default; found in the scene if empty.")]
@@ -24,7 +31,11 @@ public class MtcPlugin : PlanningPlugin
     // Per task: both are dropped when a new plan starts, so a handle can never execute a dead id.
     private readonly Dictionary<uint, PlanResult> resultById = new();
     private readonly Dictionary<PlanResult, uint> idByResult = new();
+    private readonly List<uint> previewableStages = new();
     private SolutionsTab tab;
+    // Partial / failed stage solution being fetched for a preview; a later request or a task
+    // reset replaces it, so a slower fetch is dropped. Never feeds SelectedSolutionId.
+    private uint? pendingStageSolutionId;
 
     public override string Id => "mtc";
     public override string DisplayName => "MTC";
@@ -42,8 +53,25 @@ public class MtcPlugin : PlanningPlugin
     public SolutionMsg SelectedSolution { get; private set; }
     public uint? SelectedSolutionId { get; private set; }
 
+    /// <summary>Stage whose part of the selected solution the preview verb plays; null = the whole solution.</summary>
+    public uint? PreviewStageId { get; private set; }
+    /// <summary>Stages with at least one step in the selected solution, in stage-tree order.</summary>
+    public IReadOnlyList<uint> PreviewableStages => previewableStages;
+    /// <summary>What the last preview request led to (shown on the tab), or null.</summary>
+    public string PreviewStatus { get; private set; }
+
     public event Action SelectedSolutionChanged;
     public event Action TeachModeChanged;
+    public event Action PreviewScopeChanged;
+    public event Action PreviewStatusChanged;
+
+    /// <summary>A stage's solution that is not executable: partial (the stage solved) or failed.</summary>
+    public readonly struct StageAttempt
+    {
+        public readonly uint Id;
+        public readonly bool Failed;
+        public StageAttempt(uint id, bool failed) { Id = id; Failed = failed; }
+    }
 
     private void Awake()
     {
@@ -58,7 +86,11 @@ public class MtcPlugin : PlanningPlugin
         if (player == null) player = FindFirstObjectByType<MtcSolutionPlayer>(FindObjectsInactive.Include);
         if (recorder == null) recorder = FindFirstObjectByType<PickPlaceTaskRecorder>(FindObjectsInactive.Include);
         if (pickPlace == null) Debug.LogError("[mtc] No PickPlaceClient in the scene.", this);
-        if (player != null && context.Robot != null) player.SetRobot(context.Robot);
+        if (player != null)
+        {
+            if (context.Robot != null) player.SetRobot(context.Robot);
+            player.OnProblem += OnPreviewProblem;
+        }
 
         try { pickPlace?.Initialise(context.Ros); }
         catch (InvalidOperationException) { /* already started on RosBus.Instance, the same bus */ }
@@ -67,6 +99,7 @@ public class MtcPlugin : PlanningPlugin
         {
             pickPlace.OnSolutionIdsChanged += OnSolutionIds;
             pickPlace.OnTaskReset += OnTaskReset;
+            pickPlace.OnDescriptionChanged += RefreshPreviewScope;
         }
         InTeachMode = context.Modes != null && context.Modes.Is(AppMode.Teach);
         base.OnRegister(context);
@@ -78,7 +111,9 @@ public class MtcPlugin : PlanningPlugin
         {
             pickPlace.OnSolutionIdsChanged -= OnSolutionIds;
             pickPlace.OnTaskReset -= OnTaskReset;
+            pickPlace.OnDescriptionChanged -= RefreshPreviewScope;
         }
+        if (player != null) player.OnProblem -= OnPreviewProblem;
         tab?.Dispose();
         tab = null;
         StopPreview();
@@ -86,6 +121,10 @@ public class MtcPlugin : PlanningPlugin
         idByResult.Clear();
         SelectedSolution = null;
         SelectedSolutionId = null;
+        pendingStageSolutionId = null;
+        PreviewStageId = null;
+        PreviewStatus = null;
+        previewableStages.Clear();
         base.OnUnregister(context);
     }
 
@@ -121,7 +160,11 @@ public class MtcPlugin : PlanningPlugin
         idByResult.Clear();
         SelectedSolution = null;
         SelectedSolutionId = null;
+        pendingStageSolutionId = null; // drops any partial fetch still in flight
+        PreviewStatus = null;
+        RefreshPreviewScope();
         SelectedSolutionChanged?.Invoke();
+        PreviewStatusChanged?.Invoke();
     }
 
     /// <summary>
@@ -154,6 +197,7 @@ public class MtcPlugin : PlanningPlugin
                 var selectable = Results.FirstOrDefault(r => r != null && r.Result == result);
                 if (selectable != null) Context.Selection.Select(selectable);
             }
+            RefreshPreviewScope();
             SelectedSolutionChanged?.Invoke();
             done?.Invoke(result);
         },
@@ -192,16 +236,201 @@ public class MtcPlugin : PlanningPlugin
         SelectSolution(pickPlace.SolutionIds[0], done);
     }
 
+    // --- preview --------------------------------------------------------------------
+
+    /// <summary>Preview the plan, or only the scoped stage's steps of it (<see cref="PreviewStageId"/>).</summary>
     public override void Preview(PlanResult plan)
     {
         if (plan?.PlannerPayload is not SolutionMsg solution || player == null) return;
-        player.PlaySolution(solution);
+        string what = idByResult.TryGetValue(plan, out uint id) ? $"solution {id}" : plan.Label;
+        if (PreviewStageId is uint stage && TryGetStageSteps(solution, stage, out int first, out int last))
+        {
+            string span = first == last ? $"step {first + 1}" : $"steps {first + 1}-{last + 1}";
+            SetPreviewStatus($"Previewing {StageName(stage)} ({span}) of {what}...");
+            player.PlaySolution(solution, first, last);
+        }
+        else
+        {
+            SetPreviewStatus($"Previewing {what}...");
+            player.PlaySolution(solution);
+        }
     }
 
     public override void StopPreview()
     {
         if (player != null) player.Stop();
     }
+
+    /// <summary>Scope the preview verb to one stage of the selected solution, or null for all of it.</summary>
+    public void SetPreviewStage(uint? stageId)
+    {
+        if (stageId != null && !previewableStages.Contains(stageId.Value)) stageId = null;
+        if (PreviewStageId == stageId) return;
+        PreviewStageId = stageId;
+        PreviewScopeChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// First and last step (inclusive) of the selected solution that belong to a stage. A
+    /// container stage (e.g. "pick object") covers the steps of all the stages nested under it.
+    /// </summary>
+    public bool TryGetStageSteps(uint stageId, out int first, out int last) =>
+        TryGetStageSteps(SelectedSolution, stageId, out first, out last);
+
+    private bool TryGetStageSteps(SolutionMsg solution, uint stageId, out int first, out int last)
+    {
+        first = last = -1;
+        var steps = solution?.sub_trajectory;
+        if (steps == null) return false;
+
+        // The stage and everything nested under it.
+        var family = new HashSet<uint> { stageId };
+        var stages = pickPlace?.Description?.stages;
+        if (stages != null)
+            for (bool grew = true; grew;)
+            {
+                grew = false;
+                foreach (var stage in stages)
+                    if (stage.id != stage.parent_id && family.Contains(stage.parent_id) && family.Add(stage.id))
+                        grew = true;
+            }
+
+        for (int i = 0; i < steps.Length; i++)
+        {
+            if (!family.Contains(steps[i].info.stage_id)) continue;
+            if (first < 0) first = i;
+            last = i;
+        }
+        return first >= 0;
+    }
+
+    // Stages in tree order (depth first, as the tab draws them) that own steps of the
+    // selected solution; without a description, the steps' own stage ids in order.
+    private void RefreshPreviewScope()
+    {
+        previewableStages.Clear();
+        var steps = SelectedSolution?.sub_trajectory;
+        if (steps != null && steps.Length > 0)
+        {
+            var stages = pickPlace?.Description?.stages;
+            if (stages != null && stages.Length > 0)
+            {
+                var ids = new HashSet<uint>(stages.Select(s => s.id));
+                var children = stages.ToLookup(s => s.parent_id);
+                foreach (var root in stages.Where(s => s.id == s.parent_id || !ids.Contains(s.parent_id)))
+                    Visit(root);
+
+                void Visit(StageDescriptionMsg stage)
+                {
+                    if (TryGetStageSteps(SelectedSolution, stage.id, out _, out _)) previewableStages.Add(stage.id);
+                    foreach (var child in children[stage.id])
+                        if (child.id != stage.id) Visit(child);
+                }
+            }
+            else
+            {
+                foreach (var step in steps)
+                    if (!previewableStages.Contains(step.info.stage_id)) previewableStages.Add(step.info.stage_id);
+            }
+        }
+        // A scope the new solution has no steps for falls back to the whole solution.
+        if (PreviewStageId != null && !previewableStages.Contains(PreviewStageId.Value))
+        {
+            PreviewStageId = null;
+            PreviewScopeChanged?.Invoke();
+        }
+        else PreviewScopeChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// A stage's solutions that are not executable: partial ones (listed as solved for the
+    /// stage but not for the task) and failed ones, from the statistics.
+    /// </summary>
+    public IReadOnlyList<StageAttempt> AttemptsOf(uint stageId)
+    {
+        var attempts = new List<StageAttempt>();
+        var stats = pickPlace?.Statistics?.stages?.FirstOrDefault(s => s.id == stageId);
+        if (stats == null) return attempts;
+        var complete = pickPlace.SolutionIds;
+        foreach (uint id in stats.solved ?? Array.Empty<uint>())
+            if (!complete.Contains(id)) attempts.Add(new StageAttempt(id, false));
+        foreach (uint id in stats.failed ?? Array.Empty<uint>())
+            attempts.Add(new StageAttempt(id, true));
+        return attempts;
+    }
+
+    /// <summary>
+    /// Fetch a stage's partial or failed solution with its start scene and preview it from
+    /// there; a failed one also reports the planner's reason. These are never executable, so
+    /// the selected (executable) solution is untouched.
+    /// </summary>
+    public void PreviewStageSolution(uint solutionId, bool failed = false)
+    {
+        if (pickPlace == null) return;
+        if (pickPlace.Phase == PickPlacePhase.Executing)
+        {
+            SetPreviewStatus("Cannot preview while a solution is executing.");
+            return;
+        }
+
+        string kind = failed ? "failed solution" : "stage solution";
+        pendingStageSolutionId = solutionId;
+        SetPreviewStatus($"Fetching {kind} {solutionId}...");
+
+        pickPlace.FetchSolution(solutionId,
+            solution =>
+            {
+                // A later request (or a task reset) wins over a slower fetch.
+                if (pendingStageSolutionId != solutionId) return;
+                pendingStageSolutionId = null;
+
+                string comment = FirstComment(solution);
+                string reason = failed
+                    ? $"Solution {solutionId} failed: {(string.IsNullOrEmpty(comment) ? "no reason given by the planner" : comment)}"
+                    : null;
+
+                bool hasSteps = solution.sub_trajectory != null && solution.sub_trajectory.Length > 0;
+                if (!hasSteps || player == null || pickPlace.Phase == PickPlacePhase.Executing)
+                {
+                    SetPreviewStatus(reason ?? (hasSteps
+                        ? "Preview unavailable right now."
+                        : $"Stage solution {solutionId} has no motion to preview."));
+                    return;
+                }
+
+                SetPreviewStatus(failed ? reason : $"Previewing stage solution {solutionId}...");
+                player.PlaySolution(solution, useStartScene: true);
+            },
+            message =>
+            {
+                if (pendingStageSolutionId != solutionId) return;
+                pendingStageSolutionId = null;
+                SetPreviewStatus($"Solution {solutionId} unavailable: {message}");
+            },
+            includeStartScene: true);
+    }
+
+    private static string FirstComment(SolutionMsg solution)
+    {
+        foreach (var step in solution?.sub_trajectory ?? Array.Empty<SubTrajectoryMsg>())
+            if (!string.IsNullOrEmpty(step?.info?.comment)) return step.info.comment;
+        // A failure with no motion at all only carries its reason on the sub-solutions.
+        foreach (var sub in solution?.sub_solution ?? Array.Empty<SubSolutionMsg>())
+            if (!string.IsNullOrEmpty(sub?.info?.comment)) return sub.info.comment;
+        return null;
+    }
+
+    private string StageName(uint stageId) => pickPlace?.StageName(stageId) ?? $"stage {stageId}";
+
+    private void OnPreviewProblem(string problem) => SetPreviewStatus("Cannot preview: " + problem);
+
+    private void SetPreviewStatus(string text)
+    {
+        PreviewStatus = text;
+        PreviewStatusChanged?.Invoke();
+    }
+
+    // --- execute --------------------------------------------------------------------
 
     public override async void Execute(PlanResult plan, Action<ExecutionStatus> status)
     {

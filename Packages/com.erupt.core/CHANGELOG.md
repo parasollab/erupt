@@ -8,6 +8,10 @@ All notable changes to `com.erupt.core` are documented here. The format follows
 
 ### Added
 
+- `IRobotModel.TryFindLinkTransform`: the exact link by URDF name, with no end-effector
+  fallback, for callers that place objects in a link's own frame (the MTC preview mirrors
+  `start_scene` attachments). `DirectArticulationIKController.FindLinkTransform` delegates to
+  it and no longer caches the fallback under the missing name; `FakeRobotModel` gains `Links`.
 - `ObstacleResizeWidget`: the obstacle row's `resize` verb now opens an in-world widget beside
   the selected shape (−/+ per dimension, hold to repeat, one undo step per adjustment). Rows
   follow the shape: width/height/depth for a cube, height/diameter for a cylinder, size for a

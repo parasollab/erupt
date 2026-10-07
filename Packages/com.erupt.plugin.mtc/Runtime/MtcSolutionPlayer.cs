@@ -3,44 +3,92 @@ using System.Collections.Generic;
 using UnityEngine;
 using RosMessageTypes.MoveitTaskConstructorMsgs;
 using RosMessageTypes.BuiltinInterfaces;
+using RosMessageTypes.Geometry;
 using RosMessageTypes.Moveit;
 using RosMessageTypes.Trajectory;
 using Erupt.Environment;
+using Erupt.Robot;
 
-/// <summary>Previews an MTC solution on the robot, mirroring scene_diff attachments through the environment registry.</summary>
+/// <summary>
+/// Previews an MTC solution on the robot: the whole solution, one stage's steps of it, or a
+/// stage's partial / failed solution from its own <c>start_scene</c>. Objects the solution
+/// attaches ride the link at the planned pose, through the <see cref="EnvironmentRegistry"/>;
+/// everything moved is put back when the preview ends and nothing reaches MoveIt meanwhile.
+/// </summary>
 public class MtcSolutionPlayer : MonoBehaviour
 {
+    [Tooltip("Serialised fallback; the plugin hands over the context's robot at registration.")]
     [SerializeField] private DirectArticulationIKController ikController;
-    private Erupt.Robot.IRobotModel robot;
-
-    /// <summary>Use the context's robot instead of the serialised controller.</summary>
-    public void SetRobot(Erupt.Robot.IRobotModel model) => robot = model;
-    private Erupt.Robot.IRobotModel Robot => robot ?? (ikController != null ? ikController : null);
     [SerializeField] private EnvironmentRegistry registry;
 
+    [Header("Robot name mapping")]
+    [Tooltip("Joint/link prefix used by the ROS robot, e.g. \"panda_\" for the MTC Panda demo. " +
+             "Names the Unity robot does not know are retried with Unity Name Prefix instead.")]
+    [SerializeField] private string rosNamePrefix = "panda_";
+    [Tooltip("Joint/link prefix of the Unity robot, e.g. \"fr3_\".")]
+    [SerializeField] private string unityNamePrefix = "fr3_";
+
+    [Tooltip("Seconds a partial preview (a stage, or a solution from its start scene) holds its final pose before the robot is restored.")]
+    [SerializeField, Min(0f)] private float stagePreviewHoldSeconds = 1.5f;
+
+    private IRobotModel robot;
+
+    /// <summary>Use the context's robot instead of the serialised controller.</summary>
+    public void SetRobot(IRobotModel model) => robot = model;
+    private IRobotModel Robot => robot ?? (ikController != null ? ikController : null);
+
+    /// <summary>Why the last preview could not play, or null. Raised through <see cref="OnProblem"/>.</summary>
+    public string LastProblem { get; private set; }
+    public event System.Action<string> OnProblem;
+
     private bool isPlaying;
+    /// <summary>True while a preview is animating the robot (or holding its end state).</summary>
+    public bool IsPlaying => isPlaying;
     private Coroutine playRoutine;
     private string[] savedNames;
     private float[] savedPositions;
 
-    // Objects the preview has reparented to a robot link (via scene_diff attach), with
-    // everything needed to put them back when the preview ends.
-    private struct PreviewAttach
+    // Objects the preview has moved — reparented to a robot link (scene_diff or start_scene
+    // attach) or placed at a start_scene world pose — with everything needed to put them
+    // back when the preview ends.
+    private class PreviewAttach
     {
+        public bool attached;
         public GameObject go;
         public Transform originalParent;
         public Vector3 originalPos;
         public Quaternion originalRot;
+        public Vector3 originalLocalScale;
         public bool wasPaused;
     }
     private readonly Dictionary<string, PreviewAttach> previewAttached = new();
 
-    public void PlaySolution(SolutionMsg solution)
+    public void PlaySolution(SolutionMsg solution) => PlaySolution(solution, 0, int.MaxValue, useStartScene: false);
+
+    /// <summary>
+    /// Preview only sub-trajectories <paramref name="firstStep"/>..<paramref name="lastStep"/>
+    /// (inclusive) — one stage's part of the solution. The steps before them are applied
+    /// instantly, so the robot and any carried object start where that stage really begins.
+    /// </summary>
+    public void PlaySolution(SolutionMsg solution, int firstStep, int lastStep) =>
+        PlaySolution(solution, firstStep, lastStep, useStartScene: false);
+
+    /// <summary>
+    /// Preview a solution from its own <c>start_scene</c> instead of the current state: a
+    /// stage's partial solution starts mid-task, with the robot elsewhere and possibly the
+    /// object already in the gripper. Needs a solution fetched with include_start_scene.
+    /// </summary>
+    public void PlaySolution(SolutionMsg solution, bool useStartScene) =>
+        PlaySolution(solution, 0, int.MaxValue, useStartScene);
+
+    private void PlaySolution(SolutionMsg solution, int firstStep, int lastStep, bool useStartScene)
     {
-        if (Robot == null) { Debug.LogError("[MtcSolutionPlayer] no robot assigned."); return; }
+        LastProblem = null;
+        if (Robot == null) { Report("no robot assigned to the solution player"); return; }
+        if (solution?.sub_trajectory == null || solution.sub_trajectory.Length == 0) { Report("the solution has no trajectory segments"); return; }
         if (registry == null) registry = FindFirstObjectByType<EnvironmentRegistry>();
         Stop();
-        playRoutine = StartCoroutine(PlayRoutine(solution));
+        playRoutine = StartCoroutine(PlayRoutine(solution, firstStep, lastStep, useStartScene));
     }
 
     public void Stop()
@@ -50,17 +98,22 @@ public class MtcSolutionPlayer : MonoBehaviour
         RestorePose();
     }
 
-    private IEnumerator PlayRoutine(SolutionMsg solution)
+    private IEnumerator PlayRoutine(SolutionMsg solution, int firstStep, int lastStep, bool useStartScene)
     {
         isPlaying = true;
         savedNames = Robot.GetJointStateNames();
         savedPositions = Robot.GetJointStatePositions();
+        bool playedAny = false;
+        var unmatched = new SortedSet<string>();
 
         try
         {
-            foreach (var seg in solution.sub_trajectory)
+            if (useStartScene) ApplyStartScene(solution.start_scene);
+
+            for (int step = 0; step < solution.sub_trajectory.Length && step <= lastStep; step++)
             {
                 if (!isPlaying) break;
+                var seg = solution.sub_trajectory[step];
 
                 // Attach/detach stages are zero-motion ModifyPlanningScene segments — the
                 // scene_diff must be processed even when there is no trajectory to play.
@@ -68,8 +121,35 @@ public class MtcSolutionPlayer : MonoBehaviour
 
                 var jt = seg.trajectory?.joint_trajectory;
                 if (jt == null || jt.points == null || jt.points.Length == 0) continue;
-                yield return PlayJointTrajectory(jt);
+
+                // Gripper open/close segments only name finger joints, which the arm model
+                // does not drive. Skip those; the preview is only impossible when no segment
+                // at all moves a joint the Unity robot has.
+                string[] names = MapJointNames(jt.joint_names);
+                if (names == null)
+                {
+                    unmatched.UnionWith(jt.joint_names);
+                    continue;
+                }
+                playedAny = true;
+                if (step < firstStep)
+                {
+                    // Fast-forward: land on where this earlier step ends.
+                    Robot.ApplyJointState(names, jt.points[jt.points.Length - 1].positions);
+                    continue;
+                }
+                yield return PlayJointTrajectory(jt, names);
             }
+
+            // A single stage can be over in an instant (attach, gripper-only); hold its end
+            // state briefly so it can be seen before the robot snaps back.
+            bool partial = useStartScene || firstStep > 0 || lastStep < solution.sub_trajectory.Length - 1;
+            if (isPlaying && partial && stagePreviewHoldSeconds > 0f)
+                yield return new WaitForSeconds(stagePreviewHoldSeconds);
+
+            if (isPlaying && !playedAny && unmatched.Count > 0)
+                Report($"none of the solution's joints ({string.Join(", ", unmatched)}) exist on the Unity robot " +
+                       $"({string.Join(", ", Robot.JointNames)})");
         }
         finally
         {
@@ -94,45 +174,129 @@ public class MtcSolutionPlayer : MonoBehaviour
             if (aco.@object.operation == CollisionObjectMsg.REMOVE)
                 PreviewDetach(id);
             else
-                PreviewAttachObject(id, aco.link_name);
+                PreviewAttachObject(id, aco.link_name, aco.@object.pose);
         }
     }
 
-    private void PreviewAttachObject(string id, string linkName)
+    private void PreviewAttachObject(string id, string linkName, PoseMsg poseInLink)
     {
-        if (previewAttached.ContainsKey(id)) return;
-        if (!registry.TryGet(id, out var go)) return;
+        if (previewAttached.TryGetValue(id, out var existing) && existing.attached) return;
+        if (!registry.TryGetObject(id, out var env)) return;
+        // The real robot is carrying it right now; the live attach owns its transform.
+        if (env.AttachedTo != null) return;
 
-        Transform link = Robot.FindLinkTransform(linkName);
-        if (link == null) return;
+        // Exact link only: the pose is relative to that link's frame, so the end-effector
+        // fallback of FindLinkTransform would put the object in the wrong place.
+        if (!Robot.TryFindLinkTransform(linkName, out Transform link)
+            && !Robot.TryFindLinkTransform(MapName(linkName), out link))
+        {
+            Debug.LogWarning($"[MtcSolutionPlayer] no link '{linkName}' on the Unity robot; '{id}' stays put in the preview.");
+            return;
+        }
+
+        Track(id, env.gameObject).attached = true;
+        AttachedObjectPlacement.Place(env.transform, link, poseInLink);
+    }
+
+    // Remember how the object was before the preview first touched it, and stop it streaming
+    // the preview motion into MoveIt's live scene. Undone in RestorePose.
+    private PreviewAttach Track(string id, GameObject go)
+    {
+        if (previewAttached.TryGetValue(id, out var state) && state.go == go) return state;
 
         var publishers = go.GetComponentsInChildren<CollisionObjectPublisher>(true);
-        var state = new PreviewAttach
+        state = new PreviewAttach
         {
             go = go,
             originalParent = go.transform.parent,
             originalPos = go.transform.position,
             originalRot = go.transform.rotation,
+            originalLocalScale = go.transform.localScale,
             wasPaused = publishers.Length > 0 && publishers[0].pausePublishing,
         };
         previewAttached[id] = state;
-
-        // Don't stream the preview motion into MoveIt's live scene.
         foreach (var pub in publishers) pub.pausePublishing = true;
-        go.transform.SetParent(link, worldPositionStays: true);
+        return state;
     }
 
     private void PreviewDetach(string id)
     {
-        if (!previewAttached.TryGetValue(id, out var state) || state.go == null) return;
+        if (!previewAttached.TryGetValue(id, out var state) || state.go == null || !state.attached) return;
         // Leave the object where the preview placed it for now; full state (pose, parent,
         // publisher) is restored in RestorePose when the preview ends.
+        state.attached = false;
         state.go.transform.SetParent(state.originalParent, worldPositionStays: true);
+        state.go.transform.localScale = state.originalLocalScale;
     }
 
-    private IEnumerator PlayJointTrajectory(JointTrajectoryMsg jt)
+    // Put the robot and the mirrored objects where the solution starts. Everything moved here
+    // goes through Track, so the end-of-preview restore puts it back.
+    private void ApplyStartScene(PlanningSceneMsg startScene)
     {
-        string[] names = jt.joint_names;
+        var jointState = startScene?.robot_state?.joint_state;
+        var worldObjects = startScene?.world?.collision_objects;
+        var attachedObjects = startScene?.robot_state?.attached_collision_objects;
+        bool hasJoints = jointState?.name != null && jointState.name.Length > 0;
+        if (!hasJoints && (worldObjects?.Length ?? 0) == 0 && (attachedObjects?.Length ?? 0) == 0)
+        {
+            Debug.LogWarning("[MtcSolutionPlayer] the solution carries no start scene (older server?); previewing from the current state.");
+            return;
+        }
+
+        if (hasJoints && jointState.position != null)
+        {
+            // A full robot state also lists joints the Unity robot does not drive
+            // (fingers); only the ones it knows are applied.
+            string[] mapped = MapJointNames(jointState.name);
+            if (mapped != null)
+            {
+                var known = new HashSet<string>(Robot.JointNames);
+                var names = new List<string>();
+                var positions = new List<double>();
+                for (int i = 0; i < mapped.Length && i < jointState.position.Length; i++)
+                {
+                    if (!known.Contains(mapped[i])) continue;
+                    names.Add(mapped[i]);
+                    positions.Add(jointState.position[i]);
+                }
+                Robot.ApplyJointState(names.ToArray(), positions.ToArray());
+            }
+        }
+
+        if (registry == null) return;
+
+        foreach (var co in worldObjects ?? System.Array.Empty<CollisionObjectMsg>())
+        {
+            if (string.IsNullOrEmpty(co?.id) || co.pose == null) continue;
+            if (!registry.TryGetObject(co.id, out var env)) continue;
+            if (env.AttachedTo != null) continue; // the real robot is carrying it
+
+            var state = Track(co.id, env.gameObject);
+            if (state.attached) continue;
+            ApplyRosWorldPose(env.transform, co.pose);
+        }
+
+        foreach (var aco in attachedObjects ?? System.Array.Empty<AttachedCollisionObjectMsg>())
+        {
+            string id = aco?.@object?.id;
+            if (!string.IsNullOrEmpty(id))
+                PreviewAttachObject(id, aco.link_name, aco.@object.pose);
+        }
+    }
+
+    // A ROS world pose in the registry's frame, with the same conversion inbound collision
+    // objects get (MoveItPlanningSceneSync / CollisionObjectsListenerSimple).
+    private void ApplyRosWorldPose(Transform t, PoseMsg rosPose)
+    {
+        Transform origin = registry.WorldOrigin;
+        Vector3 pos = RosUnityConversion.RosToUnityPosition(rosPose.position);
+        Quaternion rot = RosUnityConversion.RosToUnityQuaternion(rosPose.orientation);
+        t.position = origin.TransformPoint(pos);
+        t.rotation = origin.rotation * rot;
+    }
+
+    private IEnumerator PlayJointTrajectory(JointTrajectoryMsg jt, string[] names)
+    {
         var points = jt.points;
 
         Robot.ApplyJointState(names, points[0].positions);
@@ -172,16 +336,44 @@ public class MtcSolutionPlayer : MonoBehaviour
         savedNames = null;
         savedPositions = null;
 
-        // Put preview-attached objects back exactly as they were before the preview.
+        // Put preview-moved objects back exactly as they were before the preview.
         foreach (var state in previewAttached.Values)
         {
             if (state.go == null) continue;
             state.go.transform.SetParent(state.originalParent, worldPositionStays: true);
+            state.go.transform.localScale = state.originalLocalScale;
             state.go.transform.SetPositionAndRotation(state.originalPos, state.originalRot);
             foreach (var pub in state.go.GetComponentsInChildren<CollisionObjectPublisher>(true))
                 pub.pausePublishing = state.wasPaused;
         }
         previewAttached.Clear();
+    }
+
+    // The ROS robot and the Unity robot can be the same arm under different names (the MTC
+    // demo plans for "panda_*", the scene shows "fr3_*"). Without this every joint lookup
+    // misses and the preview silently does nothing.
+    private string MapName(string name) =>
+        !string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(rosNamePrefix) && name.StartsWith(rosNamePrefix)
+            ? unityNamePrefix + name.Substring(rosNamePrefix.Length) : name;
+
+    private string[] MapJointNames(string[] rosNames)
+    {
+        var known = new HashSet<string>(Robot.JointNames);
+        var mapped = new string[rosNames.Length];
+        int matched = 0;
+        for (int i = 0; i < rosNames.Length; i++)
+        {
+            mapped[i] = known.Contains(rosNames[i]) ? rosNames[i] : MapName(rosNames[i]);
+            if (known.Contains(mapped[i])) matched++;
+        }
+        return matched > 0 ? mapped : null;
+    }
+
+    private void Report(string problem)
+    {
+        LastProblem = problem;
+        Debug.LogWarning("[MtcSolutionPlayer] cannot preview: " + problem);
+        OnProblem?.Invoke(problem);
     }
 
     private static double DurationToSeconds(DurationMsg d) => d.sec + d.nanosec * 1e-9;

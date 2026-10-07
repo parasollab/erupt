@@ -31,6 +31,12 @@ namespace Erupt.Robot
         /// <summary>Link transform by URDF link name; the end effector when the name is empty.</summary>
         Transform FindLinkTransform(string linkName);
 
+        /// <summary>
+        /// As <see cref="FindLinkTransform"/> but without the end-effector fallback, for
+        /// callers that place things in the link's own frame and so need the exact link.
+        /// </summary>
+        bool TryFindLinkTransform(string linkName, out Transform link);
+
         void BeginInteraction();
         void EndInteraction();
     }

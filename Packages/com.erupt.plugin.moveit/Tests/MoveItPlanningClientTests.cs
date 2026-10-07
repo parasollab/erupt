@@ -213,6 +213,7 @@ namespace Erupt.Plugins.MoveIt.Tests
             public InteractionRefusal TrySolveToTarget(Vector3 targetPosition) => InteractionRefusal.None;
             public InteractionRefusal TryNudgeJoint(ArticulationBody joint, float deltaRadians) => InteractionRefusal.None;
             public Transform FindLinkTransform(string linkName) => null;
+            public bool TryFindLinkTransform(string linkName, out Transform link) { link = null; return false; }
             public void BeginInteraction() { }
             public void EndInteraction() { }
         }

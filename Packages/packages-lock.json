@@ -141,6 +141,17 @@
       "dependencies": {},
       "url": "https://packages.unity.com"
     },
+    "com.parasol.rader": {
+      "version": "file:RADER",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.unity.xr.interaction.toolkit": "2.5.4",
+        "com.unity.xr.core-utils": "2.3.0",
+        "com.unity.textmeshpro": "3.0.9",
+        "com.unity.xr.hands": "1.5.0"
+      }
+    },
     "com.unity.2d.common": {
       "version": "12.0.2",
       "depth": 1,

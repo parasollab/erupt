@@ -325,6 +325,76 @@ namespace Erupt.Ros.Tests
             Assert.AreEqual(PickPlaceOutcome.Disconnected, pickPlace.LastOutcome);
         }
 
+        // --- stage attempts and start scenes ---------------------------------------------
+
+        [UnityTest]
+        public IEnumerator FetchSolution_WithStartScene_IsCachedApartFromTheOneWithout()
+        {
+            var requests = RecordGetSolution(id => new GetSolutionResponse(true, "", new SolutionMsg()));
+            yield return PlanWithSolutions(7, 4);
+
+            pickPlace.FetchSolution(7, _ => { });
+            pickPlace.FetchSolution(7, _ => { }, null, includeStartScene: true);
+            Assert.AreEqual(2, requests.Count, "The cached no-scene solution must not answer a with-scene request.");
+            Assert.IsFalse(requests[0].include_start_scene);
+            Assert.IsTrue(requests[1].include_start_scene);
+
+            pickPlace.FetchSolution(7, _ => { }, null, includeStartScene: true);
+            pickPlace.FetchSolution(7, _ => { });
+            Assert.AreEqual(2, requests.Count, "Both variants are cached afterwards.");
+        }
+
+        [UnityTest]
+        public IEnumerator FetchSolution_AcceptsAnyStageAttemptId_AndRefusesUnknownOnes()
+        {
+            var requests = RecordGetSolution(id => new GetSolutionResponse(true, "", new SolutionMsg()));
+            yield return PlanWithSolutions(7, 4);
+            var stats = Statistics(k_TopicTask, 7, 4);
+            stats.stages[2].failed = new uint[] { 300 };
+            bus.Inbound(k_Statistics, stats);
+
+            Assert.IsTrue(pickPlace.IsKnownSolutionId(100), "a stage's partial solution");
+            Assert.IsTrue(pickPlace.IsKnownSolutionId(300), "a stage's failed solution");
+            Assert.IsFalse(pickPlace.IsKnownSolutionId(999));
+
+            string refusal = null;
+            pickPlace.FetchSolution(100, _ => { });
+            pickPlace.FetchSolution(300, _ => { });
+            pickPlace.FetchSolution(999, _ => { }, message => refusal = message);
+            CollectionAssert.AreEqual(new uint[] { 100, 300 }, requests.ConvertAll(r => r.solution_id));
+            Assert.That(refusal, Does.Contain("not part of the current plan"));
+        }
+
+        [UnityTest]
+        public IEnumerator FetchSolution_FailsAfterTimeout_WhenNoUsableResponseArrives()
+        {
+            // No service handler: the fake never answers, like a response that fails to deserialise.
+            typeof(PickPlaceClient).GetField("getSolutionTimeoutSeconds",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).SetValue(pickPlace, 0.05f);
+            yield return PlanWithSolutions(7, 4);
+
+            SolutionMsg fetched = null;
+            string failure = null;
+            pickPlace.FetchSolution(7, s => fetched = s, m => failure = m);
+            yield return new WaitForSeconds(0.3f);
+
+            Assert.IsNull(fetched);
+            Assert.That(failure, Does.Contain("no usable response"));
+            Assert.That(pickPlace.LastStatus, Does.StartWith("SOLUTION UNAVAILABLE"));
+        }
+
+        System.Collections.Generic.List<GetSolutionRequest> RecordGetSolution(Func<uint, GetSolutionResponse> respond)
+        {
+            var requests = new System.Collections.Generic.List<GetSolutionRequest>();
+            bus.SetServiceHandler("/get_solution", request =>
+            {
+                var r = (GetSolutionRequest)request;
+                requests.Add(r);
+                return respond(r.solution_id);
+            });
+            return requests;
+        }
+
         // --- helpers ---------------------------------------------------------------------
 
         IEnumerator PlanWithSolutions(params uint[] ids)

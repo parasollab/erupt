@@ -78,7 +78,13 @@ moveit_task_constructor_msgs/Solution solution
    container; stage 0 is the Task wrapper and is never published). Topic `task_id` is compared
    to ours with everything after the last `:` removed.
 4. **Show**: `/get_solution` on selection (20–40 ms, 60–70 KB), cached per task;
-   `sub_trajectory[i].info.stage_id` → stage name from the description.
+   `sub_trajectory[i].info.stage_id` → stage name from the description. A stage's partial
+   (`solved[]` of a non-root stage) or failed (`failed[]`) solution is fetched with
+   `include_start_scene: true` — cached apart from the plain fetch — and previewed from its
+   `start_scene` (joint state, world object poses, attachments); a failed one carries the
+   planner's reason in `info.comment`. Any id listed in the statistics is accepted by the
+   service; one the client has not seen is refused locally. A fetch with no usable response
+   (a stale message class that fails to deserialise) fails after `getSolutionTimeoutSeconds`.
 5. **Execute**: `ExecuteSolution` with `task_id` (verbatim) + `solution_id`. Feedback arrives as
    each sub-trajectory finishes; the tab ticks `sub_id` and highlights step `sub_id + 1` and its
    stage as the one now running.

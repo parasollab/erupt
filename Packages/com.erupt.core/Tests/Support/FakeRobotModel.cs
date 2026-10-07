@@ -28,6 +28,8 @@ namespace Erupt.Robot.Tests
 
         public Transform Root { get; set; }
         public Transform EndEffector { get; set; }
+        /// <summary>Links by URDF name; a name not listed here is searched under <see cref="Root"/>.</summary>
+        public readonly Dictionary<string, Transform> Links = new(StringComparer.OrdinalIgnoreCase);
         public IReadOnlyList<string> JointNames => names;
 
         public bool TryGetJointAngle(string jointName, out float positionRadians)
@@ -66,7 +68,19 @@ namespace Erupt.Robot.Tests
         }
 
         public InteractionRefusal TryNudgeJoint(ArticulationBody joint, float deltaRadians) => InteractionRefusal.None;
-        public Transform FindLinkTransform(string linkName) => EndEffector;
+        public Transform FindLinkTransform(string linkName) =>
+            TryFindLinkTransform(linkName, out var link) ? link : EndEffector;
+
+        public bool TryFindLinkTransform(string linkName, out Transform link)
+        {
+            link = null;
+            if (string.IsNullOrEmpty(linkName)) return false;
+            if (Links.TryGetValue(linkName, out link) && link != null) return true;
+            if (Root == null) return false;
+            foreach (Transform t in Root.GetComponentsInChildren<Transform>(true))
+                if (string.Equals(t.name, linkName, StringComparison.OrdinalIgnoreCase)) { link = t; return true; }
+            return false;
+        }
         public void BeginInteraction() => BeginCalls++;
         public void EndInteraction() => EndCalls++;
     }

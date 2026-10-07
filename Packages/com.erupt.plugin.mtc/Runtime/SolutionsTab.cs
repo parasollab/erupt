@@ -12,14 +12,17 @@ using RosMessageTypes.MoveitTaskConstructorMsgs;
 /// <summary>
 /// Tier 3 "MTC" tab: the solution browser and the execution panel. Stage tree with per-stage
 /// counts, the current task's solution ids, the steps of the selected one (highlighted as
-/// execution feedback arrives), and the pick/place recorder entry, which is the plan button
-/// (Teach mode only, Guidelines Part 5: demonstration lives in Teach).
-/// Interactive elements: record + up to five solution buttons + cancel = 7 (Part 8).
+/// execution feedback arrives), the preview scope (whole solution or one stage of it), the
+/// scoped stage's partial / failed attempts (cycling to one previews it from its start scene),
+/// and the pick/place recorder entry, which is the plan button (Teach mode only, Guidelines
+/// Part 5: demonstration lives in Teach).
+/// Interactive elements: record + up to three solution buttons + scope + attempt + cancel = 7
+/// (Part 8); three buttons cover a default plan (<c>PickPlaceClient.maxSolutions</c> = 3).
 /// Preview and execute are tier 2 verbs on the selected solution's handle, not buttons here.
 /// </summary>
 public sealed class SolutionsTab
 {
-    public const int MaxSolutionButtons = 5;
+    public const int MaxSolutionButtons = 3;
     private static readonly Vector2 ButtonSize = new(300f, 56f);
     private static readonly Color SelectedColor = new(0.18f, 0.32f, 0.18f, 0.94f);
     private static readonly Color IdleColor = new(0.16f, 0.17f, 0.20f, 0.94f);
@@ -28,11 +31,13 @@ public sealed class SolutionsTab
 
     private readonly MtcPlugin plugin;
     private readonly RectTransform root;
-    private readonly Button recordButton, cancelButton;
+    private readonly Button recordButton, cancelButton, scopeButton, attemptButton;
     private readonly TMPro.TextMeshProUGUI taskLabel, stagesLabel, statusLabel, breakdownLabel;
     private readonly Transform solutionsRow;
     private readonly List<Button> solutionButtons = new();
     private readonly Dictionary<Button, uint> idByButton = new();
+    private readonly List<MtcPlugin.StageAttempt> attempts = new();
+    private int attemptIndex = -1;
 
     public SolutionsTab(MtcPlugin plugin, RectTransform content)
     {
@@ -51,6 +56,8 @@ public sealed class SolutionsTab
         stagesLabel.enableWordWrapping = true;
         stagesLabel.richText = true;
         solutionsRow = UiBuilder.CreateColumn("Solutions", t, 4f).transform;
+        scopeButton = UiBuilder.CreateButton("Scope", t, "Preview: whole solution", ButtonSize, NextScope);
+        attemptButton = UiBuilder.CreateButton("Attempt", t, "Attempt: —", ButtonSize, NextAttempt);
         breakdownLabel = UiBuilder.CreateLabel("Breakdown", t, "", 18f);
         breakdownLabel.alignment = TMPro.TextAlignmentOptions.TopLeft;
         breakdownLabel.enableWordWrapping = true;
@@ -64,6 +71,8 @@ public sealed class SolutionsTab
     public RectTransform Root => root;
     public int InteractiveElementCount => UiBuilder.CountInteractive(root);
     public IReadOnlyList<Button> SolutionButtons => solutionButtons;
+    public Button ScopeButton => scopeButton;
+    public Button AttemptButton => attemptButton;
     public string StatusText => statusLabel.text;
     public string StagesText => stagesLabel.text;
     public string BreakdownText => breakdownLabel.text;
@@ -74,7 +83,7 @@ public sealed class SolutionsTab
         if (c != null)
         {
             c.OnDescriptionChanged -= RefreshTaskAndStages;
-            c.OnStatisticsChanged -= RefreshStages;
+            c.OnStatisticsChanged -= OnStatistics;
             c.OnSolutionIdsChanged -= RefreshSolutions;
             c.OnTaskReset -= RefreshAll;
             c.OnStatus -= OnStatus;
@@ -83,6 +92,8 @@ public sealed class SolutionsTab
         }
         plugin.SelectedSolutionChanged -= RefreshSelection;
         plugin.TeachModeChanged -= RefreshRecord;
+        plugin.PreviewScopeChanged -= RefreshScope;
+        plugin.PreviewStatusChanged -= OnPreviewStatus;
         if (plugin.Recorder != null) plugin.Recorder.OnRecordingComplete -= OnRecorded;
     }
 
@@ -92,7 +103,7 @@ public sealed class SolutionsTab
         if (c != null)
         {
             c.OnDescriptionChanged += RefreshTaskAndStages;
-            c.OnStatisticsChanged += RefreshStages;
+            c.OnStatisticsChanged += OnStatistics;
             c.OnSolutionIdsChanged += RefreshSolutions;
             c.OnTaskReset += RefreshAll;
             c.OnStatus += OnStatus;
@@ -101,6 +112,8 @@ public sealed class SolutionsTab
         }
         plugin.SelectedSolutionChanged += RefreshSelection;
         plugin.TeachModeChanged += RefreshRecord;
+        plugin.PreviewScopeChanged += RefreshScope;
+        plugin.PreviewStatusChanged += OnPreviewStatus;
         if (plugin.Recorder != null) plugin.Recorder.OnRecordingComplete += OnRecorded;
     }
 
@@ -145,11 +158,14 @@ public sealed class SolutionsTab
             plugin.PickPlace?.Phase == PickPlacePhase.Executing ? "Cancel execution" : "Cancel");
         RefreshStages();
         RefreshBreakdown();
+        RefreshAttempts();
     }
 
     // --- task / stages ------------------------------------------------------------
 
     private void OnStatus(string status) => statusLabel.text = status;
+
+    private void OnStatistics() { RefreshStages(); RefreshAttempts(); }
 
     private void OnExecutionFeedback(RosMessageTypes.StudyInterfaces.ExecuteSolutionFeedback _)
     {
@@ -159,7 +175,12 @@ public sealed class SolutionsTab
 
     private void RefreshAll()
     {
-        RefreshTask(); RefreshStages(); RefreshSolutions(); RefreshBusy();
+        RefreshTask(); RefreshStages(); RefreshSolutions(); RefreshScope(); RefreshBusy();
+    }
+
+    private void OnPreviewStatus()
+    {
+        if (!string.IsNullOrEmpty(plugin.PreviewStatus)) statusLabel.text = plugin.PreviewStatus;
     }
 
     private void RefreshTaskAndStages() { RefreshTask(); RefreshStages(); }
@@ -257,6 +278,68 @@ public sealed class SolutionsTab
         }
         RefreshBreakdown();
         RefreshStages();
+    }
+
+    // --- preview scope and stage attempts ---------------------------------------------
+
+    /// <summary>Cycle the preview verb's scope: the whole solution, then each stage with steps in it.</summary>
+    private void NextScope()
+    {
+        var stages = plugin.PreviewableStages;
+        if (stages.Count == 0) { plugin.SetPreviewStage(null); return; }
+        int index = plugin.PreviewStageId is uint current ? stages.ToList().IndexOf(current) : -1;
+        index = index + 1 >= stages.Count ? -1 : index + 1;
+        plugin.SetPreviewStage(index < 0 ? null : stages[index]);
+    }
+
+    private void RefreshScope()
+    {
+        var c = plugin.PickPlace;
+        string text = "Preview: whole solution";
+        if (plugin.PreviewStageId is uint stage)
+        {
+            string name = c?.StageName(stage) ?? $"stage {stage}";
+            text = plugin.TryGetStageSteps(stage, out int first, out int last)
+                ? $"Preview: {name} ({(first == last ? $"step {first + 1}" : $"steps {first + 1}-{last + 1}")})"
+                : $"Preview: {name}";
+        }
+        UiBuilder.SetButtonText(scopeButton, text);
+        UiBuilder.SetInteractable(scopeButton, plugin.PreviewableStages.Count > 0);
+        RefreshAttempts();
+    }
+
+    /// <summary>Cycle through the scoped stage's partial / failed attempts; each one is previewed as it comes up.</summary>
+    private void NextAttempt()
+    {
+        if (attempts.Count == 0) return;
+        attemptIndex = (attemptIndex + 1) % attempts.Count;
+        var attempt = attempts[attemptIndex];
+        RefreshAttemptText();
+        plugin.PreviewStageSolution(attempt.Id, attempt.Failed);
+    }
+
+    // The attempts of the scoped stage (the task's root stage when the scope is the whole
+    // solution, so its failed complete attempts can be read). Reset when the list changes.
+    private void RefreshAttempts()
+    {
+        var fresh = plugin.AttemptsOf(plugin.PreviewStageId ?? PickPlaceClient.RootStageId);
+        if (fresh.Count != attempts.Count || fresh.Where((a, i) => a.Id != attempts[i].Id || a.Failed != attempts[i].Failed).Any())
+        {
+            attempts.Clear();
+            attempts.AddRange(fresh);
+            attemptIndex = -1;
+        }
+        RefreshAttemptText();
+        UiBuilder.SetInteractable(attemptButton, attempts.Count > 0 && plugin.PickPlace?.Phase != PickPlacePhase.Executing);
+    }
+
+    private void RefreshAttemptText()
+    {
+        string text = attempts.Count == 0 ? "Attempt: —" :
+            attemptIndex < 0 ? $"Attempt: {attempts.Count} to preview" :
+            attempts[attemptIndex].Failed ? $"Attempt: ✗ #{attempts[attemptIndex].Id} failed ({attemptIndex + 1}/{attempts.Count})"
+                                          : $"Attempt: #{attempts[attemptIndex].Id} partial ({attemptIndex + 1}/{attempts.Count})";
+        UiBuilder.SetButtonText(attemptButton, text);
     }
 
     private void RefreshBreakdown()

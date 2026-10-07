@@ -5,6 +5,13 @@ All notable changes to `com.erupt.plugin.moveit` are documented here. The format
 
 ## [Unreleased]
 
+### Added
+
+- `AttachedObjectPlacement.Place`: parents a mirrored object under a robot link at the
+  link-relative pose of an `AttachedCollisionObject` (FLU link frame folded into the project's
+  world convention, link scale cancelled). Used by the MTC plugin's solution preview to show an
+  object riding the gripper where the plan puts it.
+
 ### Fixed
 
 - `CollisionObjectPublisher` reported cylinders and capsules at half their height: Unity's
