@@ -111,8 +111,8 @@ they reach the plugin; `plan` is a plugin verb).
 - **Obstacle creation is a tier 3 tab**, not the in-world placement tool Part 4 step 2 wants.
   Interim; flagged in `ScenePlacementTab`'s remarks.
 - **The wrist menu's per-axis scale slider is gone.** "Resize" is a spatial control (Part 1 P3 →
-  in-world widget, deferred). Two-handed grab scaling (`XRTwoHandedScaleTransformer`) remains.
-  The `resize` verb stays visible and disabled until the widget exists.
+  in-world widget). Two-handed grab scaling (`XRTwoHandedScaleTransformer`) remains.
+  *Resolved after Phase 6:* `ObstacleResizeWidget` is that widget; the `resize` verb opens it.
 - **Recording requires Teach mode** (one tier 1 press). Before, the wrist menu recorded from any mode.
 - **Set start is its own verb**: `set-start` is a MoveIt plugin verb on the end effector beside `plan` (maintainer's call during the review; the first cut captured start implicitly on set-goal, which made the first plan zero-length unless the robot was moved after setting the goal). Reset on the planner tab clears both.
 - Tier 1 (4) + the Obstacle row (7 verbs) already exceed the ~7 budget when an obstacle is

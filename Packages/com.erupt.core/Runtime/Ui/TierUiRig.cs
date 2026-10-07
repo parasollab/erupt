@@ -27,6 +27,15 @@ namespace Erupt.Ui
         [Tooltip("Tier 3 toggles on the router's Activate intent (the controller Menu button, as the wrist menu did). Found in the scene if empty.")]
         [SerializeField] private InteractionRouter router;
 
+        [Tooltip("Place tier 3 in front of the user's head each time it opens. Off leaves it wherever its anchor is.")]
+        [SerializeField] private bool placeInFrontOfUser = true;
+
+        [Tooltip("How far in front of the head tier 3 opens, in metres.")]
+        [SerializeField] private float summonDistance = 1.1f;
+
+        [Tooltip("Vertical offset of the panel centre from eye level, in metres. Slightly below is most comfortable.")]
+        [SerializeField] private float summonHeightOffset = -0.1f;
+
         public TierOneBar TierOne { get; private set; }
         public ContextualMenuView TierTwo { get; private set; }
         public TabbedPanelView TierThree { get; private set; }
@@ -135,8 +144,55 @@ namespace Erupt.Ui
         {
             if (TierThree == null) return;
 
+            bool wasOpen = TierThree.IsOpen;
             TierThree.SelectTab(tabId);
             Registry?.Open(TierThree);
+
+            // Only on the closed→open edge: switching tabs on an open panel must not yank
+            // it out from under the user's pointer.
+            if (!wasOpen) PlaceTierThree();
+        }
+
+        /// <summary>
+        /// Move tier 3 in front of the user's head. Guidelines Part 6: tier 3 panels are
+        /// grabbable world-space panels, so this only sets where the panel opens; the
+        /// user can carry it elsewhere afterwards.
+        /// </summary>
+        public void PlaceTierThree()
+        {
+            if (!placeInFrontOfUser || TierThree == null) return;
+
+            Camera cam = Camera.main;
+            if (cam == null) return;   // no head to place in front of; the anchor stands
+
+            Pose pose = PlacementFor(cam.transform.position, cam.transform.forward, summonDistance, summonHeightOffset);
+            TierThree.transform.SetPositionAndRotation(pose.position, pose.rotation);
+        }
+
+        /// <summary>
+        /// Where a summoned panel goes for a head at <paramref name="headPosition"/> looking
+        /// along <paramref name="headForward"/>: level with the horizon, so it does not tilt
+        /// when the user is looking down at the table, and facing the user.
+        /// </summary>
+        public static Pose PlacementFor(Vector3 headPosition, Vector3 headForward, float distance, float heightOffset)
+        {
+            Vector3 flat = FlatForward(headForward);
+
+            // A world-space canvas reads correctly when its +Z points away from the viewer,
+            // which is the convention ContextualMenuView already uses.
+            return new Pose(PlacementPositionFor(headPosition, headForward, distance, heightOffset),
+                            Quaternion.LookRotation(flat, Vector3.up));
+        }
+
+        /// <summary>The panel centre: <paramref name="distance"/> ahead along the level gaze, offset vertically.</summary>
+        public static Vector3 PlacementPositionFor(Vector3 headPosition, Vector3 headForward, float distance, float heightOffset) =>
+            headPosition + FlatForward(headForward) * distance + Vector3.up * heightOffset;
+
+        /// <summary>The gaze with its pitch removed; world forward when looking straight up or down.</summary>
+        public static Vector3 FlatForward(Vector3 headForward)
+        {
+            Vector3 flat = Vector3.ProjectOnPlane(headForward, Vector3.up);
+            return flat.sqrMagnitude < 1e-6f ? Vector3.forward : flat.normalized;
         }
 
         // --- IUiHost ---------------------------------------------------------

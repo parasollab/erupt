@@ -8,6 +8,14 @@ All notable changes to `com.erupt.core` are documented here. The format follows
 
 ### Added
 
+- `ObstacleResizeWidget`: the obstacle row's `resize` verb now opens an in-world widget beside
+  the selected shape (−/+ per dimension, hold to repeat, one undo step per adjustment). Rows
+  follow the shape: width/height/depth for a cube, height/diameter for a cylinder, size for a
+  sphere or an unknown mesh. Replaces the wrist menu's scale sliders; Guidelines Part 1 P3.
+- `TierUiRig.PlaceTierThree`: tier 3 opens in front of the user's head (`summonDistance`,
+  `summonHeightOffset`), level with the horizon and facing them, instead of wherever its scene
+  anchor happens to be. Switching tabs on an open panel does not move it; `placeInFrontOfUser`
+  turns the behaviour off.
 - Hand tracking as a full stand-in for the controllers. `OpenXrHandBackend` is no longer a
   stub: pinch selects and drags (`PinchTracker`), thumb-middle pinch emits the thumbstick
   axis, and the Meta menu gesture emits `Activate`. Joint poses are converted from XR Origin
@@ -23,6 +31,10 @@ All notable changes to `com.erupt.core` are documented here. The format follows
 
 ### Changed
 
+- The Scene tab's new shapes are 0.3 m (`defaultSize`) instead of Unity's 1 m primitives.
+  Cylinders get half that in Y so they stand as tall as they are wide (Unity's cylinder mesh is
+  2 m at scale 1); `ScenePlacementTab.DefaultScaleFor` holds the rule and the free-spot search
+  scales with the size.
 - Hands keep their XRI far ray on regardless of finger pose: the demo's `PokeGestureDetector`
   is disabled on the rig, since it turned the ray off in the pointing pose users adopt to aim
   at menus while the ERUPT ray kept drawing.

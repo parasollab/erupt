@@ -26,6 +26,9 @@ namespace Erupt.UiBindings
         [Tooltip("Offset applied to a duplicated obstacle, matching the wrist menu's behaviour.")]
         [SerializeField] private Vector3 duplicateOffset = new(0.2f, 0f, 0f);
 
+        /// <summary>The in-world resize widget the "resize" verb opens. Built on Start.</summary>
+        public ObstacleResizeWidget ResizeWidget { get; private set; }
+
         private void Start()
         {
             if (rig == null) rig = FindFirstObjectByType<TierUiRig>();
@@ -37,6 +40,11 @@ namespace Erupt.UiBindings
 
             if (selection == null) selection = FindFirstObjectByType<SelectionService>();
             if (registry == null) registry = FindFirstObjectByType<EnvironmentRegistry>();
+
+            var widgetGo = new GameObject("Resize Widget");
+            widgetGo.transform.SetParent(transform, false);
+            ResizeWidget = widgetGo.AddComponent<ObstacleResizeWidget>();
+            ResizeWidget.Initialise(rig.UndoStack, selection);
 
             BindObstacleVerbs();
         }
@@ -100,9 +108,16 @@ namespace Erupt.UiBindings
                 undo.Record(new TransformObstacleCommand(target, "Snap to Surface", position, rotation, scale));
             });
 
-            // "resize" is bound to nothing on purpose: scaling is a spatial control and
-            // Part 1 P3 puts it in the world as a widget, not on a menu. The verb stays
-            // visible and disabled until that widget exists.
+            // Scaling is a spatial control, so Part 1 P3 puts it in the world: the verb only
+            // opens a widget attached to the obstacle. Pressing it again closes the widget.
+            menu.Bind("resize", selectable =>
+            {
+                GameObject target = selectable.GameObject;
+                if (target == null || ResizeWidget == null) return;
+
+                PrimitiveType? primitive = TryPrimitive(target, out var p) ? p : null;
+                ResizeWidget.Toggle(target, primitive);
+            });
         }
 
         // Objects built through ObstacleFactory record their primitive; legacy shapes are

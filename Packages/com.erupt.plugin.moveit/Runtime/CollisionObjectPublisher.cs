@@ -307,8 +307,10 @@ public class CollisionObjectPublisher : MonoBehaviour
         }
         else if (meshName.Contains("Cylinder"))
         {
-            // For cylinder, ROS expects height and radius
-            float height = scale.y; // Unity cylinder height is along Y axis
+            // For cylinder, ROS expects height and radius. Unity's cylinder mesh spans -1..1
+            // along Y, so a Y scale of 1 is 2 m tall (CollisionObjectsListenerSimple halves
+            // the height on the way in; this is the inverse).
+            float height = scale.y * 2f;
             float radius = Mathf.Max(scale.x, scale.z) * 0.5f; // Unity cylinder has diameter of 1, so radius is 0.5 * scale
             return new SolidPrimitiveMsg
             {
@@ -318,8 +320,9 @@ public class CollisionObjectPublisher : MonoBehaviour
         }
         else if (meshName.Contains("Capsule"))
         {
-            // For capsule, ROS expects height and radius
-            float height = scale.y; // Unity capsule height is along Y axis
+            // For capsule, ROS expects height and radius. Unity's capsule mesh is also 2 m
+            // tall at a Y scale of 1.
+            float height = scale.y * 2f;
             float radius = Mathf.Max(scale.x, scale.z) * 0.5f; // Unity capsule has diameter of 1, so radius is 0.5 * scale
             return new SolidPrimitiveMsg
             {

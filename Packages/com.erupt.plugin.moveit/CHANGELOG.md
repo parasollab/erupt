@@ -5,6 +5,12 @@ All notable changes to `com.erupt.plugin.moveit` are documented here. The format
 
 ## [Unreleased]
 
+### Fixed
+
+- `CollisionObjectPublisher` reported cylinders and capsules at half their height: Unity's
+  meshes are 2 m tall at Y scale 1, and the publisher sent the scale as the height. It now
+  doubles it, the inverse of what `CollisionObjectsListenerSimple` does on the way in.
+
 ### Changed
 
 - Goal constraints cover the robot's IK chain (`IRobotModel.JointNames`) only. The joint state
