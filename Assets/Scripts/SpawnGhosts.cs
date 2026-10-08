@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class SpawnGhosts : MonoBehaviour
 {
@@ -42,6 +43,19 @@ public class SpawnGhosts : MonoBehaviour
     // Not persisted to disk.
     private (Vector3 localPosition, Quaternion localRotation)? savedPanelOffset;
 
+    private void Awake()
+    {
+        if (realRobot == null)
+        {
+            DirectArticulationIKController controller = FindFirstObjectByType<DirectArticulationIKController>(FindObjectsInactive.Include);
+            if (controller != null)
+            {
+                realRobot = controller.gameObject;
+                Debug.LogWarning($"SpawnGhosts: realRobot was not assigned; using '{realRobot.name}'.");
+            }
+        }
+    }
+
     public void SavePanelOffset(Vector3 localPosition, Quaternion localRotation)
     {
         savedPanelOffset = (localPosition, localRotation);
@@ -51,6 +65,7 @@ public class SpawnGhosts : MonoBehaviour
     {
         ClearStartGhost();
         startGhost = SpawnGhost("StartGhost", startGhostColor);
+        if (startGhost == null) return;
         CopyPoseToGhost(realRobot, startGhost);
         ApplyGhostVisibility(startGhost, startGhostHidden);
     }
@@ -59,6 +74,7 @@ public class SpawnGhosts : MonoBehaviour
     {
         ClearGoalGhost();
         goalGhost = SpawnGhost("GoalGhost", goalGhostColor);
+        if (goalGhost == null) return;
         CopyPoseToGhost(realRobot, goalGhost);
         ApplyGhostVisibility(goalGhost, goalGhostHidden);
     }
@@ -79,6 +95,7 @@ public class SpawnGhosts : MonoBehaviour
     {
         ClearStartGhost();
         startGhost = SpawnGhost("StartGhost", startGhostColor);
+        if (startGhost == null) return;
         ApplyPoseToGhost(startGhost, referenceController, jointNames, positions);
         ApplyGhostVisibility(startGhost, startGhostHidden);
     }
@@ -87,6 +104,7 @@ public class SpawnGhosts : MonoBehaviour
     {
         ClearGoalGhost();
         goalGhost = SpawnGhost("GoalGhost", goalGhostColor);
+        if (goalGhost == null) return;
         ApplyPoseToGhost(goalGhost, referenceController, jointNames, positions);
         ApplyGhostVisibility(goalGhost, goalGhostHidden);
     }
@@ -170,6 +188,18 @@ public class SpawnGhosts : MonoBehaviour
 
     public GameObject SpawnGhost(string ghostName, Color color, TrajectoryReplay replaySource = null)
     {
+        if (robotPrefab == null)
+        {
+            Debug.LogError($"SpawnGhosts: cannot spawn '{ghostName}' because robotPrefab is not assigned.");
+            return null;
+        }
+
+        if (realRobot == null)
+        {
+            Debug.LogError($"SpawnGhosts: cannot spawn '{ghostName}' because realRobot is not assigned.");
+            return null;
+        }
+
         // Instantiate under an inactive parent so Awake is deferred until after cleanup.
         var deferParent = new GameObject();
         deferParent.SetActive(false);
@@ -203,10 +233,105 @@ public class SpawnGhosts : MonoBehaviour
         ghost.transform.SetPositionAndRotation(realRobot.transform.position, realRobot.transform.rotation);
 
         ghost.transform.SetParent(null);
+
+        // Additive loading can run this scene's Start methods before StudyController makes the
+        // incoming scene active. New root objects otherwise inherit the outgoing active scene
+        // and are destroyed when that scene is retired. Keep every ghost with its real robot.
+        Scene robotScene = realRobot.scene;
+        if (robotScene.IsValid() && robotScene.isLoaded && ghost.scene != robotScene)
+        {
+            SceneManager.MoveGameObjectToScene(ghost, robotScene);
+        }
+        else if (!robotScene.IsValid() || !robotScene.isLoaded)
+        {
+            Debug.LogWarning(
+                $"SpawnGhosts: '{ghostName}' could not be assigned to the real robot's scene; " +
+                $"keeping it in '{ghost.scene.name}'.");
+        }
+
         ghost.SetActive(true);
         Destroy(deferParent);
 
+        int rendererCount = ghost.GetComponentsInChildren<Renderer>(true).Length;
+        Debug.Log(
+            $"SpawnGhosts: spawned '{ghostName}' in scene '{ghost.scene.name}' at " +
+            $"{ghost.transform.position} with {rendererCount} renderers.");
+        LogGhostVisibilityDiagnostics(ghost, ghostName);
         return ghost;
+    }
+
+    private static void LogGhostVisibilityDiagnostics(GameObject ghost, string ghostName)
+    {
+        if (ghost == null) return;
+
+        Renderer[] renderers = ghost.GetComponentsInChildren<Renderer>(true);
+        int enabledRenderers = 0;
+        int activeEnabledRenderers = 0;
+        Bounds bounds = new Bounds(ghost.transform.position, Vector3.zero);
+        bool hasBounds = false;
+        Renderer firstRenderer = null;
+
+        foreach (Renderer renderer in renderers)
+        {
+            if (renderer == null) continue;
+            if (firstRenderer == null) firstRenderer = renderer;
+
+            if (renderer.enabled)
+                enabledRenderers++;
+
+            if (renderer.enabled && renderer.gameObject.activeInHierarchy)
+            {
+                activeEnabledRenderers++;
+                if (!hasBounds)
+                {
+                    bounds = renderer.bounds;
+                    hasBounds = true;
+                }
+                else
+                {
+                    bounds.Encapsulate(renderer.bounds);
+                }
+            }
+        }
+
+        string materialInfo = "none";
+        Material material = firstRenderer != null && firstRenderer.sharedMaterial != null
+            ? firstRenderer.sharedMaterial
+            : null;
+        if (material != null)
+        {
+            string shaderName = material.shader != null ? material.shader.name : "no shader";
+            Color color = Color.clear;
+            bool hasColor = false;
+            if (material.HasProperty("_BaseColor"))
+            {
+                color = material.GetColor("_BaseColor");
+                hasColor = true;
+            }
+            else if (material.HasProperty("_Color"))
+            {
+                color = material.GetColor("_Color");
+                hasColor = true;
+            }
+
+            materialInfo = hasColor
+                ? $"{material.name} shader={shaderName} color={color}"
+                : $"{material.name} shader={shaderName}";
+        }
+
+        Camera mainCamera = Camera.main;
+        string cameraInfo = mainCamera == null
+            ? "camera=none"
+            : $"camera={mainCamera.name} pos={mainCamera.transform.position} distance={Vector3.Distance(mainCamera.transform.position, ghost.transform.position):F2}";
+
+        string boundsInfo = hasBounds
+            ? $"boundsCenter={bounds.center} boundsSize={bounds.size}"
+            : "bounds=none";
+
+        Debug.Log(
+            $"SpawnGhosts: visibility '{ghostName}': activeSelf={ghost.activeSelf}, activeInHierarchy={ghost.activeInHierarchy}, " +
+            $"renderers={renderers.Length}, enabledRenderers={enabledRenderers}, activeEnabledRenderers={activeEnabledRenderers}, " +
+            $"{boundsInfo}, layer={LayerMask.LayerToName(ghost.layer)}, material={materialInfo}, {cameraInfo}.");
     }
 
     // Reuses the robot's link colliders as raycast-only triggers so the whole posed ghost can be
@@ -306,6 +431,8 @@ public class SpawnGhosts : MonoBehaviour
     // Both hierarchies come from the same URDF so names match.
     private static void CopyPoseToGhost(GameObject source, GameObject ghost)
     {
+        if (source == null || ghost == null) return;
+
         var ghostAbByName = new Dictionary<string, ArticulationBody>();
         foreach (var ab in ghost.GetComponentsInChildren<ArticulationBody>(true))
             ghostAbByName[ab.name] = ab;

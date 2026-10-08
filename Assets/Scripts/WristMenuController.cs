@@ -59,6 +59,23 @@ public class WristMenuController : MonoBehaviour
     
     // State
     private bool isMenuVisible = false;
+
+    public void BindSceneDependencies(
+        SelectionManager manager,
+        CollisionObjectsListenerSimple listener,
+        GameObject origin)
+    {
+        selectionManager = manager;
+        collisionObjectsListener = listener;
+        worldOrigin = origin;
+
+        if (worldOrigin == null)
+        {
+            Debug.LogWarning("WristMenuController: no worldOrigin bound for this scene — spawned " +
+                "collision objects will publish absolute Unity coordinates instead of robot-base-relative " +
+                "positions. Add a 'BaseTransform' object under the robot root.");
+        }
+    }
     
     private void OnEnable()
     {
@@ -97,6 +114,11 @@ public class WristMenuController : MonoBehaviour
         toggle.style.paddingLeft = 10;
         toggle.style.paddingRight = 10;
         toggle.value = true; // Default to enabled
+        // The whole Toggle row is clickable by default; swallow presses on the
+        // text label so only the checkbox itself toggles the value.
+        toggle.labelElement.RegisterCallback<PointerDownEvent>((evt) => evt.StopPropagation());
+        toggle.labelElement.RegisterCallback<PointerUpEvent>((evt) => evt.StopPropagation());
+        toggle.labelElement.RegisterCallback<ClickEvent>((evt) => evt.StopPropagation());
         toggle.RegisterCallback<ChangeEvent<bool>>((evt) =>
         {
             var selected = selectionManager.SelectedObject;
@@ -716,11 +738,11 @@ public class WristMenuController : MonoBehaviour
         rb.useGravity = false;
         rb.isKinematic = true;
 
-        // XR interaction — Single mode so only the NearFarInteractor (one hand) holds it.
-        // This keeps the InteractionAttachController's thumbstick push/pull working correctly.
+        // Allow a second controller to join the grab so the multiple-grab scale transformer
+        // can run. One-handed push/pull remains available whenever only one hand is attached.
         shape.AddComponent<XRGrabInteractable>();
         var gi = shape.GetComponent<XRGrabInteractable>();
-        gi.selectMode = InteractableSelectMode.Single;
+        gi.selectMode = InteractableSelectMode.Multiple;
         // Keep the object where it's grabbed instead of snapping it to the controller
         gi.useDynamicAttach = true;
         // Don't match the ray hit point's position for the attach anchor — keep it at the

@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
 using UnityEngine.XR.Interaction.Toolkit;
+using UnityEngine.XR.Interaction.Toolkit.Interactors;
 using System.Collections;
 
 /// <summary>
@@ -14,6 +15,10 @@ public class SelectableGrabController : MonoBehaviour
     private XRGrabInteractable grabInteractable;
     private bool isSelected = false;
     private bool isGrabbed = false;
+    private SelectionManager subscribedSelectionManager;
+    // Scale when the first hand grabbed, so a two-handed resize (XRTwoHandedScaleTransformer
+    // only rewrites localScale and never logs) can be reported as an edit_operation on release.
+    private Vector3 grabStartScale;
 
     void Start()
     {
@@ -30,8 +35,9 @@ public class SelectableGrabController : MonoBehaviour
         // Subscribe to selection events
         if (SelectionManager.Instance != null)
         {
-            SelectionManager.Instance.OnObjectSelected += OnObjectSelected;
-            SelectionManager.Instance.OnSelectionCleared += OnSelectionCleared;
+            subscribedSelectionManager = SelectionManager.Instance;
+            subscribedSelectionManager.OnObjectSelected += OnObjectSelected;
+            subscribedSelectionManager.OnSelectionCleared += OnSelectionCleared;
         }
 
         // Check if this object is already selected (important for newly created objects)
@@ -62,10 +68,11 @@ public class SelectableGrabController : MonoBehaviour
     void OnDestroy()
     {
         // Unsubscribe from events to prevent memory leaks
-        if (SelectionManager.Instance != null)
+        if (subscribedSelectionManager != null)
         {
-            SelectionManager.Instance.OnObjectSelected -= OnObjectSelected;
-            SelectionManager.Instance.OnSelectionCleared -= OnSelectionCleared;
+            subscribedSelectionManager.OnObjectSelected -= OnObjectSelected;
+            subscribedSelectionManager.OnSelectionCleared -= OnSelectionCleared;
+            subscribedSelectionManager = null;
         }
         if (grabInteractable != null)
         {
@@ -76,26 +83,60 @@ public class SelectableGrabController : MonoBehaviour
 
     void OnGrabEntered(SelectEnterEventArgs args)
     {
+        bool wasGrabbed = isGrabbed;
         isGrabbed = true;
+
+        // NearFarInteractor initially places its far attach anchor at the collider hit point.
+        // These objects intentionally use their center as the dynamic attach point so they
+        // rotate about their own pivot. Align the interactor anchor to that same center before
+        // the first grab update; otherwise every re-grab moves the center to the front surface
+        // hit and makes the object creep closer to the controller.
+        if (args.interactorObject is NearFarInteractor nearFar &&
+            nearFar.interactionAttachController != null &&
+            nearFar.interactionAttachController.hasOffset)
+        {
+            nearFar.interactionAttachController.MoveTo(transform.position);
+        }
+
         UpdateGrabState();
 
         CollisionObjectPublisher publisher = GetComponent<CollisionObjectPublisher>();
-        if (publisher != null)
+        if (!wasGrabbed)
         {
-            ObjectMetricsLogger.Instance?.LogEvent("grab_start", publisher.objectId);
+            grabStartScale = transform.localScale;
+            if (publisher != null)
+            {
+                ObjectMetricsLogger.Instance?.LogEvent("grab_start", publisher.objectId);
+            }
         }
     }
 
     void OnGrabExited(SelectExitEventArgs args)
     {
-        isGrabbed = false;
+        // With multi-select enabled, releasing either controller is not necessarily the end
+        // of the grab. Keep the interactable enabled until the last controller lets go.
+        isGrabbed = grabInteractable != null && grabInteractable.isSelected;
         UpdateGrabState();
 
         CollisionObjectPublisher publisher = GetComponent<CollisionObjectPublisher>();
-        if (publisher != null)
+        if (!isGrabbed && publisher != null)
         {
             // ObjectMetricsLogger makes this relative to the robot base transform itself.
             ObjectMetricsLogger.Instance?.LogEvent("grab_end", publisher.objectId, transform.position, transform.rotation);
+
+            // Two-handed scaling happens entirely inside the grab, so this is the only place
+            // the resulting size can be reported. Mirrors the wrist-menu slider's resize log
+            // (same event type, same scale payload) so both resize paths look alike downstream.
+            const float scaleEpsilon = 0.001f;
+            if (Vector3.Distance(transform.localScale, grabStartScale) > scaleEpsilon)
+            {
+                ObjectMetricsLogger.Instance?.LogEvent("edit_operation", publisher.objectId,
+                    scale: transform.localScale,
+                    details: "resize:two_hand");
+                // Same reason as the slider: a scale-only change doesn't trip the publisher's
+                // position/rotation check, so push the new geometry to MoveIt explicitly.
+                publisher.ForceRepublish();
+            }
         }
     }
 

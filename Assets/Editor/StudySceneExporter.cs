@@ -78,6 +78,12 @@ public static class StudySceneExporter
         public Quat orientation;
         public Vec3 scale;
         public ColorInfo color;
+        // True when this object carries a CollisionObjectPublisher in the scene, i.e. the VR
+        // session registers it in the MoveIt planning scene. planning_scene_watcher.py uses
+        // this to register the exact same obstacle set in 2D sessions (its previous pivot-
+        // distance heuristic silently dropped VR-published props like the kitchen Lights,
+        // whose pivot sits just past the old 1.5m reach radius).
+        public bool collision;
     }
 
     [System.Serializable]
@@ -335,6 +341,7 @@ public static class StudySceneExporter
                 // Kept as a fallback/tint alongside the real per-material .mtl+texture data
                 // below, for markers that can't or don't use mesh_use_embedded_materials.
                 color = GetObjectColor(meshRenderer),
+                collision = go.GetComponent<CollisionObjectPublisher>() != null,
             });
         }
 

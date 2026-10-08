@@ -19,6 +19,7 @@ public class SelectionManager : MonoBehaviour
     private Material transparentHighlightMaterial;
     private Material originalMaterial;
     private Renderer selectedRenderer;
+    private bool selectActionSubscribed;
     private MoveItPlanningRequestMenuUI planningMenu;
 
     public GameObject SelectedObject { get; private set; }
@@ -29,10 +30,9 @@ public class SelectionManager : MonoBehaviour
 
     private void Awake()
     {
-        if (Instance != null && Instance != this)
-        {
-            Destroy(gameObject);
-        }
+        // Additive transitions briefly keep both content scenes alive. The newly loaded scene
+        // must take ownership immediately; destroying it here would leave no manager after the
+        // outgoing scene is retired.
         Instance = this;
     }
 
@@ -41,10 +41,55 @@ public class SelectionManager : MonoBehaviour
         if (rayInteractor == null)
         {
             Debug.LogError("Ray Interactor is not assigned in SelectionManager.");
-            return;
         }
 
-        selectAction.action.performed += ctx => TrySelect();
+        SubscribeToSelectAction();
+    }
+
+    private void OnEnable()
+    {
+        SubscribeToSelectAction();
+    }
+
+    private void OnDisable()
+    {
+        UnsubscribeFromSelectAction();
+    }
+
+    public void BindRayInteractor(Quest3ControllerRayInteractor interactor)
+    {
+        rayInteractor = interactor;
+    }
+
+    private void SubscribeToSelectAction()
+    {
+        if (selectActionSubscribed || selectAction == null || selectAction.action == null)
+            return;
+
+        selectAction.action.performed += OnSelectPerformed;
+        selectActionSubscribed = true;
+    }
+
+    private void OnSelectPerformed(InputAction.CallbackContext context)
+    {
+        TrySelect();
+    }
+
+    private void OnDestroy()
+    {
+        UnsubscribeFromSelectAction();
+
+        if (Instance == this)
+            Instance = null;
+    }
+
+    private void UnsubscribeFromSelectAction()
+    {
+        if (!selectActionSubscribed || selectAction == null || selectAction.action == null)
+            return;
+
+        selectAction.action.performed -= OnSelectPerformed;
+        selectActionSubscribed = false;
     }
 
     void TrySelect()
@@ -74,16 +119,30 @@ public class SelectionManager : MonoBehaviour
         if (IsHittingWristUI(hitObj))
             return;
 
-        if (hitObj.CompareTag("Selectable"))
+        GameObject selectableObject = FindSelectableObject(hitObj.transform);
+        if (selectableObject != null)
         {
-            if (SelectedObject == hitObj)
+            if (SelectedObject == selectableObject)
                 return; // Already selected — keep it so the user can grab it
-            SetSelectedObject(hitObj);
+            SetSelectedObject(selectableObject);
         }
         else
         {
             ClearSelection();
         }
+    }
+
+    private static GameObject FindSelectableObject(Transform hitTransform)
+    {
+        Transform current = hitTransform;
+        while (current != null)
+        {
+            if (current.CompareTag("Selectable"))
+                return current.gameObject;
+            current = current.parent;
+        }
+
+        return null;
     }
 
     bool IsInteractingWithUI()
@@ -159,7 +218,7 @@ public class SelectionManager : MonoBehaviour
         }
 
         SelectedObject = newSelection;
-        selectedRenderer = SelectedObject.GetComponent<Renderer>();
+        selectedRenderer = SelectedObject.GetComponentInChildren<Renderer>();
         if (selectedRenderer != null)
         {
             originalMaterial = selectedRenderer.material;

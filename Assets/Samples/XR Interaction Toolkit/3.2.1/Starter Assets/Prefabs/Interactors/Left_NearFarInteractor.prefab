@@ -638,7 +638,7 @@ MonoBehaviour:
   m_SmoothOffset: 0
   m_SmoothingSpeed: 10
   m_UseDistanceBasedVelocityScaling: 1
-  m_UseMomentum: 1
+  m_UseMomentum: 0
   m_MomentumDecayScale: 1.25
   m_MomentumDecayScaleFromInput: 5.5
   m_ZVelocityRampThreshold: 0.3

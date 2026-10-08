@@ -178,7 +178,8 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
             return;
         }
 
-        robotController = ikController;
+        EnsureRobotController();
+        EnsureGhostReferences();
 
         InitializeUIElements();
         SetupEventHandlers();
@@ -186,6 +187,46 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
         // Start planner querying immediately
         StartPlannerQuerying();
+    }
+
+    private bool EnsureRobotController()
+    {
+        if (robotController != null)
+        {
+            return true;
+        }
+
+        robotController = ikController;
+        if (robotController == null)
+        {
+            Debug.LogWarning("MoveItPlanningRequestMenuUI: DirectArticulationIKController is not assigned.");
+            return false;
+        }
+
+        return true;
+    }
+
+    private void EnsureGhostReferences()
+    {
+        if (ghostSpawner == null)
+        {
+            ghostSpawner = GetComponent<SpawnGhosts>() ??
+                FindFirstObjectByType<SpawnGhosts>(FindObjectsInactive.Include);
+            if (ghostSpawner != null)
+            {
+                Debug.LogWarning($"MoveItPlanningRequestMenuUI: ghostSpawner was not assigned; using '{ghostSpawner.name}'.");
+            }
+        }
+
+        if (trajectoryReplayer == null)
+        {
+            trajectoryReplayer = GetComponent<TrajectoryReplay>() ??
+                FindFirstObjectByType<TrajectoryReplay>(FindObjectsInactive.Include);
+            if (trajectoryReplayer != null)
+            {
+                Debug.LogWarning($"MoveItPlanningRequestMenuUI: trajectoryReplayer was not assigned; using '{trajectoryReplayer.name}'.");
+            }
+        }
     }
 
     private void StartPlannerQuerying()
@@ -434,9 +475,8 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     {
         if (!isMirroring) return;
 
-        if (robotController == null)
+        if (!EnsureRobotController())
         {
-            Debug.Log("MoveItPlanningRequestMenuUI: DirectArticulationIKController not assigned.");
             return;
         }
 
@@ -507,8 +547,13 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     {
         if (!allowStartGoalEditing) return;
         ObjectMetricsLogger.Instance?.LogEvent("set_start_state", PlanningRequestObjectId);
+        EnsureGhostReferences();
 
-        if (!startSet)
+        if (ghostSpawner == null)
+        {
+            Debug.LogWarning("MoveItPlanningRequestMenuUI: ghostSpawner not assigned; start ghost not spawned.");
+        }
+        else if (!startSet)
         {
             ghostSpawner.SpawnStartGhost();
             startSet = true;
@@ -535,8 +580,13 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
     {
         if (!allowStartGoalEditing) return;
         ObjectMetricsLogger.Instance?.LogEvent("set_goal_state", PlanningRequestObjectId);
+        EnsureGhostReferences();
 
-        if (!goalSet)
+        if (ghostSpawner == null)
+        {
+            Debug.LogWarning("MoveItPlanningRequestMenuUI: ghostSpawner not assigned; goal ghost not spawned.");
+        }
+        else if (!goalSet)
         {
             ghostSpawner.SpawnGoalGhost();
             goalSet = true;
@@ -669,7 +719,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
     private RobotStateMsg GetRobotStateMsgFromController()
     {
-        if (robotController == null) return new RobotStateMsg();
+        if (!EnsureRobotController()) return new RobotStateMsg();
 
         string[] names = RemapJointNamesToRos(robotController.GetJointStateNames());
         float[] positionsF = robotController.GetJointStatePositions();
@@ -721,9 +771,17 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
             return;
         }
 
-        if (ghostSpawner == null || robotController == null)
+        if (!EnsureRobotController())
         {
-            Debug.LogWarning("MoveItPlanningRequestMenuUI: ghostSpawner or robotController not assigned.");
+            Debug.LogWarning("MoveItPlanningRequestMenuUI: robotController not available for trajectory ghosts.");
+            return;
+        }
+
+        EnsureGhostReferences();
+
+        if (ghostSpawner == null)
+        {
+            Debug.LogWarning("MoveItPlanningRequestMenuUI: ghostSpawner not assigned.");
             return;
         }
 
@@ -832,6 +890,7 @@ public class MoveItPlanningRequestMenuUI : MonoBehaviour
 
     private void PreviewTrajectory(JointTrajectoryMsg trajectory)
     {
+        EnsureGhostReferences();
         if (trajectoryReplayer != null)
         {
             stopReplayButton.SetEnabled(true);

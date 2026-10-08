@@ -26,25 +26,25 @@ public class SurveyStepDisplay : MonoBehaviour
     {
         new Step(
             "Survey",
-            "You have finished all the scenes for this task. Now, you will be shown a series of questions. Please tell the study administrator that you are about to begin the survey and then verbally tell them your answer to the following questions.\n\nPress the 'B' button to advance to the first question, then point at the Confirm button on the panel that appears and pull the trigger."),
+            "You have finished all the scenes for this task. Now, you will be shown a series of questions. Please tell the study administrator that you are about to begin the survey and then verbally tell them your answer to the following questions.\n\nPress the 'B' button to advance to the first question."),
         new Step(
             "Mental Demand",
-            "How much mental and perceptual activity was required (e.g. thinking, deciding, calculating, remembering, looking, searching, etc.)? Was the task easy or demanding, simple or complex, exacting or forgiving?\n\nPlease rate on a scale from 0 (Low) to 100 (High) in an increment of 5.\n\nPlease verbally tell the study administrator your answer. Then, press 'B' to advance to the next question, and select Confirm on the panel that appears."),
+            "How much mental and perceptual activity was required (e.g. thinking, deciding, calculating, remembering, looking, searching, etc.)? Was the task easy or demanding, simple or complex, exacting or forgiving?\n\nPlease rate on a scale from 0 (Low) to 100 (High) in an increment of 5.\n\nPlease verbally tell the study administrator your answer. Then, press 'B' to advance to the next question."),
         new Step(
             "Physical Demand",
-            "How much physical activity was required (e.g., pushing, pulling, turning, controlling, activating, etc.)? Was the task easy or demanding, slow or brisk, slack or strenuous, restful or laborious?\n\nPlease rate on a scale from 0 (Low) to 100 (High) in an increment of 5.\n\nPlease verbally tell the study administrator your answer. Then, press 'B' to advance to the next question, and select Confirm on the panel that appears."),
+            "How much physical activity was required (e.g., pushing, pulling, turning, controlling, activating, etc.)? Was the task easy or demanding, slow or brisk, slack or strenuous, restful or laborious?\n\nPlease rate on a scale from 0 (Low) to 100 (High) in an increment of 5.\n\nPlease verbally tell the study administrator your answer. Then, press 'B' to advance to the next question."),
         new Step(
             "Temporal Demand",
-            "How much time pressure did you feel due to the rate or pace at which the tasks or task elements occurred? Was the pace slow and leisurely or rapid and frantic?\n\nPlease rate on a scale from 0 (Low) to 100 (High) in an increment of 5.\n\nPlease verbally tell the study administrator your answer. Then, press 'B' to advance to the next question, and select Confirm on the panel that appears."),
+            "How much time pressure did you feel due to the rate or pace at which the tasks or task elements occurred? Was the pace slow and leisurely or rapid and frantic?\n\nPlease rate on a scale from 0 (Low) to 100 (High) in an increment of 5.\n\nPlease verbally tell the study administrator your answer. Then, press 'B' to advance to the next question."),
         new Step(
             "Performance",
-            "How successful do you think you were in accomplishing the goals of the task set by the experimenter (or yourself)? How satisfied were you with your performance in accomplishing these goals?\n\nPlease rate on a scale from 0 (Poor) to 100 (Good) in an increment of 5.\n\nPlease verbally tell the study administrator your answer. Then, press 'B' to advance to the next question, and select Confirm on the panel that appears."),
+            "How successful do you think you were in accomplishing the goals of the task set by the experimenter (or yourself)? How satisfied were you with your performance in accomplishing these goals?\n\nPlease rate on a scale from 0 (Poor) to 100 (Good) in an increment of 5.\n\nPlease verbally tell the study administrator your answer. Then, press 'B' to advance to the next question."),
         new Step(
             "Effort",
-            "How hard did you have to work (mentally and physically) to accomplish your level of performance?\n\nPlease rate on a scale from 0 (Low) to 100 (High) in an increment of 5.\n\nPlease verbally tell the study administrator your answer. Then, press 'B' to advance to the next question, and select Confirm on the panel that appears."),
+            "How hard did you have to work (mentally and physically) to accomplish your level of performance?\n\nPlease rate on a scale from 0 (Low) to 100 (High) in an increment of 5.\n\nPlease verbally tell the study administrator your answer. Then, press 'B' to advance to the next question."),
         new Step(
             "Frustration Level",
-            "How insecure, discouraged, irritated, stressed and annoyed versus secure, gratified, content, relaxed and complacent did you feel during the task?\n\nPlease rate on a scale from 0 (Low) to 100 (High) in an increment of 5.\n\nPlease verbally tell the study administrator your answer. Then, press 'B' to continue the study, and select Confirm on the panel that appears.")
+            "How insecure, discouraged, irritated, stressed and annoyed versus secure, gratified, content, relaxed and complacent did you feel during the task?\n\nPlease rate on a scale from 0 (Low) to 100 (High) in an increment of 5.\n\nPlease verbally tell the study administrator your answer. Then, press 'B' to continue the study.")
     };
 
     [SerializeField] private UIDocument uiDocument;
@@ -54,6 +54,7 @@ public class SurveyStepDisplay : MonoBehaviour
     private Label stepCounterLabel;
     private Label bodyLabel;
     private int stepIndex;
+    private InputAction _backAction;
 
     private void OnEnable()
     {
@@ -81,11 +82,35 @@ public class SurveyStepDisplay : MonoBehaviour
         {
             Debug.LogError("SurveyStepDisplay: Advance action is not assigned.");
         }
+
+        // Resolved from the rig's InputActionManager by name (SpawnHuman's pattern), so no
+        // scene rewiring is needed. Right-controller 'A' returns to the previous question,
+        // unconfirmed — matching the B-button page turns, which are also unconfirmed.
+        _backAction = StudyInputActions.FindStepBack();
+        if (_backAction != null)
+        {
+            _backAction.performed += OnBackPressed;
+            _backAction.Enable();
+        }
+        else
+        {
+            Debug.LogWarning("SurveyStepDisplay: No 'StepBack' action found; back navigation disabled.");
+        }
     }
 
     private void OnAdvancePressed(InputAction.CallbackContext context)
     {
         StudyController.ConfirmAdvance(PerformAdvance);
+    }
+
+    private void OnBackPressed(InputAction.CallbackContext context)
+    {
+        if (stepIndex <= 0)
+            return;
+
+        stepIndex--;
+        ShowCurrentStep();
+        ObjectMetricsLogger.Instance?.LogEvent("step_back", "survey");
     }
 
     // Runs only once the participant confirms the advance via the dialog.
@@ -98,18 +123,28 @@ public class SurveyStepDisplay : MonoBehaviour
             return;
         }
 
-        if (advanceAction != null)
-        {
-            advanceAction.action.performed -= OnAdvancePressed;
-        }
-
         if (StudyController.Instance != null)
         {
-            StudyController.Instance.FinishSurvey();
+            if (!StudyController.Instance.FinishSurvey())
+            {
+                stepIndex = Steps.Length - 1;
+                return;
+            }
         }
         else
         {
             Debug.LogError("SurveyStepDisplay: No StudyController found to finish the survey.");
+            stepIndex = Steps.Length - 1;
+            return;
+        }
+
+        if (advanceAction != null)
+        {
+            advanceAction.action.performed -= OnAdvancePressed;
+        }
+        if (_backAction != null)
+        {
+            _backAction.performed -= OnBackPressed;
         }
     }
 
@@ -124,7 +159,11 @@ public class SurveyStepDisplay : MonoBehaviour
                 : $"Question {stepIndex} of {Steps.Length - 1} — {step.Heading}";
         }
         if (bodyLabel != null)
-            bodyLabel.text = step.Body;
+        {
+            bodyLabel.text = stepIndex > 0
+                ? step.Body + "\n\nPress 'A' on your right controller to return to the previous question."
+                : step.Body;
+        }
     }
 
     private void OnDisable()
@@ -132,6 +171,10 @@ public class SurveyStepDisplay : MonoBehaviour
         if (advanceAction != null)
         {
             advanceAction.action.performed -= OnAdvancePressed;
+        }
+        if (_backAction != null)
+        {
+            _backAction.performed -= OnBackPressed;
         }
     }
 }

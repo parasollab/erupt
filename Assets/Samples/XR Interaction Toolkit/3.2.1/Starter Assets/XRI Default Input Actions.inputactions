@@ -2275,9 +2275,9 @@
                     "initialStateCheck": false
                 },
                 {
-                    "name": "GoBackStudy",
+                    "name": "StepBack",
                     "type": "Button",
-                    "id": "9542e82f-4294-4754-98ea-5ede1dc88161",
+                    "id": "fc9e0fa9-ae6f-4884-af77-264a4818e9ef",
                     "expectedControlType": "",
                     "processors": "",
                     "interactions": "",
@@ -2628,28 +2628,6 @@
                 },
                 {
                     "name": "",
-                    "id": "d49ac197-4b6f-445e-807f-381486ae60b6",
-                    "path": "<OculusTouchController>{RightHand}/primaryButton",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "",
-                    "action": "GoBackStudy",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
-                    "id": "5d00086a-0a2f-4fe8-a4ea-1bd69d844740",
-                    "path": "<QuestTouchPlusController>{RightHand}/primaryButton",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "",
-                    "action": "GoBackStudy",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
                     "id": "a2f91f67-6053-4bb6-8e66-f6ec1bb18a89",
                     "path": "<OculusTouchController>{RightHand}/secondaryButton",
                     "interactions": "",
@@ -2683,12 +2661,34 @@
                 },
                 {
                     "name": "",
-                    "id": "e5bb47f3-b8f2-410a-b810-df59016c302b",
+                    "id": "89234183-1f53-463c-905f-7bf0d820eaa0",
+                    "path": "<OculusTouchController>{RightHand}/primaryButton",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "StepBack",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "b05b621a-7d58-461b-a93b-956848f10f5b",
+                    "path": "<QuestTouchPlusController>{RightHand}/primaryButton",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "StepBack",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "d90d3e33-a524-4813-9d67-2d4c7af3e845",
                     "path": "<Keyboard>/backspace",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
-                    "action": "GoBackStudy",
+                    "action": "StepBack",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }
