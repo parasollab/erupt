@@ -16,6 +16,9 @@ public class SelectableGrabController : MonoBehaviour
     private bool isSelected = false;
     private bool isGrabbed = false;
     private SelectionManager subscribedSelectionManager;
+    // Scale when the first hand grabbed, so a two-handed resize (XRTwoHandedScaleTransformer
+    // only rewrites localScale and never logs) can be reported as an edit_operation on release.
+    private Vector3 grabStartScale;
 
     void Start()
     {
@@ -98,9 +101,13 @@ public class SelectableGrabController : MonoBehaviour
         UpdateGrabState();
 
         CollisionObjectPublisher publisher = GetComponent<CollisionObjectPublisher>();
-        if (!wasGrabbed && publisher != null)
+        if (!wasGrabbed)
         {
-            ObjectMetricsLogger.Instance?.LogEvent("grab_start", publisher.objectId);
+            grabStartScale = transform.localScale;
+            if (publisher != null)
+            {
+                ObjectMetricsLogger.Instance?.LogEvent("grab_start", publisher.objectId);
+            }
         }
     }
 
@@ -116,6 +123,20 @@ public class SelectableGrabController : MonoBehaviour
         {
             // ObjectMetricsLogger makes this relative to the robot base transform itself.
             ObjectMetricsLogger.Instance?.LogEvent("grab_end", publisher.objectId, transform.position, transform.rotation);
+
+            // Two-handed scaling happens entirely inside the grab, so this is the only place
+            // the resulting size can be reported. Mirrors the wrist-menu slider's resize log
+            // (same event type, same scale payload) so both resize paths look alike downstream.
+            const float scaleEpsilon = 0.001f;
+            if (Vector3.Distance(transform.localScale, grabStartScale) > scaleEpsilon)
+            {
+                ObjectMetricsLogger.Instance?.LogEvent("edit_operation", publisher.objectId,
+                    scale: transform.localScale,
+                    details: "resize:two_hand");
+                // Same reason as the slider: a scale-only change doesn't trip the publisher's
+                // position/rotation check, so push the new geometry to MoveIt explicitly.
+                publisher.ForceRepublish();
+            }
         }
     }
 
