@@ -6,11 +6,11 @@
       -1.1,
       -0.9
     ],
-    "resolution": 0.08,
+    "resolution": 0.05,
     "dims": [
-      29,
-      29,
-      28
+      45,
+      45,
+      44
     ],
     "max_radius": 0.0,
     "n_dirs": 15,
@@ -91,63 +91,106 @@
         0.0
       ]
     },
-    "voxels_total": 23548,
-    "voxels_sampled": 23548,
-    "voxels_reachable": 7275,
-    "reachable_fraction_of_sampled": 0.3089434346865976,
+    "voxels_total": 89100,
+    "voxels_sampled": 89100,
+    "voxels_reachable": 33090,
+    "reachable_fraction_of_sampled": 0.37138047138047137,
     "reachable_per_direction": {
-      "down": 4920,
-      "down30_+x": 4959,
-      "down30_+y": 4839,
-      "down30_-x": 4993,
-      "down30_-y": 4841,
-      "down60_+x": 4924,
-      "down60_+y": 4713,
-      "down60_-x": 4870,
-      "down60_-y": 4678,
-      "horiz_+x": 4575,
-      "horiz_+y": 3831,
-      "horiz_-x": 4517,
-      "horiz_-y": 3318,
-      "up": 4989,
-      "radial_out": 5413
+      "down": 27742,
+      "down30_+x": 27657,
+      "down30_+y": 27637,
+      "down30_-x": 27645,
+      "down30_-y": 27680,
+      "down60_+x": 27268,
+      "down60_+y": 27184,
+      "down60_-x": 27250,
+      "down60_-y": 27255,
+      "horiz_+x": 26936,
+      "horiz_+y": 26949,
+      "horiz_-x": 26945,
+      "horiz_-y": 26951,
+      "up": 27846,
+      "radial_out": 29440
     },
     "dexterity_histogram": {
-      "0.0-0.1": 16461,
-      "0.1-0.2": 244,
-      "0.2-0.3": 544,
-      "0.3-0.4": 277,
-      "0.4-0.5": 695,
-      "0.5-0.6": 447,
-      "0.6-0.7": 1182,
-      "0.7-0.8": 779,
-      "0.8-0.9": 1848,
-      "0.9-1.0": 1071
+      "0.0-0.1": 56491,
+      "0.1-0.2": 570,
+      "0.2-0.3": 951,
+      "0.3-0.4": 489,
+      "0.4-0.5": 1669,
+      "0.5-0.6": 1130,
+      "0.6-0.7": 2035,
+      "0.7-0.8": 1424,
+      "0.8-0.9": 4924,
+      "0.9-1.0": 19417
     },
-    "size_bytes": 94429
+    "size_bytes": 356637
   },
   "generator": {
-    "group": "ur_manipulator",
-    "ik_link": "",
+    "method": "fk_sampling",
+    "robot": "ur5e",
+    "robot_profile": "/home/courtney/erupt_ws/install/planning_scene_utils/share/planning_scene_utils/config/reachability/ur5e.yaml",
+    "curobo_robot_config": "ur5e.yml",
     "frame_id": "base_link",
+    "joint_names": [
+      "shoulder_pan_joint",
+      "shoulder_lift_joint",
+      "elbow_joint",
+      "wrist_1_joint",
+      "wrist_2_joint",
+      "wrist_3_joint"
+    ],
     "extent_xy": 1.1,
     "z_min": -0.9,
     "z_max": 1.25,
-    "resolution": 0.08,
+    "resolution": 0.05,
     "max_radius": 1.05,
     "clip_center": [
       0.0,
       0.0,
       0.1625
     ],
-    "ik_timeout": 0.01,
-    "avoid_collisions": false,
-    "seed_joint_names": [],
-    "seed_joint_positions": [
-      0.0
-    ],
-    "ik_calls_done": 141840,
-    "ik_calls_total": 141840,
-    "elapsed_seconds": 498.94234117499946
+    "samples": 100000000,
+    "batch": 262144,
+    "slots_per_bin": 8,
+    "direction_tolerance_deg": 15.0,
+    "distinct_tol": 0.35,
+    "reject_self_collision": true,
+    "random_seed": 0,
+    "elapsed_seconds": 7.177619156999754
+  },
+  "sampling": {
+    "samples_drawn": 100000000,
+    "samples_self_colliding": 27177788,
+    "samples_in_grid": 72822212,
+    "candidate_pairs": 18907481,
+    "seconds": 3.1,
+    "bits_set": 412385,
+    "bits_low_confidence": {
+      "hits<=1": 7508,
+      "hits<=2": 12602,
+      "hits<=5": 24046,
+      "hits<=10": 48668
+    },
+    "bits_found_in_last_10pct_of_samples": 775,
+    "stored_configs_per_bit": {
+      "1": 7799,
+      "2": 5425,
+      "3": 4506,
+      "4": 4139,
+      "5": 4438,
+      "6": 4662,
+      "7": 5504,
+      "8": 375912
+    },
+    "configs_total": 3144709
+  },
+  "configs": {
+    "file": "ur5e_ur_manipulator.configs.npz",
+    "rmap_sha1": "918d33168e50488f19af50c65e2fb7c6fb8aa433",
+    "rows": 3144709,
+    "pos_tolerance": 0.04330127018922193,
+    "dir_tolerance_deg": 15.0,
+    "set_bits_without_config": 0
   }
 }
