@@ -6,6 +6,7 @@ using RosMessageTypes.Shape;
 using RosMessageTypes.Geometry;
 using RosMessageTypes.Std;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using RosMessageTypes.BuiltinInterfaces;
 using Unity.Robotics.ROSTCPConnector.MessageGeneration;
@@ -26,6 +27,8 @@ public class CollisionObjectPublisher : MonoBehaviour
     public bool isMesh = false;
     public bool autoDetectMeshType = false; // New field for automatic detection
     public bool createReadableMeshCopy = false; // Create readable copy of non-readable meshes
+    [Tooltip("Compound object: every Unity primitive (cube, sphere, cylinder) on this object and under these transforms is published as one primitive of this collision object, posed relative to this transform. The factory station uses it so a single planning-scene object (\"table\", the MTC surface link) carries the table, trays, totes, fixture and chute: the arm avoids all of them and the carried part may touch any of them.")]
+    public Transform[] compoundRoots;
     public float publishRateHz = 1f;
     public bool trackLatency = false;
     // Off by default so the study's /latency_data rows keep their 3-column shape
@@ -385,6 +388,16 @@ public class CollisionObjectPublisher : MonoBehaviour
                     return;
                 }
             }
+            else if (compoundRoots != null && compoundRoots.Length > 0)
+            {
+                if (!TryBuildCompoundPrimitives(out SolidPrimitiveMsg[] primitives, out PoseMsg[] primitivePoses))
+                {
+                    Debug.LogError($"No Unity primitives found on '{gameObject.name}' or under its compoundRoots - cannot publish collision object '{objectId}'");
+                    return;
+                }
+                msg.primitives = primitives;
+                msg.primitive_poses = primitivePoses;
+            }
             else
             {
                 SolidPrimitiveMsg primitive = CreatePrimitiveFromUnityShape();
@@ -456,6 +469,22 @@ public class CollisionObjectPublisher : MonoBehaviour
         Debug.Log("[CollisionObjectPublisher] Cleared all world collision objects from the planning scene.");
     }
 
+    /// <summary>
+    /// Removes one object this app does not own from the planning scene (e.g. a part left
+    /// behind by an earlier Unity session that quit without its REMOVEs reaching ROS).
+    /// </summary>
+    public static void PublishRemove(string id)
+    {
+        if (string.IsNullOrEmpty(id)) return;
+        EnqueueOutgoing(new CollisionObjectMsg
+        {
+            id = id,
+            header = new HeaderMsg { frame_id = "world", stamp = GetRosTimestamp() },
+            operation = CollisionObjectMsg.REMOVE
+        });
+        s_AddedFrameById.Remove(id);
+    }
+
     // Publishes REMOVEs for every id that was ADDed at some point but no longer has a live
     // publisher. Called by StudyController after a scene transition completes, when teardown
     // REMOVEs (published from OnDestroy mid-transition) may have been lost.
@@ -509,15 +538,61 @@ public class CollisionObjectPublisher : MonoBehaviour
     {
         // Get the mesh filter to determine what Unity primitive this is
         MeshFilter meshFilter = GetComponent<MeshFilter>();
-        if (meshFilter == null || meshFilter.mesh == null)
+        if (meshFilter == null || meshFilter.sharedMesh == null)
         {
             return null;
         }
 
-        string meshName = meshFilter.mesh.name;
         // lossyScale, not localScale: props nested under scaled parents (e.g. the 0.12-scaled
         // computer model in the Task4 factory scenes) need the full hierarchy scale.
-        Vector3 scale = transform.lossyScale;
+        return PrimitiveFromUnityMesh(meshFilter.sharedMesh.name, transform.lossyScale);
+    }
+
+    // Every active Unity primitive on this object and under compoundRoots, each posed relative
+    // to this transform. The relative pose is computed from rotation and position only: this
+    // object may itself be a scaled cube (the station table), and InverseTransformPoint would
+    // divide the offsets by that scale.
+    bool TryBuildCompoundPrimitives(out SolidPrimitiveMsg[] primitives, out PoseMsg[] poses)
+    {
+        var shapes = new List<SolidPrimitiveMsg>();
+        var shapePoses = new List<PoseMsg>();
+        Quaternion inverse = Quaternion.Inverse(transform.rotation);
+
+        void Add(MeshFilter mf)
+        {
+            if (mf == null || mf.sharedMesh == null) return;
+            SolidPrimitiveMsg shape = PrimitiveFromUnityMesh(mf.sharedMesh.name, mf.transform.lossyScale);
+            if (shape == null)
+            {
+                Debug.LogWarning($"[{gameObject.name}] '{mf.name}' is not a Unity primitive; left out of compound collision object '{objectId}'");
+                return;
+            }
+            Vector3 localPosition = inverse * (mf.transform.position - transform.position);
+            Quaternion localRotation = inverse * mf.transform.rotation;
+            shapes.Add(shape);
+            shapePoses.Add(new PoseMsg(
+                RosUnityConversion.UnityToRosPosition(localPosition),
+                RosUnityConversion.UnityToRosQuaternion(localRotation)));
+        }
+
+        Add(GetComponent<MeshFilter>());
+        foreach (Transform root in compoundRoots)
+        {
+            if (root == null) continue;
+            foreach (MeshFilter mf in root.GetComponentsInChildren<MeshFilter>(false))
+                Add(mf);
+        }
+
+        primitives = shapes.ToArray();
+        poses = shapePoses.ToArray();
+        return primitives.Length > 0;
+    }
+
+    // Maps a Unity primitive mesh (by name) at the given world scale to a MoveIt solid primitive;
+    // null for anything that is not a Unity primitive.
+    static SolidPrimitiveMsg PrimitiveFromUnityMesh(string meshName, Vector3 scale)
+    {
+        if (string.IsNullOrEmpty(meshName)) return null;
 
         // Match Unity primitive types based on mesh name
         if (meshName.Contains("Cube"))

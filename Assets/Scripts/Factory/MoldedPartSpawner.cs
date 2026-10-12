@@ -54,6 +54,8 @@ namespace Factory
         void OnEnable()
         {
             if (molder != null) molder.Ejected += SpawnPart;
+            // Parts of earlier sessions that are still in MoveIt's scene get removed, not mirrored.
+            if (listener != null) listener.ClaimIdPrefix(idPrefix);
         }
 
         void OnDisable()

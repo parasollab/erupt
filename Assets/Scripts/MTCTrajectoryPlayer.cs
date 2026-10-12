@@ -1,10 +1,13 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using RosMessageTypes.MoveitTaskConstructorMsgs;
 using RosMessageTypes.BuiltinInterfaces;
 using RosMessageTypes.Moveit;
 using RosMessageTypes.Trajectory;
+using RosMessageTypes.Sensor;
+using Erupt.Ros;
 
 public class MTCTrajectoryPlayer : MonoBehaviour
 {
@@ -25,9 +28,26 @@ public class MTCTrajectoryPlayer : MonoBehaviour
     public string LastProblem { get; private set; }
     public event System.Action<string> OnProblem;
 
+    [Header("Live execution")]
+    [Tooltip("While this client executes a solution the Unity robot follows /joint_states, so the real motion " +
+             "is shown (previews are stopped). Found in the scene when empty.")]
+    [SerializeField] private PickPlaceClient pickPlaceClient;
+    [SerializeField] private string jointStateTopic = "/joint_states";
+
+    [Tooltip("Log every preview step (segment index, joints, attach/detach) to the console.")]
+    public bool verboseLog = false;
+
+    private IRosBus ros;
+    private bool mirroring;
+    private JointStateMsg latestJointState;
+    /// <summary>True while the Unity robot follows the live /joint_states (during execution).</summary>
+    public bool IsMirroring => mirroring;
+
     private bool isPlaying;
     /// <summary>True while a solution preview is animating the robot.</summary>
     public bool IsPlaying => isPlaying;
+    /// <summary>Index of the sub-trajectory being previewed, or -1.</summary>
+    public int CurrentStep { get; private set; } = -1;
     private Coroutine playRoutine;
     private string[] savedNames;
     private float[] savedPositions;
@@ -46,6 +66,74 @@ public class MTCTrajectoryPlayer : MonoBehaviour
         public bool wasPaused;
     }
     private readonly Dictionary<string, PreviewAttach> previewAttached = new();
+
+    private void Start()
+    {
+        if (pickPlaceClient == null) pickPlaceClient = FindFirstObjectByType<PickPlaceClient>(FindObjectsInactive.Include);
+        if (pickPlaceClient != null)
+        {
+            pickPlaceClient.OnPhaseChanged += OnClientPhaseChanged;
+            OnClientPhaseChanged();
+        }
+    }
+
+    private void OnDestroy()
+    {
+        if (pickPlaceClient != null) pickPlaceClient.OnPhaseChanged -= OnClientPhaseChanged;
+        StopLiveMirror();
+    }
+
+    private void Update()
+    {
+        if (mirroring) ApplyLatestJointState();
+    }
+
+    private void OnClientPhaseChanged()
+    {
+        if (pickPlaceClient != null && pickPlaceClient.Phase == PickPlacePhase.Executing) StartLiveMirror();
+        else StopLiveMirror();
+    }
+
+    /// <summary>Follow /joint_states on the Unity robot; any running preview is stopped first.</summary>
+    public void StartLiveMirror()
+    {
+        if (mirroring || ikController == null) return;
+        ros ??= RosBus.Instance;
+        if (ros == null) return;
+        Stop();
+        ros.Subscribe<JointStateMsg>(jointStateTopic, OnJointState);
+        mirroring = true;
+    }
+
+    /// <summary>Stop following /joint_states; the robot stays at the last state received.</summary>
+    public void StopLiveMirror()
+    {
+        if (!mirroring) return;
+        mirroring = false;
+        ros?.Unsubscribe<JointStateMsg>(jointStateTopic, OnJointState);
+        ApplyLatestJointState();
+    }
+
+    // Messages arrive far faster than frames; only the newest one is applied, once per frame.
+    private void OnJointState(JointStateMsg msg) => latestJointState = msg;
+
+    private void ApplyLatestJointState()
+    {
+        var msg = latestJointState;
+        latestJointState = null;
+        if (msg?.name == null || msg.position == null || ikController == null) return;
+        string[] mapped = MapJointNames(msg.name);
+        if (mapped == null) return;
+        var names = new List<string>(mapped.Length);
+        var positions = new List<double>(mapped.Length);
+        for (int i = 0; i < mapped.Length && i < msg.position.Length; i++)
+        {
+            if (!ikController.HasJoint(mapped[i])) continue;
+            names.Add(mapped[i]);
+            positions.Add(msg.position[i]);
+        }
+        if (names.Count > 0) ikController.ApplyJointState(names.ToArray(), positions.ToArray());
+    }
 
     public void PlaySolution(SolutionMsg solution) => PlaySolution(solution, 0, int.MaxValue);
 
@@ -98,6 +186,11 @@ public class MTCTrajectoryPlayer : MonoBehaviour
             {
                 if (!isPlaying) break;
                 var seg = solution.sub_trajectory[step];
+                CurrentStep = step;
+                if (verboseLog)
+                    Debug.Log($"[MTCTrajectoryPlayer] step {step} stage={seg.info?.stage_id} pts={seg.trajectory?.joint_trajectory?.points?.Length ?? 0} " +
+                              $"joints={(seg.trajectory?.joint_trajectory?.joint_names == null ? "-" : string.Join(",", seg.trajectory.joint_trajectory.joint_names))} " +
+                              $"acos={string.Join(",", (seg.scene_diff?.robot_state?.attached_collision_objects ?? System.Array.Empty<AttachedCollisionObjectMsg>()).Select(a => $"{(a.@object?.operation == CollisionObjectMsg.REMOVE ? "REMOVE" : "ADD")}:{a.@object?.id}"))}");
 
                 // Attach/detach stages are zero-motion ModifyPlanningScene segments — the
                 // scene_diff must be processed even when there is no trajectory to play.
@@ -106,8 +199,8 @@ public class MTCTrajectoryPlayer : MonoBehaviour
                 var jt = seg.trajectory?.joint_trajectory;
                 if (jt == null || jt.points == null || jt.points.Length == 0) continue;
 
-                // Gripper open/close segments only name finger joints, which the Unity arm
-                // controller does not drive. Skip those; the preview is only impossible
+                // Arm and gripper (finger) segments are both played. A segment naming only
+                // joints the Unity robot lacks is skipped; the preview is only impossible
                 // when no segment at all moves a joint the Unity robot has.
                 string[] names = MapJointNames(jt.joint_names);
                 if (names == null)
@@ -133,12 +226,13 @@ public class MTCTrajectoryPlayer : MonoBehaviour
 
             if (isPlaying && !playedAny && unmatched.Count > 0)
                 Report($"none of the solution's joints ({string.Join(", ", unmatched)}) exist on the Unity robot " +
-                       $"({string.Join(", ", ikController.JointNames)})");
+                       $"({string.Join(", ", ikController.GetJointStateNames())})");
         }
         finally
         {
             RestorePose();
             isPlaying = false;
+            CurrentStep = -1;
             playRoutine = null;
         }
     }
@@ -180,6 +274,7 @@ public class MTCTrajectoryPlayer : MonoBehaviour
 
         Track(id, go).attached = true;
         AttachedObjectPlacement.Place(go.transform, link, poseInLink);
+        if (verboseLog) Debug.Log($"[MTCTrajectoryPlayer] preview attach '{id}' to {link.name} at step {CurrentStep}");
     }
 
     // Remember how the object was before the preview first touched it, and stop it streaming
@@ -211,6 +306,7 @@ public class MTCTrajectoryPlayer : MonoBehaviour
         state.attached = false;
         state.go.transform.SetParent(state.originalParent, worldPositionStays: true);
         state.go.transform.localScale = state.originalLocalScale;
+        if (verboseLog) Debug.Log($"[MTCTrajectoryPlayer] preview detach '{id}' at step {CurrentStep}, world pos {state.go.transform.position}");
     }
 
     // Put the robot and the mirrored objects where the solution starts. Everything moved here
@@ -229,12 +325,12 @@ public class MTCTrajectoryPlayer : MonoBehaviour
 
         if (hasJoints && jointState.position != null)
         {
-            // A full robot state also lists joints the Unity robot does not drive
-            // (fingers); only the ones it knows are applied.
+            // A full robot state may list joints the Unity robot does not have;
+            // only the ones it knows (arm and gripper) are applied.
             string[] mapped = MapJointNames(jointState.name);
             if (mapped != null)
             {
-                var known = new HashSet<string>(ikController.JointNames);
+                var known = new HashSet<string>(ikController.GetJointStateNames());
                 var names = new List<string>();
                 var positions = new List<double>();
                 for (int i = 0; i < mapped.Length && i < jointState.position.Length; i++)
@@ -331,7 +427,7 @@ public class MTCTrajectoryPlayer : MonoBehaviour
 
     private string[] MapJointNames(string[] rosNames)
     {
-        var known = new HashSet<string>(ikController.JointNames);
+        var known = new HashSet<string>(ikController.GetJointStateNames());
         var mapped = new string[rosNames.Length];
         int matched = 0;
         for (int i = 0; i < rosNames.Length; i++)
@@ -351,5 +447,9 @@ public class MTCTrajectoryPlayer : MonoBehaviour
 
     private static double DurationToSeconds(DurationMsg d) => d.sec + d.nanosec * 1e-9;
 
-    private void OnDisable() => Stop();
+    private void OnDisable()
+    {
+        Stop();
+        StopLiveMirror();
+    }
 }

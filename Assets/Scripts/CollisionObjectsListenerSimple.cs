@@ -153,6 +153,29 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
     /// that id back, but the listener must keep the existing object rather than rebuild
     /// coincident geometry on top of it.
     /// </summary>
+    // Id prefixes whose objects only ever originate in this app (factory parts). A planning-scene
+    // object with such an id that no live Unity object owns is a leftover of an earlier session
+    // whose REMOVEs never reached ROS; mirroring it would put an invisible duplicate exactly where
+    // the next session's part lands, and the gripper could then never close on the real part.
+    private readonly HashSet<string> _claimedIdPrefixes = new();
+
+    /// <summary>
+    /// Declares that every planning-scene object whose id starts with <paramref name="prefix"/>
+    /// belongs to this app: ones it does not own are removed from the scene instead of mirrored.
+    /// </summary>
+    public void ClaimIdPrefix(string prefix)
+    {
+        if (!string.IsNullOrEmpty(prefix)) _claimedIdPrefixes.Add(prefix);
+    }
+
+    private bool IsStaleClaimedId(string id)
+    {
+        if (_publisherOwnedIds.Contains(id) || attachedIds.Contains(id)) return false;
+        foreach (string prefix in _claimedIdPrefixes)
+            if (id.StartsWith(prefix)) return true;
+        return false;
+    }
+
     public void RegisterUnityOwnedObject(string id, GameObject unityObject)
     {
         if (string.IsNullOrEmpty(id)) return;
@@ -222,6 +245,16 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
             }
 
             Debug.Log($"[CO Listener] Skipping '{co.id}' — already managed by CollisionObjectPublisher.");
+            return;
+        }
+
+        if (co.operation != OP_REMOVE && IsStaleClaimedId(co.id))
+        {
+            Debug.LogWarning($"[CO Listener] '{co.id}' is a {string.Join("/", _claimedIdPrefixes)} object no live Unity object owns (left by an earlier session); removing it from the planning scene.");
+            CollisionObjectPublisher.PublishRemove(co.id);
+            if (objectsById.TryGetValue(co.id, out var stale) && stale) Destroy(stale);
+            objectsById.Remove(co.id);
+            _geometrySignatureById.Remove(co.id);
             return;
         }
 

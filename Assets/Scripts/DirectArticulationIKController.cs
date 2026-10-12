@@ -21,6 +21,12 @@ public class DirectArticulationIKController : MonoBehaviour
     [SerializeField] private float solveWeight = 0.85f;
     [SerializeField] private JointInitialPosition[] initialPose;
 
+    [Tooltip("Keep the robot's colliders out of physics contacts (they stay raycastable for selection). The robot is " +
+             "driven kinematically, so a contact with a carried part or the table can only shove the arm: opening the " +
+             "fingers around an attached part pushed the whole arm 16 cm up during previews, and every frame's joint " +
+             "write then baked that drift into the held pose.")]
+    [SerializeField] private bool ignorePhysicsContacts = true;
+
     private readonly HashSet<string> warnedMissingJoints = new HashSet<string>();
 
     private static readonly string[] DefaultInitialJointNames =
@@ -38,13 +44,45 @@ public class DirectArticulationIKController : MonoBehaviour
     private readonly List<ArticulationBody> joints = new List<ArticulationBody>();
     private readonly List<string> jointNames = new List<string>();
     private readonly Dictionary<string, ArticulationBody> jointByName = new Dictionary<string, ArticulationBody>();
+
+    // Prismatic URDF joints (the gripper fingers). They are not part of the IK chain, but they
+    // are held every FixedUpdate and addressable by name exactly like the arm joints. The
+    // imported fingers have no drive stiffness, so before this any contact — the carried part,
+    // the table, a tote wall — slid them freely and they stayed wherever they were pushed.
+    private readonly List<ArticulationBody> gripperJoints = new List<ArticulationBody>();
+    private readonly List<string> gripperJointNames = new List<string>();
+    private readonly List<float> heldGripperPositions = new List<float>();
+
+    [Serializable]
+    public struct JointMimic
+    {
+        [Tooltip("Joint that follows another one whenever an applied joint state does not name it.")]
+        public string joint;
+        [Tooltip("Joint it follows.")]
+        public string mimics;
+        public float multiplier;
+        public float offset;
+    }
+
+    [Tooltip("MoveIt trajectories name only active joints, so a URDF mimic finger never arrives; these rules fill it in from its source joint. Default: the second gripper finger follows the first.")]
+    [SerializeField] private JointMimic[] mimicJoints =
+    {
+        new JointMimic { joint = "fr3_finger_joint2", mimics = "fr3_finger_joint1", multiplier = 1f, offset = 0f }
+    };
     private readonly List<ArticulationBody> allBodies = new List<ArticulationBody>();
     private readonly List<float> heldJointPositions = new List<float>();
     private bool isInteracting;
 
     public Transform EndEffector => endEffector;
+    /// <summary>Arm (IK chain) joint names, index-aligned with <see cref="Joints"/>.</summary>
     public IReadOnlyList<string> JointNames => jointNames;
     public IReadOnlyList<ArticulationBody> Joints => joints;
+    /// <summary>Gripper (prismatic) joint names, index-aligned with <see cref="GripperJoints"/>.</summary>
+    public IReadOnlyList<string> GripperJointNames => gripperJointNames;
+    public IReadOnlyList<ArticulationBody> GripperJoints => gripperJoints;
+
+    /// <summary>True when <see cref="ApplyJointState(string[], double[])"/> can drive this joint (arm or gripper).</summary>
+    public bool HasJoint(string jointName) => !string.IsNullOrEmpty(jointName) && jointByName.ContainsKey(jointName);
 
     public int GetJointIndex(ArticulationBody joint)
     {
@@ -343,9 +381,13 @@ public class DirectArticulationIKController : MonoBehaviour
         return InteractionRefusal.None;
     }
 
+    /// <summary>Every joint this controller drives: the arm chain first, then the gripper joints.</summary>
     public string[] GetJointStateNames()
     {
-        return jointNames.ToArray();
+        var names = new List<string>(jointNames.Count + gripperJointNames.Count);
+        names.AddRange(jointNames);
+        names.AddRange(gripperJointNames);
+        return names.ToArray();
     }
 
     public void LogJointDriveLimits()
@@ -361,12 +403,17 @@ public class DirectArticulationIKController : MonoBehaviour
         }
     }
 
+    /// <summary>Positions in the order of <see cref="GetJointStateNames"/>.</summary>
     public float[] GetJointStatePositions()
     {
-        float[] positions = new float[joints.Count];
+        float[] positions = new float[joints.Count + gripperJoints.Count];
         for (int i = 0; i < joints.Count; i++)
         {
             positions[i] = ClampedRosPosition(joints[i]);
+        }
+        for (int i = 0; i < gripperJoints.Count; i++)
+        {
+            positions[joints.Count + i] = ClampedRosPosition(gripperJoints[i]);
         }
 
         return positions;
@@ -413,6 +460,7 @@ public class DirectArticulationIKController : MonoBehaviour
             ApplyNamedJointPosition(names[i], (float)positions[i]);
         }
 
+        ApplyMimics(names, count);
         CaptureHeldPose();
         ZeroJointVelocities();
     }
@@ -430,8 +478,31 @@ public class DirectArticulationIKController : MonoBehaviour
             ApplyNamedJointPosition(names[i], positions[i]);
         }
 
+        ApplyMimics(names, count);
         CaptureHeldPose();
         ZeroJointVelocities();
+    }
+
+    // Drives each mimic joint from its source when the applied state named the source but not
+    // the mimic (MoveIt trajectories carry only the active finger joint).
+    private void ApplyMimics(IList<string> names, int count)
+    {
+        if (mimicJoints == null) return;
+        foreach (JointMimic rule in mimicJoints)
+        {
+            if (string.IsNullOrWhiteSpace(rule.joint) || string.IsNullOrWhiteSpace(rule.mimics)) continue;
+            if (Names(names, count, rule.joint) || !Names(names, count, rule.mimics)) continue;
+            if (!jointByName.TryGetValue(rule.mimics, out ArticulationBody source) ||
+                !jointByName.TryGetValue(rule.joint, out ArticulationBody target)) continue;
+            ApplyJointPosition(target, source.jointPosition[0] * rule.multiplier + rule.offset);
+        }
+
+        static bool Names(IList<string> list, int n, string name)
+        {
+            for (int i = 0; i < n; i++)
+                if (list[i] == name) return true;
+            return false;
+        }
     }
 
     private void FixedUpdate()
@@ -451,6 +522,11 @@ public class DirectArticulationIKController : MonoBehaviour
         }
 
         allBodies.AddRange(robotRoot.GetComponentsInChildren<ArticulationBody>());
+        if (ignorePhysicsContacts)
+        {
+            foreach (Collider collider in robotRoot.GetComponentsInChildren<Collider>(true))
+                collider.excludeLayers = ~0;
+        }
         foreach (ArticulationBody body in allBodies)
         {
             body.useGravity = false;
@@ -472,6 +548,8 @@ public class DirectArticulationIKController : MonoBehaviour
     {
         joints.Clear();
         jointNames.Clear();
+        gripperJoints.Clear();
+        gripperJointNames.Clear();
         jointByName.Clear();
         if (robotRoot == null)
             return;
@@ -482,7 +560,7 @@ public class DirectArticulationIKController : MonoBehaviour
                 continue;
 
             ArticulationBody body = component.GetComponent<ArticulationBody>();
-            if (body == null || body.jointType != ArticulationJointType.RevoluteJoint)
+            if (body == null || !IsDrivable(body))
                 continue;
 
             bool gotName = TryGetUrdfJointName(component, out string name);
@@ -495,6 +573,8 @@ public class DirectArticulationIKController : MonoBehaviour
         var sb = new System.Text.StringBuilder("[IK] BuildJointChain discovered joints:");
         for (int i = 0; i < jointNames.Count; i++)
             sb.Append($"\n  [{i}] name='{jointNames[i]}' go='{joints[i].name}'");
+        for (int i = 0; i < gripperJointNames.Count; i++)
+            sb.Append($"\n  gripper [{i}] name='{gripperJointNames[i]}' go='{gripperJoints[i].name}'");
         Debug.Log(sb.ToString());
 
         // Fallback for robots not imported via the URDF importer.
@@ -502,16 +582,28 @@ public class DirectArticulationIKController : MonoBehaviour
         {
             foreach (ArticulationBody body in robotRoot.GetComponentsInChildren<ArticulationBody>(true))
             {
-                if (body.jointType == ArticulationJointType.RevoluteJoint)
+                if (IsDrivable(body))
                     AddJoint(body, body.name);
             }
         }
     }
 
+    // Revolute joints form the IK chain; prismatic ones are gripper fingers.
+    private static bool IsDrivable(ArticulationBody body) =>
+        body.jointType == ArticulationJointType.RevoluteJoint || body.jointType == ArticulationJointType.PrismaticJoint;
+
     private void AddJoint(ArticulationBody joint, string jointName)
     {
-        joints.Add(joint);
-        jointNames.Add(jointName);
+        if (joint.jointType == ArticulationJointType.PrismaticJoint)
+        {
+            gripperJoints.Add(joint);
+            gripperJointNames.Add(jointName);
+        }
+        else
+        {
+            joints.Add(joint);
+            jointNames.Add(jointName);
+        }
         jointByName[jointName] = joint;
     }
 
@@ -557,11 +649,16 @@ public class DirectArticulationIKController : MonoBehaviour
         {
             heldJointPositions.Add(joint.jointPosition[0]);
         }
+        heldGripperPositions.Clear();
+        foreach (ArticulationBody joint in gripperJoints)
+        {
+            heldGripperPositions.Add(joint.jointPosition[0]);
+        }
     }
 
     private void ApplyHeldPose()
     {
-        if (heldJointPositions.Count != joints.Count)
+        if (heldJointPositions.Count != joints.Count || heldGripperPositions.Count != gripperJoints.Count)
         {
             CaptureHeldPose();
         }
@@ -569,6 +666,10 @@ public class DirectArticulationIKController : MonoBehaviour
         for (int i = 0; i < joints.Count; i++)
         {
             ApplyJointPosition(joints[i], heldJointPositions[i]);
+        }
+        for (int i = 0; i < gripperJoints.Count; i++)
+        {
+            ApplyJointPosition(gripperJoints[i], heldGripperPositions[i]);
         }
 
         ZeroJointVelocities();

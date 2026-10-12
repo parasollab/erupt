@@ -35,6 +35,35 @@ The CAD exports have meaningless body names (`Body1:133`), so parts are picked g
 components into the prefabs and laid out the scene (copy into `Assets/Editor` to rerun; it overwrites
 FactoryDemo.unity from ReachabilityVR.unity).
 
+## URDF package (ROS 2)
+
+`factory_machines_description/` is an ament_cmake package with one URDF per machine
+(`urdf/haas_vf1.urdf`, `haas_st10.urdf`, `haas_ec500.urdf`, `injection_molder.urdf`), Collada visual
+meshes with the CAD colours and decimated STL collision meshes, plus `display.launch.py`
+(robot_state_publisher + joint_state_publisher_gui + RViz). Symlink or copy it into `erupt_ws/src`.
+
+- `prep/<m>.blend` are the assembled outputs of `bl_assemble.py` (one mesh object per part, pivot at the
+  object origin, `Static` for the rest) and are the archived source for the URDF meshes.
+- `urdf_spec_<m>.json` maps Blender objects to links and defines the joints: `type`, `axis`
+  (Blender/URDF frame: X right, Y back, Z up), `lower`/`upper`, `velocity`, `effort`, optional `mimic`,
+  nominal `mass`, per-link `collision_faces`; virtual links use `"mesh": null, "pivot_of"`. Joint origins
+  are computed as child pivot minus parent pivot, so re-pivoting a part in the spec moves the joint.
+  Values mirror the Unity prefab motion (Unity→Blender: `(x,y,z) → (−x,−z,y)`).
+- `bl_export_urdf.py <spec> <package_dir>` – headless Blender: converts materials to Principled nodes
+  (the Collada exporter reads those), exports each part in its pivot-local frame (`.dae` visual; STL
+  collision by edge-collapse decimation, or for `"collision_method": "voxel"` links by solidify → voxel
+  remesh → decimate, which keeps thin sheet-metal walls that plain collapse turns into spikes), computes box inertia and writes the URDF.
+- `bl_check_urdf.py <package_dir> <machine> <out_dir> [spec]` – verifies the URDF without ROS: XML/tree/
+  limit checks, mesh paths, DAE `Z_UP`/metre headers, binary STL, then re-imports every mesh, asserts the
+  imported transforms are identity, builds the kinematic tree and renders zero/lower/mid/upper poses
+  and the spec's `check_poses` (plus a flat-coloured collision pass) as PNGs.
+
+```
+B=/Applications/Blender.app/Contents/MacOS/Blender
+$B -b --python bl_export_urdf.py -- urdf_spec_vf1.json factory_machines_description
+$B -b --python bl_check_urdf.py  -- factory_machines_description haas_vf1 /tmp/chk urdf_spec_vf1.json
+```
+
 ## FR3 pick-and-place station (MTC)
 
 `Assets/Editor/MtcSceneBuilder.cs` ("ERUPT/Scenes/Build FactoryDemo MTC station") moves the MTC stack

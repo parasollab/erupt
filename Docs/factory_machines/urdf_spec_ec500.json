@@ -1,0 +1,18 @@
+{
+ "machine": "haas_ec500", "blend": "prep/ec500.blend", "root_empty": "HaasEC500", "collision_faces": 3000,
+ "links": {
+  "base_link":      {"mesh": "Static",        "mass": 9000, "collision_faces": 12000, "collision_method": "voxel", "voxel_size": 0.03},
+  "door":           {"mesh": "Door",          "mass": 60},
+  "pallet_changer": {"mesh": "PalletChanger", "mass": 400,  "collision_faces": 3000},
+  "carousel":       {"mesh": "Carousel",      "mass": 120}
+ },
+ "joints": [
+  {"name": "door_slide",           "parent": "base_link", "child": "door",           "type": "prismatic",  "axis": [-1,0,0], "lower": 0.0, "upper": 0.86, "velocity": 0.5, "effort": 500},
+  {"name": "pallet_changer_index", "parent": "base_link", "child": "pallet_changer", "type": "continuous", "axis": [0,0,1],  "velocity": 1.0, "effort": 500, "step_deg": 180},
+  {"name": "carousel_index",       "parent": "base_link", "child": "carousel",       "type": "continuous", "axis": [1,0,0],  "velocity": 0.5, "effort": 200, "step_deg": 7.2}
+ ],
+ "check_poses": {
+  "open":     {"door_slide": 0.86},
+  "swapping": {"door_slide": 0.86, "pallet_changer_index": 1.5708, "carousel_index": 0.628}
+ }
+}

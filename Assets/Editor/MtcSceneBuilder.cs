@@ -370,7 +370,9 @@ public static class MtcSceneBuilder
 
     // Station geometry (world metres; floor y = 0, visitor at the origin facing +z, fr3 base at
     // (0, 0.75, 1) on RobotPedestal). Every pick/place anchor stays 0.25-0.65 m from the base.
-    private static readonly Vector3 TableCentre = new Vector3(0f, 0.72f, 1.1f);
+    // Table top 5 mm under the fr3 base (y 0.75): the slab passes under link0, and a planning
+    // scene box that exactly touches the base counts as a collision at the start state.
+    private static readonly Vector3 TableCentre = new Vector3(0f, 0.715f, 1.1f);
     private static readonly Vector3 TableSize = new Vector3(1.6f, 0.06f, 0.9f);
     private static readonly Vector3 TrayCentre = new Vector3(-0.5f, 0.76f, 1.2f);
     private static readonly Vector3 ToteLeftCentre = new Vector3(0.5f, 0.75f, 0.95f);
@@ -381,6 +383,10 @@ public static class MtcSceneBuilder
     private static readonly Vector3 MolderPosition = new Vector3(-2.6f, 0f, 1.82f);
     private static readonly Vector3 Vf1Position = new Vector3(-5.0f, 0f, 6.4f);
     private const float MolderDropDistance = 0.15f;
+    // Parts rest this far above their tray floor. MTC's "attach object" stage collision-checks the
+    // scene with the part already attached to the hand, one stage before it allows object/table
+    // contact, so a part sitting exactly on the floor fails every plan ("blank_1 colliding with table").
+    private const float RestGap = 0.005f;
     private const float Fr3Reach = 0.855f;
 
     private static void LayoutFactoryStation(Scene scene, Composition c)
@@ -419,8 +425,11 @@ public static class MtcSceneBuilder
         SceneManager.MoveGameObjectToScene(station, scene);
         Transform root = station.transform;
 
-        // Work table: the only published prop. Its id must be the MTC server's surface_link
-        // ("table"), the one surface the carried object may touch during lift and place.
+        // Work table: the published prop. Its id must be the MTC server's surface_link
+        // ("table"), the one object the carried part may touch during lift and place. The
+        // trays, totes, fixture and chute are published as further primitives of this same
+        // object (compoundRoots, wired below) so the arm plans around them too; as separate
+        // ids the part resting on a tray would already collide with it before the lift.
         GameObject table = Box("StationTable", root, TableCentre, TableSize, tableMat);
         var tablePub = table.AddComponent<CollisionObjectPublisher>();
         tablePub.objectId = "table";
@@ -428,7 +437,7 @@ public static class MtcSceneBuilder
         tablePub.worldOrigin = c.baseTransform;
         tablePub.publishRateHz = 0.5f;
 
-        // Parts tray with four slots (parts rest 5 mm above the floor slab).
+        // Parts tray with four slots (parts rest RestGap above the floor slab).
         Transform tray = Group("PartsTray", root, TrayCentre);
         Box("Floor", tray, TrayCentre, new Vector3(0.36f, 0.01f, 0.26f), trayMat);
         Lips(tray, TrayCentre, 0.36f, 0.26f, 0.03f, trayMat);
@@ -436,11 +445,11 @@ public static class MtcSceneBuilder
         var slotList = new List<Transform>();
         foreach (float x in new[] { -0.545f, -0.455f })
             foreach (float z in new[] { 1.15f, 1.25f })
-                slotList.Add(Group($"Slot{slotList.Count}", slots, new Vector3(x, TrayCentre.y + 0.005f + 0.02f, z)));
+                slotList.Add(Group($"Slot{slotList.Count}", slots, new Vector3(x, TrayCentre.y + 0.005f + RestGap + 0.02f, z)));
 
         // Totes: the demonstrated place targets.
-        Tote("ToteLeft", root, ToteLeftCentre, toteMat);
-        Tote("ToteRight", root, ToteRightCentre, toteMat);
+        Transform toteLeft = Tote("ToteLeft", root, ToteLeftCentre, toteMat);
+        Transform toteRight = Tote("ToteRight", root, ToteRightCentre, toteMat);
 
         // Blanks tray + fixture plate (same mechanism, mill-kitting props).
         Transform blanks = Group("BlanksTray", root, BlanksTrayCentre);
@@ -448,7 +457,7 @@ public static class MtcSceneBuilder
         Lips(blanks, BlanksTrayCentre, 0.30f, 0.20f, 0.03f, trayMat);
         var blankSlots = new List<Transform>();
         foreach (float x in new[] { -0.33f, -0.25f, -0.17f })
-            blankSlots.Add(Group($"BlankSlot{blankSlots.Count}", blanks, new Vector3(x, BlanksTrayCentre.y + 0.005f + 0.015f, BlanksTrayCentre.z)));
+            blankSlots.Add(Group($"BlankSlot{blankSlots.Count}", blanks, new Vector3(x, BlanksTrayCentre.y + 0.005f + RestGap + 0.015f, BlanksTrayCentre.z)));
         Transform fixture = Group("FixturePlate", root, FixtureCentre);
         Box("Plate", fixture, FixtureCentre, new Vector3(0.30f, 0.01f, 0.20f), fixtureMat);
         foreach (float x in new[] { -0.09f, 0f, 0.09f })
@@ -467,6 +476,9 @@ public static class MtcSceneBuilder
             GameObject rail = Box("Rail", bed, bed.position + bed.right * side + bed.up * 0.02f, new Vector3(0.01f, 0.05f, dir.magnitude), chuteMat);
             rail.transform.rotation = bed.rotation;
         }
+
+        tablePub.compoundRoots = new[] { tray, toteLeft, toteRight, blanks, fixture, chute };
+        Line($"'table' collision object carries {tablePub.compoundRoots.Length} fixture groups as extra primitives");
 
         Transform partsRoot = Group("Parts", root, Vector3.zero);
 
@@ -533,12 +545,13 @@ public static class MtcSceneBuilder
         Box("LipBack", parent, new Vector3(centre.x, y, centre.z + depth * 0.5f), new Vector3(width, height, 0.015f), material);
     }
 
-    private static void Tote(string name, Transform root, Vector3 centre, Material material)
+    private static Transform Tote(string name, Transform root, Vector3 centre, Material material)
     {
         Transform tote = Group(name, root, centre);
         Box("Floor", tote, centre + new Vector3(0f, 0.005f, 0f), new Vector3(0.28f, 0.01f, 0.20f), material);
         Lips(tote, centre, 0.28f, 0.20f, 0.06f, material);
         Group("DropAnchor", tote, centre + new Vector3(0f, 0.05f, 0f));
+        return tote;
     }
 
     private static Bounds RendererBounds(Transform t)
@@ -657,6 +670,8 @@ public static class MtcSceneBuilder
               "PickPlaceStationController wired, autoSort off");
         var tablePub = station.GetComponentsInChildren<CollisionObjectPublisher>(true).FirstOrDefault(p => p.objectId == "table");
         Check(tablePub != null && tablePub.worldOrigin != null, "StationTable publishes as 'table'");
+        Check(tablePub != null && tablePub.compoundRoots != null && tablePub.compoundRoots.Length == 6 && tablePub.compoundRoots.All(r => r != null),
+              "'table' compoundRoots cover tray, totes, blanks tray, fixture and chute");
 
         // Reach: every anchor between 0.25 and 0.65 m horizontally from the base.
         Vector3 basePos = baseTransform != null ? baseTransform.position : fr3.transform.position;

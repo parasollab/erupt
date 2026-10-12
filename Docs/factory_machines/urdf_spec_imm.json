@@ -1,0 +1,16 @@
+{
+ "machine": "injection_molder", "blend": "prep/imm.blend", "root_empty": "InjectionMolder", "collision_faces": 3000,
+ "links": {
+  "base_link":     {"mesh": "Static",       "mass": 4500, "collision_faces": 10000, "collision_method": "voxel", "voxel_size": 0.03},
+  "moving_platen": {"mesh": "MovingPlaten", "mass": 600,  "collision_faces": 3000},
+  "toggle_links":  {"mesh": "ToggleLinks",  "mass": 150}
+ },
+ "joints": [
+  {"name": "moving_platen_slide", "parent": "base_link", "child": "moving_platen", "type": "prismatic", "axis": [0,-1,0], "lower": 0.0, "upper": 0.27,  "velocity": 0.15,  "effort": 20000},
+  {"name": "toggle_links_slide",  "parent": "base_link", "child": "toggle_links",  "type": "prismatic", "axis": [0,-1,0], "lower": 0.0, "upper": 0.135, "velocity": 0.075, "effort": 20000,
+   "mimic": {"joint": "moving_platen_slide", "multiplier": 0.5, "offset": 0.0}}
+ ],
+ "check_poses": {
+  "open": {"moving_platen_slide": 0.27}
+ }
+}

@@ -1,0 +1,26 @@
+{
+ "machine": "haas_vf1", "blend": "prep/vf1.blend", "root_empty": "HaasVF1", "collision_faces": 3000,
+ "links": {
+  "base_link": {"mesh": "Static",    "mass": 3200, "collision_faces": 12000, "collision_method": "voxel", "voxel_size": 0.03},
+  "door_left": {"mesh": "DoorLeft",  "mass": 25},
+  "door_right":{"mesh": "DoorRight", "mass": 25},
+  "head":      {"mesh": "Head",      "mass": 300,  "collision_faces": 3000},
+  "spindle":   {"mesh": "Spindle",   "mass": 40,   "collision_faces": 1500},
+  "saddle":    {"mesh": "Saddle",    "mass": 120},
+  "table":     {"mesh": "Table",     "mass": 150},
+  "carousel":  {"mesh": "Carousel",  "mass": 30}
+ },
+ "joints": [
+  {"name": "door_left_slide",  "parent": "base_link", "child": "door_left",  "type": "prismatic",  "axis": [-1,0,0], "lower": 0.0,  "upper": 0.55,  "velocity": 0.5,  "effort": 500},
+  {"name": "door_right_slide", "parent": "base_link", "child": "door_right", "type": "prismatic",  "axis": [1,0,0],  "lower": 0.0,  "upper": 0.55,  "velocity": 0.5,  "effort": 500},
+  {"name": "head_z",           "parent": "base_link", "child": "head",       "type": "prismatic",  "axis": [0,0,1],  "lower": -0.40, "upper": 0.0,  "velocity": 0.35, "effort": 500},
+  {"name": "spindle_spin",     "parent": "head",      "child": "spindle",    "type": "continuous", "axis": [0,0,1],  "velocity": 94.2, "effort": 50, "step_deg": 90},
+  {"name": "saddle_y",         "parent": "base_link", "child": "saddle",     "type": "prismatic",  "axis": [0,1,0],  "lower": 0.0,  "upper": 0.245, "velocity": 0.35, "effort": 500},
+  {"name": "table_x",          "parent": "saddle",    "child": "table",      "type": "prismatic",  "axis": [1,0,0],  "lower": 0.0,  "upper": 0.333, "velocity": 0.35, "effort": 500},
+  {"name": "carousel_index",   "parent": "base_link", "child": "carousel",   "type": "continuous", "axis": [0,0,1],  "velocity": 1.5,  "effort": 200, "step_deg": 18}
+ ],
+ "check_poses": {
+  "open":    {"door_left_slide": 0.55, "door_right_slide": 0.55},
+  "cutting": {"head_z": -0.40, "saddle_y": 0.21, "table_x": 0.253, "spindle_spin": 0.5, "carousel_index": 0.314}
+ }
+}

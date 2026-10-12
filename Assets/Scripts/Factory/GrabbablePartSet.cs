@@ -22,6 +22,7 @@ namespace Factory
 
         void Start()
         {
+            if (listener != null) listener.ClaimIdPrefix(idPrefix); // stale blanks of earlier sessions are removed
             if (slots == null) return;
             Quaternion upright = worldOrigin != null ? worldOrigin.transform.rotation : Quaternion.identity;
             for (int i = 0; i < slots.Length; i++)

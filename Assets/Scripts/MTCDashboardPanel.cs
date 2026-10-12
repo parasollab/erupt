@@ -25,15 +25,12 @@ public class MTCDashboardPanel : MonoBehaviour
     [Tooltip("Shows the live selection on the Plan tab; found in the scene when empty.")]
     [SerializeField] private SelectionManager selectionManager;
 
-    private static readonly Color RowColor = new(0.08f, 0.08f, 0.08f);
-    private static readonly Color SelectedColor = new(0.18f, 0.32f, 0.18f);
-    private static readonly Color ActiveColor = new(0.10f, 0.40f, 0.10f);
-    private static readonly Color StageSelectedColor = new(0.15f, 0.20f, 0.30f);
     private static readonly Color DoneColor = new(0.55f, 0.85f, 0.55f);
-    private static readonly Color MutedColor = new(0.6f, 0.6f, 0.6f);
 
     private VisualElement root;
     private VisualElement panelPlan, panelStages, panelSolutions;
+    private Dictionary<VisualElement, Button> tabButtons;
+    private Label solutionsTitle;
 
     private Button recordButton, planCancelButton;
     private Label planObjectIdLabel, planStatusLabel, taskIdLabel;
@@ -185,9 +182,16 @@ public class MTCDashboardPanel : MonoBehaviour
         panelStages = root.Q<VisualElement>("mtcPanelStages");
         panelSolutions = root.Q<VisualElement>("mtcPanelSolutions");
 
+        tabButtons = new Dictionary<VisualElement, Button>
+        {
+            [panelPlan] = root.Q<Button>("mtcTabPlan"),
+            [panelStages] = root.Q<Button>("mtcTabStages"),
+            [panelSolutions] = root.Q<Button>("mtcTabSolutions"),
+        };
         BindButton("mtcTabPlan", () => ShowTab(panelPlan));
         BindButton("mtcTabStages", () => ShowTab(panelStages));
         BindButton("mtcTabSolutions", () => ShowTab(panelSolutions));
+        solutionsTitle = root.Q<Label>("mtcSolutionsTitle");
 
         planObjectIdLabel = root.Q<Label>("mtcPlanObjectIdLabel");
         planStatusLabel = root.Q<Label>("mtcPlanStatusLabel");
@@ -221,7 +225,12 @@ public class MTCDashboardPanel : MonoBehaviour
     private void ShowTab(VisualElement active)
     {
         foreach (var p in new[] { panelPlan, panelStages, panelSolutions })
-            if (p != null) p.style.display = p == active ? DisplayStyle.Flex : DisplayStyle.None;
+        {
+            if (p == null) continue;
+            p.style.display = p == active ? DisplayStyle.Flex : DisplayStyle.None;
+            if (tabButtons != null && tabButtons.TryGetValue(p, out var tab) && tab != null)
+                tab.EnableInClassList("mtc-tab--active", p == active);
+        }
     }
 
     // The solution list refreshes the controls, which refresh the stages, breakdown and progress.
@@ -306,7 +315,7 @@ public class MTCDashboardPanel : MonoBehaviour
     {
         if (taskIdLabel == null) return;
         string id = Client?.TaskId;
-        taskIdLabel.text = string.IsNullOrEmpty(id) ? "Task: ---" : $"Task: {id}";
+        taskIdLabel.text = string.IsNullOrEmpty(id) ? "No task yet" : $"Task {id}";
     }
 
     /// <summary>Stage running now: the one after the last finished sub-trajectory, or null when idle.</summary>
@@ -361,15 +370,15 @@ public class MTCDashboardPanel : MonoBehaviour
         statsById.TryGetValue(stage.id, out var s);
         bool isActive = active == stage.id;
 
-        var row = Row(isActive ? ActiveColor : hasSelectedStage && selectedStageId == stage.id ? StageSelectedColor : Color.clear);
+        var row = Row(isActive ? "mtc-row--active" : hasSelectedStage && selectedStageId == stage.id ? "mtc-row--stage-selected" : null);
         row.name = $"mtcStage{stage.id}";
-        row.style.paddingLeft = depth * 12 + 4;
+        row.style.paddingLeft = depth * 10 + 6;
 
-        var nameLabel = Text((isActive ? "▶ " : "") + stage.name, Color.white, 12);
+        var nameLabel = Title((isActive ? "▶ " : "") + stage.name);
         nameLabel.style.flexGrow = 1;
+        nameLabel.style.flexShrink = 1;
         if (isActive) nameLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
-        var statsLabel = Text($"✓{s?.solved?.Length ?? 0}  ✗{s?.num_failed ?? 0}  {s?.total_compute_time ?? 0:F1}s", new Color(0.65f, 0.65f, 0.65f), 11);
-        statsLabel.style.unityTextAlign = TextAnchor.MiddleRight;
+        var statsLabel = Label($"✓{s?.solved?.Length ?? 0}  ✗{s?.num_failed ?? 0}  {s?.total_compute_time ?? 0:F1}s", "mtc-row__stats");
         row.Add(nameLabel);
         row.Add(statsLabel);
 
@@ -400,21 +409,20 @@ public class MTCDashboardPanel : MonoBehaviour
         if (SelectedSolution != null && TryGetStageSteps(selectedStageId, out int firstStep, out int lastStep))
         {
             uint stageId = selectedStageId;
-            var previewRow = Row(StageSelectedColor);
+            var previewRow = Row("mtc-row--stage-selected");
             previewRow.name = "mtcPreviewStageRow";
             string span = firstStep == lastStep ? $"step {firstStep + 1}" : $"steps {firstStep + 1}-{lastStep + 1}";
-            var previewLabel = Text($"▶ Preview this stage in solution {SelectedSolutionId} ({span})", new Color(0.55f, 0.75f, 1f), 11);
-            previewLabel.style.flexGrow = 1;
-            previewRow.Add(previewLabel);
+            previewRow.Add(Column(Title($"▶ Preview this stage"), Detail($"solution {SelectedSolutionId}, {span}")));
             previewRow.RegisterCallback<PointerDownEvent>(_ => PreviewStage(stageId));
             stageSolutionsContainer.Add(previewRow);
         }
 
         if (!string.IsNullOrEmpty(StageSolutionStatus))
         {
-            var status = Text(StageSolutionStatus, new Color(0.65f, 0.65f, 0.35f), 11);
+            var status = Label(StageSolutionStatus, "mtc-row__comment");
             status.name = "mtcStageSolutionStatus";
-            status.style.whiteSpace = WhiteSpace.Normal;
+            status.style.paddingLeft = 8;
+            status.style.paddingBottom = 4;
             stageSolutionsContainer.Add(status);
         }
 
@@ -423,7 +431,7 @@ public class MTCDashboardPanel : MonoBehaviour
         var failedIds = stageStats?.failed ?? Array.Empty<uint>();
         if ((solved == null || solved.Length == 0) && failedIds.Length == 0)
         {
-            stageSolutionsContainer.Add(Text("No solutions for this stage yet.", MutedColor, 11));
+            stageSolutionsContainer.Add(Label("No solutions for this stage yet.", "mtc-empty"));
             return;
         }
         solved ??= Array.Empty<uint>();
@@ -433,13 +441,11 @@ public class MTCDashboardPanel : MonoBehaviour
         foreach (uint id in solved)
         {
             uint capturedId = id;
-            var row = Row(Color.clear);
+            var row = Row(null);
             row.Add(RankLabel(rank++));
             row.name = $"mtcStageSolution{id}";
-            var idLabel = Text($"solution id {id}", Color.white, 11);
-            idLabel.style.flexGrow = 1;
-            row.Add(idLabel);
-            row.Add(Text(complete ? "tap to open" : "partial · ▶ preview", new Color(0.55f, 0.75f, 1f), 10));
+            row.Add(Column(Title($"solution {id}"), Detail(complete ? "complete" : "partial")));
+            row.Add(Label(complete ? "open ▸" : "▶ preview", "mtc-row__hint"));
             if (complete)
                 row.RegisterCallback<PointerDownEvent>(_ => { SelectSolution(capturedId); ShowTab(panelSolutions); });
             else
@@ -448,16 +454,17 @@ public class MTCDashboardPanel : MonoBehaviour
         }
 
         if (failedIds.Length == 0) return;
-        stageSolutionsContainer.Add(Text($"Failed attempts ({failedIds.Length})", FailedColor, 11));
+        stageSolutionsContainer.Add(Label($"FAILED ATTEMPTS ({failedIds.Length})", "mtc-section"));
         foreach (uint id in failedIds)
         {
             uint capturedId = id;
-            var row = Row(Color.clear);
+            var row = Row("mtc-row--failed");
             row.name = $"mtcStageFailed{id}";
-            var idLabel = Text($"✗ solution id {id}", FailedColor, 11);
+            var idLabel = Title($"✗ solution {id}");
+            idLabel.style.color = new StyleColor(FailedColor);
             idLabel.style.flexGrow = 1;
             row.Add(idLabel);
-            row.Add(Text("failed · tap for reason", FailedColor, 10));
+            row.Add(Label("why? ▸", "mtc-row__hint"));
             row.RegisterCallback<PointerDownEvent>(_ => PreviewStageSolution(capturedId, failed: true));
             stageSolutionsContainer.Add(row);
         }
@@ -563,26 +570,23 @@ public class MTCDashboardPanel : MonoBehaviour
         {
             uint capturedId = id;
             bool isSelected = SelectedSolutionId == id;
-            var row = Row(isSelected ? SelectedColor : RowColor);
+            var row = Row(isSelected ? "mtc-row--selected" : null);
             row.name = $"mtcSolution{id}";
-            row.style.paddingLeft = 6;
-            row.style.paddingRight = 6;
-            row.style.paddingTop = 4;
-            row.style.paddingBottom = 4;
             row.Add(RankLabel(rank++));
 
-            var idLabel = Text($"solution {id}", Color.white, 12);
-            idLabel.style.flexGrow = 1;
-            row.Add(idLabel);
-
             string detail = isSelected && SelectedSolution != null
-                ? $"cost {SelectedSolution.sub_trajectory.Sum(t => t.info.cost):F3}  {SelectedSolution.sub_trajectory.Length} steps"
-                : isSelected ? "fetching..." : "tap to show";
-            row.Add(Text(detail, new Color(0.55f, 0.75f, 1f), 11));
+                ? $"cost {SelectedSolution.sub_trajectory.Sum(t => t.info.cost):F2} · {SelectedSolution.sub_trajectory.Length} steps"
+                : isSelected ? "fetching..." : rank == 2 ? "lowest cost" : "tap to show";
+            row.Add(Column(Title($"solution {id}"), Detail(detail)));
+            if (isSelected) row.Add(Label("selected", "mtc-row__hint"));
 
             row.RegisterCallback<PointerDownEvent>(_ => SelectSolution(capturedId));
             solutionListContainer.Add(row);
         }
+        if (ids.Count == 0)
+            solutionListContainer.Add(Label(Busy ? "Planning..." : "No solutions yet. Record a pick and place on the Plan tab.", "mtc-empty"));
+        if (solutionsTitle != null)
+            solutionsTitle.text = ids.Count == 0 ? "SOLUTIONS" : $"SOLUTIONS ({ids.Count}, BEST FIRST)";
         RefreshControls();
     }
 
@@ -620,7 +624,7 @@ public class MTCDashboardPanel : MonoBehaviour
         if (SelectedSolutionId == null) return;
         if (SelectedSolution == null)
         {
-            breakdownContainer.Add(Text($"Fetching solution {SelectedSolutionId}...", MutedColor, 11));
+            breakdownContainer.Add(Label($"Fetching solution {SelectedSolutionId}...", "mtc-empty"));
             return;
         }
 
@@ -638,29 +642,30 @@ public class MTCDashboardPanel : MonoBehaviour
             string stageName = Client?.StageName(info.stage_id) ?? $"Stage {info.stage_id}";
             int pts = steps[i].trajectory?.joint_trajectory?.points?.Length ?? 0;
 
-            var row = Row(isActive ? ActiveColor : Color.clear);
+            var row = Row(isActive ? "mtc-row--active" : isDone ? "mtc-row--done" : null);
             row.name = $"mtcStep{i}";
-            string mark = isDone ? "✓ " : isActive ? "▶ " : "   ";
-            string text = $"{mark}{i + 1}. {stageName}  cost={info.cost:F3}  pts={pts}";
-            if (!string.IsNullOrEmpty(info.planner_id)) text += $"  [{info.planner_id}]";
-            var label = Text(text, isDone ? DoneColor : Color.white, 11);
-            if (isActive) label.style.unityFontStyleAndWeight = FontStyle.Bold;
-            label.style.flexGrow = 1;
-            row.Add(label);
+            string mark = isDone ? "✓ " : isActive ? "▶ " : "";
+            var title = Title($"{mark}{i + 1}. {stageName}");
+            if (isDone) title.style.color = new StyleColor(DoneColor);
+            if (isActive) title.style.unityFontStyleAndWeight = FontStyle.Bold;
+
+            string planner = CleanPlannerId(info.planner_id);
+            string detail = pts == 0 ? "no motion" : $"{pts} {(pts == 1 ? "point" : "points")} · cost {info.cost:F2}";
+            if (!string.IsNullOrEmpty(planner)) detail += $" · {planner}";
+            var column = Column(title, Detail(detail));
+            // MTC stamps every successful trajectory with "Solution generated by <planner>"; only
+            // the other comments (failure reasons, warnings) are worth a line.
+            if (!string.IsNullOrEmpty(info.comment) && !info.comment.StartsWith("Solution generated by"))
+                column.Add(Label(info.comment, "mtc-row__comment"));
+            row.Add(column);
             if (!running)
             {
                 // Tap a step to preview just that stage's part of the solution.
                 int capturedStep = i;
-                row.Add(Text("▶ preview", new Color(0.55f, 0.75f, 1f), 10));
+                row.Add(Label("▶", "mtc-row__hint"));
                 row.RegisterCallback<PointerDownEvent>(_ => PreviewStep(capturedStep));
             }
             breakdownContainer.Add(row);
-
-            if (!string.IsNullOrEmpty(info.comment))
-            {
-                var comment = Text($"      // {info.comment}", new Color(0.65f, 0.65f, 0.35f), 10);
-                breakdownContainer.Add(comment);
-            }
         }
     }
 
@@ -799,32 +804,42 @@ public class MTCDashboardPanel : MonoBehaviour
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
 
-    private static VisualElement Row(Color background)
+    // Rows are one USS class each (MTCDashboard.uss); state is a modifier class.
+    private static VisualElement Row(string modifierClass)
     {
         var row = new VisualElement();
-        row.style.flexDirection = FlexDirection.Row;
-        row.style.paddingLeft = 6;
-        row.style.paddingTop = 3;
-        row.style.paddingBottom = 3;
-        row.style.borderBottomWidth = 1;
-        row.style.borderBottomColor = new StyleColor(new Color(0.2f, 0.2f, 0.2f));
-        row.style.backgroundColor = new StyleColor(background);
+        row.AddToClassList("mtc-row");
+        if (!string.IsNullOrEmpty(modifierClass)) row.AddToClassList(modifierClass);
         return row;
     }
 
-    private static Label Text(string text, Color color, int size)
+    private static Label Label(string text, string className)
     {
         var label = new Label(text);
-        label.style.color = new StyleColor(color);
-        label.style.fontSize = size;
+        label.AddToClassList(className);
         return label;
     }
 
-    private static Label RankLabel(int rank)
+    private static Label Title(string text) => Label(text, "mtc-row__title");
+    private static Label Detail(string text) => Label(text, "mtc-row__detail");
+
+    // Title over detail, filling the row; the hint or stats sit to its right.
+    private static VisualElement Column(Label title, Label detail)
     {
-        var label = Text($"#{rank}", new Color(1f, 0.8f, 0.2f), 12);
-        label.style.width = 28;
-        label.style.unityFontStyleAndWeight = FontStyle.Bold;
-        return label;
+        var column = new VisualElement();
+        column.AddToClassList("mtc-row__main");
+        column.Add(title);
+        if (detail != null) column.Add(detail);
+        return column;
+    }
+
+    private static Label RankLabel(int rank) => Label($"#{rank}", "mtc-rank");
+
+    // MTC reports the pipeline and planner as "pipeline, planner" (either may be empty).
+    private static string CleanPlannerId(string plannerId)
+    {
+        if (string.IsNullOrWhiteSpace(plannerId)) return null;
+        var parts = plannerId.Split(',').Select(p => p.Trim()).Where(p => p.Length > 0).ToList();
+        return parts.Count == 0 ? null : string.Join(" / ", parts);
     }
 }

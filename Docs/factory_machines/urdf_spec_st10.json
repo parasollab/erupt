@@ -1,0 +1,22 @@
+{
+ "machine": "haas_st10", "blend": "prep/st10.blend", "root_empty": "HaasST10", "collision_faces": 3000,
+ "links": {
+  "base_link":         {"mesh": "Static",      "mass": 3600, "collision_faces": 10000, "collision_method": "voxel", "voxel_size": 0.03},
+  "door":              {"mesh": "Door",        "mass": 40},
+  "chuck":             {"mesh": "Chuck",       "mass": 35},
+  "turret_z_carriage": {"mesh": null, "pivot_of": "TurretSlide", "mass": 1.0},
+  "turret_slide":      {"mesh": "TurretSlide", "mass": 250,  "collision_faces": 3000},
+  "turret":            {"mesh": "Turret",      "mass": 90,   "collision_faces": 4000}
+ },
+ "joints": [
+  {"name": "door_slide",   "parent": "base_link",         "child": "door",              "type": "prismatic",  "axis": [-1,0,0], "lower": 0.0, "upper": 0.9,  "velocity": 0.5, "effort": 500},
+  {"name": "chuck_spin",   "parent": "base_link",         "child": "chuck",             "type": "continuous", "axis": [1,0,0],  "velocity": 73.3, "effort": 50, "step_deg": 90},
+  {"name": "turret_z",     "parent": "base_link",         "child": "turret_z_carriage", "type": "prismatic",  "axis": [-1,0,0], "lower": 0.0, "upper": 0.17, "velocity": 0.3, "effort": 500},
+  {"name": "turret_x",     "parent": "turret_z_carriage", "child": "turret_slide",      "type": "prismatic",  "axis": [0,-0.683,-0.731], "lower": 0.0, "upper": 0.08, "velocity": 0.3, "effort": 500},
+  {"name": "turret_index", "parent": "turret_slide",      "child": "turret",            "type": "continuous", "axis": [1,0,0],  "velocity": 2.0, "effort": 200, "step_deg": 30}
+ ],
+ "check_poses": {
+  "open":    {"door_slide": 0.9},
+  "cutting": {"door_slide": 0.9, "turret_z": 0.17, "turret_x": 0.06, "turret_index": 0.5236}
+ }
+}

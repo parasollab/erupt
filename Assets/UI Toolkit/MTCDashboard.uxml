@@ -1,57 +1,61 @@
 <ui:UXML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ui="UnityEngine.UIElements" noNamespaceSchemaLocation="../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
-    <ui:VisualElement name="mtcRoot" style="flex-grow: 1; background-color: rgb(20, 20, 20);">
+    <Style src="MTCDashboard.uss" />
+    <ui:VisualElement name="mtcRoot" class="mtc-root" style="flex-grow: 1;">
 
         <!-- Header -->
-        <ui:Label text="MTC Dashboard" name="mtcTitleLabel" style="-unity-text-align: upper-center; -unity-font-style: bold; font-size: 20px; color: rgb(255, 255, 255); border-bottom-width: 2px; border-bottom-color: rgb(80, 80, 80); padding-top: 6px; padding-bottom: 6px;" />
-        <ui:Label text="Task: ---" name="mtcTaskIdLabel" style="-unity-text-align: upper-center; color: rgb(140, 140, 140); font-size: 11px; margin-bottom: 4px;" />
+        <ui:Label text="MTC Dashboard" name="mtcTitleLabel" class="mtc-title" />
+        <ui:Label text="No task yet" name="mtcTaskIdLabel" class="mtc-task" />
 
         <!-- Tab bar -->
-        <ui:VisualElement name="mtcTabBar" style="flex-direction: row; border-bottom-width: 2px; border-bottom-color: rgb(80, 80, 80); margin-bottom: 4px;">
-            <ui:Button text="Plan" name="mtcTabPlan" style="flex-grow: 1; -unity-font-style: bold; color: rgb(255, 255, 255);" />
-            <ui:Button text="Stages" name="mtcTabStages" style="flex-grow: 1; -unity-font-style: bold; color: rgb(255, 255, 255);" />
-            <ui:Button text="Solutions" name="mtcTabSolutions" style="flex-grow: 1; -unity-font-style: bold; color: rgb(255, 255, 255);" />
+        <ui:VisualElement name="mtcTabBar" class="mtc-tabbar">
+            <ui:Button text="Plan" name="mtcTabPlan" class="mtc-tab mtc-tab--active" />
+            <ui:Button text="Stages" name="mtcTabStages" class="mtc-tab" />
+            <ui:Button text="Solutions" name="mtcTabSolutions" class="mtc-tab" />
         </ui:VisualElement>
 
         <!-- Tab 1: Plan -->
-        <ui:VisualElement name="mtcPanelPlan" style="flex-grow: 1; padding-left: 8px; padding-right: 8px; padding-top: 6px; padding-bottom: 6px;">
-            <ui:Label text="Pick &amp; Place Recording" style="-unity-font-style: bold; color: rgb(255, 255, 255); font-size: 15px; margin-bottom: 8px;" />
-            <ui:Label text="Selected object:" style="color: rgb(140, 140, 140); font-size: 12px;" />
-            <ui:Label text="---" name="mtcPlanObjectIdLabel" style="color: rgb(100, 220, 100); font-size: 13px; margin-bottom: 12px;" />
-            <ui:Button text="Start Recording" name="mtcPlanRecordButton" selectable="false" focusable="false" style="-unity-font-style: bold; margin-bottom: 8px;" />
-            <ui:Button text="Cancel Planning" name="mtcPlanCancelButton" selectable="false" focusable="false" style="-unity-font-style: bold; margin-bottom: 8px; color: rgb(255, 150, 120);" />
-            <ui:Label text="Idle" name="mtcPlanStatusLabel" style="-unity-text-align: upper-center; color: rgb(190, 190, 190); font-size: 12px;" />
+        <ui:VisualElement name="mtcPanelPlan" class="mtc-panel">
+            <ui:Label text="PICK &amp; PLACE RECORDING" class="mtc-section" />
+            <ui:Label text="Selected object" class="mtc-field-label" />
+            <ui:Label text="---" name="mtcPlanObjectIdLabel" class="mtc-field-value" />
+            <ui:Label text="Select a part, start recording, then grab it and release it where it should go." class="mtc-empty" />
+            <ui:Button text="Start Recording" name="mtcPlanRecordButton" selectable="false" focusable="false" class="mtc-button mtc-button--record" style="flex-grow: 0; margin-top: 6px; margin-bottom: 6px;" />
+            <ui:Button text="Cancel Planning" name="mtcPlanCancelButton" selectable="false" focusable="false" class="mtc-button mtc-button--danger" style="flex-grow: 0;" />
+            <ui:Label text="Idle" name="mtcPlanStatusLabel" class="mtc-status" />
         </ui:VisualElement>
 
         <!-- Tab 2: Stages -->
-        <ui:VisualElement name="mtcPanelStages" style="flex-grow: 1; padding-left: 8px; padding-right: 8px; padding-top: 6px; padding-bottom: 6px; display: none;">
-            <ui:Label text="Stage Tree" style="-unity-font-style: bold; color: rgb(255, 255, 255); font-size: 15px; margin-bottom: 6px;" />
-            <ui:ScrollView name="mtcStageScrollView" style="flex-grow: 1;">
+        <ui:VisualElement name="mtcPanelStages" class="mtc-panel" style="display: none;">
+            <ui:Label text="STAGE TREE" class="mtc-section" />
+            <ui:ScrollView name="mtcStageScrollView" class="mtc-list mtc-list--fill">
                 <ui:VisualElement name="mtcStageTreeContainer" />
             </ui:ScrollView>
-            <ui:Label text="Stage Solutions" name="mtcStageSolutionsTitle" style="-unity-font-style: bold; color: rgb(200, 200, 200); font-size: 13px; margin-top: 4px; margin-bottom: 4px;" />
-            <ui:ScrollView name="mtcStageSolutionsScrollView" style="height: 130px; border-top-width: 1px; border-top-color: rgb(60, 60, 60);">
+            <ui:Label text="STAGE SOLUTIONS" name="mtcStageSolutionsTitle" class="mtc-section" />
+            <ui:ScrollView name="mtcStageSolutionsScrollView" class="mtc-list" style="height: 140px;">
                 <ui:VisualElement name="mtcStageSolutionsContainer" />
             </ui:ScrollView>
         </ui:VisualElement>
 
         <!-- Tab 3: Solutions -->
-        <ui:VisualElement name="mtcPanelSolutions" style="flex-grow: 1; padding-left: 8px; padding-right: 8px; padding-top: 6px; padding-bottom: 6px; display: none;">
-            <ui:Label text="Solutions" style="-unity-font-style: bold; color: rgb(255, 255, 255); font-size: 15px; margin-bottom: 4px;" />
-            <ui:ScrollView name="mtcSolutionScrollView" style="height: 180px; border-bottom-width: 1px; border-bottom-color: rgb(60, 60, 60); margin-bottom: 6px;">
+        <ui:VisualElement name="mtcPanelSolutions" class="mtc-panel" style="display: none;">
+            <ui:Label text="SOLUTIONS" name="mtcSolutionsTitle" class="mtc-section" />
+            <ui:ScrollView name="mtcSolutionScrollView" class="mtc-list" style="height: 140px;">
                 <ui:VisualElement name="mtcSolutionListContainer" />
             </ui:ScrollView>
-            <ui:Label text="Stage Breakdown" name="mtcBreakdownTitle" style="-unity-font-style: bold; color: rgb(200, 200, 200); font-size: 13px; margin-bottom: 4px;" />
-            <ui:ScrollView name="mtcBreakdownScrollView" style="flex-grow: 1; margin-bottom: 6px;">
+            <ui:Label text="STEPS" name="mtcBreakdownTitle" class="mtc-section" />
+            <ui:ScrollView name="mtcBreakdownScrollView" class="mtc-list mtc-list--fill">
                 <ui:VisualElement name="mtcBreakdownContainer" />
             </ui:ScrollView>
-            <ui:VisualElement style="flex-direction: row;">
-                <ui:Button text="Preview" name="mtcPreviewButton" selectable="false" focusable="false" style="flex-grow: 1; -unity-font-style: bold;" />
-                <ui:Button text="Stop" name="mtcStopPreviewButton" selectable="false" focusable="false" style="flex-grow: 1; -unity-font-style: bold;" />
-                <ui:Button text="Execute" name="mtcExecuteButton" selectable="false" focusable="false" style="flex-grow: 1; -unity-font-style: bold; color: rgb(120, 255, 120);" />
-                <ui:Button text="Cancel" name="mtcCancelExecuteButton" selectable="false" focusable="false" style="flex-grow: 1; -unity-font-style: bold; color: rgb(255, 150, 120);" />
+            <ui:VisualElement class="mtc-button-row">
+                <ui:Button text="Preview" name="mtcPreviewButton" selectable="false" focusable="false" class="mtc-button" />
+                <ui:Button text="Stop" name="mtcStopPreviewButton" selectable="false" focusable="false" class="mtc-button" />
             </ui:VisualElement>
-            <ui:ProgressBar title="Execution progress" value="0" low-value="0" high-value="100" name="mtcExecProgress" style="display: none; margin-top: 4px;" />
-            <ui:Label text="" name="mtcExecStatusLabel" style="-unity-text-align: upper-center; color: rgb(190, 190, 190); font-size: 12px; margin-top: 4px;" />
+            <ui:VisualElement class="mtc-button-row mtc-button-row--last">
+                <ui:Button text="Execute" name="mtcExecuteButton" selectable="false" focusable="false" class="mtc-button mtc-button--primary" />
+                <ui:Button text="Cancel" name="mtcCancelExecuteButton" selectable="false" focusable="false" class="mtc-button mtc-button--danger" />
+            </ui:VisualElement>
+            <ui:ProgressBar title="Execution progress" value="0" low-value="0" high-value="100" name="mtcExecProgress" class="mtc-progress" style="display: none;" />
+            <ui:Label text="" name="mtcExecStatusLabel" class="mtc-status" />
         </ui:VisualElement>
 
     </ui:VisualElement>
