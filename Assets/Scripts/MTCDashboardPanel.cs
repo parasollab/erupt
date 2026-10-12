@@ -22,6 +22,8 @@ public class MTCDashboardPanel : MonoBehaviour
     [Tooltip("Found in the scene when empty.")]
     [SerializeField] private PickPlaceClient pickPlaceAction;
     [SerializeField] private MTCTrajectoryPlayer trajectoryPlayer;
+    [Tooltip("Shows the live selection on the Plan tab; found in the scene when empty.")]
+    [SerializeField] private SelectionManager selectionManager;
 
     private static readonly Color RowColor = new(0.08f, 0.08f, 0.08f);
     private static readonly Color SelectedColor = new(0.18f, 0.32f, 0.18f);
@@ -97,6 +99,14 @@ public class MTCDashboardPanel : MonoBehaviour
             pickPlaceRecorder.OnRecordingDiscarded += OnPickPlaceDiscarded;
         }
 
+        if (selectionManager == null) selectionManager = FindFirstObjectByType<SelectionManager>(FindObjectsInactive.Include);
+        if (selectionManager != null)
+        {
+            selectionManager.OnObjectSelected -= OnSelectionChanged;
+            selectionManager.OnObjectSelected += OnSelectionChanged;
+            OnSelectionChanged(selectionManager.SelectedObject);
+        }
+
         RefreshAll();
     }
 
@@ -118,6 +128,30 @@ public class MTCDashboardPanel : MonoBehaviour
             pickPlaceRecorder.OnRecordingComplete -= OnPickPlaceRecorded;
             pickPlaceRecorder.OnRecordingDiscarded -= OnPickPlaceDiscarded;
         }
+
+        if (selectionManager != null)
+            selectionManager.OnObjectSelected -= OnSelectionChanged;
+    }
+
+    // The Plan tab mirrors the live selection so the visitor can see which object a
+    // recording will use before pressing Start Recording.
+    private void OnSelectionChanged(GameObject selected)
+    {
+        if (planObjectIdLabel == null) return;
+        if (selected == null)
+        {
+            planObjectIdLabel.text = "--- (point at a part and select it)";
+            return;
+        }
+        var publisher = selected.GetComponent<CollisionObjectPublisher>();
+        bool grabbable = selected.GetComponent<UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable>() != null;
+        planObjectIdLabel.text = publisher != null && grabbable
+            ? $"{publisher.objectId} (selected)"
+            : $"{selected.name} (not a planning-scene object)";
+        if (planStatusLabel != null && pickPlaceRecorder != null && !pickPlaceRecorder.IsRecording && !Busy)
+            planStatusLabel.text = publisher != null && grabbable
+                ? "Start Recording, grab it, drop it where it should go, Stop Recording"
+                : "Select a part on the tray first";
     }
 
     private void BindUI()

@@ -317,6 +317,7 @@ public static class MtcSceneBuilder
         SetRef(c.dashboard, "pickPlaceRecorder", c.recorder);
         SetRef(c.dashboard, "pickPlaceAction", c.client);
         SetRef(c.dashboard, "trajectoryPlayer", fr3Player);
+        SetRef(c.dashboard, "selectionManager", c.selection);
 
         SetRef(fr3Player, "ikController", c.ik);
         SetRef(fr3Player, "sceneListener", c.listener);

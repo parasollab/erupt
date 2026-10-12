@@ -3,7 +3,67 @@ guid: efed496fa920340fcbd623f89423b8a2
 ModelImporter:
   serializedVersion: 24200
   internalIDToNameTable: []
-  externalObjects: {}
+  externalObjects:
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_0_127_0
+    second: {fileID: 2100000, guid: 7ebfd2141991f4912a13d70c31e5a2e6, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_0_204_204
+    second: {fileID: 2100000, guid: bc7afb5b86d6142fa9eeca3e6f8ec38a, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_127_127_127
+    second: {fileID: 2100000, guid: 79c1ab8a1cae5431ba4b137e74f44f19, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_127_42_0
+    second: {fileID: 2100000, guid: 6f454f72ba1bc4e9993656290f89ae86, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_170_170_170
+    second: {fileID: 2100000, guid: 81ced4aa2846b4d7b8c454da990136b0, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_170_85_0
+    second: {fileID: 2100000, guid: ce7894dcc5c0d4884bd15d7cc8e74405, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_204_0_0
+    second: {fileID: 2100000, guid: 7b45f0721b5b341c8a6f70b59f5740a4, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_204_127_85
+    second: {fileID: 2100000, guid: 7092999392bb449e4bef82aa90475a66, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_204_170_42
+    second: {fileID: 2100000, guid: d99d7bd2a9ad34ab2b74349e8d1976be, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_204_204_0
+    second: {fileID: 2100000, guid: 36b80f70a2ee248c7a4e287af463b394, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_204_204_204
+    second: {fileID: 2100000, guid: 5212a68865ec54d6d8a54a917c47d11c, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_85_85_85
+    second: {fileID: 2100000, guid: 38b9dbc6b64144d0b8c2705277d20ffe, type: 2}
   materials:
     materialImportMode: 1
     materialName: 0
