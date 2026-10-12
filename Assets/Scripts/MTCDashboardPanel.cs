@@ -63,12 +63,35 @@ public class MTCDashboardPanel : MonoBehaviour
     private PickPlaceClient Client => pickPlaceAction;
     private bool Busy => Client != null && Client.Busy;
 
+    private Coroutine bindWhenReady;
+
     private void OnEnable()
     {
         if (uiDocument == null) uiDocument = GetComponent<UIDocument>();
-        root = uiDocument?.rootVisualElement;
-        if (root == null) { Debug.LogError("[MTCDashboardPanel] No root visual element."); return; }
+        if (uiDocument == null) uiDocument = GetComponentInChildren<UIDocument>(true);
+        root = uiDocument != null ? uiDocument.rootVisualElement : null;
+        if (root == null)
+        {
+            // The UIDocument lives on a child, whose OnEnable runs after this one, so the root
+            // visual element may not exist yet; bind as soon as it does.
+            bindWhenReady = StartCoroutine(BindWhenRootReady());
+            return;
+        }
+        Bind();
+    }
 
+    private System.Collections.IEnumerator BindWhenRootReady()
+    {
+        while (uiDocument != null && uiDocument.rootVisualElement == null)
+            yield return null;
+        bindWhenReady = null;
+        if (uiDocument == null) { Debug.LogError("[MTCDashboardPanel] No UIDocument."); yield break; }
+        root = uiDocument.rootVisualElement;
+        Bind();
+    }
+
+    private void Bind()
+    {
         if (pickPlaceAction == null) pickPlaceAction = FindFirstObjectByType<PickPlaceClient>(FindObjectsInactive.Include);
         if (pickPlaceRecorder == null) pickPlaceRecorder = FindFirstObjectByType<PickPlaceTaskRecorder>(FindObjectsInactive.Include);
 
@@ -112,6 +135,7 @@ public class MTCDashboardPanel : MonoBehaviour
 
     private void OnDisable()
     {
+        if (bindWhenReady != null) { StopCoroutine(bindWhenReady); bindWhenReady = null; }
         if (Client != null)
         {
             Client.OnStatus -= OnStatus;

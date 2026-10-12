@@ -340,8 +340,13 @@ public static class MtcSceneBuilder
             Line($"Wrist menu '{Path(wrist.transform)}': MTC enabled");
         }
 
-        EnsureMetaRigXROrigin(target);
-        AddHandInteractionGroups(target, Require<XRInteractionManager>(Root(target, "XR Interaction Manager")));
+        // Meta-rig fixes needed by the AR scenes only; the VR demo rig (ReachabilityVR lineage)
+        // runs its interactors without a group or a passive XROrigin.
+        if (arExtras)
+        {
+            EnsureMetaRigXROrigin(target);
+            AddHandInteractionGroups(target, Require<XRInteractionManager>(Root(target, "XR Interaction Manager")));
+        }
 
         // --- Anything still pointing into KitchenFR3 goes to the target counterpart ---
         var counterparts = new Dictionary<string, GameObject>
@@ -714,6 +719,7 @@ public static class MtcSceneBuilder
             ("chute", new Vector3(-1.0f, 1.6f, -0.3f), new Vector3(-1.8f, 0.9f, 1.2f)),
             ("molder", new Vector3(-0.5f, 2.5f, -1.5f), new Vector3(-2.6f, 1.0f, 1.8f)),
             ("top", new Vector3(0f, 18f, 3f), new Vector3(0f, 0f, 3.1f)),
+            ("menus", new Vector3(0.35f, 1.6f, -1.6f), new Vector3(0.35f, 1.0f, 0f)),
         };
         try
         {
