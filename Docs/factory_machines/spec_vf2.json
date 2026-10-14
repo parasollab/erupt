@@ -1,0 +1,56 @@
+{
+ "name": "HaasVF2",
+ "blend": "prep/vf2.blend",
+ "objects_json": "prep/vf2_objects.json",
+ "budget": 260000,
+ "origin": [
+  0.0,
+  -0.611,
+  -0.505
+ ],
+ "glass_materials": [
+  "Opaque(182,200,211)",
+  "Opaque(159,255,221)"
+ ],
+ "parts": [
+  {
+   "name": "DoorLeft",
+   "select": [
+    "37-0400-LEFT DOOR|Body1.010"
+   ],
+   "pivot": [
+    -0.33,
+    -0.983,
+    0.66
+   ]
+  },
+  {
+   "name": "DoorRight",
+   "select": [
+    "37-0400-RIGHT DOOR|Body1.011"
+   ],
+   "pivot": [
+    0.305,
+    -0.983,
+    0.66
+   ]
+  }
+ ],
+ "drop": [
+  "CONV-HOLDER-VF-SM|Body1.012",
+  "CONV-SHELF-VF-SM|Body1.013"
+ ],
+ "adjust": [
+  {
+   "select": [
+    "37-0400-SIDE DOORS-main|Body1.009",
+    "37-0400-SIDE DOORS-main|Body2.005"
+   ],
+   "translate": [
+    0,
+    0,
+    -0.62
+   ]
+  }
+ ]
+}

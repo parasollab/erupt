@@ -85,6 +85,7 @@ def box_inertia(obj, mass):
 # ---- export meshes ---------------------------------------------------------------------------
 pivots = {'base_link': Vector((0, 0, 0))}
 info = {}
+col_objs = {}
 depsgraph = bpy.context.evaluated_depsgraph_get()
 for lname, ldef in links.items():
     mesh_name = ldef.get('mesh')
@@ -113,35 +114,32 @@ for lname, ldef in links.items():
     n_vis = len(obj.data.polygons)
     budget = int(ldef.get('collision_faces', spec.get('collision_faces', 3000)))
     method = ldef.get('collision_method', 'collapse')
+    # The collision mesh is a separate object (<link>_col, mesh in the link frame) so it can also go
+    # into the optional Unity collision FBX after the STL export.
+    col_obj = obj.copy(); col_obj.data = obj.data.copy(); col_obj.name = lname + '_col'; col_obj.data.name = lname + '_col'
+    bpy.context.scene.collection.objects.link(col_obj)
+    col_obj.data.materials.clear()
     if method == 'voxel':
         # Sheet-metal enclosures collapse into spikes under plain edge-collapse decimation. Thicken the
         # shells (solidify), voxel-remesh into one manifold surface, then decimate that.
         vox = float(ldef.get('voxel_size', 0.03))
-        col_obj = obj.copy(); col_obj.data = obj.data.copy(); bpy.context.scene.collection.objects.link(col_obj)
         so = col_obj.modifiers.new('urdf_sol', 'SOLIDIFY'); so.thickness = 2 * vox; so.offset = 0.0
         rm = col_obj.modifiers.new('urdf_rm', 'REMESH'); rm.mode = 'VOXEL'; rm.voxel_size = vox; rm.use_remove_disconnected = False
         tri = col_obj.modifiers.new('urdf_tri', 'TRIANGULATE')
         for mname in ('urdf_sol', 'urdf_rm', 'urdf_tri'):
             with bpy.context.temp_override(object=col_obj, active_object=col_obj, selected_objects=[col_obj], selected_editable_objects=[col_obj]):
                 bpy.ops.object.modifier_apply(modifier=mname)
-        n_rm = len(col_obj.data.polygons)
-        dec = col_obj.modifiers.new('urdf_col', 'DECIMATE')
-        dec.decimate_type = 'COLLAPSE'; dec.ratio = min(1.0, budget / max(1, n_rm)); dec.use_collapse_triangulate = True
-        export_obj = col_obj
-    else:
-        dec = obj.modifiers.new('urdf_col', 'DECIMATE')
-        dec.decimate_type = 'COLLAPSE'; dec.ratio = min(1.0, budget / max(1, n_vis)); dec.use_collapse_triangulate = True
-        export_obj = obj
-    select_only(export_obj)
-    depsgraph = bpy.context.evaluated_depsgraph_get()
-    n_col = len(export_obj.evaluated_get(depsgraph).data.polygons)
+    n_src = len(col_obj.data.polygons)
+    dec = col_obj.modifiers.new('urdf_col', 'DECIMATE')
+    dec.decimate_type = 'COLLAPSE'; dec.ratio = min(1.0, budget / max(1, n_src)); dec.use_collapse_triangulate = True
+    with bpy.context.temp_override(object=col_obj, active_object=col_obj, selected_objects=[col_obj], selected_editable_objects=[col_obj]):
+        bpy.ops.object.modifier_apply(modifier='urdf_col')
+    n_col = len(col_obj.data.polygons)
+    select_only(col_obj)
     stl = os.path.join(col_dir, lname + '.stl')
     bpy.ops.wm.stl_export(filepath=stl, export_selected_objects=True, apply_modifiers=True, ascii_format=False,
                           global_scale=1.0, use_scene_unit=False, forward_axis='Y', up_axis='Z', use_batch=False)
-    if export_obj is obj:
-        obj.modifiers.remove(dec)
-    else:
-        bpy.data.objects.remove(export_obj)
+    col_objs[lname] = col_obj
     select_only(obj)
     c, I, (mn, mx) = box_inertia(obj, float(ldef.get('mass', 1.0)))
     info[lname] = {'mesh': mesh_name, 'visual_faces': n_vis, 'collision_faces': n_col,
@@ -195,6 +193,33 @@ with open(urdf_path, 'w') as fh:
     fh.write('<?xml version="1.0"?>\n')
     fh.write(ET.tostring(robot, encoding='unicode'))
     fh.write('\n')
+
+# Optional: the same collision meshes as one FBX for Unity (CollisionObjectPublisher mesh objects),
+# laid out like bl_assemble's visual FBX: every <link>_col flat under a root empty at its link pivot,
+# plus Axis_X/Y/Z markers, so the Unity builder can nest each one under its visual part.
+unity_fbx = spec.get('unity_collision_fbx')
+if unity_fbx:
+    unity_fbx = os.path.abspath(os.path.join(spec_dir, unity_fbx))
+    root = bpy.data.objects.new(spec.get('root_empty', machine) + '_collision', None)
+    bpy.context.scene.collection.objects.link(root)
+    keep = {root}
+    for lname, col_obj in col_objs.items():
+        col_obj.parent = root; col_obj.matrix_parent_inverse = Matrix.Identity(4)
+        col_obj.matrix_world = Matrix.Translation(pivots[lname])
+        keep.add(col_obj)
+    for nm, v in (('Axis_X', (1, 0, 0)), ('Axis_Y', (0, 1, 0)), ('Axis_Z', (0, 0, 1))):
+        if nm in bpy.data.objects:  # the assembled blend still carries bl_assemble's markers; avoid Axis_X.001
+            bpy.data.objects.remove(bpy.data.objects[nm])
+        e = bpy.data.objects.new(nm, None); bpy.context.scene.collection.objects.link(e); e.location = v; e.parent = root; keep.add(e)
+    for o in bpy.data.objects:
+        o.select_set(o in keep)
+    bpy.context.view_layer.update()
+    os.makedirs(os.path.dirname(unity_fbx), exist_ok=True)
+    bpy.ops.export_scene.fbx(filepath=unity_fbx, use_selection=True, object_types={'EMPTY', 'MESH'}, apply_unit_scale=True,
+                             apply_scale_options='FBX_SCALE_ALL', bake_space_transform=True, axis_forward='-Z', axis_up='Y',
+                             mesh_smooth_type='OFF', use_mesh_modifiers=True, add_leaf_bones=False, path_mode='STRIP',
+                             use_custom_props=False, use_triangles=True, use_tspace=False, embed_textures=False)
+    log(f"wrote Unity collision FBX {unity_fbx} ({len(col_objs)} meshes)")
 
 total_dae = sum(i.get('dae_bytes', 0) for i in info.values()); total_stl = sum(i.get('stl_bytes', 0) for i in info.values())
 log(f"wrote {urdf_path}: {len(links)} links, {len(joints)} joints, dae total {total_dae/1e6:.1f}MB, stl total {total_stl/1e6:.1f}MB")

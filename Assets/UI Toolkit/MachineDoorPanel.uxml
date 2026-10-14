@@ -1,0 +1,13 @@
+<ui:UXML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ui="UnityEngine.UIElements" noNamespaceSchemaLocation="../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
+    <Style src="MTCDashboard.uss" />
+    <ui:VisualElement name="doorRoot" class="mtc-root" style="flex-grow: 1;">
+        <ui:Label text="Haas VF-2" name="doorTitleLabel" class="mtc-title" />
+        <ui:Label text="Doors closed" name="doorStatusLabel" class="mtc-task" />
+        <ui:VisualElement class="mtc-panel">
+            <ui:Label text="ENCLOSURE DOORS" class="mtc-section" />
+            <ui:Button text="Open Doors" name="doorOpenButton" selectable="false" focusable="false" class="mtc-button mtc-button--primary" style="flex-grow: 0; margin-top: 6px; margin-bottom: 6px; height: 48px; font-size: 18px;" />
+            <ui:Button text="Close Doors" name="doorCloseButton" selectable="false" focusable="false" class="mtc-button mtc-button--danger" style="flex-grow: 0; height: 48px; font-size: 18px;" />
+            <ui:Label text="Open the doors before planning a load or unload; the robot plans around the closed doors." class="mtc-empty" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

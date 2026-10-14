@@ -1,7 +1,7 @@
-# Blender headless: import a CAD OBJ (cm), planar+collapse decimate per body, save .blend,
+# Blender headless: import a CAD OBJ (cm) or FBX (metres, named assemblies), planar-dissolve per body, save .blend,
 # dump per-object stats, render overview + ID images.
 import bpy, sys, json, math, os, time
-from mathutils import Vector
+from mathutils import Vector, Matrix
 argv = sys.argv[sys.argv.index('--')+1:]
 obj_path, out_dir, name = argv[0], argv[1], argv[2]
 target_faces = int(argv[3]) if len(argv) > 3 else 150000
@@ -10,9 +10,27 @@ t0 = time.time()
 def log(*a): print(f"[prep {name} {time.time()-t0:6.0f}s]", *a, flush=True)
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
-bpy.ops.wm.obj_import(filepath=obj_path, global_scale=0.01, use_split_objects=True, use_split_groups=True,
-                      forward_axis='NEGATIVE_Z', up_axis='Y', validate_meshes=True)
-meshes = [o for o in bpy.data.objects if o.type == 'MESH']
+if obj_path.lower().endswith('.fbx'):
+    # CAD FBX (e.g. the Fusion/STEP export of the VF-2): the importer already applies the unit scale
+    # and the Z-up conversion through the root empty, and the assembly tree carries real names.
+    # Bake every world transform into the mesh data and keep the parent assembly name on each
+    # body ("<assembly>|<body>") so part specs can select bodies by assembly.
+    bpy.ops.import_scene.fbx(filepath=obj_path)
+    bpy.context.view_layer.update()
+    meshes = [o for o in bpy.data.objects if o.type == 'MESH']
+    for o in meshes:
+        assembly = o.parent.name if o.parent is not None else 'root'
+        if o.data.users > 1:
+            o.data = o.data.copy()  # instanced bodies (the six leveling pads) must not share the bake
+        o.data.transform(o.matrix_world)
+        o.parent = None
+        o.matrix_world = Matrix.Identity(4)
+        o.name = f"{assembly}|{o.name}"
+    bpy.context.view_layer.update()
+else:
+    bpy.ops.wm.obj_import(filepath=obj_path, global_scale=0.01, use_split_objects=True, use_split_groups=True,
+                          forward_axis='NEGATIVE_Z', up_axis='Y', validate_meshes=True)
+    meshes = [o for o in bpy.data.objects if o.type == 'MESH']
 for o in [o for o in bpy.data.objects if o.type != 'MESH']:
     bpy.data.objects.remove(o)
 total0 = sum(len(o.data.polygons) for o in meshes)
@@ -60,7 +78,7 @@ scene.display.shading.light = 'STUDIO'; scene.display.shading.color_type = 'MATE
 scene.display.shading.show_cavity = True; scene.display.shading.show_shadows = False
 scene.display.shading.show_object_outline = True
 scene.display_settings.display_device = 'sRGB'
-scene.view_settings.view_transform = 'Standard'; scene.view_settings.look = 'NONE'
+scene.view_settings.view_transform = 'Standard'; scene.view_settings.look = 'None'
 scene.render.dither_intensity = 0.0
 scene.world = bpy.data.worlds.new('W'); scene.world.color = (0.9, 0.9, 0.9)
 cam_data = bpy.data.cameras.new('cam'); cam = bpy.data.objects.new('cam', cam_data); scene.collection.objects.link(cam); scene.camera = cam

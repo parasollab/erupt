@@ -8,6 +8,10 @@ bpy.ops.wm.open_mainfile(filepath=spec['blend'])
 S = float(spec.get('scale', 1.0))
 meshes = [o for o in bpy.data.objects if o.type == 'MESH']
 objs = {o['name']: o for o in json.load(open(spec['objects_json']))['objects']}
+missing = [n for n in objs if n not in bpy.data.objects]
+if len(missing) > len(objs) // 2:
+    raise SystemExit(f"{spec['blend']} does not hold the prepared bodies ({len(missing)}/{len(objs)} missing): it is probably "
+                     "already the assembled output. Rerun bl_prepare.py on the CAD export first.")
 
 # ---- bake transforms, scale, rebase ---------------------------------------------------------
 for o in meshes:
@@ -19,7 +23,12 @@ for o in meshes:
     if n == 0: continue
     arr = np.empty(n * 3, dtype=np.float32); o.data.vertices.foreach_get('co', arr); arr = arr.reshape(n, 3)
     gmin = Vector(map(min, gmin, Vector(arr.min(axis=0)))); gmax = Vector(map(max, gmax, Vector(arr.max(axis=0))))
-rebase = Vector((-(gmin.x + gmax.x) / 2, -(gmin.y + gmax.y) / 2, -gmin.z))
+if 'origin' in spec:
+    # Explicit machine origin in the source frame (e.g. the enclosure footprint centre on the floor,
+    # leaving a chip conveyor or pendant that sticks out of the footprint out of the centring).
+    rebase = -Vector(spec['origin'])
+else:
+    rebase = Vector((-(gmin.x + gmax.x) / 2, -(gmin.y + gmax.y) / 2, -gmin.z))
 T = Matrix.Translation(rebase * S) @ Matrix.Scale(S, 4)
 for o in meshes:
     o.data.transform(T)
@@ -83,9 +92,11 @@ def qmat(mat, override=None):
         qmats[key] = m
     return qmats[key]
 glass = set(spec.get('glass', []))
+glass_materials = set(spec.get('glass_materials', []))  # source material names that are window panes
 for o in meshes:
     for slot in o.material_slots:
-        slot.material = qmat(slot.material, 'Glass' if o.name in glass else None)
+        is_glass = o.name in glass or (slot.material is not None and slot.material.name in glass_materials)
+        slot.material = qmat(slot.material, 'Glass' if is_glass else None)
 
 # ---- extras (primitive meshes) -------------------------------------------------------------
 def add_extra(e):
@@ -109,6 +120,13 @@ def add_extra(e):
     ob = bpy.data.objects.new(e['name'], me); bpy.context.scene.collection.objects.link(ob)
     for p in me.polygons: p.use_smooth = e['type'] != 'box' and e['type'] != 'hex'
     return ob
+
+# ---- adjustments: move bodies the CAD stores in a different pose (e.g. side doors modelled raised)
+for adj in spec.get('adjust', []):
+    T = Matrix.Translation(V(adj.get('translate', (0, 0, 0))))
+    for n in resolve(adj.get('select', [])):
+        bpy.data.objects[n].data.transform(T)
+        print(f"ASM adjusted {n}: translate {list(adj.get('translate', (0, 0, 0)))}")
 
 # ---- parts -----------------------------------------------------------------------------------
 root = bpy.data.objects.new(spec['name'], None); bpy.context.scene.collection.objects.link(root)
@@ -149,7 +167,11 @@ def build_part(pdef, parent):
 
 for pdef in spec['parts']:
     build_part(pdef, root)
-# static remainder
+# static remainder (minus any bodies the spec drops, e.g. a pendant that would hang in the robot's way)
+for n in resolve(spec.get('drop', [])):
+    if n not in claimed and n not in part_objs:
+        bpy.data.objects.remove(bpy.data.objects[n]); claimed.add(n)
+        print("ASM dropped", n)
 rest = [o for o in bpy.data.objects if o.type == 'MESH' and o.name not in claimed and o.name not in part_objs and o.parent is None]
 with bpy.context.temp_override(active_object=rest[0], selected_editable_objects=rest, selected_objects=rest):
     bpy.ops.object.join()

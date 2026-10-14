@@ -1,0 +1,16 @@
+{
+ "machine": "haas_vf2", "blend": "prep/vf2.blend", "root_empty": "HaasVF2", "collision_faces": 3000,
+ "unity_collision_fbx": "../../Assets/Models/Factory Machines/HaasVF2_collision.fbx",
+ "links": {
+  "base_link":  {"mesh": "Static",    "mass": 3600, "collision_faces": 12000, "collision_method": "voxel", "voxel_size": 0.03},
+  "door_left":  {"mesh": "DoorLeft",  "mass": 28,   "collision_faces": 1500},
+  "door_right": {"mesh": "DoorRight", "mass": 28,   "collision_faces": 1500}
+ },
+ "joints": [
+  {"name": "door_left_slide",  "parent": "base_link", "child": "door_left",  "type": "prismatic", "axis": [-1,0,0], "lower": 0.0, "upper": 0.48, "velocity": 0.3, "effort": 500},
+  {"name": "door_right_slide", "parent": "base_link", "child": "door_right", "type": "prismatic", "axis": [1,0,0],  "lower": 0.0, "upper": 0.48, "velocity": 0.3, "effort": 500}
+ ],
+ "check_poses": {
+  "open": {"door_left_slide": 0.48, "door_right_slide": 0.48}
+ }
+}
