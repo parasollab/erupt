@@ -1,0 +1,16 @@
+{"name":"HaasVF2TR","blend":"prep/vf2tr.blend","objects_json":"prep/vf2tr_objects.json","budget":500000,
+ "origin":[0.0,-0.611,-0.505],
+ "glass_materials":["Opaque(119,147,166)","Opaque(88,255,184)"],
+ "drop":["CONV PKG_VF-2_1_2023|CONV-HOLDER-VF-SM","CONV PKG_VF-2_1_2023|CONV-SHELF-VF-SM",
+         "160mm_PLATTER|160mm Standard Platter"],
+ "adjust":[
+  {"select":["SIDE DOORS_VF-2_1_2023|37-0400-SIDE DOORS-main"],"translate":[0,0,-0.62]},
+  {"select":["TABLE_VF-2_1_2023|37-0281-DEF","SADDLE_VF-2_1_2023|37-0059-DEF","TR_BODY|TRT-160_2",
+             "TR_TRUNNION|TRT-160_1","250mm_PLATTER|250mm Optional Platter"],"translate":[0,-0.25,0]}
+ ],
+ "parts":[
+  {"name":"DoorLeft","select":["DOORS_VF-2_1_2023|37-0400-LEFT DOOR"],"pivot":[-0.33,-0.983,0.66]},
+  {"name":"DoorRight","select":["DOORS_VF-2_1_2023|37-0400-RIGHT DOOR"],"pivot":[0.305,-0.983,0.66]},
+  {"name":"Trunnion","select":["TR_TRUNNION|TRT-160_1"],"pivot":[-0.381,-0.964,0.55]},
+  {"name":"Platter","select":["250mm_PLATTER|250mm Optional Platter"],"pivot":[-0.381,-0.942,0.535]}
+ ]}

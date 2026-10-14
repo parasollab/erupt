@@ -1,0 +1,21 @@
+{
+ "machine": "haas_vf2tr", "blend": "prep/vf2tr.blend", "root_empty": "HaasVF2TR", "collision_faces": 3000,
+ "unity_collision_fbx": "../../Assets/Models/Factory Machines/HaasVF2TR_collision.fbx",
+ "links": {
+  "base_link":  {"mesh": "Static",    "mass": 3900, "collision_faces": 12000, "collision_method": "voxel", "voxel_size": 0.03},
+  "door_left":  {"mesh": "DoorLeft",  "mass": 28,   "collision_faces": 1500},
+  "door_right": {"mesh": "DoorRight", "mass": 28,   "collision_faces": 1500},
+  "trunnion":   {"mesh": "Trunnion",  "mass": 60,   "collision_faces": 2000},
+  "platter":    {"mesh": "Platter",   "mass": 12,   "collision_faces": 800}
+ },
+ "joints": [
+  {"name": "door_left_slide",  "parent": "base_link", "child": "door_left",  "type": "prismatic",  "axis": [-1,0,0], "lower": 0.0,    "upper": 0.48,  "velocity": 0.3, "effort": 500},
+  {"name": "door_right_slide", "parent": "base_link", "child": "door_right", "type": "prismatic",  "axis": [1,0,0],  "lower": 0.0,    "upper": 0.48,  "velocity": 0.3, "effort": 500},
+  {"name": "trunnion_tilt",    "parent": "base_link", "child": "trunnion",   "type": "revolute",   "axis": [1,0,0],  "lower": -2.094, "upper": 2.094, "velocity": 1.0, "effort": 200},
+  {"name": "platter_spin",     "parent": "trunnion",  "child": "platter",    "type": "continuous", "axis": [0,0,1],  "velocity": 3.0, "effort": 100, "step_deg": 45}
+ ],
+ "check_poses": {
+  "open":   {"door_left_slide": 0.48, "door_right_slide": 0.48},
+  "tilted": {"door_left_slide": 0.48, "door_right_slide": 0.48, "trunnion_tilt": 0.785, "platter_spin": 0.5}
+ }
+}

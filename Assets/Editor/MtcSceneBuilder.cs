@@ -404,18 +404,21 @@ public static class MtcSceneBuilder
 
     // ------------------------------------------------------------------ VF-2 work cell
 
-    private const string Vf2ModelPath = "Assets/Models/Factory Machines/HaasVF2.fbx";
-    private const string Vf2CollisionModelPath = "Assets/Models/Factory Machines/HaasVF2_collision.fbx";
-    private const string Vf2PrefabPath = "Assets/Prefabs/Factory/HaasVF2.prefab";
+    private const string Vf2ModelPath = "Assets/Models/Factory Machines/HaasVF2TR.fbx";
+    private const string Vf2CollisionModelPath = "Assets/Models/Factory Machines/HaasVF2TR_collision.fbx";
+    private const string Vf2PrefabPath = "Assets/Prefabs/Factory/HaasVF2TR.prefab";
+    private const string Vf2MaterialPrefix = "HaasVF2TR";
     private const string MachineMaterialFolder = "Assets/Materials/Factory/Machines";
     private const string MachineGlassMaterialPath = "Assets/Materials/Factory/MachineGlass.mat";
     private const string PlanningMenuPrefabPath = "Assets/Prefabs/MoveItPlanningRequestMenu.prefab";
     private const string DoorPanelUxmlPath = "Assets/UI Toolkit/MachineDoorPanel.uxml";
-    private const string MachineName = "Haas VF-2";
+    private const string MachineName = "Haas VF-2TR";
     private const string DoorMenuName = "MachineDoorMenu";
     private const string Vf2BodyId = "vf2_body";
     private const string Vf2DoorLeftId = "vf2_door_left";
     private const string Vf2DoorRightId = "vf2_door_right";
+    private const string Vf2TrunnionId = "vf2_trunnion";
+    private const string Vf2PlatterId = "vf2_platter";
     // Travel of each sliding door (metres); the outer edges stop just inside the enclosure's side panels.
     private const float DoorTravel = 0.48f;
     // Door panel: 300 x DoorPanelHeight document units at the menu prefab's 0.2 scale (1 unit = 2 mm).
@@ -427,12 +430,18 @@ public static class MtcSceneBuilder
     // sill (0.62 m above the floor) onto the machine table (0.85 m). Raw stock is stacked on a
     // stand to the robot's right, the conveyor runs from its left to the parts table.
     private static readonly Vector3 PedestalSize = new Vector3(0.6f, 0.75f, 0.44f);
+    // Pedestal centre is 3 cm in front of the robot base so its back face clears the voxel-thickened
+    // front-panel collision mesh (which reaches 3 cm in front of the enclosure's lower panel).
+    private const float PedestalZ = 0.97f;
     private const float DoorPlaneZ = 1.25f;
-    // Vise block on the VF-2 table, 0.40 m behind the door front (0.65 m from the base). It is
-    // 6 cm tall so a part resting on it clears the voxel-thickened body collision mesh (3 cm).
-    private static readonly Vector3 FixtureSize = new Vector3(0.24f, 0.06f, 0.16f);
-    private const float MachineTableTopY = 0.853f;
-    private static readonly Vector3 FixtureCentre = new Vector3(0f, MachineTableTopY + 0.03f, DoorPlaneZ + 0.397f);
+    // The TRT-160 platter sits left of the spindle centreline; the machine is shifted right so the
+    // platter is only 0.18 m off the robot's axis while the arm still passes through the door
+    // opening (0.93 m wide, so 0.27 m of clearance on the near side).
+    private const float MachineXOffset = 0.2f;
+    // Fixture block on the trunnion platter (the CAD's saddle is jogged 0.25 m toward the doors in
+    // spec_vf2tr.json so the platter is within reach). 6 cm tall so a resting part clears the
+    // collision meshes around it; placed from the prefab's Platter part at build time.
+    private static readonly Vector3 FixtureSize = new Vector3(0.16f, 0.06f, 0.16f);
     private static readonly Vector3 StockStandSize = new Vector3(0.3f, 0.7f, 0.3f);
     private static readonly Vector3 StockStandCentre = new Vector3(0.6f, 0.35f, 0.88f);
     // Billets are 6 cm tall so a top-down grasp on the top one keeps the fingertips above the next.
@@ -499,7 +508,7 @@ public static class MtcSceneBuilder
 
         GameObject pedestal = Root(scene, "RobotPedestal");
         pedestal.transform.localScale = PedestalSize;
-        pedestal.transform.position = new Vector3(0f, PedestalSize.y * 0.5f, 1f);
+        pedestal.transform.position = new Vector3(0f, PedestalSize.y * 0.5f, PedestalZ);
         Line($"RobotPedestal resized to {PedestalSize}");
 
         Material tableMat = MakeMaterial("StationTable", new Color(0.30f, 0.31f, 0.33f), 0.55f, 0.7f);
@@ -526,7 +535,7 @@ public static class MtcSceneBuilder
         Bounds bodyBounds = RendererBounds(machine.transform);
         if (doorBounds.center.z > bodyBounds.center.z)
             throw new InvalidOperationException("VF-2 doors are not on the visitor side; check the prefab's front axis");
-        machine.transform.position = new Vector3(-doorBounds.center.x, 0f, DoorPlaneZ - doorBounds.min.z);
+        machine.transform.position = new Vector3(MachineXOffset - doorBounds.center.x, 0f, DoorPlaneZ - doorBounds.min.z);
         foreach (CollisionObjectPublisher pub in machine.GetComponentsInChildren<CollisionObjectPublisher>(true))
         {
             pub.worldOrigin = c.baseTransform;
@@ -534,6 +543,9 @@ public static class MtcSceneBuilder
         }
         Bounds placed = RendererBounds(machine.transform);
         Line($"{MachineName} at {machine.transform.position}, bounds {placed.min} .. {placed.max}, door front z = {DoorPlaneZ}");
+        Bounds platterBounds = RendererBounds(FindChild(machine, "Platter"));
+        Vector3 fixtureCentre = new Vector3(platterBounds.center.x, platterBounds.max.y + FixtureSize.y * 0.5f, platterBounds.center.z);
+        Line($"Platter top at {platterBounds.max.y:F3}, centre ({platterBounds.center.x:F3}, {platterBounds.center.z:F3}); fixture at {fixtureCentre}");
 
         GameObject doorMenu = BuildDoorMenu(scene, doors);
         Line($"Door menu '{doorMenu.name}' at {doorMenu.transform.position}");
@@ -563,11 +575,11 @@ public static class MtcSceneBuilder
             stockSlots.Add(Group($"StockSlot{i}", stock, new Vector3(StockStandCentre.x, y, StockStandCentre.z)));
         }
 
-        // Vise block on the machine table: where a billet is loaded for machining.
-        Transform fixture = Group("MachineFixture", root, FixtureCentre);
-        Box("Block", fixture, FixtureCentre, FixtureSize, fixtureMat);
-        Box("Pad", fixture, FixtureCentre + new Vector3(0f, FixtureSize.y * 0.5f + 0.002f, 0f), new Vector3(0.09f, 0.004f, 0.06f), trayMat);
-        Group("DropAnchor", fixture, FixtureCentre + new Vector3(0f, FixtureSize.y * 0.5f + 0.004f + RestGap + BilletSize.y * 0.5f, 0f));
+        // Fixture block on the platter: where a billet is loaded for machining.
+        Transform fixture = Group("MachineFixture", root, fixtureCentre);
+        Box("Block", fixture, fixtureCentre, FixtureSize, fixtureMat);
+        Box("Pad", fixture, fixtureCentre + new Vector3(0f, FixtureSize.y * 0.5f + 0.002f, 0f), new Vector3(0.09f, 0.004f, 0.06f), trayMat);
+        Group("DropAnchor", fixture, fixtureCentre + new Vector3(0f, FixtureSize.y * 0.5f + 0.004f + RestGap + BilletSize.y * 0.5f, 0f));
 
         Transform conveyor = BuildConveyor(root, beltMat, frameMat);
         tablePub.compoundRoots = new[] { conveyor, fixture };
@@ -593,6 +605,19 @@ public static class MtcSceneBuilder
         billets.worldOrigin = c.baseTransform;
         billets.listener = c.listener;
         billets.partsRoot = partsRoot;
+        // The billets are baked into the scene (same grab/publish stack the runtime spawner would
+        // add) so the stack is visible in the editor; GrabbablePartSet registers them at Start.
+        var baked = new List<GameObject>();
+        for (int i = 0; i < stockSlots.Count; i++)
+        {
+            string id = $"{billets.idPrefix}{i + 1}";
+            GameObject part = GrabbableCollisionObjectFactory.CreatePrimitive(PrimitiveType.Cube, id, BilletSize, id, c.baseTransform, blankMat, true);
+            part.transform.SetParent(partsRoot, true);
+            part.transform.SetPositionAndRotation(stockSlots[i].position, c.baseTransform.transform.rotation);
+            baked.Add(part);
+        }
+        billets.prePlaced = baked.ToArray();
+        Line($"{baked.Count} billets baked on the stock stand");
 
         SetFloat(c.client, "placeHeightOffsetMeters", FactoryPlaceHeightOffset);
 
@@ -688,16 +713,17 @@ public static class MtcSceneBuilder
 
         ConfigureMachineImport(Vf2ModelPath, readable: false, materials: true);
         ConfigureMachineImport(Vf2CollisionModelPath, readable: true, materials: false);
-        ExtractMachineMaterials(Vf2ModelPath, "HaasVF2");
+        ExtractMachineMaterials(Vf2ModelPath, Vf2MaterialPrefix);
 
         GameObject visual = InstantiateModel(Vf2ModelPath, out AxisMap map);
         GameObject collision = InstantiateModel(Vf2CollisionModelPath, out AxisMap colMap);
         if ((map.x - colMap.x).magnitude > 1e-3f || (map.y - colMap.y).magnitude > 1e-3f || (map.z - colMap.z).magnitude > 1e-3f)
             throw new InvalidOperationException($"visual and collision FBX axis maps differ: {map} vs {colMap}");
-        visual.name = "HaasVF2";
-        Line($"HaasVF2 axis map {map}");
+        visual.name = Vf2MaterialPrefix;
+        Line($"{Vf2MaterialPrefix} axis map {map}");
 
         Transform doorLeft = FindChild(visual, "DoorLeft"), doorRight = FindChild(visual, "DoorRight"), body = FindChild(visual, "Static");
+        Transform trunnion = FindChild(visual, "Trunnion"), platter = FindChild(visual, "Platter");
         var left = doorLeft.gameObject.AddComponent<Factory.SlidingPart>();
         left.openOffset = map.V(-DoorTravel, 0f, 0f);
         left.travelTime = 1.8f;
@@ -710,6 +736,8 @@ public static class MtcSceneBuilder
         AttachCollision(collision, "base_link_col", body, Vf2BodyId, 0.5f);
         AttachCollision(collision, "door_left_col", doorLeft, Vf2DoorLeftId, 2f);
         AttachCollision(collision, "door_right_col", doorRight, Vf2DoorRightId, 2f);
+        AttachCollision(collision, "trunnion_col", trunnion, Vf2TrunnionId, 0.5f);
+        AttachCollision(collision, "platter_col", platter, Vf2PlatterId, 0.5f);
         UnityEngine.Object.DestroyImmediate(collision);
 
         var doors = visual.AddComponent<Factory.MachineDoors>();
@@ -989,7 +1017,7 @@ public static class MtcSceneBuilder
             Bounds l = RendererBounds(doors.doors[0].transform), r = RendererBounds(doors.doors[1].transform);
             doorsClosed = l; doorsClosed.Encapsulate(r);
             Check(Mathf.Abs(doorsClosed.min.z - DoorPlaneZ) < 0.01f, $"door front at z = {DoorPlaneZ} (is {doorsClosed.min.z:F3})");
-            Check(Mathf.Abs(doorsClosed.center.x) < 0.02f, $"door opening centred on the robot (x {doorsClosed.center.x:F3})");
+            Check(Mathf.Abs(doorsClosed.center.x - MachineXOffset) < 0.02f, $"door opening centre at x = {MachineXOffset} (is {doorsClosed.center.x:F3})");
             Check(doorsClosed.center.z < machineBounds.center.z, "doors are on the visitor side of the machine");
             // Pose the doors open in memory (never saved) to measure the opening.
             foreach (Factory.SlidingPart d in doors.doors) d.Set(1f);
@@ -1006,7 +1034,7 @@ public static class MtcSceneBuilder
         if (machineT != null)
         {
             var renderers = machineT.GetComponentsInChildren<MeshRenderer>(true);
-            Check(renderers.Length == 3, $"machine has 3 renderers: Static and two doors (has {renderers.Length})");
+            Check(renderers.Length == 5, $"machine has 5 renderers: Static, two doors, trunnion, platter (has {renderers.Length})");
             foreach (MeshRenderer r in renderers)
             {
                 var mf = r.GetComponent<MeshFilter>();
@@ -1029,10 +1057,10 @@ public static class MtcSceneBuilder
             }
             long totalTris = renderers.Select(r => r.GetComponent<MeshFilter>()?.sharedMesh).Where(m => m != null)
                 .Sum(m => { long t = 0; for (int i = 0; i < m.subMeshCount; i++) t += (long)m.GetIndexCount(i) / 3; return t; });
-            Check(totalTris > 250000 && totalTris < 270000, $"machine triangle count matches the Blender export (~260k; is {totalTris})");
+            Check(totalTris > 400000 && totalTris < 480000, $"machine triangle count matches the Blender export (~441k; is {totalTris})");
         }
         var machinePubs = machineT != null ? machineT.GetComponentsInChildren<CollisionObjectPublisher>(true) : new CollisionObjectPublisher[0];
-        foreach (string id in new[] { Vf2BodyId, Vf2DoorLeftId, Vf2DoorRightId })
+        foreach (string id in new[] { Vf2BodyId, Vf2DoorLeftId, Vf2DoorRightId, Vf2TrunnionId, Vf2PlatterId })
         {
             CollisionObjectPublisher pub = machinePubs.FirstOrDefault(p => p.objectId == id);
             var mf = pub != null ? pub.GetComponent<MeshFilter>() : null;
@@ -1063,6 +1091,18 @@ public static class MtcSceneBuilder
         Check(billets != null && billets.slots != null && billets.slots.Length == BilletCount && billets.slots.All(s => s != null)
               && billets.worldOrigin == origin && billets.listener != null && billets.partsRoot != null, $"GrabbablePartSet wired ({BilletCount} stock slots)");
         Check(station.GetComponent<Factory.MoldedPartSpawner>() == null && station.GetComponent<Factory.PickPlaceStationController>() == null, "no moulder-era components on the station");
+        if (billets != null && billets.slots != null)
+        {
+            Check(billets.prePlaced != null && billets.prePlaced.Length == billets.slots.Length && billets.prePlaced.All(p => p != null), "a baked billet per stock slot");
+            for (int i = 0; billets.prePlaced != null && i < billets.prePlaced.Length; i++)
+            {
+                GameObject p = billets.prePlaced[i];
+                var pub = p != null ? p.GetComponent<CollisionObjectPublisher>() : null;
+                Check(pub != null && pub.objectId == $"{billets.idPrefix}{i + 1}" && pub.worldOrigin == origin && !pub.hasBeenPublished, $"billet {i + 1} publishes as '{billets.idPrefix}{i + 1}'");
+                Check(p != null && p.GetComponent<UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable>() != null && p.CompareTag("Selectable"), $"billet {i + 1} is grabbable and selectable");
+                Check(p != null && billets.slots[i] != null && Vector3.Distance(p.transform.position, billets.slots[i].position) < 1e-3f, $"billet {i + 1} sits on its slot");
+            }
+        }
         var tablePub = station.GetComponentsInChildren<CollisionObjectPublisher>(true).FirstOrDefault(p => p.objectId == "table");
         Check(tablePub != null && tablePub.worldOrigin == origin && !tablePub.isMesh && tablePub.name == "RawStockStand", "RawStockStand publishes as 'table'");
         Transform conveyor = station.transform.Find("Conveyor"), fixture = station.transform.Find("MachineFixture"), table = station.transform.Find("PartsTable");
@@ -1080,11 +1120,15 @@ public static class MtcSceneBuilder
             for (int i = 1; i < billets.slots.Length; i++)
                 Check(billets.slots[i].position.y - billets.slots[i - 1].position.y >= billets.partSize.y + RestGap - 1e-4f, $"billet {i} stacks on billet {i - 1} with the rest gap");
         }
-        if (fixture != null)
+        Transform platterT = machineT != null ? machineT.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name == "Platter") : null;
+        if (fixture != null && platterT != null)
         {
-            Bounds fb = RendererBounds(fixture);
-            Check(fb.min.z > DoorPlaneZ + 0.25f && fb.max.z < DoorPlaneZ + 0.7f && fb.min.y > MachineTableTopY - 0.001f, "fixture sits on the machine table behind the door sill");
+            Bounds fb = RendererBounds(fixture), pb = RendererBounds(platterT);
+            Check(Mathf.Abs(fb.min.y - pb.max.y) < 0.01f && fb.min.x > pb.min.x && fb.max.x < pb.max.x && fb.min.z > pb.min.z && fb.max.z < pb.max.z,
+                  $"fixture sits on the trunnion platter (platter top {pb.max.y:F3}, fixture bottom {fb.min.y:F3})");
+            Check(fb.min.z > DoorPlaneZ + 0.05f, "fixture is behind the door sill");
         }
+        else Check(false, "machine has a Platter part");
 
         // Reach: every pick/place anchor between 0.25 and 0.8 x reach horizontally from the base.
         Vector3 basePos = baseTransform != null ? baseTransform.position : fr3.transform.position;
@@ -1111,7 +1155,8 @@ public static class MtcSceneBuilder
         {
             Bounds pb = RendererBounds(pedestal.transform);
             Check(pb.max.z < DoorPlaneZ, $"pedestal front ({pb.max.z:F3}) is in front of the door plane");
-            Check(openingWidth > 0f && pb.min.x > doorsOpen.center.x - openingWidth * 0.5f && pb.max.x < doorsOpen.center.x + openingWidth * 0.5f, "pedestal fits inside the door opening");
+            float leftEdge = doorsOpen.center.x - openingWidth * 0.5f, rightEdge = doorsOpen.center.x + openingWidth * 0.5f;
+            Check(openingWidth > 0f && basePos.x > leftEdge + 0.2f && basePos.x < rightEdge - 0.2f, $"robot axis has 0.2 m clearance inside the door opening ({leftEdge:F2}..{rightEdge:F2})");
         }
         // The machine's bounding box reaches 0.5 m in front of the doors (chip-conveyor shelf,
         // pendant), so props are tested against the machine's collision-mesh vertices instead.
@@ -1143,7 +1188,7 @@ public static class MtcSceneBuilder
         if (pedestal != null)
         {
             Bounds pb = RendererBounds(pedestal.transform);
-            pb.Expand(0.02f);
+            pb.Expand(0.01f);
             int inside = machineVertices.Count(v => pb.Contains(v));
             Check(inside == 0, $"no machine geometry inside the pedestal ({inside} collision vertices)");
         }

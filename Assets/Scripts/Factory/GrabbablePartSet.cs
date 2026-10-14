@@ -16,6 +16,9 @@ namespace Factory
         public GameObject worldOrigin;
         public CollisionObjectsListenerSimple listener;
         public Transform partsRoot;
+        [Tooltip("Parts already baked into the scene (one per slot, in slot order; visible in the editor). " +
+                 "They are registered instead of created; slots beyond this list still get a new part.")]
+        public GameObject[] prePlaced;
 
         public IReadOnlyList<GameObject> Parts => parts;
         readonly List<GameObject> parts = new List<GameObject>();
@@ -29,6 +32,15 @@ namespace Factory
             {
                 if (slots[i] == null) continue;
                 string id = idPrefix + (i + 1);
+                if (prePlaced != null && i < prePlaced.Length && prePlaced[i] != null)
+                {
+                    GameObject baked = prePlaced[i];
+                    var pub = baked.GetComponent<CollisionObjectPublisher>();
+                    if (pub != null) id = pub.objectId;
+                    if (listener != null) listener.RegisterUnityOwnedObject(id, baked);
+                    parts.Add(baked);
+                    continue;
+                }
                 GameObject part = GrabbableCollisionObjectFactory.CreatePrimitive(
                     PrimitiveType.Cube, id, partSize, id, worldOrigin, partMaterial, freezeRotation);
                 if (partsRoot != null) part.transform.SetParent(partsRoot, true);

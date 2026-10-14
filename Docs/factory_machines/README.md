@@ -1,51 +1,61 @@
 # Factory machine models (FactoryDemo scene)
 
 `Assets/Scenes/Demo Scenes/FactoryDemo.unity` is the ReachabilityVR demo rig (FR3 on a pedestal, VR camera
-rig, wrist menus, MTC pick/place stack) laid out as a one-machine work cell around a Haas VF-2:
+rig, wrist menus, MTC pick/place stack) laid out as a one-machine work cell around a Haas VF-2TR (VF-2 with
+the TRT-160 trunnion):
 
-| Prefab (`Assets/Prefabs/Factory`) | Source (Desktop) | Animated parts |
+| Prefab (`Assets/Prefabs/Factory`) | Source (Desktop) | Parts |
 |---|---|---|
-| HaasVF2 | `vf-2_solid_models_1_2023/VF-2_STEP__1_2023.fbx` (Fusion export of the STEP, named assemblies) | DoorLeft/DoorRight (slide 0.48 m each, driven together by `Factory.MachineDoors`); everything else is static for now |
+| HaasVF2TR | `vf-2_solid_models_1_2023/VF-2TR_STEP__1_2023.STEP` (SolidWorks STEP AP214, inches, named assemblies) | DoorLeft/DoorRight (slide 0.48 m each, driven together by `Factory.MachineDoors`); Trunnion and Platter are separate static parts (the fixture block is placed on the platter); everything else is `Static` |
 
-The VF-2 prefab also carries three renderer-less collision meshes (`Static/Collision`, `DoorLeft/Collision`,
-`DoorRight/Collision`, from `HaasVF2_collision.fbx`) with `CollisionObjectPublisher`s `vf2_body`,
-`vf2_door_left`, `vf2_door_right`, so MoveIt plans around the enclosure and the doors follow in the planning
-scene as they slide. The doors are opened and closed from the `MachineDoorMenu` world-space panel
-(`MachineDoorPanel.uxml` + `Factory.MachineDoorPanel`, an instance of the planning-menu prefab like the MTC
-dashboard) standing just outside the machine's front-right corner.
+The prefab also carries renderer-less collision meshes under each part (from `HaasVF2TR_collision.fbx`) with
+`CollisionObjectPublisher`s `vf2_body`, `vf2_door_left`, `vf2_door_right`, `vf2_trunnion`, `vf2_platter`, so
+MoveIt plans around the enclosure and the doors follow in the planning scene as they slide. The doors are
+opened and closed from the `MachineDoorMenu` world-space panel (`MachineDoorPanel.uxml` +
+`Factory.MachineDoorPanel`, an instance of the planning-menu prefab like the MTC dashboard) standing just
+outside the machine's front-right corner.
 
 The four machines of the earlier hall (HaasVF1, HaasST10, HaasEC500, InjectionMolder, with their
 `Factory.*Cycle` components) remain as prefabs and in the URDF package but are no longer in the scene.
-`FactorySceneBuilder.cs.txt` is the archived one-shot script that built them.
+`FactorySceneBuilder.cs.txt` is the archived one-shot script that built them. The plain VF-2 (built from a
+Fusion FBX export, `spec_vf2.json` / `urdf_spec_vf2.json`) was replaced by the TR on 2026-10-14; its URDF
+stays in the package, its Unity assets were removed.
 
-## Rebuilding the VF-2 (Blender 4.3, headless)
+## Rebuilding the VF-2TR (OpenCASCADE + Blender 4.3, headless)
+
+STEP goes through `step_to_obj.py` (needs the `cadquery-ocp` wheel: `python3.10 -m venv occ &&
+occ/bin/pip install cadquery-ocp`). It reads the STEP with the XCAF document reader, so assembly names and
+face colours survive, tessellates every solid at a fixed tolerance (2 mm / 0.5 rad gives ~450k triangles for
+the whole machine, clean enough that no decimation is needed) and writes one OBJ object per leaf solid named
+`<enclosing product>|<leaf product>` with materials `Opaque(r,g,b)`, in metres, Y-up as SolidWorks stores it.
 
 ```
 B=/Applications/Blender.app/Contents/MacOS/Blender
-$B -b --python bl_prepare.py  -- ~/Desktop/vf-2_solid_models_1_2023/VF-2_STEP__1_2023.fbx prep vf2
-$B -b --python bl_assemble.py -- spec_vf2.json /tmp/asm/HaasVF2.fbx
-cp /tmp/asm/HaasVF2.fbx "../../Assets/Models/Factory Machines/HaasVF2.fbx"
-$B -b /tmp/asm/HaasVF2.blend --python-expr "import bpy; bpy.ops.wm.save_as_mainfile(filepath='$PWD/prep/vf2.blend', compress=True)"
 PKG=~/VR/erupt_ws/src/factory_machines_description
-$B -b --python bl_export_urdf.py -- urdf_spec_vf2.json $PKG   # URDF + meshes + HaasVF2_collision.fbx
-$B -b --python bl_check_urdf.py  -- $PKG haas_vf2 /tmp/chk urdf_spec_vf2.json
+occ/bin/python step_to_obj.py ~/Desktop/vf-2_solid_models_1_2023/VF-2TR_STEP__1_2023.STEP /tmp/tr/vf2tr.obj --lin 2.0 --ang 0.5
+$B -b --python bl_prepare.py  -- /tmp/tr/vf2tr.obj prep vf2tr 500000 --scale 1.0
+$B -b --python bl_assemble.py -- spec_vf2tr.json /tmp/asm/HaasVF2TR.fbx
+cp /tmp/asm/HaasVF2TR.fbx "../../Assets/Models/Factory Machines/HaasVF2TR.fbx"
+$B -b /tmp/asm/HaasVF2TR.blend --python-expr "import bpy; bpy.ops.wm.save_as_mainfile(filepath='$PWD/prep/vf2tr.blend', compress=True)"
+$B -b --python bl_export_urdf.py -- urdf_spec_vf2tr.json $PKG   # URDF + meshes + HaasVF2TR_collision.fbx
+$B -b --python bl_check_urdf.py  -- $PKG haas_vf2tr /tmp/chk urdf_spec_vf2tr.json
 ```
 
-`bl_prepare.py` accepts an FBX as well as an OBJ: the FBX assembly tree is baked into world space (instanced
-bodies such as the leveling pads get their own mesh data first) and every body is renamed
-`<assembly>|<body>`, so `spec_vf2.json` selects the doors by name (`37-0400-LEFT DOOR|Body1.010`). The spec's
-`origin` puts the machine origin at the main enclosure's footprint centre on the floor (the chip conveyor and
-pendant stick out of it), and `glass_materials` turns the door-window material into `Glass` (remapped to
-`MachineGlass` in Unity). `drop` leaves out the chip-conveyor holder/shelf brackets (they stick 0.5 m out of the
-front-left at head height), and `adjust` lowers the two side doors by 0.62 m: the CAD stores them raised, with
-their glass above the roof line and the 0.3-1.1 m side openings exposed. `prep/vf2.blend` is the assembled
-output (parts + `Static`), the input of the URDF exporter; `prep/vf2_objects.json` are the per-body bounds from
-the prepare step. Rerun `bl_prepare.py` before `bl_assemble.py` (the assembled blend no longer holds the raw
-bodies; the script says so).
+`spec_vf2tr.json`: `origin` puts the machine origin at the main enclosure's footprint centre on the floor
+(chip chute and pendant stick out of it); `glass_materials` turns the door and side-door window materials into
+`Glass` (remapped to `MachineGlass` in Unity); `drop` leaves out the chip-conveyor holder/shelf brackets
+(0.5 m out of the front-left at head height) and the 160 mm platter the CAD keeps inside the 250 mm one;
+`adjust` lowers the side doors 0.62 m (the CAD stores them raised, glass above the roof and the 0.3-1.1 m side
+openings exposed) and jogs the saddle, table, trunnion and platter 0.25 m toward the doors (the machine's Y
+travel) so the platter is within the FR3's reach. `prep/vf2tr.blend` is the assembled output (parts +
+`Static`), the input of the URDF exporter; `prep/vf2tr_objects.json` are the per-body bounds from the prepare
+step. Rerun `bl_prepare.py` before `bl_assemble.py` (the assembled blend no longer holds the raw bodies; the
+script says so). `bl_prepare.py` also accepts the Fusion FBX route used for the plain VF-2 (assembly tree baked
+into world space, bodies renamed `<assembly>|<body>`).
 
-Then delete `Assets/Prefabs/Factory/HaasVF2.prefab` (if it exists) and run *ERUPT > Scenes > Relayout
+Then delete `Assets/Prefabs/Factory/HaasVF2TR.prefab` (if it exists) and run *ERUPT > Scenes > Relayout
 FactoryDemo (VF-2 cell)* (`MtcSceneBuilder.RelayoutFactoryBatch` headless): it re-imports both FBX files,
-extracts the materials double-sided into `Assets/Materials/Factory/Machines/HaasVF2_*`, bakes the
+extracts the materials double-sided into `Assets/Materials/Factory/Machines/HaasVF2TR_*`, bakes the
 `SlidingPart`s, collision publishers and `MachineDoors` into the prefab, and rebuilds the cell.
 
 ## Rebuilding the earlier machines' FBX files (Blender 4.3, headless)
@@ -111,15 +121,17 @@ $B -b --python bl_check_urdf.py  -- $PKG haas_vf1 /tmp/chk urdf_spec_vf1.json
 rebuilds the cell in a scene that already has the fr3 (`RelayoutFactoryBatch` headless). Either way the
 layout is (world metres, floor y = 0, visitor at the origin facing +z, fr3 base at (0, 0.75, 1)):
 
-- `Machines/Haas VF-2`: behind the robot, facing it, door front at z = 1.25 (3 cm behind the 0.6 x 0.44 m
-  `RobotPedestal`). The robot reaches over the door sill onto the machine table (0.85 m).
+- `Machines/Haas VF-2TR`: behind the robot, facing it, door front at z = 1.25 (6 cm behind the 0.6 x 0.44 m
+  `RobotPedestal`), shifted 0.2 m to the right so the trunnion platter (left of the spindle centreline) is only
+  0.18 m off the robot's axis. The robot reaches over the door sill onto the platter (top 1.10 m).
 - `MachineDoorMenu`: Open / Close doors panel at the machine's front-right corner, facing the visitor.
 - `FR3 Station/RawStockStand`: 0.3 x 0.7 x 0.3 m stand to the robot's right with a stack of four 8 x 6 x 5 cm
-  billets (`GrabbablePartSet`, ids `blank_1..4`, 5 mm rest gaps). The stand publishes as collision object
+  billets (`GrabbablePartSet`, ids `blank_1..4`, 5 mm rest gaps). The billets are baked into the scene
+  (`prePlaced`, visible in the editor) and registered at Start instead of spawned. The stand publishes as collision object
   `table` = the MTC server's `surface_link`, with the conveyor and the machine fixture as further primitives
   (`compoundRoots`): the arm avoids all of them, the carried part may touch any of them.
-- `FR3 Station/MachineFixture`: 6 cm vise block on the VF-2 table, 0.40 m behind the door front (0.65 m
-  from the base); its `DropAnchor` is where a billet goes for machining.
+- `FR3 Station/MachineFixture`: 6 cm fixture block on the trunnion platter (0.53 m from the base, placed from
+  the prefab's Platter part at build time); its `DropAnchor` is where a billet goes for machining.
 - `FR3 Station/Conveyor`: belt from the robot's left (x -0.45, `DropAnchor` at x -0.6) to the parts table.
 - `FR3 Station/PartsTable`: 1.6 x 0.9 m table at (-3.7, 0.8), 3.7 m from the robot (phase 2).
 

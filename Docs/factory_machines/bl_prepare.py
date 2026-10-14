@@ -3,6 +3,14 @@
 import bpy, sys, json, math, os, time
 from mathutils import Vector, Matrix
 argv = sys.argv[sys.argv.index('--')+1:]
+# Options for OBJ input: --scale <factor to metres> (default 0.01, CAD exports in cm) and
+# --zup (the OBJ is already Z-up, e.g. from step_to_obj.py; default is a Y-up OBJ).
+obj_scale = 0.01
+obj_zup = False
+if '--scale' in argv:
+    i = argv.index('--scale'); obj_scale = float(argv[i + 1]); del argv[i:i + 2]
+if '--zup' in argv:
+    argv.remove('--zup'); obj_zup = True
 obj_path, out_dir, name = argv[0], argv[1], argv[2]
 target_faces = int(argv[3]) if len(argv) > 3 else 150000
 os.makedirs(out_dir, exist_ok=True)
@@ -28,8 +36,8 @@ if obj_path.lower().endswith('.fbx'):
         o.name = f"{assembly}|{o.name}"
     bpy.context.view_layer.update()
 else:
-    bpy.ops.wm.obj_import(filepath=obj_path, global_scale=0.01, use_split_objects=True, use_split_groups=True,
-                          forward_axis='NEGATIVE_Z', up_axis='Y', validate_meshes=True)
+    bpy.ops.wm.obj_import(filepath=obj_path, global_scale=obj_scale, use_split_objects=True, use_split_groups=True,
+                          forward_axis='Y' if obj_zup else 'NEGATIVE_Z', up_axis='Z' if obj_zup else 'Y', validate_meshes=True)
     meshes = [o for o in bpy.data.objects if o.type == 'MESH']
 for o in [o for o in bpy.data.objects if o.type != 'MESH']:
     bpy.data.objects.remove(o)
