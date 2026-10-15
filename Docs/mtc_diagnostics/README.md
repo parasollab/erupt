@@ -24,3 +24,21 @@ each solution segment's joints and scene-diff attach/detach ops, then plays the 
 `MTCTrajectoryPlayer.verboseLog` on while logging the part's parent and pose every 250 ms. Earlier
 variants (kept in the session notes) spawned a molded part and planned it off its tray slot, and
 executed a solution while logging `/attached_collision_objects_ros` and `/collision_objects_ros`.
+
+## Timing the attach/detach notices against the robot (`detach_timing_probe.py`)
+
+Unity learns about attach/detach from `planning_scene_watcher.py` on `/attached_collision_objects_ros`;
+if that lags the robot, the carried part is "lifted back up" after the hand opens and snaps to its
+place pose only when the notice lands. The probe speaks the ROS-TCP-Endpoint protocol itself (no
+Unity, no ROS install needed): it subscribes to `/joint_states`, `/attached_collision_objects_ros`,
+`/collision_objects_ros` and `/monitored_planning_scene`, reads the scene over `/get_planning_scene`,
+picks the topmost `blank_*` and plans+executes placing it back where it is via the deprecated
+`/pick_place_task` topic, then prints a timeline of robot-motion windows against the notices.
+
+```
+python3 -I Docs/mtc_diagnostics/detach_timing_probe.py <endpoint ip> [record seconds]
+```
+
+Needs the full stack up (move_group, `mtc_pick_place_server`, the watcher, ROS-TCP-Endpoint on port
+10000). A healthy run shows the ACO REMOVE and the blank's CO ADD inside the gap between the
+"open hand" and "retreat" motion windows; a lagging watcher shows them after the last window.

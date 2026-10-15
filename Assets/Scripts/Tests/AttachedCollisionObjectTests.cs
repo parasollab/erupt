@@ -229,6 +229,49 @@ namespace Erupt.Ros.Tests
         }
 
         [UnityTest]
+        public IEnumerator ExpectedDetach_ReleasesAtOnce_AndTheWatchersLateNoticesDoNotRecapture()
+        {
+            yield return Build();
+            bus.Inbound(SceneTopic, Box("cube", Vector3.zero));
+            scene.TryGetObject("cube", out var go);
+            Transform originalParent = go.transform.parent;
+            var attach = host.GetComponent<AttachedCollisionObjectListener>();
+
+            // The executing solution reports its attach step done before the watcher says anything.
+            attach.ApplyExpected(Attached("cube", "panda_hand", CollisionObjectMsg.ADD, 0, 0, 0.1));
+            Assert.AreSame(hand, go.transform.parent);
+            Assert.IsTrue(scene.attachedIds.Contains("cube"));
+            // The watcher's own attach arrives later and changes nothing.
+            bus.Inbound(AttachTopic, Attached("cube", "fr3_hand", CollisionObjectMsg.ADD, 0, 0, 0.1));
+            Assert.AreSame(hand, go.transform.parent);
+
+            robot.transform.position = new Vector3(0f, 1f, 0f);
+            Vector3 released = go.transform.position;
+            attach.ApplyExpected(Attached("cube", "panda_hand", CollisionObjectMsg.REMOVE, 0, 0, 0));
+            Assert.AreSame(originalParent, go.transform.parent, "An expected detach releases the object right away.");
+            AssertClose(released, go.transform.position);
+            Assert.IsFalse(scene.attachedIds.Contains("cube"));
+
+            // The watcher is behind: its attach for a step the robot already finished must not
+            // put the object back into the hand; its detach and re-ADD then end the hand-off.
+            robot.transform.position = new Vector3(0f, 2f, 0f);
+            bus.Inbound(AttachTopic, Attached("cube", "fr3_hand", CollisionObjectMsg.ADD, 0, 0, 0.1));
+            Assert.AreSame(originalParent, go.transform.parent, "A stale watcher attach must be ignored.");
+            AssertClose(released, go.transform.position);
+            bus.Inbound(AttachTopic, Attached("cube", "fr3_hand", CollisionObjectMsg.REMOVE, 0, 0, 0));
+            Assert.AreSame(originalParent, go.transform.parent);
+            bus.Inbound(SceneTopic, Box("cube", new Vector3(0.5f, 0f, 0f)));
+            yield return null;
+            AssertClose(new Vector3(0.5f, 0f, 0f), go.transform.position);
+            foreach (var pub in go.GetComponentsInChildren<CollisionObjectPublisher>(true))
+                Assert.IsFalse(pub.attachedToRobot, "The object publishes again once the place pose is in.");
+
+            // A later genuine pick is not mistaken for a stale notice.
+            bus.Inbound(AttachTopic, Attached("cube", "fr3_hand", CollisionObjectMsg.ADD, 0, 0, 0.1));
+            Assert.AreSame(hand, go.transform.parent);
+        }
+
+        [UnityTest]
         public IEnumerator ClearingTheRegistryMidCarry_LeavesNothingUnderTheLink()
         {
             yield return Build();

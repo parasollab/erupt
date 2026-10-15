@@ -7,6 +7,7 @@ using RosMessageTypes.BuiltinInterfaces;
 using RosMessageTypes.Moveit;
 using RosMessageTypes.Trajectory;
 using RosMessageTypes.Sensor;
+using RosMessageTypes.StudyInterfaces;
 using Erupt.Ros;
 
 public class MTCTrajectoryPlayer : MonoBehaviour
@@ -34,6 +35,14 @@ public class MTCTrajectoryPlayer : MonoBehaviour
     [SerializeField] private PickPlaceClient pickPlaceClient;
     [SerializeField] private string jointStateTopic = "/joint_states";
 
+    [Tooltip("Live attach listener. While a solution executes, its attach/detach steps are applied " +
+             "through this listener as soon as the server reports each step done, so the carried " +
+             "object is released when the hand opens even when the planning-scene watcher's notice " +
+             "lags behind the robot. Found in the scene when empty.")]
+    [SerializeField] private AttachedCollisionObjectListener attachedListener;
+    [Tooltip("Apply the executing solution's attach/detach steps from the execution feedback.")]
+    [SerializeField] private bool applySolutionStepsDuringExecution = true;
+
     [Tooltip("Log every preview step (segment index, joints, attach/detach) to the console.")]
     public bool verboseLog = false;
 
@@ -42,6 +51,16 @@ public class MTCTrajectoryPlayer : MonoBehaviour
     private JointStateMsg latestJointState;
     /// <summary>True while the Unity robot follows the live /joint_states (during execution).</summary>
     public bool IsMirroring => mirroring;
+
+    // The solution being executed and how far its scene diffs have been applied.
+    private bool trackingExecution;
+    private uint trackedSolutionId;
+    private bool solutionRequested;
+    private SolutionMsg executingSolution;
+    private int reportedStep = -1;       // highest sub_trajectory index the server reported done
+    private int appliedThroughStep = -1; // highest index whose scene_diff attach/detach was applied
+    /// <summary>Index of the last executed sub-trajectory whose attach/detach was applied, or -1.</summary>
+    public int ExecutionStepApplied => appliedThroughStep;
 
     private bool isPlaying;
     /// <summary>True while a solution preview is animating the robot.</summary>
@@ -81,6 +100,7 @@ public class MTCTrajectoryPlayer : MonoBehaviour
     {
         if (pickPlaceClient != null) pickPlaceClient.OnPhaseChanged -= OnClientPhaseChanged;
         StopLiveMirror();
+        StopExecutionTracking();
     }
 
     private void Update()
@@ -90,8 +110,101 @@ public class MTCTrajectoryPlayer : MonoBehaviour
 
     private void OnClientPhaseChanged()
     {
-        if (pickPlaceClient != null && pickPlaceClient.Phase == PickPlacePhase.Executing) StartLiveMirror();
-        else StopLiveMirror();
+        if (pickPlaceClient != null && pickPlaceClient.Phase == PickPlacePhase.Executing)
+        {
+            StartLiveMirror();
+            StartExecutionTracking();
+        }
+        else
+        {
+            StopLiveMirror();
+            StopExecutionTracking();
+        }
+    }
+
+    // ---- attach/detach from the executing solution ---------------------------------------
+    //
+    // MoveIt applies each sub-trajectory's scene diff (attach, detach) when that step finishes,
+    // and the server reports the step done at the same moment through the execution feedback.
+    // The planning-scene watcher's notice of the same attach/detach arrives on a separate,
+    // slower path (full planning-scene messages with every mesh in the cell), so mirroring the
+    // diff from the feedback keeps the Unity object in step with the robot it rides.
+
+    private void StartExecutionTracking()
+    {
+        StopExecutionTracking();
+        if (!applySolutionStepsDuringExecution || pickPlaceClient == null) return;
+        uint solutionId = pickPlaceClient.ExecutingSolutionId;
+        if (solutionId == 0) return; // plan-and-execute goals: no solution to read, the listener alone mirrors
+        if (attachedListener == null) attachedListener = FindFirstObjectByType<AttachedCollisionObjectListener>();
+        if (attachedListener == null) return;
+
+        trackingExecution = true;
+        trackedSolutionId = solutionId;
+        attachedListener.ForgetExpected();
+        pickPlaceClient.OnExecutionFeedback += OnExecutionFeedback;
+        RequestExecutingSolution();
+    }
+
+    // Feedback for the first steps may land before the solution does; ApplyReportedSteps
+    // catches up once it is here. A failed fetch is retried on the next feedback.
+    private void RequestExecutingSolution()
+    {
+        if (solutionRequested || executingSolution != null) return;
+        solutionRequested = true;
+        uint solutionId = trackedSolutionId;
+        pickPlaceClient.FetchSolution(solutionId, solution =>
+        {
+            if (!trackingExecution || trackedSolutionId != solutionId) return;
+            executingSolution = solution;
+            ApplyReportedSteps();
+        }, problem =>
+        {
+            if (!trackingExecution || trackedSolutionId != solutionId) return;
+            solutionRequested = false;
+            Debug.LogWarning($"[MTCTrajectoryPlayer] executing solution {solutionId} unavailable ({problem}); attach/detach follow the watcher until it is.");
+        });
+    }
+
+    private void StopExecutionTracking()
+    {
+        if (trackingExecution && pickPlaceClient != null) pickPlaceClient.OnExecutionFeedback -= OnExecutionFeedback;
+        trackingExecution = false;
+        trackedSolutionId = 0;
+        solutionRequested = false;
+        executingSolution = null;
+        reportedStep = -1;
+        appliedThroughStep = -1;
+    }
+
+    // sub_id is the index of the sub-trajectory that just finished.
+    private void OnExecutionFeedback(ExecuteSolutionFeedback feedback)
+    {
+        if (feedback == null || !trackingExecution) return;
+        int step = feedback.sub_id > int.MaxValue ? int.MaxValue : (int)feedback.sub_id;
+        reportedStep = Mathf.Max(reportedStep, step);
+        if (executingSolution == null) RequestExecutingSolution();
+        ApplyReportedSteps();
+    }
+
+    private void ApplyReportedSteps()
+    {
+        var steps = executingSolution?.sub_trajectory;
+        if (steps == null || attachedListener == null) return;
+        int last = Mathf.Min(reportedStep, steps.Length - 1);
+        for (int step = appliedThroughStep + 1; step <= last; step++)
+        {
+            var acos = steps[step].scene_diff?.robot_state?.attached_collision_objects;
+            if (acos == null) continue;
+            foreach (var aco in acos)
+            {
+                if (string.IsNullOrEmpty(aco?.@object?.id)) continue;
+                if (verboseLog)
+                    Debug.Log($"[MTCTrajectoryPlayer] step {step} done: {(aco.@object.operation == CollisionObjectMsg.REMOVE ? "detach" : "attach")} '{aco.@object.id}'");
+                attachedListener.ApplyExpected(aco);
+            }
+        }
+        appliedThroughStep = Mathf.Max(appliedThroughStep, last);
     }
 
     /// <summary>Follow /joint_states on the Unity robot; any running preview is stopped first.</summary>
@@ -451,5 +564,6 @@ public class MTCTrajectoryPlayer : MonoBehaviour
     {
         Stop();
         StopLiveMirror();
+        StopExecutionTracking();
     }
 }

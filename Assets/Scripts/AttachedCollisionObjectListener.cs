@@ -39,6 +39,11 @@ public class AttachedCollisionObjectListener : MonoBehaviour
              "letting the object publish again anyway.")]
     [SerializeField] private float resumeTimeout = 2f;
 
+    [Tooltip("Same wait after a detach applied from the executing solution's step feedback " +
+             "(see ApplyExpected): the watcher's own detach and re-ADD are still on their way " +
+             "and may lag the robot by several seconds when the planning scene is large.")]
+    [SerializeField] private float expectedDetachResumeTimeout = 20f;
+
     // Everything changed on attach, so detach can put it back.
     private class AttachState
     {
@@ -56,6 +61,10 @@ public class AttachedCollisionObjectListener : MonoBehaviour
     // arrives (so Unity's possibly-stale pose isn't pushed back into MoveIt): id -> deadline
     private readonly Dictionary<string, float> pendingResume = new();
     private readonly List<string> expired = new();
+    // Ids released through ApplyExpected whose watcher notices have not arrived yet. The
+    // watcher's attach for such an id describes a step the robot has already finished and
+    // must not put the object back into the hand; its detach then only ends the wait.
+    private readonly HashSet<string> expectedDetached = new();
 
     private IRosBus ros;
 
@@ -108,10 +117,42 @@ public class AttachedCollisionObjectListener : MonoBehaviour
         if (string.IsNullOrEmpty(id)) return;
 
         if (msg.@object.operation == CollisionObjectMsg.REMOVE)
-            Detach(id);
-        else
-            Attach(msg);
+        {
+            Detach(id, expected: false);
+            return;
+        }
+        if (expectedDetached.Contains(id))
+        {
+            // The robot already put this down (ApplyExpected); the watcher is catching up.
+            Debug.Log($"[ACO Listener] Ignoring the watcher's late attach of '{id}'; it was already released from the executing solution.");
+            return;
+        }
+        Attach(msg);
     }
+
+    /// <summary>
+    /// Applies an attach (operation ADD) or detach (REMOVE) that the executing solution says
+    /// has just happened: the server reports each solution step done the moment MoveIt applies
+    /// its scene diff, which reaches Unity well before the planning-scene watcher's notice on
+    /// <see cref="topic"/> when the scene is large. The watcher's later messages for the same
+    /// step are then no-ops; its post-detach re-ADD still sets the exact place pose.
+    /// </summary>
+    public void ApplyExpected(AttachedCollisionObjectMsg msg)
+    {
+        string id = msg?.@object?.id;
+        if (string.IsNullOrEmpty(id)) return;
+
+        if (msg.@object.operation == CollisionObjectMsg.REMOVE)
+        {
+            Detach(id, expected: true);
+            return;
+        }
+        expectedDetached.Remove(id); // picked up again: the next watcher attach is genuine
+        Attach(msg);
+    }
+
+    /// <summary>Forget earlier expected detaches, e.g. when a new execution starts.</summary>
+    public void ForgetExpected() => expectedDetached.Clear();
 
     // Idempotent: a repeated attach (new link or relative pose) re-places the object and
     // keeps the state saved by the first one.
@@ -159,13 +200,21 @@ public class AttachedCollisionObjectListener : MonoBehaviour
         Debug.Log($"[ACO Listener] Attached '{id}' to link '{link.name}' (moved {Vector3.Distance(jumpFrom, go.transform.position) * 1000f:F1} mm onto the link-relative pose).");
     }
 
-    void Detach(string id)
+    // expected: the detach comes from the executing solution (ApplyExpected), not the watcher.
+    void Detach(string id, bool expected)
     {
         if (sceneListener == null) return;
         bool wasAttached = sceneListener.attachedIds.Remove(id);
 
         if (!attached.TryGetValue(id, out var state))
         {
+            if (!expected && expectedDetached.Remove(id))
+            {
+                // The watcher's notice of a detach already applied from the solution: only
+                // its re-ADD with the place pose is still outstanding, on the usual timeout.
+                if (pendingResume.ContainsKey(id)) pendingResume[id] = Time.time + resumeTimeout;
+                return;
+            }
             if (wasAttached) Debug.LogWarning($"[ACO Listener] Detach for '{id}' with no saved attach state.");
             return;
         }
@@ -177,8 +226,9 @@ public class AttachedCollisionObjectListener : MonoBehaviour
         // The re-ADD that follows on the scene topic carries the exact place pose; the
         // publishers stay silent until it lands. Resumed in OnObjectUpdated.
         sceneListener.awaitingDetachPose.Add(id);
-        pendingResume[id] = Time.time + resumeTimeout;
-        Debug.Log($"[ACO Listener] Detached '{id}'.");
+        pendingResume[id] = Time.time + (expected ? expectedDetachResumeTimeout : resumeTimeout);
+        if (expected) expectedDetached.Add(id);
+        Debug.Log($"[ACO Listener] Detached '{id}'{(expected ? " (from the executing solution)" : "")}.");
     }
 
     void OnObjectUpdated(string id)
@@ -214,6 +264,7 @@ public class AttachedCollisionObjectListener : MonoBehaviour
 
         attached.Clear();
         pendingResume.Clear();
+        expectedDetached.Clear();
         if (ikController != null) ikController.ClearLinkCache();
     }
 

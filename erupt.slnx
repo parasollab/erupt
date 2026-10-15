@@ -12,13 +12,13 @@
   <Project Path="Unity.Robotics.ROSTCPConnector.Editor.csproj" />
   <Project Path="Unity.Robotics.Visualizations.csproj" />
   <Project Path="AprilTag.Runtime.csproj" />
+  <Project Path="Erupt.Ros.Tests.csproj" />
   <Project Path="XRViz.Editor.csproj" />
   <Project Path="Erupt.Interaction.Backends.OpenXR.csproj" />
   <Project Path="Unity.XR.Interaction.Toolkit.Samples.Hands.csproj" />
   <Project Path="Unity.Robotics.ROSTCPConnector.MessageGeneration.csproj" />
   <Project Path="Unity.XR.Interaction.Toolkit.Samples.StarterAssets.csproj" />
   <Project Path="Erupt.Interaction.Editor.csproj" />
-  <Project Path="Erupt.Ros.Tests.csproj" />
   <Project Path="Unity.XR.Hands.Samples.VisualizerSample.csproj" />
   <Project Path="Unity.Robotics.Visualizations.Editor.csproj" />
   <Project Path="Erupt.Ui.csproj" />
