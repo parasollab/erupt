@@ -12,7 +12,8 @@ namespace Factory
         public Vector3 partSize = new Vector3(0.08f, 0.03f, 0.05f);
         public Material partMaterial;
         public string idPrefix = "blank_";
-        public bool freezeRotation = true;
+        [Tooltip("Keep the part's rotation while it is grabbed. Off = the parts handle exactly like wrist-menu shapes.")]
+        public bool freezeRotation = false;
         public GameObject worldOrigin;
         public CollisionObjectsListenerSimple listener;
         public Transform partsRoot;

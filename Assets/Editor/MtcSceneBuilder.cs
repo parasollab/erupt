@@ -605,13 +605,14 @@ public static class MtcSceneBuilder
         billets.worldOrigin = c.baseTransform;
         billets.listener = c.listener;
         billets.partsRoot = partsRoot;
+        billets.freezeRotation = false; // handle like wrist-menu shapes
         // The billets are baked into the scene (same grab/publish stack the runtime spawner would
         // add) so the stack is visible in the editor; GrabbablePartSet registers them at Start.
         var baked = new List<GameObject>();
         for (int i = 0; i < stockSlots.Count; i++)
         {
             string id = $"{billets.idPrefix}{i + 1}";
-            GameObject part = GrabbableCollisionObjectFactory.CreatePrimitive(PrimitiveType.Cube, id, BilletSize, id, c.baseTransform, blankMat, true);
+            GameObject part = GrabbableCollisionObjectFactory.CreatePrimitive(PrimitiveType.Cube, id, BilletSize, id, c.baseTransform, blankMat, billets.freezeRotation);
             part.transform.SetParent(partsRoot, true);
             part.transform.SetPositionAndRotation(stockSlots[i].position, c.baseTransform.transform.rotation);
             baked.Add(part);

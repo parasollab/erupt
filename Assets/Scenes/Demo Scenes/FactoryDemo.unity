@@ -18274,7 +18274,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1bb4a8a9ae0a7451faa7c12357ce5be8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: xrviz::UnityEngine.XR.Interaction.Toolkit.Transformers.XRGrabTransformerLockPose
-  m_freezePose: 1
+  m_freezePose: 0
 --- !u!114 &1243826291
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -18424,7 +18424,12 @@ MonoBehaviour:
   m_ForceGravityOnDetach: 0
   m_RetainTransformParent: 1
   m_StartingSingleGrabTransformers: []
-  m_StartingMultipleGrabTransformers: []
+  m_StartingMultipleGrabTransformers:
+  - {fileID: 1243826289}
+  - {fileID: 1243826288}
+  - {fileID: 1243826291}
+  - {fileID: 1243826290}
+  - {fileID: 1243826287}
   m_AddDefaultGrabTransformers: 1
   m_FarAttachMode: 0
   m_LimitLinearVelocity: 0
@@ -24512,7 +24517,7 @@ MonoBehaviour:
   partSize: {x: 0.08, y: 0.06, z: 0.05}
   partMaterial: {fileID: 2100000, guid: fa255d45433f446fc9d03bfc697713e6, type: 2}
   idPrefix: blank_
-  freezeRotation: 1
+  freezeRotation: 0
   worldOrigin: {fileID: 900000001}
   listener: {fileID: 909369343}
   partsRoot: {fileID: 583832234}
@@ -26392,7 +26397,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1bb4a8a9ae0a7451faa7c12357ce5be8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: xrviz::UnityEngine.XR.Interaction.Toolkit.Transformers.XRGrabTransformerLockPose
-  m_freezePose: 1
+  m_freezePose: 0
 --- !u!114 &1671521482
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -26542,7 +26547,12 @@ MonoBehaviour:
   m_ForceGravityOnDetach: 0
   m_RetainTransformParent: 1
   m_StartingSingleGrabTransformers: []
-  m_StartingMultipleGrabTransformers: []
+  m_StartingMultipleGrabTransformers:
+  - {fileID: 1671521480}
+  - {fileID: 1671521479}
+  - {fileID: 1671521482}
+  - {fileID: 1671521481}
+  - {fileID: 1671521478}
   m_AddDefaultGrabTransformers: 1
   m_FarAttachMode: 0
   m_LimitLinearVelocity: 0
@@ -28963,7 +28973,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1bb4a8a9ae0a7451faa7c12357ce5be8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: xrviz::UnityEngine.XR.Interaction.Toolkit.Transformers.XRGrabTransformerLockPose
-  m_freezePose: 1
+  m_freezePose: 0
 --- !u!114 &1801910319
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -29113,7 +29123,12 @@ MonoBehaviour:
   m_ForceGravityOnDetach: 0
   m_RetainTransformParent: 1
   m_StartingSingleGrabTransformers: []
-  m_StartingMultipleGrabTransformers: []
+  m_StartingMultipleGrabTransformers:
+  - {fileID: 1801910317}
+  - {fileID: 1801910316}
+  - {fileID: 1801910319}
+  - {fileID: 1801910318}
+  - {fileID: 1801910315}
   m_AddDefaultGrabTransformers: 1
   m_FarAttachMode: 0
   m_LimitLinearVelocity: 0
@@ -31728,7 +31743,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1bb4a8a9ae0a7451faa7c12357ce5be8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: xrviz::UnityEngine.XR.Interaction.Toolkit.Transformers.XRGrabTransformerLockPose
-  m_freezePose: 1
+  m_freezePose: 0
 --- !u!114 &1985633545
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -31878,7 +31893,12 @@ MonoBehaviour:
   m_ForceGravityOnDetach: 0
   m_RetainTransformParent: 1
   m_StartingSingleGrabTransformers: []
-  m_StartingMultipleGrabTransformers: []
+  m_StartingMultipleGrabTransformers:
+  - {fileID: 1985633543}
+  - {fileID: 1985633542}
+  - {fileID: 1985633545}
+  - {fileID: 1985633544}
+  - {fileID: 1985633541}
   m_AddDefaultGrabTransformers: 1
   m_FarAttachMode: 0
   m_LimitLinearVelocity: 0

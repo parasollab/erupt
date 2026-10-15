@@ -54,6 +54,20 @@ public static class GrabbableCollisionObjectFactory
         var twoHanded = GetOrAdd<XRTwoHandedScaleTransformer>(go);
         var uiScale = GetOrAdd<XRUIScaleTransformer>(go);
 
+        // The order matters: the two-handed scale transformer locks the orientation after the
+        // general transformer has moved the object, so a second hand scales instead of turning.
+        // The runtime list below is what a one-session object uses; the serialized starting list
+        // is what a baked object (MtcSceneBuilder's billets) registers at Awake. Without the
+        // starting list a baked object has only XRI's general transformer for two-hand grabs and
+        // spins with the hands the moment a second interactor joins.
+        var multiple = gi.startingMultipleGrabTransformers;
+        multiple.Clear();
+        multiple.Add(general);
+        multiple.Add(twoHanded);
+        multiple.Add(axisLock);
+        multiple.Add(lockPose);
+        multiple.Add(uiScale);
+        gi.startingSingleGrabTransformers.Clear(); // one hand: XRI's default general transformer only
         gi.AddMultipleGrabTransformer(general);
         gi.AddMultipleGrabTransformer(twoHanded);
         gi.AddMultipleGrabTransformer(axisLock);
