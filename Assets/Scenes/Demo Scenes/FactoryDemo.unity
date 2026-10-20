@@ -10079,6 +10079,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 3731865409109120876, guid: 46fae3e1bd65645b4835315513e75b34, type: 3}
       insertIndex: -1
       addedObject: {fileID: 733397758}
+    - targetCorrespondingSourceObject: {fileID: 3731865409109120876, guid: 46fae3e1bd65645b4835315513e75b34, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 0}
   m_SourcePrefab: {fileID: 100100000, guid: 46fae3e1bd65645b4835315513e75b34, type: 3}
 --- !u!1 &733397756 stripped
 GameObject:
@@ -13070,7 +13073,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &900000022
 Transform:
   m_ObjectHideFlags: 0
@@ -13098,7 +13101,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7c3f8e4d0a2b4c9d1e5f3a4b5c6d7e8f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: xrviz::ReachabilityVolumeVisualizer
-  robot: {fileID: 0}
+  robot: {fileID: 1228241008}
   topic: /reachability_map
   requestTopic: /reachability_map/request
   requestRetrySeconds: 5
@@ -13246,6 +13249,7 @@ MonoBehaviour:
   rosNamePrefix: panda_
   unityNamePrefix: fr3_
   resumeTimeout: 2
+  expectedDetachResumeTimeout: 20
 --- !u!1 &910058972
 GameObject:
   m_ObjectHideFlags: 0
@@ -17783,6 +17787,8 @@ MonoBehaviour:
   stagePreviewHoldSeconds: 1.5
   pickPlaceClient: {fileID: 0}
   jointStateTopic: /joint_states
+  attachedListener: {fileID: 0}
+  applySolutionStepsDuringExecution: 1
   verboseLog: 0
 --- !u!114 &1228241014
 MonoBehaviour:
@@ -17803,7 +17809,7 @@ MonoBehaviour:
   baseAnchor: {fileID: 900000002}
   unityJointNamePrefix: fr3_
   rosJointNamePrefix: panda_
-  reachabilityMap: {fileID: 0}
+  reachabilityMap: {fileID: 4900000, guid: 38253a7367c014c8598cee7011a0261c, type: 3}
   reachabilityMapResource: 
   defaultSliceHeight: 0.3
 --- !u!1 &1234151602
@@ -22053,6 +22059,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 3927579247218649798, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1481755732}
+    - targetCorrespondingSourceObject: {fileID: 3927579247218649798, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 0}
   m_SourcePrefab: {fileID: 100100000, guid: c6b4b184963f45b4f82ef507fe7e2e5c, type: 3}
 --- !u!4 &1481755726 stripped
 Transform:
@@ -25274,6 +25283,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 3731865409109120876, guid: 46fae3e1bd65645b4835315513e75b34, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1633403976}
+    - targetCorrespondingSourceObject: {fileID: 3731865409109120876, guid: 46fae3e1bd65645b4835315513e75b34, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 0}
   m_SourcePrefab: {fileID: 100100000, guid: 46fae3e1bd65645b4835315513e75b34, type: 3}
 --- !u!1 &1633403973 stripped
 GameObject:
