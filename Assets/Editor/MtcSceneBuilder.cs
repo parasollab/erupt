@@ -424,7 +424,7 @@ public static class MtcSceneBuilder
     // Travel of each sliding door (metres); the outer edges stop just inside the enclosure's side panels.
     private const float DoorTravel = 0.48f;
     // Door panel: 300 x DoorPanelHeight document units at the menu prefab's 0.2 scale (1 unit = 2 mm).
-    private const float DoorPanelHeight = 220f;
+    private const float DoorPanelHeight = 440f;
 
     // Cell geometry (world metres; floor y = 0, visitor at the origin facing +z, fr3 base at
     // (Fr3BaseX, 0.75, 1) on RobotPedestal). The VF-2 stands behind the robot facing it with its
@@ -445,10 +445,26 @@ public static class MtcSceneBuilder
     // platter is only 0.18 m off the robot's axis while the arm still passes through the door
     // opening (0.93 m wide, so 0.27 m of clearance on the near side).
     private const float MachineXOffset = 0.2f;
-    // Fixture block on the trunnion platter (the CAD's saddle is jogged 0.25 m toward the doors in
-    // spec_vf2tr.json so the platter is within reach). 6 cm tall so a resting part clears the
-    // collision meshes around it; placed from the prefab's Platter part at build time.
-    private static readonly Vector3 FixtureSize = new Vector3(0.16f, 0.06f, 0.16f);
+    // Self-centring pneumatic vise on the trunnion platter (Factory.MachineVise; the CAD's saddle
+    // is jogged 0.25 m toward the doors in spec_vf2tr.json so the platter is within reach). Base
+    // plate, a parallels plate the part rests on, two jaws authored open ViseOpenGap apart with
+    // hardened plates facing inward, lamps on the front, an air block on the back. The jaws run
+    // along x; the clamp axis is z. Placed from the prefab's Platter part at build time; the
+    // TRT-160 platter is narrower than the base, which overhangs it front and back the way a
+    // 5-axis vise on an adapter plate does.
+    private static readonly Vector3 ViseBaseSize = new Vector3(0.16f, 0.03f, 0.18f);
+    // The vise sits this far toward the doors off the platter centre: the machine's collision
+    // mesh rises 14 cm above the jaws just behind the platter's back edge, and the layout rule
+    // wants the fixture's footprint (+2 cm) clear of it.
+    private const float ViseZOffset = -0.01f;
+    private static readonly Vector3 ViseParallelsSize = new Vector3(0.16f, 0.015f, 0.09f);
+    private const float ViseOpenGap = 0.12f; // between the jaw plates, fully open
+    private static readonly Vector3 ViseJawSize = new Vector3(0.16f, 0.045f, 0.026f);
+    private const float ViseJawPlateThickness = 0.004f;
+    // The job wants this much part above the jaw plates: the billet as stacked (6 cm tall) gives
+    // 3 cm plus the rest gap, laid on its 6 cm side it gives 2.5 cm and the panel flags it.
+    private const float ViseRequiredStickout = 0.03f;
+    private const float ViseLampSize = 0.01f;
     private static readonly Vector3 StockStandSize = new Vector3(0.3f, 0.7f, 0.3f);
     private static readonly Vector3 StockStandCentre = new Vector3(Fr3BaseX, 0.35f, 0.40f);
     // Billets are 6 cm tall so a top-down grasp on the top one keeps the fingertips above the next.
@@ -579,11 +595,22 @@ public static class MtcSceneBuilder
         Bounds placed = RendererBounds(machine.transform);
         Line($"{MachineName} at {machine.transform.position}, bounds {placed.min} .. {placed.max}, door front z = {DoorPlaneZ}");
         Bounds platterBounds = RendererBounds(FindChild(machine, "Platter"));
-        Vector3 fixtureCentre = new Vector3(platterBounds.center.x, platterBounds.max.y + FixtureSize.y * 0.5f, platterBounds.center.z);
-        Line($"Platter top at {platterBounds.max.y:F3}, centre ({platterBounds.center.x:F3}, {platterBounds.center.z:F3}); fixture at {fixtureCentre}");
-
-        GameObject doorMenu = BuildDoorMenu(scene, doors);
-        Line($"Door menu '{doorMenu.name}' at {doorMenu.transform.position}");
+        Vector3 fixtureCentre = new Vector3(platterBounds.center.x, platterBounds.max.y + ViseBaseSize.y * 0.5f, platterBounds.center.z + ViseZOffset);
+        Line($"Platter top at {platterBounds.max.y:F3}, centre ({platterBounds.center.x:F3}, {platterBounds.center.z:F3}), size {platterBounds.size}; vise base at {fixtureCentre}");
+        // Parts the robot drops land on the platter or trunnion if they miss the vise; the CAD
+        // parts have no colliders of their own (the machine's collision meshes are for MoveIt).
+        int machineColliders = 0;
+        foreach (string partName in new[] { "Platter", "Trunnion" })
+        {
+            Transform part = FindChild(machine, partName);
+            foreach (MeshFilter mf in part.GetComponentsInChildren<MeshFilter>(true))
+            {
+                if (mf.GetComponent<Renderer>() == null || mf.sharedMesh == null || mf.GetComponent<MeshCollider>() != null) continue;
+                mf.gameObject.AddComponent<MeshCollider>().sharedMesh = mf.sharedMesh;
+                machineColliders++;
+            }
+        }
+        Line($"{machineColliders} mesh collider(s) added to the platter and trunnion");
 
         // --- the station ----------------------------------------------------------------
         var station = new GameObject(FactoryStationRoot);
@@ -610,15 +637,16 @@ public static class MtcSceneBuilder
             stockSlots.Add(Group($"StockSlot{i}", stock, new Vector3(StockStandCentre.x, y, StockStandCentre.z)));
         }
 
-        // Fixture block on the platter: where a billet is loaded for machining.
-        Transform fixture = Group("MachineFixture", root, fixtureCentre);
-        Box("Block", fixture, fixtureCentre, FixtureSize, fixtureMat);
-        Box("Pad", fixture, fixtureCentre + new Vector3(0f, FixtureSize.y * 0.5f + 0.002f, 0f), new Vector3(0.09f, 0.004f, 0.06f), trayMat);
-        Group("DropAnchor", fixture, fixtureCentre + new Vector3(0f, FixtureSize.y * 0.5f + 0.004f + RestGap + BilletSize.y * 0.5f, 0f));
+        // The vise on the platter: where a billet is loaded for machining.
+        Material viseMat = MakeMaterial("ViseBody", new Color(0.17f, 0.19f, 0.25f), 0.45f, 0.75f);
+        Material jawPlateMat = MakeMaterial("ViseJawPlate", new Color(0.56f, 0.57f, 0.60f), 0.65f, 0.95f);
+        Material lampMat = MakeMaterial("ViseLamp", new Color(0.25f, 0.25f, 0.25f), 0.3f, 0f);
+        (Transform fixture, Factory.MachineVise vise) = BuildVise(root, fixtureCentre, viseMat, jawPlateMat, fixtureMat, lampMat, tablePub);
+        Line($"Vise '{fixture.name}' at {fixtureCentre}: opening {ViseOpenGap} m, parallels top {vise.jawWindow.position.y:F3}, jaw plates top {vise.jawWindow.position.y + vise.jawHeight:F3}");
 
         Transform conveyor = BuildConveyor(root, beltMat, frameMat);
         tablePub.compoundRoots = new[] { conveyor, fixture };
-        Line("'table' collision object = stock stand + conveyor + machine fixture");
+        Line("'table' collision object = stock stand + conveyor + vise (jaws included, re-sent when they move)");
 
         // Parts table at the far end of the conveyor (phase 2 content goes here).
         Transform table = Group("PartsTable", root, PartsTableCentre);
@@ -654,6 +682,17 @@ public static class MtcSceneBuilder
         }
         billets.prePlaced = baked.ToArray();
         Line($"{baked.Count} billets baked on the stock stand");
+
+        // Parts the robot lets go of fall onto whatever is under them and freeze where they land.
+        var gravity = station.AddComponent<Factory.ReleasedPartGravity>();
+        gravity.partsRoot = partsRoot;
+        gravity.restGap = RestGap;
+        gravity.attachedListener = UnityEngine.Object.FindFirstObjectByType<AttachedCollisionObjectListener>(FindObjectsInactive.Include);
+        gravity.trajectoryPlayer = UnityEngine.Object.FindFirstObjectByType<MTCTrajectoryPlayer>(FindObjectsInactive.Include);
+        Line($"ReleasedPartGravity on the station (listener {(gravity.attachedListener != null ? "wired" : "found at runtime")}, player {(gravity.trajectoryPlayer != null ? "wired" : "found at runtime")})");
+
+        GameObject doorMenu = BuildDoorMenu(scene, doors, vise, gravity);
+        Line($"Door menu '{doorMenu.name}' at {doorMenu.transform.position}");
 
         SetFloat(c.client, "placeHeightOffsetMeters", FactoryPlaceHeightOffset);
 
@@ -710,13 +749,70 @@ public static class MtcSceneBuilder
     // The door menu is an instance of the planning-menu prefab with its document swapped for
     // MachineDoorPanel.uxml -- the same recipe as the MTCMenu dashboard -- so it carries the
     // world-space UI Toolkit, poke and grab stack that already works on the headset.
-    private static GameObject BuildDoorMenu(Scene scene, Factory.MachineDoors doors)
+    private static GameObject BuildDoorMenu(Scene scene, Factory.MachineDoors doors, Factory.MachineVise vise, Factory.ReleasedPartGravity gravity)
     {
         (GameObject menu, UIDocument doc) = BuildPanelMenu(scene, DoorMenuName, DoorPanelUxmlPath, DoorPanelHeight, DoorMenuPosition);
         var panel = doc.gameObject.AddComponent<Factory.MachineDoorPanel>();
         SetRef(panel, "uiDocument", doc);
         SetRef(panel, "doors", doors);
+        SetRef(panel, "vise", vise);
+        SetRef(panel, "gravity", gravity);
         return menu;
+    }
+
+    // The self-centring vise: an unscaled group (the 'table' compound root the validator and
+    // the publisher walk) holding scaled cubes. Each jaw is its own unscaled group with a body
+    // and a plate so the SlidingPart moves both; authored OPEN, openOffset points inward.
+    private static (Transform fixture, Factory.MachineVise vise) BuildVise(Transform root, Vector3 baseCentre, Material body, Material plate,
+                                                                            Material parallels, Material lamp, CollisionObjectPublisher tablePub)
+    {
+        Transform fixture = Group("MachineFixture", root, baseCentre);
+        Box("Base", fixture, baseCentre, ViseBaseSize, body);
+        float baseTop = baseCentre.y + ViseBaseSize.y * 0.5f;
+        Box("Parallels", fixture, new Vector3(baseCentre.x, baseTop + ViseParallelsSize.y * 0.5f, baseCentre.z), ViseParallelsSize, parallels);
+        float parallelsTop = baseTop + ViseParallelsSize.y;
+        float plateHeight = ViseJawSize.y - ViseParallelsSize.y;
+
+        var jaws = new Factory.SlidingPart[2];
+        for (int i = 0; i < 2; i++)
+        {
+            float side = i == 0 ? -1f : 1f; // -z faces the visitor
+            float faceZ = baseCentre.z + side * ViseOpenGap * 0.5f;
+            Transform jaw = Group(i == 0 ? "JawFront" : "JawBack", fixture, new Vector3(baseCentre.x, baseTop, faceZ));
+            Box("Body", jaw, new Vector3(baseCentre.x, baseTop + ViseJawSize.y * 0.5f, faceZ + side * (ViseJawPlateThickness + ViseJawSize.z * 0.5f)), ViseJawSize, body);
+            Box("Plate", jaw, new Vector3(baseCentre.x, parallelsTop + plateHeight * 0.5f, faceZ + side * ViseJawPlateThickness * 0.5f),
+                new Vector3(ViseJawSize.x, plateHeight, ViseJawPlateThickness), plate);
+            var slide = jaw.gameObject.AddComponent<Factory.SlidingPart>();
+            slide.openOffset = new Vector3(0f, 0f, -side * ViseOpenGap * 0.5f);
+            slide.travelTime = 1.2f;
+            slide.openAmount = 0f;
+            jaws[i] = slide;
+        }
+
+        Transform window = Group("JawWindow", fixture, new Vector3(baseCentre.x, parallelsTop, baseCentre.z));
+        Group("DropAnchor", fixture, new Vector3(baseCentre.x, parallelsTop + RestGap + BilletSize.y * 0.5f, baseCentre.z));
+
+        float frontZ = baseCentre.z - ViseBaseSize.z * 0.5f - ViseLampSize * 0.5f;
+        GameObject presentLamp = Box("PartPresentLamp", fixture, new Vector3(baseCentre.x - 0.045f, baseCentre.y, frontZ), Vector3.one * ViseLampSize, lamp);
+        GameObject clampLamp = Box("ClampedLamp", fixture, new Vector3(baseCentre.x - 0.025f, baseCentre.y, frontZ), Vector3.one * ViseLampSize, lamp);
+        foreach (GameObject l in new[] { presentLamp, clampLamp })
+            UnityEngine.Object.DestroyImmediate(l.GetComponent<Collider>());
+        // Air block on the side away from the robot (nothing behind the vise: the machine's
+        // collision mesh rises just past the platter's back edge).
+        Box("AirBlock", fixture, new Vector3(baseCentre.x + ViseBaseSize.x * 0.5f + 0.01f, baseCentre.y, baseCentre.z + 0.05f), new Vector3(0.02f, 0.02f, 0.03f), body);
+
+        var vise = fixture.gameObject.AddComponent<Factory.MachineVise>();
+        vise.jaws = jaws;
+        vise.jawWindow = window;
+        vise.openGap = ViseOpenGap;
+        vise.jawWidth = ViseJawSize.x;
+        vise.jawHeight = plateHeight;
+        vise.requiredStickout = ViseRequiredStickout;
+        vise.presentLamp = presentLamp.GetComponent<Renderer>();
+        vise.clampLamp = clampLamp.GetComponent<Renderer>();
+        vise.republishOnMove = tablePub;
+        vise.machineName = MachineName;
+        return (fixture, vise);
     }
 
     // A world-space panel on an instance of the planning-menu prefab (the recipe the MTCMenu
@@ -1379,11 +1475,62 @@ public static class MtcSceneBuilder
         if (fixture != null && platterT != null)
         {
             Bounds fb = RendererBounds(fixture), pb = RendererBounds(platterT);
-            Check(Mathf.Abs(fb.min.y - pb.max.y) < 0.01f && fb.min.x > pb.min.x && fb.max.x < pb.max.x && fb.min.z > pb.min.z && fb.max.z < pb.max.z,
-                  $"fixture sits on the trunnion platter (platter top {pb.max.y:F3}, fixture bottom {fb.min.y:F3})");
+            Transform baseT = fixture.Find("Base");
+            Bounds bb = baseT != null ? RendererBounds(baseT) : fb;
+            // A 5-axis vise on a TRT-160 overhangs the platter; what matters is that it stands on
+            // the platter top, centred on it.
+            Check(Mathf.Abs(bb.min.y - pb.max.y) < 0.01f && Mathf.Abs(bb.center.x - pb.center.x) < 0.02f && Mathf.Abs(bb.center.z - pb.center.z) < 0.02f,
+                  $"vise base stands centred on the trunnion platter (platter top {pb.max.y:F3}, base bottom {bb.min.y:F3})");
             Check(fb.min.z > DoorPlaneZ + 0.05f, "fixture is behind the door sill");
+            foreach (string partName in new[] { "Platter", "Trunnion" })
+            {
+                Transform part = machineT.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name == partName);
+                Check(part != null && part.GetComponentsInChildren<MeshFilter>(true).Where(mf => mf.GetComponent<Renderer>() != null).All(mf => mf.GetComponent<MeshCollider>() != null),
+                      $"{partName} has mesh colliders for dropped parts");
+            }
         }
         else Check(false, "machine has a Platter part");
+
+        // --- the vise ---------------------------------------------------------------------
+        var vise = fixture != null ? fixture.GetComponent<Factory.MachineVise>() : null;
+        Check(vise != null, "MachineFixture carries a MachineVise");
+        if (vise != null)
+        {
+            Check(vise.jaws != null && vise.jaws.Length == 2 && vise.jaws.All(j => j != null), "vise has two jaw SlidingParts");
+            Check(vise.jawWindow != null && vise.jawWindow.IsChildOf(fixture), "vise jaw window is under the fixture");
+            Check(vise.republishOnMove == tablePub, "vise re-sends the 'table' compound when its jaws move");
+            Check(vise.presentLamp != null && vise.clampLamp != null, "vise lamps assigned");
+            Check(Mathf.Abs(vise.openGap - ViseOpenGap) < 1e-4f && vise.openGap >= Mathf.Max(BilletSize.x, BilletSize.z) + 0.03f, $"jaw opening {vise.openGap:F3} m takes a billet either way round with clearance");
+            if (vise.jaws != null && vise.jaws.Length == 2 && vise.jaws.All(j => j != null))
+            {
+                foreach (Factory.SlidingPart jaw in vise.jaws)
+                    Check(Mathf.Abs(jaw.openOffset.magnitude - ViseOpenGap * 0.5f) < 1e-4f && jaw.openAmount == 0f, $"jaw '{jaw.name}' authored open with half-gap travel inward");
+                Transform plateA = vise.jaws[0].transform.Find("Plate"), plateB = vise.jaws[1].transform.Find("Plate");
+                if (plateA != null && plateB != null)
+                {
+                    Bounds a = RendererBounds(plateA), b = RendererBounds(plateB);
+                    float faceGap = Mathf.Max(a.min.z, b.min.z) - Mathf.Min(a.max.z, b.max.z);
+                    Check(Mathf.Abs(faceGap - ViseOpenGap) < 2e-3f, $"jaw plates are {faceGap:F3} m apart when open");
+                    Vector3 mid = (a.center + b.center) * 0.5f;
+                    Check(vise.jawWindow != null && Mathf.Abs(vise.jawWindow.position.x - mid.x) < 1e-3f && Mathf.Abs(vise.jawWindow.position.z - mid.z) < 1e-3f, "jaw window centred between the plates");
+                    Check(vise.jawWindow != null && Mathf.Abs(a.max.y - (vise.jawWindow.position.y + vise.jawHeight)) < 2e-3f, $"jawHeight matches the plate tops ({a.max.y:F3})");
+                }
+                else Check(false, "each jaw has a Plate");
+                Transform parallelsT = fixture.Find("Parallels");
+                Check(parallelsT != null && vise.jawWindow != null && Mathf.Abs(RendererBounds(parallelsT).max.y - vise.jawWindow.position.y) < 1e-3f, "jaw window sits on the parallels' top");
+                Transform anchor = fixture.Find("DropAnchor");
+                Check(anchor != null && vise.jawWindow != null && Vector3.Distance(anchor.position, vise.jawWindow.position + Vector3.up * (RestGap + BilletSize.y * 0.5f)) < 1e-3f, "fixture DropAnchor is a billet resting on the parallels");
+                // Parts rest RestGap above the parallels (the drop lifts them by it), as the vise measures.
+                float stackedStickout = BilletSize.y + RestGap - vise.jawHeight, flatStickout = BilletSize.z + RestGap - vise.jawHeight;
+                Check(stackedStickout >= vise.requiredStickout - 1e-4f && flatStickout < vise.requiredStickout - 1e-4f,
+                      $"required stickout {vise.requiredStickout * 1000f:F0} mm passes the stacked billet ({stackedStickout * 1000f:F0} mm) and fails it laid flat ({flatStickout * 1000f:F0} mm)");
+            }
+        }
+        var gravity = station.GetComponent<Factory.ReleasedPartGravity>();
+        Check(gravity != null && gravity.partsRoot == station.transform.Find("Parts") && Mathf.Abs(gravity.restGap - RestGap) < 1e-5f, "ReleasedPartGravity on the station over the Parts root");
+        Check(doorPanel != null && RefIs(doorPanel, "vise", vise) && RefIs(doorPanel, "gravity", gravity), "machine panel drives the vise and shows drops");
+        GameObject floor = R("Floor");
+        Check(floor != null && floor.GetComponentInChildren<Collider>(true) != null, "floor has a collider to catch dropped parts");
 
         // Reach: every pick/place anchor between 0.25 and 0.8 x reach horizontally from the base.
         Vector3 basePos = baseTransform != null ? baseTransform.position : fr3.transform.position;
@@ -1451,7 +1598,14 @@ public static class MtcSceneBuilder
             // the part rests.
             Bounds fb = RendererBounds(fixture);
             var above = new Bounds(new Vector3(fb.center.x, fb.max.y + 0.15f, fb.center.z), new Vector3(fb.size.x + 0.04f, 0.32f, fb.size.z + 0.04f));
-            int inside = machineVertices.Count(v => above.Contains(v));
+            List<Vector3> offending = machineVertices.Where(v => above.Contains(v)).ToList();
+            int inside = offending.Count;
+            if (inside > 0)
+            {
+                var ob = new Bounds(offending[0], Vector3.zero);
+                foreach (Vector3 v in offending) ob.Encapsulate(v);
+                Line($"  machine vertices above the fixture span {ob.min} .. {ob.max} (fixture bounds {fb.min} .. {fb.max})");
+            }
             Check(inside == 0, $"fixture top clears the machine's collision mesh ({inside} vertices above it)");
         }
         if (pedestal != null)

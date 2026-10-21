@@ -63,3 +63,26 @@ survives the physics steps), `BaseTransform` and the pedestal; the six reach mar
 ROS map after the delay; `BeginReposition` returns to Placing. Screenshots land in `PROBE_OUT`
 (`placing_default`, `placing_moved`, `placing_far`, `placement_panel`, `confirmed`). Verified
 2026-10-20: 40 checks, 0 failures, with ROS-TCP-Endpoint up the ADDs went out within 100 ms of Confirm.
+
+## Vise load (`ViseProbe.cs`)
+
+Same copy-to-`Assets/Editor/` recipe, run **without** `-nographics`; no ROS needed:
+
+```
+PROBE_OUT=/tmp/probe "/Applications/Unity/Hub/Editor/6000.2.1f1/Unity.app/Contents/MacOS/Unity" -batchmode \
+  -projectPath "$PWD" -executeMethod ViseProbe.Run -logFile /tmp/probe.log
+grep '\[PROBE' /tmp/probe.log
+```
+
+It plays `FactoryDemo`, confirms the robot placement, opens the doors and takes the top billet through
+the load the robot would do: hovers it 4.5 cm over the parallels, 14 degrees skewed and off the clamp
+axis (5 cm side across the jaws, i.e. world rotation = yaw only; the baked billets are yawed -90 with
+the base), hands it to `ReleasedPartGravity.Drop` as the detach would, and checks it lands flat on the
+parallels with the rest gap and is kinematic again. `MachineVise.Clamp` then has to centre it on the
+clamp axis and square it to the plates while leaving its position along the jaws alone; a 40 degree
+load must come out `ClampedPoor` ("clamped on its corners"), closing on nothing `Empty`. The machine
+panel's vise lines are read back. It also lists any collider inside the jaw window and whatever the
+settled part touches, which is how the first run's "landed on the back jaw" turned out to be the
+probe's own hover pose. Screenshots in `PROBE_OUT`: `vise_open`, `vise_hover`, `vise_dropped`,
+`vise_clamped`, `vise_clamped_close`, `vise_clamped_poor`, `machine_panel`. Verified 2026-10-21:
+28 checks, 0 failures.

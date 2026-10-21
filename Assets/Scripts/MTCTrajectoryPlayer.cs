@@ -420,7 +420,18 @@ public class MTCTrajectoryPlayer : MonoBehaviour
         state.go.transform.SetParent(state.originalParent, worldPositionStays: true);
         state.go.transform.localScale = state.originalLocalScale;
         if (verboseLog) Debug.Log($"[MTCTrajectoryPlayer] preview detach '{id}' at step {CurrentStep}, world pos {state.go.transform.position}");
+        PreviewReleased?.Invoke(state.go);
     }
+
+    /// <summary>
+    /// The preview's robot has just opened its hand on this object (it is back under its
+    /// original parent at the preview's place pose). Whatever a listener does to it is undone
+    /// when the preview ends, announced first by <see cref="PreviewEnding"/>.
+    /// </summary>
+    public event System.Action<GameObject> PreviewReleased;
+
+    /// <summary>Raised just before a preview puts its moved objects back where they started.</summary>
+    public event System.Action PreviewEnding;
 
     // Put the robot and the mirrored objects where the solution starts. Everything moved here
     // goes through Track, so the end-of-preview restore puts it back.
@@ -519,6 +530,7 @@ public class MTCTrajectoryPlayer : MonoBehaviour
         savedPositions = null;
 
         // Put preview-attached objects back exactly as they were before the preview.
+        if (previewAttached.Count > 0) PreviewEnding?.Invoke();
         foreach (var state in previewAttached.Values)
         {
             if (state.go == null) continue;

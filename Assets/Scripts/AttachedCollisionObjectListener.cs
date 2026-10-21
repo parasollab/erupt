@@ -243,8 +243,18 @@ public class AttachedCollisionObjectListener : MonoBehaviour
         sceneListener.awaitingDetachPose.Remove(id);
         if (sceneListener.attachedIds.Contains(id)) return; // picked up again meanwhile
         if (sceneListener.TryGetObject(id, out var go))
+        {
             SetAttachedToRobot(go, false);
+            Released?.Invoke(go);
+        }
     }
+
+    /// <summary>
+    /// The robot has let go of this object and its publisher is live again at the pose
+    /// MoveIt reported (or Unity's own, after the timeout). Fired once per detach, after the
+    /// place pose has been applied, so listeners may move the object from here on.
+    /// </summary>
+    public event System.Action<GameObject> Released;
 
     // Scene change / teardown: leave nothing parented under a robot link.
     // On teardown the original parent may itself be mid-destroy (Unity refuses to reparent
