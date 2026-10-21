@@ -11,6 +11,8 @@ using UnityEngine.UIElements;
 using Unity.XR.CoreUtils;
 using UnityEngine.XR.Interaction.Toolkit;
 using UnityEngine.XR.Interaction.Toolkit.Interactors;
+using UnityEngine.XR.Interaction.Toolkit.Interactables;
+using UnityEngine.XR.Interaction.Toolkit.Transformers;
 
 // Bakes the MTC pick/place stack from KitchenFR3 (fr3 robot, PickPlaceClient, recorder,
 // dashboard) into a demo scene in place of the ur5e. Two targets share the composition:
@@ -425,10 +427,15 @@ public static class MtcSceneBuilder
     private const float DoorPanelHeight = 220f;
 
     // Cell geometry (world metres; floor y = 0, visitor at the origin facing +z, fr3 base at
-    // (0, 0.75, 1) on RobotPedestal). The VF-2 stands behind the robot facing it with its door
-    // front at DoorPlaneZ, 3 cm behind the pedestal's front face; the arm reaches over the door
-    // sill (0.62 m above the floor) onto the machine table (0.85 m). Raw stock is stacked on a
-    // stand to the robot's right, the conveyor runs from its left to the parts table.
+    // (Fr3BaseX, 0.75, 1) on RobotPedestal). The VF-2 stands behind the robot facing it with its
+    // door front at DoorPlaneZ, 3 cm behind the pedestal's front face; the arm reaches over the
+    // door sill (0.62 m above the floor) onto the machine table (0.85 m). The robot stands off to
+    // the conveyor side of the door opening (-0.27..0.67) so the area directly in front of the
+    // doors stays clear for the visitor to see and reach the fixture; the arm enters the opening
+    // diagonally (the trunnion platter is in the opening's left part, x -0.17; MoveIt checks the
+    // door meshes). Raw stock is stacked on a stand in front of the robot on the visitor's side,
+    // the conveyor runs from the robot's left to the parts table.
+    private const float Fr3BaseX = -0.4f;
     private static readonly Vector3 PedestalSize = new Vector3(0.6f, 0.75f, 0.44f);
     // Pedestal centre is 3 cm in front of the robot base so its back face clears the voxel-thickened
     // front-panel collision mesh (which reaches 3 cm in front of the enclosure's lower panel).
@@ -443,14 +450,14 @@ public static class MtcSceneBuilder
     // collision meshes around it; placed from the prefab's Platter part at build time.
     private static readonly Vector3 FixtureSize = new Vector3(0.16f, 0.06f, 0.16f);
     private static readonly Vector3 StockStandSize = new Vector3(0.3f, 0.7f, 0.3f);
-    private static readonly Vector3 StockStandCentre = new Vector3(0.6f, 0.35f, 0.88f);
+    private static readonly Vector3 StockStandCentre = new Vector3(Fr3BaseX, 0.35f, 0.40f);
     // Billets are 6 cm tall so a top-down grasp on the top one keeps the fingertips above the next.
     private static readonly Vector3 BilletSize = new Vector3(0.08f, 0.06f, 0.05f);
     private const int BilletCount = 4;
     // The belt runs in front of the VF-2's chip-conveyor shelf, which sticks 0.5 m out of the
     // enclosure's front-left (its collision mesh reaches z 0.91 at belt height).
-    private const float ConveyorZ = 0.70f, ConveyorStartX = -0.40f, ConveyorEndX = -2.85f, ConveyorTopY = 0.72f, ConveyorWidth = 0.3f;
-    private static readonly Vector3 PartsTableCentre = new Vector3(-3.7f, 0.715f, 0.8f);
+    private const float ConveyorZ = 0.70f, ConveyorStartX = Fr3BaseX - 0.40f, ConveyorEndX = Fr3BaseX - 2.85f, ConveyorTopY = 0.72f, ConveyorWidth = 0.3f;
+    private static readonly Vector3 PartsTableCentre = new Vector3(Fr3BaseX - 3.7f, 0.715f, 0.8f);
     private static readonly Vector3 TableSize = new Vector3(1.6f, 0.06f, 0.9f);
     private static readonly Vector3 DoorMenuPosition = new Vector3(1.4f, 1.3f, 1.0f);
     private static readonly Vector3 XrDashboardPosition = new Vector3(-2.2f, 1.39f, 2.4f);
@@ -459,6 +466,32 @@ public static class MtcSceneBuilder
     // contact, so a part sitting exactly on a surface fails every plan.
     private const float RestGap = 0.005f;
     private const float Fr3Reach = 0.855f;
+
+    // Robot placement phase (RobotPlacementController): the visitor drags a ring on the floor
+    // around the pedestal, the robot + pedestal follow it, reach markers show whether the
+    // anchors are solvable, Confirm opens the pick-and-place UI. The handle's pivot is the
+    // robot axis on the floor; the ring is offset so it circles the pedestal.
+    private const string ReachVolumeName = "Reachability Volume";
+    private const string PlacementRootName = "RobotPlacement";
+    private const string PlacementHandleName = "RobotPlacementHandle";
+    private const string ReachMarkersName = "ReachTargetMarkers";
+    private const string PlacementMenuName = "RobotPlacementMenu";
+    private const string DesktopRigName = "Desktop Mouse Rig";
+    private const string PlacementPanelUxmlPath = "Assets/UI Toolkit/RobotPlacementPanel.uxml";
+    private const string PlacementRingMeshPath = "Assets/Models/Factory Machines/PlacementRing.asset";
+    private const float PlacementPanelHeight = 430f;
+    private static readonly Vector3 Fr3BasePosition = new Vector3(Fr3BaseX, 0.75f, 1f);
+    private static readonly Vector3 DefaultHandlePosition = new Vector3(Fr3BaseX, 0f, 1f);
+    private const float HandleRingInnerRadius = 0.42f, HandleRingOuterRadius = 0.50f, HandleRingThickness = 0.02f;
+    // World x/z the handle may be moved within; z max keeps the pedestal front in front of the door plane.
+    private static readonly Vector2 PlacementBoundsMin = new Vector2(-1.2f, -0.2f);
+    private static readonly Vector2 PlacementBoundsMax = new Vector2(1.2f, 1.03f);
+    private static readonly Vector3 PlacementMenuPosition = new Vector3(-1.3f, 1.3f, 0.3f);
+    // Where the robot stands when the placement phase opens: front-right of the cell, turned away
+    // from the machine, ~1.1 m from the ideal spot. The pedestal must clear the stock stand and the
+    // conveyor, and the pose must lie inside the bounds (the validator checks both).
+    private static readonly Vector2 PlacementStartOffset = new Vector2(0.8f, -0.8f);
+    private const float PlacementStartYaw = 35f;
 
     // Maps Blender-frame vectors (x right, y back, z up as exported) into the prefab's local frame,
     // read from the Axis_X/Y/Z empties bl_assemble.py / bl_export_urdf.py put in every FBX.
@@ -498,7 +531,7 @@ public static class MtcSceneBuilder
 
     private static void LayoutVf2Cell(Scene scene, Composition c)
     {
-        foreach (string name in new[] { "Machines", FactoryStationRoot, DoorMenuName })
+        foreach (string name in new[] { "Machines", FactoryStationRoot, DoorMenuName, PlacementRootName, PlacementHandleName, ReachMarkersName, PlacementMenuName })
         {
             GameObject old = scene.GetRootGameObjects().FirstOrDefault(r => r.name == name);
             if (old == null) continue;
@@ -506,10 +539,12 @@ public static class MtcSceneBuilder
             Line($"Removed previous '{name}'");
         }
 
+        // The robot's ideal spot (the scene is authored there; the placement phase starts elsewhere).
+        c.fr3.transform.SetPositionAndRotation(Fr3BasePosition, Quaternion.identity);
         GameObject pedestal = Root(scene, "RobotPedestal");
         pedestal.transform.localScale = PedestalSize;
-        pedestal.transform.position = new Vector3(0f, PedestalSize.y * 0.5f, PedestalZ);
-        Line($"RobotPedestal resized to {PedestalSize}");
+        pedestal.transform.position = new Vector3(Fr3BaseX, PedestalSize.y * 0.5f, PedestalZ);
+        Line($"fr3 at {Fr3BasePosition}; RobotPedestal resized to {PedestalSize}");
 
         Material tableMat = MakeMaterial("StationTable", new Color(0.30f, 0.31f, 0.33f), 0.55f, 0.7f);
         Material trayMat = MakeMaterial("StationTray", new Color(0.16f, 0.17f, 0.18f), 0.3f, 0f);
@@ -622,9 +657,24 @@ public static class MtcSceneBuilder
 
         SetFloat(c.client, "placeHeightOffsetMeters", FactoryPlaceHeightOffset);
 
-        // The reachability volume carries the UR5e placeholder map; off until an fr3 map exists.
-        GameObject reach = scene.GetRootGameObjects().FirstOrDefault(r => r.name == "Reachability Volume");
-        if (reach != null && reach.activeSelf) { reach.SetActive(false); Line("Reachability Volume disabled"); }
+        // The reachability volume rides on the robot base (its meshes hang under BaseTransform);
+        // the placement phase shows it with the baked fr3 map while the robot is moved.
+        GameObject reach = scene.GetRootGameObjects().FirstOrDefault(r => r.name == ReachVolumeName)
+                           ?? throw new InvalidOperationException($"FactoryDemo has no '{ReachVolumeName}' root");
+        var visualizer = Require<ReachabilityVolumeVisualizer>(reach);
+        var reachProfile = Require<RobotReachProfile>(c.fr3);
+        if (reachProfile.reachabilityMap == null)
+            throw new InvalidOperationException("fr3's RobotReachProfile has no baked reachability map (Assets/Resources/ReachabilityMaps/fr3_panda_arm.bytes)");
+        reach.SetActive(true);
+        SetRef(visualizer, "robot", c.fr3);
+        SetBool(visualizer, "useBakedMap", true);
+        SetBool(visualizer, "useRosMap", true);
+        Line($"{ReachVolumeName} active on the fr3 with map '{reachProfile.reachabilityMap.name}'");
+
+        var reachTargets = new List<Transform> { fixture.Find("DropAnchor") };
+        reachTargets.AddRange(stockSlots);
+        reachTargets.Add(conveyor.Find("DropAnchor"));
+        BuildPlacementStage(scene, c, pedestal, visualizer, doorMenu, reachTargets);
 
         // The XR dashboard used to float where the machine now stands; park it beside the machine.
         GameObject dashboardRoot = scene.GetRootGameObjects().FirstOrDefault(r => r.name == "XRDashboard");
@@ -662,12 +712,24 @@ public static class MtcSceneBuilder
     // world-space UI Toolkit, poke and grab stack that already works on the headset.
     private static GameObject BuildDoorMenu(Scene scene, Factory.MachineDoors doors)
     {
+        (GameObject menu, UIDocument doc) = BuildPanelMenu(scene, DoorMenuName, DoorPanelUxmlPath, DoorPanelHeight, DoorMenuPosition);
+        var panel = doc.gameObject.AddComponent<Factory.MachineDoorPanel>();
+        SetRef(panel, "uiDocument", doc);
+        SetRef(panel, "doors", doors);
+        return menu;
+    }
+
+    // A world-space panel on an instance of the planning-menu prefab (the recipe the MTCMenu
+    // dashboard uses): the document swapped for 'uxmlPath', the inherited planning UI disabled,
+    // the poke collider sized to the panel, the whole thing turned toward the visitor's spot.
+    private static (GameObject menu, UIDocument doc) BuildPanelMenu(Scene scene, string name, string uxmlPath, float heightUnits, Vector3 position)
+    {
         GameObject menuPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(PlanningMenuPrefabPath)
                                 ?? throw new InvalidOperationException($"{PlanningMenuPrefabPath} missing");
-        var uxml = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(DoorPanelUxmlPath)
-                   ?? throw new InvalidOperationException($"{DoorPanelUxmlPath} missing");
+        var uxml = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(uxmlPath)
+                   ?? throw new InvalidOperationException($"{uxmlPath} missing");
         var menu = (GameObject)PrefabUtility.InstantiatePrefab(menuPrefab, scene);
-        menu.name = DoorMenuName;
+        menu.name = name;
         var planningUi = menu.GetComponentInChildren<MoveItPlanningRequestMenuUI>(true);
         if (planningUi != null) planningUi.enabled = false;
         UIDocument doc = menu.GetComponentInChildren<UIDocument>(true)
@@ -675,25 +737,216 @@ public static class MtcSceneBuilder
         doc.visualTreeAsset = uxml;
         var so = new SerializedObject(doc);
         SetNumber(Prop(so, "m_WorldSpaceWidth"), 300f);
-        SetNumber(Prop(so, "m_WorldSpaceHeight"), DoorPanelHeight);
+        SetNumber(Prop(so, "m_WorldSpaceHeight"), heightUnits);
         so.ApplyModifiedPropertiesWithoutUndo();
         // The document's position is the panel's top-left corner (1 unit = 1 cm before the root's
         // 0.2 scale); the panel hangs down to just above the grab handle at the prefab root, and
         // the poke collider covers exactly the panel.
-        doc.transform.localPosition = new Vector3(-1.5f, DoorPanelHeight / 100f + 0.2f, 0f);
+        doc.transform.localPosition = new Vector3(-1.5f, heightUnits / 100f + 0.2f, 0f);
         var collider = doc.GetComponent<BoxCollider>();
         if (collider != null)
         {
-            collider.center = new Vector3(1.5f, -DoorPanelHeight / 200f, 0f);
-            collider.size = new Vector3(3f, DoorPanelHeight / 100f, 0.4f);
+            collider.center = new Vector3(1.5f, -heightUnits / 200f, 0f);
+            collider.size = new Vector3(3f, heightUnits / 100f, 0.4f);
         }
-        var panel = doc.gameObject.AddComponent<Factory.MachineDoorPanel>();
-        SetRef(panel, "uiDocument", doc);
-        SetRef(panel, "doors", doors);
         // A world-space document faces its local -z; turn that toward the visitor's spot.
-        Vector3 toVisitor = new Vector3(-DoorMenuPosition.x, 0f, -DoorMenuPosition.z).normalized;
-        menu.transform.SetPositionAndRotation(DoorMenuPosition, Quaternion.LookRotation(-toVisitor, Vector3.up));
-        return menu;
+        Vector3 toVisitor = new Vector3(-position.x, 0f, -position.z).normalized;
+        menu.transform.SetPositionAndRotation(position, Quaternion.LookRotation(-toVisitor, Vector3.up));
+        return (menu, doc);
+    }
+
+    // ------------------------------------------------------------------ robot placement
+
+    // The placement phase: floor handle (ring around the pedestal, XRI far/near grab sliding on
+    // world x/z), reach markers on the anchors, the controller that moves robot + pedestal after
+    // the handle and gates the MTC / door menus, its panel, and a desktop mouse rig for editor runs.
+    private static void BuildPlacementStage(Scene scene, Composition c, GameObject pedestal, ReachabilityVolumeVisualizer visualizer,
+                                            GameObject doorMenu, List<Transform> targets)
+    {
+        if (targets.Any(t => t == null))
+            throw new InvalidOperationException("placement targets incomplete (fixture / conveyor DropAnchor missing)");
+
+        // --- the handle ---------------------------------------------------------------------
+        var handle = new GameObject(PlacementHandleName);
+        SceneManager.MoveGameObjectToScene(handle, scene);
+        handle.transform.SetPositionAndRotation(DefaultHandlePosition, Quaternion.identity);
+        var rb = handle.AddComponent<Rigidbody>();
+        rb.isKinematic = true;
+        rb.useGravity = false;
+        // Transformers before the interactable so the serialized starting lists hold them in this
+        // order (a baked interactable registers only what the lists name, see GrabbableCollisionObjectFactory).
+        var general = handle.AddComponent<XRGeneralGrabTransformer>();
+        general.permittedDisplacementAxes = XRGeneralGrabTransformer.ManipulationAxes.X | XRGeneralGrabTransformer.ManipulationAxes.Z;
+        general.constrainedAxisDisplacementMode = XRGeneralGrabTransformer.ConstrainedAxisDisplacementMode.WorldAxisRelative;
+        general.allowOneHandedScaling = false;
+        general.allowTwoHandedScaling = false;
+        var floorYaw = handle.AddComponent<XRGrabTransformerFloorYaw>();
+        floorYaw.lockHeight = true;
+        floorYaw.yawOnly = true;
+        floorYaw.clampToBounds = true;
+        floorYaw.boundsMin = PlacementBoundsMin;
+        floorYaw.boundsMax = PlacementBoundsMax;
+        // Added before the ring child: XRGrabInteractable.Reset adopts a lone rendered child as
+        // its predicted-visuals transform, which the handle must not use.
+        var grab = handle.AddComponent<XRGrabInteractable>();
+        grab.movementType = XRBaseInteractable.MovementType.Instantaneous;
+        grab.trackPosition = true;
+        grab.trackRotation = false; // turning is done with the panel's buttons
+        grab.trackScale = false;
+        grab.throwOnDetach = false;
+        grab.useDynamicAttach = true;
+        grab.matchAttachPosition = true;
+        grab.matchAttachRotation = true;
+        grab.snapToColliderVolume = true;
+        grab.selectMode = InteractableSelectMode.Single;
+        grab.addDefaultGrabTransformers = false;
+        grab.startingSingleGrabTransformers.Clear();
+        grab.startingSingleGrabTransformers.Add(general);
+        grab.startingSingleGrabTransformers.Add(floorYaw);
+        grab.startingMultipleGrabTransformers.Clear();
+        grab.startingMultipleGrabTransformers.Add(general);
+        grab.startingMultipleGrabTransformers.Add(floorYaw);
+        handle.AddComponent<DesktopDragHandle>();
+
+        var ring = new GameObject("Ring");
+        ring.transform.SetParent(handle.transform, false);
+        ring.transform.localPosition = new Vector3(0f, HandleRingThickness * 0.5f, PedestalZ - DefaultHandlePosition.z);
+        ring.AddComponent<MeshFilter>().sharedMesh = EnsureRingMesh();
+        ring.AddComponent<MeshRenderer>().sharedMaterial = MakeMaterial("PlacementRing", new Color(0.2f, 0.8f, 1f), 0.4f, 0f);
+        var ringCollider = ring.AddComponent<BoxCollider>();
+        ringCollider.center = Vector3.zero;
+        ringCollider.size = new Vector3(HandleRingOuterRadius * 2f, HandleRingThickness, HandleRingOuterRadius * 2f);
+        ringCollider.isTrigger = false;      // triggers break the far-ray grab (NearFar ignores them)
+        ringCollider.excludeLayers = ~0;     // rays and pokes hit it, physics never does
+        grab.colliders.Clear();
+        grab.colliders.Add(ringCollider);
+        EditorUtility.SetDirty(grab);
+        Line($"{PlacementHandleName} at {DefaultHandlePosition}: ring r {HandleRingInnerRadius}..{HandleRingOuterRadius} around the pedestal, bounds {PlacementBoundsMin}..{PlacementBoundsMax}");
+
+        // --- reach markers (own root: a MeshFilter under the station would be published) ------
+        var markersGo = new GameObject(ReachMarkersName);
+        SceneManager.MoveGameObjectToScene(markersGo, scene);
+        var markerSet = markersGo.AddComponent<Factory.ReachTargetMarkerSet>();
+        SetRef(markerSet, "reachability", visualizer);
+        SetRef(markerSet, "markerMaterial", MakeMaterial("ReachMarker", Color.white, 0.3f, 0f));
+        SetArray(markerSet, "targets", targets.Cast<UnityEngine.Object>().ToArray());
+        Line($"{ReachMarkersName}: {targets.Count} targets ({string.Join(", ", targets.Select(t => Path(t)))})");
+
+        // --- the controller -------------------------------------------------------------------
+        var placementRoot = new GameObject(PlacementRootName);
+        SceneManager.MoveGameObjectToScene(placementRoot, scene);
+        var controller = placementRoot.AddComponent<Factory.RobotPlacementController>();
+        SetRef(controller, "robotRoot", c.fr3);
+        SetRef(controller, "pedestal", pedestal.transform);
+        SetRef(controller, "baseAnchor", c.baseTransform.transform);
+        SetRef(controller, "handle", handle.transform);
+        SetRef(controller, "handleInteractable", grab);
+        SetRef(controller, "reachability", visualizer);
+        SetRef(controller, "markers", markerSet);
+        SetRef(controller, "pickPlaceClient", c.client);
+        SetRef(controller, "trajectoryPlayer", Require<MTCTrajectoryPlayer>(c.fr3));
+        SetRef(controller, "recorder", c.recorder != null ? c.recorder : FindInScene<PickPlaceTaskRecorder>(scene));
+        SetRef(controller, "ghosts", Require<SpawnGhosts>(c.ghostsGo));
+        SetArray(controller, "wristMenus", FindAllInScene<WristMenuController>(scene).Cast<UnityEngine.Object>().ToArray());
+        SetArray(controller, "gatedObjects", new UnityEngine.Object[] { c.mtcMenu, doorMenu });
+        SetArray(controller, "placementObjects", new UnityEngine.Object[] { handle, markersGo });
+        SetVector2(controller, "cellBoundsMin", PlacementBoundsMin);
+        SetVector2(controller, "cellBoundsMax", PlacementBoundsMax);
+        SetVector2(controller, "startOffset", PlacementStartOffset);
+        SetFloat(controller, "startYawDegrees", PlacementStartYaw);
+        SetBool(controller, "startInPlacement", true);
+        SetBool(controller, "hideReachabilityWhenConfirmed", true);
+        Line($"Placement starts {PlacementStartOffset.magnitude:F2} m from the ideal spot (offset {PlacementStartOffset}, yaw {PlacementStartYaw})");
+        var keys = placementRoot.AddComponent<Factory.RobotPlacementDesktopInput>();
+        SetRef(keys, "controller", controller);
+        keys.editorOnly = true;
+        keys.onlyWithoutHeadset = true;
+        // The gated menus are authored active; the controller turns them off at runtime until Confirm.
+        c.mtcMenu.SetActive(true);
+        doorMenu.SetActive(true);
+
+        // --- the panel ------------------------------------------------------------------------
+        (GameObject menu, UIDocument doc) = BuildPanelMenu(scene, PlacementMenuName, PlacementPanelUxmlPath, PlacementPanelHeight, PlacementMenuPosition);
+        var panel = doc.gameObject.AddComponent<Factory.RobotPlacementPanel>();
+        SetRef(panel, "uiDocument", doc);
+        SetRef(panel, "controller", controller);
+        Line($"Placement menu '{menu.name}' at {menu.transform.position}");
+
+        // --- desktop stand-in (editor only; inert with a headset) -----------------------------
+        if (scene.GetRootGameObjects().All(r => r.name != DesktopRigName))
+        {
+            var rig = new GameObject(DesktopRigName);
+            SceneManager.MoveGameObjectToScene(rig, scene);
+            var mouse = rig.AddComponent<DesktopMouseInteractor>();
+            mouse.editorOnly = true;
+            mouse.onlyWithoutHeadset = true;
+            mouse.startPosition = new Vector3(0f, 1.6f, -0.8f);
+            mouse.lookAt = new Vector3(Fr3BaseX * 0.5f, 0.8f, 1f);
+            Line($"{DesktopRigName} added (editor-only mouse drag of the handle)");
+        }
+    }
+
+    // Flat annulus on the floor: top face plus outer and inner walls. Created once as an asset.
+    private static Mesh EnsureRingMesh()
+    {
+        var existing = AssetDatabase.LoadAssetAtPath<Mesh>(PlacementRingMeshPath);
+        if (existing != null) return existing;
+        const int segments = 64;
+        float ri = HandleRingInnerRadius, ro = HandleRingOuterRadius, h = HandleRingThickness * 0.5f;
+        var verts = new List<Vector3>();
+        var tris = new List<int>();
+        void Quad(int a, int b, int c, int d) { tris.AddRange(new[] { a, b, c, a, c, d }); }
+        for (int i = 0; i < segments; i++)
+        {
+            float a0 = i * Mathf.PI * 2f / segments, a1 = (i + 1) * Mathf.PI * 2f / segments;
+            Vector3 d0 = new Vector3(Mathf.Cos(a0), 0f, Mathf.Sin(a0)), d1 = new Vector3(Mathf.Cos(a1), 0f, Mathf.Sin(a1));
+            int b = verts.Count;
+            // 0..3 top face, 4..7 outer wall, 8..11 inner wall (separate vertices so the normals stay hard)
+            verts.AddRange(new[] { d0 * ri + Vector3.up * h, d0 * ro + Vector3.up * h, d1 * ro + Vector3.up * h, d1 * ri + Vector3.up * h });
+            verts.AddRange(new[] { d0 * ro + Vector3.up * h, d0 * ro - Vector3.up * h, d1 * ro - Vector3.up * h, d1 * ro + Vector3.up * h });
+            verts.AddRange(new[] { d0 * ri - Vector3.up * h, d0 * ri + Vector3.up * h, d1 * ri + Vector3.up * h, d1 * ri - Vector3.up * h });
+            Quad(b + 0, b + 3, b + 2, b + 1);
+            Quad(b + 4, b + 7, b + 6, b + 5);
+            Quad(b + 8, b + 11, b + 10, b + 9);
+        }
+        var mesh = new Mesh { name = "PlacementRing" };
+        mesh.SetVertices(verts);
+        mesh.SetTriangles(tris, 0);
+        mesh.RecalculateNormals();
+        mesh.RecalculateBounds();
+        string folder = System.IO.Path.GetDirectoryName(PlacementRingMeshPath);
+        if (!AssetDatabase.IsValidFolder(folder))
+            System.IO.Directory.CreateDirectory(folder);
+        AssetDatabase.CreateAsset(mesh, PlacementRingMeshPath);
+        Line($"Created {PlacementRingMeshPath}");
+        return mesh;
+    }
+
+    private static void SetArray(Component target, string field, UnityEngine.Object[] values)
+    {
+        var so = new SerializedObject(target);
+        SerializedProperty p = Prop(so, field);
+        p.arraySize = values.Length;
+        for (int i = 0; i < values.Length; i++)
+            p.GetArrayElementAtIndex(i).objectReferenceValue = values[i];
+        so.ApplyModifiedPropertiesWithoutUndo();
+        Line($"{Path(target.transform)}.{target.GetType().Name}.{field} = [{string.Join(", ", values.Select(Describe))}]");
+    }
+
+    private static void SetVector2(Component target, string field, Vector2 value)
+    {
+        var so = new SerializedObject(target);
+        Prop(so, field).vector2Value = value;
+        so.ApplyModifiedPropertiesWithoutUndo();
+    }
+
+    private static List<UnityEngine.Object> ArrayRefs(Component target, string field)
+    {
+        SerializedProperty p = new SerializedObject(target).FindProperty(field);
+        var list = new List<UnityEngine.Object>();
+        for (int i = 0; p != null && i < p.arraySize; i++)
+            list.Add(p.GetArrayElementAtIndex(i).objectReferenceValue);
+        return list;
     }
 
     // ------------------------------------------------------------------ VF-2 prefab
@@ -950,8 +1203,8 @@ public static class MtcSceneBuilder
         Check(doorMenu != null, $"root '{DoorMenuName}' present");
         Check(pedestal != null, "root 'RobotPedestal' present");
         Check(R("ur5e_robot") == null, "ur5e_robot removed");
-        GameObject reach = R("Reachability Volume");
-        Check(reach == null || !reach.activeSelf, "Reachability Volume inactive");
+        GameObject reach = R(ReachVolumeName);
+        Check(reach != null && reach.activeSelf, $"root '{ReachVolumeName}' present and active");
         foreach (string n in new[] { "XR Interaction Manager", "EventSystem", "XR UI Toolkit Manager" })
             Check(R(n) != null, $"UI input root '{n}' present");
         Check(FindAllInScene<PanelInputConfiguration>(scene).Any(p => p.gameObject.activeInHierarchy), "an active PanelInputConfiguration exists");
@@ -962,7 +1215,7 @@ public static class MtcSceneBuilder
         if (baseTransform != null)
         {
             Check(Mathf.Abs(Mathf.DeltaAngle(baseTransform.localEulerAngles.y, -90f)) < 0.5f, "BaseTransform local yaw is -90");
-            Check(Vector3.Distance(baseTransform.position, new Vector3(0f, 0.75f, 1f)) < 0.01f, "BaseTransform world position is (0, 0.75, 1)");
+            Check(Vector3.Distance(baseTransform.position, Fr3BasePosition) < 0.01f, $"BaseTransform world position is {Fr3BasePosition}");
         }
         GameObject origin = baseTransform != null ? baseTransform.gameObject : null;
 
@@ -971,6 +1224,7 @@ public static class MtcSceneBuilder
               && profile.unityJointNamePrefix == Fr3UnityJointPrefix && profile.rosJointNamePrefix == Fr3RosJointPrefix
               && profile.baseAnchor == baseTransform, "RobotReachProfile on fr3 has the panda planning names and baseAnchor");
 
+        Check(profile != null && profile.reachabilityMap != null, "RobotReachProfile carries a baked reachability map");
         var ik = FindInScene<DirectArticulationIKController>(scene);
         Check(ik != null && RefIs(ik, "robotRoot", fr3.transform) && RefName(ik, "endEffector") == Fr3EndEffectorLink, "IK controller targets fr3 / fr3_hand_tcp");
         var ghosts = FindInScene<SpawnGhosts>(scene);
@@ -1142,6 +1396,15 @@ public static class MtcSceneBuilder
             Vector3 d = a.position - basePos; d.y = 0f;
             Check(d.magnitude > 0.25f && d.magnitude < Fr3Reach * 0.8f, $"anchor '{Path(a)}' at {d.magnitude:F2} m from the base");
         }
+        Transform fixtureAnchor = anchors.FirstOrDefault(a => a.name == "DropAnchor" && fixture != null && a.IsChildOf(fixture));
+        if (fixtureAnchor != null)
+        {
+            // Sightline from the visitor's eye (origin, 1.6 m) to the fixture, sampled at the robot's depth.
+            Vector3 eye = new Vector3(0f, 1.6f, 0f);
+            float t = (basePos.z - eye.z) / (fixtureAnchor.position.z - eye.z);
+            Vector3 sight = Vector3.Lerp(eye, fixtureAnchor.position, t);
+            Check(Mathf.Abs(sight.x - basePos.x) > 0.25f, $"robot axis is {Mathf.Abs(sight.x - basePos.x):F2} m off the visitor's sightline to the fixture (> 0.25)");
+        }
         if (table != null)
         {
             Vector3 d = table.position - basePos; d.y = 0f;
@@ -1157,7 +1420,12 @@ public static class MtcSceneBuilder
             Bounds pb = RendererBounds(pedestal.transform);
             Check(pb.max.z < DoorPlaneZ, $"pedestal front ({pb.max.z:F3}) is in front of the door plane");
             float leftEdge = doorsOpen.center.x - openingWidth * 0.5f, rightEdge = doorsOpen.center.x + openingWidth * 0.5f;
-            Check(openingWidth > 0f && basePos.x > leftEdge + 0.2f && basePos.x < rightEdge - 0.2f, $"robot axis has 0.2 m clearance inside the door opening ({leftEdge:F2}..{rightEdge:F2})");
+            // The arm reaches the platter through the opening, entering it diagonally when the base is
+            // off to the side; door-frame clearance itself is MoveIt's job (the door meshes are
+            // collision objects). Keep the base near enough that the diagonal stays shallow.
+            Check(openingWidth > 0f && basePos.x > leftEdge - 0.3f && basePos.x < rightEdge + 0.3f, $"robot axis within 0.3 m of the door opening ({leftEdge:F2}..{rightEdge:F2})");
+            Check(openingWidth > 0f && (basePos.x < leftEdge + 0.1f || basePos.x > rightEdge - 0.1f),
+                  $"robot axis ({basePos.x:F2}) leaves the area in front of the door opening clear");
         }
         // The machine's bounding box reaches 0.5 m in front of the doors (chip-conveyor shelf,
         // pendant), so props are tested against the machine's collision-mesh vertices instead.
@@ -1193,6 +1461,110 @@ public static class MtcSceneBuilder
             int inside = machineVertices.Count(v => pb.Contains(v));
             Check(inside == 0, $"no machine geometry inside the pedestal ({inside} collision vertices)");
         }
+
+        // --- robot placement phase ------------------------------------------------------
+        GameObject placementRoot = R(PlacementRootName), handleGo = R(PlacementHandleName), markersGo = R(ReachMarkersName), placementMenu = R(PlacementMenuName);
+        Check(placementRoot != null, $"root '{PlacementRootName}' present");
+        Check(handleGo != null && handleGo.activeSelf, $"root '{PlacementHandleName}' present and active");
+        Check(markersGo != null && markersGo.activeSelf, $"root '{ReachMarkersName}' present and active");
+        Check(placementMenu != null && placementMenu.activeSelf, $"root '{PlacementMenuName}' present and active");
+        var visualizer = reach != null ? reach.GetComponent<ReachabilityVolumeVisualizer>() : null;
+        Check(visualizer != null && RefIs(visualizer, "robot", fr3), "ReachabilityVolumeVisualizer bound to the fr3");
+        if (handleGo != null)
+        {
+            Check(Vector3.Distance(handleGo.transform.position, DefaultHandlePosition) < 1e-3f && Quaternion.Angle(handleGo.transform.rotation, Quaternion.identity) < 0.1f,
+                  $"handle authored at the default pose {DefaultHandlePosition}");
+            Check(!handleGo.transform.IsChildOf(fr3.transform) && !fr3.transform.IsChildOf(handleGo.transform), "handle and robot are separate roots");
+            Check(Vector3.Distance(fr3.transform.position - handleGo.transform.position, Fr3BasePosition - DefaultHandlePosition) < 1e-3f, "robot sits above the handle pivot");
+            if (pedestal != null)
+                Check(Vector3.Distance(pedestal.transform.position - handleGo.transform.position, new Vector3(0f, PedestalSize.y * 0.5f, PedestalZ - DefaultHandlePosition.z)) < 1e-3f,
+                      "pedestal keeps its authored offset from the handle");
+            var grab = handleGo.GetComponent<XRGrabInteractable>();
+            var general = handleGo.GetComponent<XRGeneralGrabTransformer>();
+            var floorYaw = handleGo.GetComponent<XRGrabTransformerFloorYaw>();
+            Check(grab != null && grab.movementType == XRBaseInteractable.MovementType.Instantaneous && grab.trackPosition && !grab.trackRotation && !grab.trackScale
+                  && !grab.throwOnDetach && grab.selectMode == InteractableSelectMode.Single && !grab.addDefaultGrabTransformers,
+                  "handle grab: instantaneous, position only, single select, no default transformers");
+            Check(general != null && general.permittedDisplacementAxes == (XRGeneralGrabTransformer.ManipulationAxes.X | XRGeneralGrabTransformer.ManipulationAxes.Z)
+                  && general.constrainedAxisDisplacementMode == XRGeneralGrabTransformer.ConstrainedAxisDisplacementMode.WorldAxisRelative
+                  && !general.allowOneHandedScaling && !general.allowTwoHandedScaling, "general transformer slides on world x/z only");
+            Check(floorYaw != null && floorYaw.lockHeight && floorYaw.yawOnly && floorYaw.clampToBounds && floorYaw.boundsMin == PlacementBoundsMin && floorYaw.boundsMax == PlacementBoundsMax,
+                  "floor-yaw transformer locks height and clamps to the cell bounds");
+            Check(grab != null && general != null && floorYaw != null && grab.startingSingleGrabTransformers.SequenceEqual(new XRBaseGrabTransformer[] { general, floorYaw })
+                  && grab.startingMultipleGrabTransformers.SequenceEqual(new XRBaseGrabTransformer[] { general, floorYaw }), "starting transformer lists are [general, floorYaw]");
+            var ringCollider = handleGo.GetComponentInChildren<BoxCollider>(true);
+            Check(ringCollider != null && !ringCollider.isTrigger && ringCollider.excludeLayers.value == ~0, "ring collider is solid and excluded from physics");
+            Check(grab != null && ringCollider != null && grab.colliders.Count == 1 && grab.colliders[0] == ringCollider, "grab interactable uses the ring collider");
+            Check(ringCollider != null && Mathf.Abs(ringCollider.size.x - HandleRingOuterRadius * 2f) < 1e-3f && Mathf.Abs(ringCollider.transform.position.z - PedestalZ) < 1e-3f, "ring circles the pedestal");
+            var ringRenderer = handleGo.GetComponentInChildren<MeshRenderer>(true);
+            Check(ringRenderer != null && ringRenderer.sharedMaterial != null && ringRenderer.GetComponent<MeshFilter>()?.sharedMesh != null, "handle ring renders");
+            Check(handleGo.GetComponentInChildren<CollisionObjectPublisher>(true) == null && handleGo.GetComponent<SelectableGrabController>() == null && !handleGo.CompareTag("Selectable"),
+                  "handle is neither a collision object nor selectable");
+            var rbody = handleGo.GetComponent<Rigidbody>();
+            Check(rbody != null && rbody.isKinematic && !rbody.useGravity, "handle rigidbody is kinematic");
+            Check(handleGo.GetComponent<DesktopDragHandle>() != null, "handle is draggable by the desktop mouse rig");
+        }
+        var markerSet = markersGo != null ? markersGo.GetComponent<Factory.ReachTargetMarkerSet>() : null;
+        Check(markerSet != null && RefIs(markerSet, "reachability", visualizer) && visualizer != null && RefSet(markerSet, "markerMaterial"), "ReachTargetMarkerSet wired to the visualizer");
+        if (markerSet != null)
+        {
+            List<UnityEngine.Object> targetRefs = ArrayRefs(markerSet, "targets");
+            Check(targetRefs.Count == anchors.Count && targetRefs.All(t => t != null) && anchors.All(a => targetRefs.Contains(a)), $"markers cover the {anchors.Count} pick/place anchors");
+            Check(!markersGo.transform.IsChildOf(station.transform) && markersGo.GetComponentInChildren<MeshFilter>(true) == null, "markers root is outside the station and carries no baked meshes");
+        }
+        var placement = placementRoot != null ? placementRoot.GetComponent<Factory.RobotPlacementController>() : null;
+        Check(placement != null && RefIs(placement, "robotRoot", fr3) && pedestal != null && RefIs(placement, "pedestal", pedestal.transform) && RefIs(placement, "baseAnchor", baseTransform)
+              && handleGo != null && RefIs(placement, "handle", handleGo.transform) && RefSet(placement, "handleInteractable") && RefIs(placement, "reachability", visualizer)
+              && RefIs(placement, "markers", markerSet) && RefIs(placement, "pickPlaceClient", client) && RefIs(placement, "trajectoryPlayer", player)
+              && RefIs(placement, "recorder", recorder) && RefIs(placement, "ghosts", ghosts), "RobotPlacementController wired");
+        if (placement != null)
+        {
+            List<UnityEngine.Object> gated = ArrayRefs(placement, "gatedObjects"), placing = ArrayRefs(placement, "placementObjects"), wrists = ArrayRefs(placement, "wristMenus");
+            Check(gated.Count == 2 && gated.Contains(menu) && gated.Contains(doorMenu), "gated objects are the MTC menu and the door menu");
+            Check(placing.Count == 2 && placing.Contains(handleGo) && placing.Contains(markersGo), "placement objects are the handle and the markers");
+            Check(wrists.Count == wristCount && wrists.All(w => w != null), $"controller hides the MTC controls of all {wristCount} wrist menu(s)");
+            Check(menu != null && menu.activeSelf && doorMenu != null && doorMenu.activeSelf, "gated menus authored active (the controller hides them until Confirm)");
+            var pso = new SerializedObject(placement);
+            Vector2 bmin = pso.FindProperty("cellBoundsMin").vector2Value, bmax = pso.FindProperty("cellBoundsMax").vector2Value;
+            Check(bmin == PlacementBoundsMin && bmax == PlacementBoundsMax && bmin.x < DefaultHandlePosition.x && bmax.x > DefaultHandlePosition.x
+                  && bmin.y < DefaultHandlePosition.z && bmax.y > DefaultHandlePosition.z, "cell bounds contain the default pose");
+            Check(bmax.y + (PedestalZ - DefaultHandlePosition.z) + PedestalSize.z * 0.5f < DoorPlaneZ, "cell bounds keep the pedestal in front of the door plane");
+            Check(pso.FindProperty("startInPlacement").boolValue, "scene starts in the placement phase");
+            Check(pso.FindProperty("hideReachabilityWhenConfirmed").boolValue, "reachability volume hides once the placement is confirmed");
+            Vector2 startOff = pso.FindProperty("startOffset").vector2Value;
+            float startYaw = pso.FindProperty("startYawDegrees").floatValue;
+            Vector3 startHandle = DefaultHandlePosition + new Vector3(startOff.x, 0f, startOff.y);
+            Check(startOff == PlacementStartOffset && Mathf.Abs(startYaw - PlacementStartYaw) < 1e-3f, $"start pose is the authored offset {PlacementStartOffset} / yaw {PlacementStartYaw}");
+            Check(startOff.magnitude > 0.6f && startOff.magnitude < 2f, $"start pose is {startOff.magnitude:F2} m from the ideal spot (0.6..2 m)");
+            Check(startHandle.x > bmin.x && startHandle.x < bmax.x && startHandle.z > bmin.y && startHandle.z < bmax.y, "start pose lies inside the cell bounds");
+            // Pedestal footprint at the start pose (rotated box on the floor) must not overlap the props.
+            Quaternion sr = Quaternion.Euler(0f, startYaw, 0f);
+            Vector3 pedCentre = startHandle + sr * new Vector3(0f, 0f, PedestalZ - DefaultHandlePosition.z);
+            var corners = new List<Vector3>();
+            foreach (float sx in new[] { -1f, 1f }) foreach (float sz in new[] { -1f, 1f })
+                corners.Add(pedCentre + sr * new Vector3(sx * PedestalSize.x * 0.5f, 0f, sz * PedestalSize.z * 0.5f));
+            Bounds pedAtStart = new Bounds(corners[0], Vector3.zero);
+            foreach (Vector3 cnr in corners) pedAtStart.Encapsulate(cnr);
+            pedAtStart.Expand(new Vector3(0.1f, 10f, 0.1f));
+            foreach (string n in new[] { "RawStockStand", "Conveyor", "MachineFixture", "PartsTable" })
+            {
+                Transform t = station.transform.Find(n);
+                if (t == null) continue;
+                Bounds b = RendererBounds(t);
+                Check(!pedAtStart.Intersects(b), $"pedestal at the start pose clears '{n}'");
+            }
+            Check(machineBounds.size != Vector3.zero && pedAtStart.max.z < DoorPlaneZ, "pedestal at the start pose stays in front of the door plane");
+            var keys = placementRoot.GetComponent<Factory.RobotPlacementDesktopInput>();
+            Check(keys != null && RefIs(keys, "controller", placement) && keys.editorOnly && keys.onlyWithoutHeadset, "editor keyboard input for the placement phase wired");
+        }
+        var placementPanel = placementMenu != null ? placementMenu.GetComponentInChildren<Factory.RobotPlacementPanel>(true) : null;
+        Check(placementPanel != null && placement != null && placementPanel.Controller == placement, "RobotPlacementPanel targets the controller");
+        var placementDoc = placementMenu != null ? placementMenu.GetComponentInChildren<UIDocument>(true) : null;
+        Check(placementDoc != null && placementDoc.visualTreeAsset != null && placementDoc.visualTreeAsset.name == "RobotPlacementPanel", "placement menu document shows RobotPlacementPanel.uxml");
+        Check(placementMenu != null && placementMenu.GetComponentsInChildren<MoveItPlanningRequestMenuUI>(true).All(u => !u.enabled), "placement menu's inherited planning UI is disabled");
+        Check(placementMenu != null && placementMenu.transform.position.z < DoorPlaneZ && placementMenu.transform.position.x < 0f, "placement menu on the visitor's left, in front of the machine");
+        var desktopRig = R(DesktopRigName);
+        Check(desktopRig != null && desktopRig.GetComponent<DesktopMouseInteractor>() is DesktopMouseInteractor dm && dm.editorOnly && dm.onlyWithoutHeadset, "desktop mouse rig present and editor-only");
 
         Debug.Log(Log.ToString());
         return failures;
@@ -1249,6 +1621,8 @@ public static class MtcSceneBuilder
             ("machine_right", new Vector3(4.0f, 2.0f, 2.3f), new Vector3(0.5f, 1.2f, 2.3f)),
             ("machine_top", new Vector3(0f, 6.5f, 2.3f), new Vector3(0f, 0f, 2.31f)),
             ("machine_low", new Vector3(-1.5f, 0.3f, -0.5f), new Vector3(0f, 0.8f, 2f)),
+            ("placement", new Vector3(0f, 2.4f, -1.6f), new Vector3(0f, 0.3f, 1.0f)),
+            ("placement_menu", new Vector3(-0.3f, 1.5f, -0.9f), new Vector3(-1.3f, 1.3f, 0.3f)),
         };
         var openShots = new (string, Vector3, Vector3)[]
         {

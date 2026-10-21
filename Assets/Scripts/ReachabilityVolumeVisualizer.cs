@@ -95,6 +95,7 @@ public class ReachabilityVolumeVisualizer : MonoBehaviour
     // ---- state -----------------------------------------------------------------------------
 
     private ReachabilityMap _map;
+    private ReachabilityMap _bakedMap;
     private string _mapSource = "none";
     private RobotReachProfile _profile;
     private Transform _anchor;
@@ -118,6 +119,7 @@ public class ReachabilityVolumeVisualizer : MonoBehaviour
     private ROSConnection _ros;
     private bool _subscribed;
     private bool _gotTopicMap;
+    private bool _rosMapHeld;
     private float _lastRequestTime = float.NegativeInfinity;
     private bool _loggedRequest;
     private ulong _lastPayloadHash;
@@ -180,6 +182,42 @@ public class ReachabilityVolumeVisualizer : MonoBehaviour
         return _map.SampleDexterity(WorldToRos(worldPoint), CurrentFilter);
     }
 
+    /// <summary>Dexterity at a Unity world point with an explicit filter: the tool-down bit only, or every direction.</summary>
+    public float SampleDexterity(Vector3 worldPoint, bool topDownOnly)
+    {
+        if (_map == null || _anchor == null)
+            return 0f;
+        return _map.SampleDexterity(WorldToRos(worldPoint), topDownOnly ? _map.DownMask : _map.AllMask);
+    }
+
+    /// <summary>False while the baked map is held in place of the topic map (see <see cref="SetRosMapEnabled"/>).</summary>
+    public bool RosMapEnabled => !_rosMapHeld;
+
+    /// <summary>
+    /// Holds (false) or resumes (true) the ROS map. The server's map is carved by the planning
+    /// scene in the robot base frame, so while the robot is being moved it describes the wrong
+    /// place; holding re-applies the baked map and ignores the topic. Resuming forgets the last
+    /// payload and requests the map again, so even a byte-identical map is accepted.
+    /// </summary>
+    public void SetRosMapEnabled(bool enabled)
+    {
+        if (enabled == !_rosMapHeld)
+            return;
+        _rosMapHeld = !enabled;
+        if (_rosMapHeld)
+        {
+            if (_bakedMap != null && _map != _bakedMap)
+                ApplyMap(_bakedMap, "baked (held while the robot is placed)");
+        }
+        else
+        {
+            _gotTopicMap = false;
+            _lastPayloadHash = 0;
+            _lastRequestTime = float.NegativeInfinity;
+            _loggedRequest = false;
+        }
+    }
+
     // ---- lifecycle --------------------------------------------------------------------------
 
     private uint CurrentFilter => _map == null ? 0u : (_topDownOnly ? _map.DownMask : _map.AllMask);
@@ -231,7 +269,7 @@ public class ReachabilityVolumeVisualizer : MonoBehaviour
 
     private void Update()
     {
-        if (_subscribed && !_gotTopicMap && _ros != null && _ros.HasConnectionThread && !_ros.HasConnectionError &&
+        if (_subscribed && !_gotTopicMap && !_rosMapHeld && _ros != null && _ros.HasConnectionThread && !_ros.HasConnectionError &&
             Time.time - _lastRequestTime >= requestRetrySeconds)
         {
             _lastRequestTime = Time.time;
@@ -404,13 +442,14 @@ public class ReachabilityVolumeVisualizer : MonoBehaviour
             Debug.LogError($"{LogTag} baked map {source} is invalid: {error}");
             return;
         }
+        _bakedMap = map;
         ApplyMap(map, "baked " + source);
     }
 
     private void OnMapMessage(UInt8MultiArrayMsg msg)
     {
         byte[] data = msg?.data;
-        if (data == null || data.Length == 0)
+        if (data == null || data.Length == 0 || _rosMapHeld)
             return;
         ulong hash = Fnv1a(data);
         if (hash == _lastPayloadHash && _gotTopicMap)

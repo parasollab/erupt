@@ -80,24 +80,9 @@ public class MarkerRobotPlacement : MonoBehaviour
             _tracker.enabled = false;
     }
 
-    /// <summary>
-    /// Moves a robot root. URDF-imported robots are ArticulationBody chains, and PhysX ignores
-    /// Transform writes on an articulation root: the pose shows for one frame and the next physics
-    /// step restores the old one. TeleportRoot moves the articulation itself; the Transform is set
-    /// first so the root body's world pose (and any non-articulated children) reflect the target.
-    /// </summary>
-    static void MoveRobot(GameObject robot, Vector3 position, Quaternion rotation)
-    {
-        robot.transform.SetPositionAndRotation(position, rotation);
-
-        foreach (var body in robot.GetComponentsInChildren<ArticulationBody>(true))
-        {
-            if (!body.isRoot) continue;
-            body.TeleportRoot(body.transform.position, body.transform.rotation);
-            body.linearVelocity = Vector3.zero;
-            body.angularVelocity = Vector3.zero;
-        }
-    }
+    // Articulation roots must be moved with TeleportRoot; see ArticulationRootMover.
+    static void MoveRobot(GameObject robot, Vector3 position, Quaternion rotation) =>
+        ArticulationRootMover.MoveRoot(robot, position, rotation);
 
     void OnDestroy()
     {

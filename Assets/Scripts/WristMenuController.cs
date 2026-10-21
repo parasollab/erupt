@@ -66,6 +66,7 @@ public class WristMenuController : MonoBehaviour
     private Button recordPickPlaceButton;
     private Label recordStatusLabel;
     private Button mtcButton;
+    private bool mtcControlsAvailable = true;
     private Button reachabilityButton;
     private Button reachabilityBackButton;
     private Toggle reachShellToggle;
@@ -380,12 +381,7 @@ public class WristMenuController : MonoBehaviour
         recordPickPlaceButton = root.Q<Button>("wristMenuRecordPickPlaceButton");
         recordStatusLabel = root.Q<Label>("wristMenuRecordStatusLabel");
         mtcButton = root.Q<Button>("wristMenuMTCButton");
-        if (mtcButton != null)
-            mtcButton.style.display = enableMTC ? DisplayStyle.Flex : DisplayStyle.None;
-        if (recordPickPlaceButton != null)
-            recordPickPlaceButton.style.display = enableMTC ? DisplayStyle.Flex : DisplayStyle.None;
-        if (recordStatusLabel != null)
-            recordStatusLabel.style.display = enableMTC ? DisplayStyle.Flex : DisplayStyle.None;
+        ApplyMtcControlsVisibility();
 
         // Reachability button is shown only when a visualizer is bound (serialized or via BindSceneDependencies).
         reachabilityButton = root.Q<Button>("wristMenuReachabilityButton");
@@ -930,6 +926,24 @@ public class WristMenuController : MonoBehaviour
         }
     }
     
+    /// <summary>
+    /// Hides or shows the MTC and record controls without touching enableMTC. The factory demo's
+    /// placement phase hides them until the robot's position is confirmed.
+    /// </summary>
+    public void SetMtcControlsAvailable(bool available)
+    {
+        mtcControlsAvailable = available;
+        ApplyMtcControlsVisibility();
+    }
+
+    private void ApplyMtcControlsVisibility()
+    {
+        DisplayStyle display = enableMTC && mtcControlsAvailable ? DisplayStyle.Flex : DisplayStyle.None;
+        if (mtcButton != null) mtcButton.style.display = display;
+        if (recordPickPlaceButton != null) recordPickPlaceButton.style.display = display;
+        if (recordStatusLabel != null) recordStatusLabel.style.display = display;
+    }
+
     private void OnMTCClicked()
     {
         if (mtcDashboardPanel == null) return;

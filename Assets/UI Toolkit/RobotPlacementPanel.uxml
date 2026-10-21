@@ -1,0 +1,29 @@
+<ui:UXML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ui="UnityEngine.UIElements" noNamespaceSchemaLocation="../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
+    <Style src="MTCDashboard.uss" />
+    <ui:VisualElement name="placementRoot" class="mtc-root" style="flex-grow: 1;">
+        <ui:Label text="Robot placement" name="placementTitleLabel" class="mtc-title" />
+        <ui:Label text="Move the robot to where it can reach everything" name="placementStatusLabel" class="mtc-task" style="white-space: normal;" />
+        <ui:VisualElement name="placementEditPanel" class="mtc-panel">
+            <ui:Label text="POSITION (forward = toward the machine)" class="mtc-section" />
+            <ui:VisualElement style="flex-direction: row; margin-bottom: 4px;">
+                <ui:Button text="Left" name="placementNudgeLeftButton" selectable="false" focusable="false" class="mtc-button" style="flex-grow: 1; height: 40px; font-size: 16px;" />
+                <ui:Button text="Forward" name="placementNudgeTowardButton" selectable="false" focusable="false" class="mtc-button" style="flex-grow: 1; height: 40px; font-size: 16px;" />
+                <ui:Button text="Right" name="placementNudgeRightButton" selectable="false" focusable="false" class="mtc-button" style="flex-grow: 1; height: 40px; font-size: 16px;" />
+            </ui:VisualElement>
+            <ui:VisualElement style="flex-direction: row; margin-bottom: 8px;">
+                <ui:Button text="Turn left" name="placementTurnLeftButton" selectable="false" focusable="false" class="mtc-button" style="flex-grow: 1; height: 40px; font-size: 16px;" />
+                <ui:Button text="Back" name="placementNudgeAwayButton" selectable="false" focusable="false" class="mtc-button" style="flex-grow: 1; height: 40px; font-size: 16px;" />
+                <ui:Button text="Turn right" name="placementTurnRightButton" selectable="false" focusable="false" class="mtc-button" style="flex-grow: 1; height: 40px; font-size: 16px;" />
+            </ui:VisualElement>
+            <ui:Button text="Start over" name="placementResetButton" selectable="false" focusable="false" class="mtc-button" style="flex-grow: 0; height: 40px; font-size: 16px; margin-bottom: 8px;" />
+            <ui:Label text="REACH" class="mtc-section" />
+            <ui:Label text="All targets reachable top-down" name="placementWarningLabel" class="mtc-empty" style="white-space: normal; margin-bottom: 8px;" />
+            <ui:Button text="Confirm placement" name="placementConfirmButton" selectable="false" focusable="false" class="mtc-button mtc-button--primary" style="flex-grow: 0; height: 48px; font-size: 18px;" />
+        </ui:VisualElement>
+        <ui:VisualElement name="placementConfirmedPanel" class="mtc-panel" style="display: none;">
+            <ui:Label text="PLACEMENT" class="mtc-section" />
+            <ui:Button text="Reposition robot" name="placementRepositionButton" selectable="false" focusable="false" class="mtc-button mtc-button--danger" style="flex-grow: 0; margin-top: 6px; margin-bottom: 6px; height: 48px; font-size: 18px;" />
+            <ui:Label text="Available once no plan is recording or executing." name="placementRepositionHint" class="mtc-empty" style="white-space: normal;" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

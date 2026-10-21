@@ -42,3 +42,24 @@ python3 -I Docs/mtc_diagnostics/detach_timing_probe.py <endpoint ip> [record sec
 Needs the full stack up (move_group, `mtc_pick_place_server`, the watcher, ROS-TCP-Endpoint on port
 10000). A healthy run shows the ACO REMOVE and the blank's CO ADD inside the gap between the
 "open hand" and "retreat" motion windows; a lagging watcher shows them after the last window.
+
+## Robot placement phase (`PlacementProbe.cs`)
+
+Same copy-to-`Assets/Editor/` recipe, run **without** `-nographics` (the XR ray line renderers
+crash the headless GfxDevice when the probe's camera renders):
+
+```
+PROBE_OUT=/tmp/probe "/Applications/Unity/Hub/Editor/6000.2.1f1/Unity.app/Contents/MacOS/Unity" -batchmode \
+  -projectPath "$PWD" -executeMethod PlacementProbe.Run -logFile /tmp/probe.log
+grep '\[PROBE' /tmp/probe.log
+```
+
+No ROS needed. It plays `FactoryDemo` and checks the `RobotPlacementController` flow: starts in
+Placing with the menus hidden and every `CollisionObjectPublisher` paused, the visualizer holding
+the baked map; `Nudge`/`Rotate` move the fr3 root, its root `ArticulationBody` (TeleportRoot
+survives the physics steps), `BaseTransform` and the pedestal; the six reach markers re-sample
+(moving the robot away turns targets unreachable, the nudge clamps to the cell bounds); `Reset`;
+`Confirm` shows the menus, unpauses and flags every room publisher for a fresh ADD, re-enables the
+ROS map after the delay; `BeginReposition` returns to Placing. Screenshots land in `PROBE_OUT`
+(`placing_default`, `placing_moved`, `placing_far`, `placement_panel`, `confirmed`). Verified
+2026-10-20: 40 checks, 0 failures, with ROS-TCP-Endpoint up the ADDs went out within 100 ms of Confirm.

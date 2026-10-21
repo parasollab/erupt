@@ -135,6 +135,17 @@ public class DesktopMouseInteractor : MonoBehaviour
             return;
         }
         Transform target = null;
+        // Floor handles (robot placement) have no publisher; they slide on the floor only.
+        var handle = hit.collider.GetComponentInParent<DesktopDragHandle>();
+        if (handle != null)
+        {
+            _dragged = handle.transform;
+            _draggedPublisher = null;
+            _dragVertical = false;
+            _dragPlane = new Plane(Vector3.up, hit.point);
+            _dragOffset = _dragged.position - hit.point;
+            return;
+        }
         var publisher = hit.collider.GetComponentInParent<CollisionObjectPublisher>();
         if (publisher != null && !publisher.attachedToRobot)
         {
