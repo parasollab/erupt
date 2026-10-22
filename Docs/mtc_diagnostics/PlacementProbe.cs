@@ -71,7 +71,7 @@ public static class PlacementProbe
             Check(markers != null && markers.Count == 6 && markers.GetComponentsInChildren<MeshRenderer>().Length == 6, $"6 reach markers exist ({markers?.Count})");
             Log($"reachable at default pose: {markers.ReachableCount}/{markers.Count}; warnings: {string.Join(" | ", ctl.Warnings())}");
             for (int i = 0; i < markers.Count; i++) Log($"  {markers.TargetLabel(i)}: topdown={markers.TopDownDexterity[i]:F2} reachable={markers.IsReachable(i)}");
-            Check(markers.ReachableCount < markers.Count, "the start pose leaves targets unreachable (the visitor has work to do)");
+            Check(markers.ReachableCount < markers.Count, "the start pose leaves targets unreachable (the user has work to do)");
             Check(Vector3.Distance(ctl.Handle.position, ctl.StartHandlePose.position) < 1e-3f && Vector3.Distance(ctl.StartHandlePose.position, ctl.DefaultHandlePose.position) > 0.5f,
                   $"robot starts at the start pose {ctl.StartHandlePose.position}, away from the ideal {ctl.DefaultHandlePose.position}");
             Check(Vector3.Distance(fr3.transform.position, ctl.StartHandlePose.position + new Vector3(0f, 0.75f, 0f)) < 1e-3f, "fr3 root was moved to the start pose");
@@ -85,8 +85,8 @@ public static class PlacementProbe
             Log($"reachable at the ideal pose: {markers.ReachableCount}/{markers.Count}");
             Check(markers.ReachableCount == markers.Count, "all targets reachable at the ideal pose");
             for (int i = 0; i < markers.Count; i++) Log($"  {markers.TargetLabel(i)}: topdown={markers.TopDownDexterity[i]:F2}");
-            // The visitor's view of the fixture from the spawn spot, past the robot.
-            Shot(outDir, "visitor_view_ideal", new Vector3(0f, 1.6f, 0f), fixtureAnchor.position, 60f);
+            // The user's view of the fixture from the spawn spot, past the robot.
+            Shot(outDir, "user_view_ideal", new Vector3(0f, 1.6f, 0f), fixtureAnchor.position, 60f);
 
             Vector3 fr3Pos0 = fr3.transform.position, base0 = baseT.position, ped0 = pedestal.position, body0 = rootBody.transform.position;
             float dex0 = vis.SampleDexterity(fixtureAnchor.position, true);

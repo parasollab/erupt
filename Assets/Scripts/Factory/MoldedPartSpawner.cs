@@ -7,7 +7,7 @@ using UnityEngine.XR.Interaction.Toolkit.Interactables;
 namespace Factory
 {
     // Turns each injection-moulder ejection into a real part on the station tray: a small
-    // grabbable box with a CollisionObjectPublisher, so the visitor can demonstrate a pick and
+    // grabbable box with a CollisionObjectPublisher, so the user can demonstrate a pick and
     // place with it and MoveIt knows where it is. Parts slide down the chute, hop onto the first
     // free tray slot and only then start publishing. The oldest idle part is recycled once the
     // cap is reached.

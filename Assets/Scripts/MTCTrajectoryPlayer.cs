@@ -138,6 +138,7 @@ public class MTCTrajectoryPlayer : MonoBehaviour
         if (solutionId == 0) return; // plan-and-execute goals: no solution to read, the listener alone mirrors
         if (attachedListener == null) attachedListener = FindFirstObjectByType<AttachedCollisionObjectListener>();
         if (attachedListener == null) return;
+        attachedListener.syncRobot = SyncMirroredJoints;
 
         trackingExecution = true;
         trackedSolutionId = solutionId;
@@ -191,6 +192,10 @@ public class MTCTrajectoryPlayer : MonoBehaviour
     {
         var steps = executingSolution?.sub_trajectory;
         if (steps == null || attachedListener == null) return;
+        // The step feedback and the joint states share one socket and arrive in order, but the
+        // joint states are only applied once per frame: bring the robot up to date first, or a
+        // long frame places the attached object against an arm pose that is seconds old.
+        SyncMirroredJoints();
         int last = Mathf.Min(reportedStep, steps.Length - 1);
         for (int step = appliedThroughStep + 1; step <= last; step++)
         {
@@ -200,11 +205,18 @@ public class MTCTrajectoryPlayer : MonoBehaviour
             {
                 if (string.IsNullOrEmpty(aco?.@object?.id)) continue;
                 if (verboseLog)
-                    Debug.Log($"[MTCTrajectoryPlayer] step {step} done: {(aco.@object.operation == CollisionObjectMsg.REMOVE ? "detach" : "attach")} '{aco.@object.id}'");
+                    Debug.Log($"[MTCTrajectoryPlayer] step {step} ('{pickPlaceClient?.StageName(steps[step].info?.stage_id ?? 0)}', reported {reportedStep}) done: " +
+                              $"{(aco.@object.operation == CollisionObjectMsg.REMOVE ? "detach" : "attach")} '{aco.@object.id}' frame '{aco.@object.header?.frame_id}'");
                 attachedListener.ApplyExpected(aco);
             }
         }
         appliedThroughStep = Mathf.Max(appliedThroughStep, last);
+    }
+
+    /// <summary>Apply the newest received joint state now (no-op when not mirroring or nothing new).</summary>
+    public void SyncMirroredJoints()
+    {
+        if (mirroring) ApplyLatestJointState();
     }
 
     /// <summary>Follow /joint_states on the Unity robot; any running preview is stopped first.</summary>

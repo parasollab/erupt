@@ -5,14 +5,14 @@ using UnityEngine;
 
 namespace Factory
 {
-    // Parts the robot lets go of fall. The place pose MTC executes is wherever the visitor
+    // Parts the robot lets go of fall. The place pose MTC executes is wherever the user
     // released the part, usually hovering; once the gripper opens (the executing solution's
     // detach, or the preview's) the part becomes a dynamic rigidbody for a moment, drops onto
     // whatever is under it - the vise parallels, a jaw plate, the platter, the floor - and is
     // frozen again where it comes to rest. The rest pose is what the publisher then sends to
     // MoveIt, so the clamp and the later unload pick work from where the part really is.
     // A real cell never drops a part on the vise; the panel shows the drop height so the
-    // visitor learns to release low without anything snapping the pose for them.
+    // user learns to release low without anything snapping the pose for them.
     public class ReleasedPartGravity : MonoBehaviour
     {
         [Serializable]
@@ -56,6 +56,9 @@ namespace Factory
             public CollisionObjectPublisher[] publishers;
             public bool[] wasPaused;
             public SelectableGrabController grabLock;
+            public RigidbodyInterpolation interpolation; // restored after the fall: an interpolating
+            // kinematic body reports a blended transform for a frame after every teleport, and the
+            // publisher sent such a blend to MoveIt right after the recorder put a part back.
         }
 
         readonly Dictionary<GameObject, SettleState> settling = new Dictionary<GameObject, SettleState>();
@@ -116,6 +119,7 @@ namespace Factory
                 preview = preview,
                 publishers = part.GetComponentsInChildren<CollisionObjectPublisher>(true),
                 grabLock = part.GetComponent<SelectableGrabController>(),
+                interpolation = part.GetComponent<Rigidbody>().interpolation,
             };
             state.wasPaused = new bool[state.publishers.Length];
             for (int i = 0; i < state.publishers.Length; i++)
@@ -141,6 +145,8 @@ namespace Factory
         {
             settling.Remove(part);
             Freeze(part);
+            var body = part != null ? part.GetComponent<Rigidbody>() : null;
+            if (body != null) body.interpolation = state.interpolation;
             for (int i = 0; i < state.publishers.Length; i++)
                 if (state.publishers[i] != null) state.publishers[i].pausePublishing = state.wasPaused[i];
             if (state.grabLock != null) state.grabLock.SetLocked(false);

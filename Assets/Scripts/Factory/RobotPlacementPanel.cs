@@ -67,7 +67,7 @@ namespace Factory
             confirmButton = root.Q<Button>("placementConfirmButton");
             repositionButton = root.Q<Button>("placementRepositionButton");
 
-            // The visitor stands at the origin facing +z with the machine beyond the robot, so
+            // The user stands at the origin facing +z with the machine beyond the robot, so
             // "left" is world -x, "toward the machine" is world +z.
             if (nudgeLeft != null) nudgeLeft.clicked += OnNudgeLeft;
             if (nudgeRight != null) nudgeRight.clicked += OnNudgeRight;

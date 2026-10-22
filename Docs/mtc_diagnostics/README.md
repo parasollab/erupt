@@ -86,3 +86,125 @@ settled part touches, which is how the first run's "landed on the back jaw" turn
 probe's own hover pose. Screenshots in `PROBE_OUT`: `vise_open`, `vise_hover`, `vise_dropped`,
 `vise_clamped`, `vise_clamped_close`, `vise_clamped_poor`, `machine_panel`. Verified 2026-10-21:
 28 checks, 0 failures.
+
+## Planning into the vise (`VisePlanProbe.cs`)
+
+Same copy-to-`Assets/Editor/` recipe, `-nographics` is fine, ROS stack up (move_group, `mtc_pick_place_server`,
+ROS-TCP-Endpoint at the prefab IP):
+
+```
+PROBE_BASE_DX=0.4 "/Applications/Unity/Hub/Editor/6000.2.1f1/Unity.app/Contents/MacOS/Unity" -batchmode -nographics \
+  -projectPath "$PWD" -executeMethod VisePlanProbe.Run -logFile /tmp/plan.log
+grep '\[PROBE\]' /tmp/plan.log
+```
+
+It plays `FactoryDemo`, puts the robot on the placement phase's ideal spot (plus `PROBE_BASE_DX` / `PROBE_BASE_DZ`
+metres, world), confirms, opens the doors, dumps the planning scene (the `table` compound's primitives included),
+asks `/check_state_validity` whether the ready pose is collision-free, then sends real `/pick_place` goals: the top
+billet into the open jaws with its 5 cm side across (A), with its 8 cm side across (B) and onto the conveyor's drop
+anchor as a control (C), printing per-stage solved/failed counts and the first failure comments. After A it sweeps
+`/compute_ik` + `/check_state_validity` over 24 yaws of the top-down grasp at the place pose, 15 cm above it (the
+retreat) and at the pick. `PROBE_GRID="x,z;x,z;..."` instead re-confirms the robot at each base pose and runs only
+the ready-pose check and the two sweeps (the stock stand and conveyor do not follow the robot in the probe; in a
+relayout they do).
+
+Found with it (2026-10-21): from the authored spot (x -0.4, left of the door opening) nothing plans. The ready pose
+has `panda_hand` 1.9 cm inside `vf2_body` (the wall left of the opening; the doors make no difference), so every
+connect stage fails, and the place over the vise has `panda_link5` through the parked left door / the wall for all
+24 yaws, because the forearm must cross the opening's left edge to hold the hand vertical over a vise 24 cm behind
+the door plane. Grid: x <= -0.1 fails on link5, x >= 0.2 at z 1.0 (and everything at z 0.9) cannot rise 15 cm for
+the retreat; x = 0, z = 1.0 gives 20-21/24 and plans both billet orientations into the jaws with 3 solutions each
+(every stage incl. move home). The conveyor control fails there only because the conveyor stayed 1 m away.
+
+## Recording the whole load as a video (`DemoVideoProbe.cs`)
+
+Same copy-to-`Assets/Editor/` recipe, ROS stack up, run **without** `-nographics` (frames are rendered):
+
+```
+PROBE_OUT=/tmp/demo_video "/Applications/Unity/Hub/Editor/6000.2.1f1/Unity.app/Contents/MacOS/Unity" -batchmode \
+  -projectPath "$PWD" -executeMethod DemoVideoProbe.Run -logFile /tmp/video.log
+cd /tmp/demo_video && python3 - <<'PY'
+# captions.txt (frame<TAB>caption) -> captions.srt at 12 fps; see the session notes for the full snippet
+PY
+ffmpeg -framerate 12 -i frames/frame_%05d.jpg -vf "subtitles=captions.srt" -c:v libx264 -pix_fmt yuv420p -crf 20 demo_pipeline.mp4
+```
+
+A scripted camera records 1280x720 JPEG frames at 12 fps while the probe plays the demo end to end:
+drags the placement ring from the start pose to the ideal spot and confirms, opens the doors, selects the
+top billet, Start Recording, carries it over the open jaws (10 deg skewed) and lets go, Stop Recording
+(the goal goes out, the billet returns to the stack), waits for the plan, previews the first solution
+(the part drops in the preview too), executes it (the drop comes from the executing solution's detach),
+clamps, shows the machine panel and releases. `frames/captions.txt` has one caption per frame for the
+subtitle file. Verified 2026-10-21 from the x = 0 robot spot: plan 3 solutions, execute succeeded,
+drop 40 mm flat, clamped "squared from 26 deg, stickout 35 mm", 675 frames = 56 s.
+
+Things that look odd in the footage but are not bugs: the cyan sphere at the gripper is the robot's IK
+jog handle (`Quest3RobotInteractionController` hides it only while a preview plays or a solution
+executes); after "move home" the hand hovers just in front of and above the vise because the ready
+pose reaches 0.31 m forward from a base 0.25 m before the door plane.
+
+### Choosing recording cameras (`CameraScoutProbe.cs`)
+
+Same copy-to-`Assets/Editor/` recipe, no ROS, run without `-nographics`. Renders 1080p stills of the user's view
+before and after confirming, the wide/side views and nine candidate vise cameras with a billet seated in the
+jaws and the robot in its home pose, so an angle the arm does not block can be picked without a headset.
+Picked 2026-10-21: the vise close-up is `window + (0.55, 0.45, -0.05)`, from inside the opening to the right of
+the vise, which keeps the arm on the left of frame; the old front-right view had the forearm across the vise.
+The video probe also parks the IK jog handle (disables `Quest3RobotInteractionController`, hides its handle) and
+records 1920x1080 at 15 fps, JPEG 95, 4x MSAA.
+
+### Button presses on camera (video probe, 2026-10-21)
+
+Every panel step in the recording is done through the panel's own button: `Press(doc, buttonName, caption)` cuts
+to the panel, slides a yellow pointer dot onto the button, flashes it white and sends it a `NavigationSubmitEvent`
+(the same path the headset's poke uses), so Confirm placement, Open Doors, Start/Stop Recording, the Solutions
+tab, Preview, Execute, Clamp and Release all run through the UI. Element positions come from
+`element.worldBound` relative to `rootVisualElement.worldBound` mapped onto the document's poke collider; note the
+world-space document's layout y runs *downward from 0* (the root spans y = -height..0), so distance from the top
+is `yMax - y`. `PROBE_POINTER_TEST=1` presses three buttons and exits (a 2-minute check of the mapping).
+The probe also browses the plan's solutions and previews/executes the one whose place yaw is closest to the
+demonstration: the MTC server samples the place yaw for a box, so the executed yaw differs per solution and per
+run (26, 25, 40 degrees seen for a 10-degree demonstration). One run also aborted execution with MoveIt error
+-4 (CONTROL_FAILED) after the place, on the fake controllers; rerun.
+
+### Full cycle (video v7, 2026-10-21)
+
+The recording now ends with the unload: Release the vise, Start Recording, carry the billet from the open jaws
+onto the conveyor's drop anchor (1.5 cm up), Stop Recording, plan on the dashboard, Execute, cut to the belt as
+the hand opens. Both pick-and-places go through the same `DemonstrateAndPlan` / `ExecuteSelected` routines, so the
+probe is the reference for the whole cycle: load 3 solutions, clamp squared, unload 3 solutions, billet dropped
+15 mm onto the belt at the anchor; 142 s. The doors are slowed to 3 s for the camera and the planning wait is
+filmed on the dashboard. `getSolutionTimeoutSeconds` is 15 s in the scene (builder constant
+`FactoryGetSolutionTimeout`, validator check) and 20 s in the recording.
+
+### Timings and clean-up (video v9, 2026-10-22)
+
+MTC plans the load in ~1 s and the unload in ~0.5 s. What looked like a long planning wait was reading the
+solutions back: one `/get_solution` reply (19 steps, each with a scene diff) takes ~7 s to arrive and
+deserialize, so the probe now prefetches all of them in parallel (3 in ~3 s) while the Plan tab shows the status,
+then browses them on the Solutions tab from the cache (~0.6 s per row). The headset dashboard pays the same ~7 s
+on every first tap of a solution; slimming the scene diffs on the server would fix that for both.
+The probe hides the headset's controller models and pointer rays (45 renderers/visual components, the ray visuals
+re-enable their LineRenderers each LateUpdate so the components are disabled first). The small white capsules
+under each panel are the panels' grab handles, part of the VR UI, left as they are. One unload plan aborted
+instantly on a run and planned normally on the next (3 solutions); the probe demonstrates again if the first
+attempt is refused and dumps the per-stage statistics on a failure.
+
+### Place yaw: server-side fix (2026-10-22)
+
+The executed place came out 15 or 30 degrees off the demonstrated yaw (MoveIt's own post-place re-add says so; the
+vise then reports "squared from 25 deg" or "clamped on its corners, 40 deg"). Cause: `PickPlaceTaskDynamic` in the
+MTC fork gave the place `ComputeIK` the hand's grasp frame as IK frame, so the TCP (not the object) reached the target
+and the object carried the sampled grasp yaw (15-degree steps). `demo/src/pick_place_task_dynamic.cpp` now uses
+`setIKFrame(object_id)` like upstream MTC. Rebuild on the ROS machine:
+`colcon build --packages-select moveit_task_constructor_demo mtc_pick_place_server` and relaunch the server.
+The video probe logs "yaw X (demonstrated Y)" after each drop to confirm; the solution-browsing yaw estimate in the
+probe is unreliable (it read a constant 15 deg) and only decides which row is selected.
+
+### Instant plan refusals after a drop (2026-10-22)
+
+"ABORTED: planning failed" within 0.0 s with grasp pose IK 0/25 came from a wrong part pose: right after the recorder
+put the billet back (or the preview restored it) the publisher sent a position on a straight blend between the old and
+new poses, inside the platter. `ReleasedPartGravity` had switched the billet's rigidbody to `Interpolate` for the fall and
+left it there; an interpolating kinematic body reports a blended transform for one frame after every teleport. The drop
+routine now restores the previous interpolation mode when the part freezes.

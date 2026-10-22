@@ -7,7 +7,7 @@ using UnityEngine.XR.Interaction.Toolkit.Interactables;
 namespace Factory
 {
     /// <summary>
-    /// First phase of the factory demo: the visitor drags a floor handle and the robot (an
+    /// First phase of the factory demo: the user drags a floor handle and the robot (an
     /// articulation chain, moved with TeleportRoot) and its pedestal follow it, with the
     /// reachability volume riding on the robot base. Confirm freezes the pose and opens the
     /// pick-and-place phase.
@@ -38,7 +38,7 @@ namespace Factory
         private Transform handle;
         [SerializeField] private XRGrabInteractable handleInteractable;
         [SerializeField, Tooltip("Where the robot starts the placement phase, as a world x/z offset from its authored (ideal) pose, " +
-                                 "so the visitor has to bring it into place. Zero = start at the authored pose.")]
+                                 "so the user has to bring it into place. Zero = start at the authored pose.")]
         private Vector2 startOffset = Vector2.zero;
         [SerializeField, Tooltip("Yaw (degrees) the robot starts with, relative to its authored pose.")]
         private float startYawDegrees = 0f;
@@ -131,7 +131,7 @@ namespace Factory
             if (startInPlacement)
             {
                 EnterPlacing();
-                // The scene is authored with the robot at its ideal spot; the visitor has to find it.
+                // The scene is authored with the robot at its ideal spot; the user has to find it.
                 handle.SetPositionAndRotation(_startHandlePose.position, _startHandlePose.rotation);
                 ApplyHandlePose(SanitisedHandlePose());
                 if (markers != null) markers.Refresh();

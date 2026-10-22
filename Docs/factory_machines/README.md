@@ -119,12 +119,12 @@ $B -b --python bl_check_urdf.py  -- $PKG haas_vf1 /tmp/chk urdf_spec_vf1.json
 `Assets/Editor/MtcSceneBuilder.cs` builds the cell. *Build FactoryDemo MTC station* moves the MTC stack from
 `Old Scenes/KitchenFR3.unity` into a FactoryDemo that still has the UR5e; *Relayout FactoryDemo (VF-2 cell)*
 rebuilds the cell in a scene that already has the fr3 (`RelayoutFactoryBatch` headless). Either way the
-layout is (world metres, floor y = 0, visitor at the origin facing +z, fr3 base at (0, 0.75, 1)):
+layout is (world metres, floor y = 0, user at the origin facing +z, fr3 base at (0, 0.75, 1)):
 
 - `Machines/Haas VF-2TR`: behind the robot, facing it, door front at z = 1.25 (6 cm behind the 0.6 x 0.44 m
   `RobotPedestal`), shifted 0.2 m to the right so the trunnion platter (left of the spindle centreline) is only
   0.18 m off the robot's axis. The robot reaches over the door sill onto the platter (top 1.10 m).
-- `MachineDoorMenu`: Open / Close doors panel at the machine's front-right corner, facing the visitor.
+- `MachineDoorMenu`: Open / Close doors panel at the machine's front-right corner, facing the user.
 - `FR3 Station/RawStockStand`: 0.3 x 0.7 x 0.3 m stand to the robot's right with a stack of four 8 x 6 x 5 cm
   billets (`GrabbablePartSet`, ids `blank_1..4`, 5 mm rest gaps). The billets are baked into the scene
   (`prePlaced`, visible in the editor) and registered at Start instead of spawned. The stand publishes as collision object
@@ -138,7 +138,7 @@ layout is (world metres, floor y = 0, visitor at the origin facing +z, fr3 base 
 `ValidateFactoryBatch` checks the wiring, the door travel/opening, the reach of every anchor and the
 clearances; `RenderFactoryShotsBatch` (`FACTORY_SHOT_DIR`) renders check views with the doors closed and open.
 
-Visitor flow: open the doors from the door menu (closed doors are collision objects, so a load plan fails
+User flow: open the doors from the door menu (closed doors are collision objects, so a load plan fails
 against them); wrist menu "Record Pick Place" (or the MTC dashboard's Plan tab), point at the top billet,
 grab it and drop it on the fixture in the machine, stop recording. The place pose goes to the `/pick_place`
 action; the dashboard lists stages and solutions, Preview animates the FR3, Execute runs it. The unload is

@@ -41,6 +41,10 @@ public class DesktopMouseInteractor : MonoBehaviour
     public float maxRayDistance = 20f;
     public float verticalScrollStep = 0.05f;
     public bool selectOnClick = true;
+    [Tooltip("Degrees per second the [ and ] keys turn the dragged or selected shape about the vertical axis.")]
+    public float rotateDegreesPerSecond = 45f;
+    [Tooltip("Told when a mouse drag puts a shape down, so Stop Recording sends the pose (found in the scene when empty).")]
+    public PickPlaceTaskRecorder recorder;
     public bool showHelp = true;
 
     Transform _rig;
@@ -64,15 +68,25 @@ public class DesktopMouseInteractor : MonoBehaviour
             return;
         }
         _rig = moveCameraRoot ? targetCamera.transform.root : targetCamera.transform;
+        if (recorder == null) recorder = FindFirstObjectByType<PickPlaceTaskRecorder>(FindObjectsInactive.Include);
 
-        // Put the *camera* at startPosition looking at lookAt, compensating for its offset and
-        // rotation inside the rig.
-        Vector3 dir = (lookAt - startPosition).normalized;
-        _yaw = Mathf.Atan2(dir.x, dir.z) * Mathf.Rad2Deg;
-        _pitch = -Mathf.Asin(Mathf.Clamp(dir.y, -1f, 1f)) * Mathf.Rad2Deg;
-        ApplyCameraPose(startPosition);
+        JumpTo(startPosition, lookAt);
         _lastMouse = Input.mousePosition;
     }
+
+    /// <summary>Put the camera at <paramref name="cameraPosition"/> looking at <paramref name="target"/> (editor views).</summary>
+    public void JumpTo(Vector3 cameraPosition, Vector3 target)
+    {
+        if (_rig == null) return;
+        // Put the *camera* there, compensating for its offset and rotation inside the rig.
+        Vector3 dir = (target - cameraPosition).normalized;
+        _yaw = Mathf.Atan2(dir.x, dir.z) * Mathf.Rad2Deg;
+        _pitch = -Mathf.Asin(Mathf.Clamp(dir.y, -1f, 1f)) * Mathf.Rad2Deg;
+        ApplyCameraPose(cameraPosition);
+    }
+
+    /// <summary>The shape a left-drag is moving right now, or null.</summary>
+    public Transform Dragged => _dragged;
 
     void ApplyCameraPose(Vector3 cameraWorldPosition)
     {
@@ -124,6 +138,34 @@ public class DesktopMouseInteractor : MonoBehaviour
             if (_dragged != null) EndDrag();
             SelectionManager.Instance?.DeleteSelectedObject();
         }
+
+        // ---- turning: [ and ] yaw the dragged (else the selected) shape ---------------------
+        float turn = (Input.GetKey(KeyCode.RightBracket) ? 1f : 0f) - (Input.GetKey(KeyCode.LeftBracket) ? 1f : 0f);
+        if (turn != 0f)
+        {
+            Transform shape = _dragged != null ? _dragged : SelectionManager.Instance?.SelectedObject?.transform;
+            var publisher = shape != null ? shape.GetComponentInParent<CollisionObjectPublisher>() : null;
+            if (shape != null && publisher != null && !publisher.attachedToRobot && IsKinematic(shape))
+            {
+                shape.Rotate(Vector3.up, turn * rotateDegreesPerSecond * Time.deltaTime, Space.World);
+                _turned = publisher;
+            }
+        }
+        else if (_turned != null)
+        {
+            if (_dragged == null) _turned.ForceRepublish();
+            if (recorder != null && _dragged == null) recorder.NotifyObjectReleased(_turned.gameObject);
+            _turned = null;
+        }
+    }
+
+    CollisionObjectPublisher _turned;
+
+    // A part the robot has just dropped is a live physics body until it settles; leave it alone.
+    static bool IsKinematic(Transform t)
+    {
+        var rb = t.GetComponentInParent<Rigidbody>();
+        return rb == null || rb.isKinematic;
     }
 
     void BeginDrag()
@@ -147,7 +189,7 @@ public class DesktopMouseInteractor : MonoBehaviour
             return;
         }
         var publisher = hit.collider.GetComponentInParent<CollisionObjectPublisher>();
-        if (publisher != null && !publisher.attachedToRobot)
+        if (publisher != null && !publisher.attachedToRobot && IsKinematic(publisher.transform))
         {
             if (!requireGrabInteractable || hit.collider.GetComponentInParent<XRGrabInteractable>() != null)
                 target = publisher.transform;
@@ -190,6 +232,8 @@ public class DesktopMouseInteractor : MonoBehaviour
     {
         // Publish the final pose right away instead of waiting for the next rate-limited tick.
         if (_draggedPublisher != null) _draggedPublisher.ForceRepublish();
+        // A mouse drag ending is the desktop's "hand let go": the recorder takes the pose from here.
+        if (_draggedPublisher != null && recorder != null) recorder.NotifyObjectReleased(_draggedPublisher.gameObject);
         _dragged = null;
         _draggedPublisher = null;
     }
@@ -198,7 +242,7 @@ public class DesktopMouseInteractor : MonoBehaviour
     {
         if (!showHelp) return;
         const string help = "Mouse: right-drag look | WASD/QE move | scroll zoom | left-drag move shape | " +
-                            "Shift+drag or scroll-while-dragging raise/lower | Delete removes selected";
+                            "Shift+drag or scroll-while-dragging raise/lower | [ ] turn shape | Delete removes selected";
         GUI.Label(new Rect(10, Screen.height - 26, Screen.width - 20, 22), help);
     }
 }

@@ -5,7 +5,7 @@ using RosMessageTypes.Geometry;
 
 namespace Factory
 {
-    // Optional "auto-sort" for the FR3 station: once the visitor has demonstrated one pick and
+    // Optional "auto-sort" for the FR3 station: once the user has demonstrated one pick and
     // place (PickPlaceTaskRecorder), every part the moulder delivers afterwards is planned and
     // executed to the same place pose, with a small spread so parts do not stack. Off by
     // default; toggle autoSort in the Inspector.

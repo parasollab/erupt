@@ -79,6 +79,7 @@ namespace Erupt.Ros.Tests
             var rb = part.GetComponent<Rigidbody>();
             Assert.IsTrue(rb.isKinematic, "frozen again where it landed");
             Assert.IsFalse(rb.useGravity);
+            Assert.AreEqual(RigidbodyInterpolation.None, rb.interpolation, "interpolation restored: a teleported kinematic body must report its new pose at once");
             Assert.IsFalse(part.GetComponent<CollisionObjectPublisher>().pausePublishing, "publisher resumed");
             // Resting on the top face (0.55) + half height (0.03) + rest gap (0.005).
             Assert.AreEqual(0.585f, part.transform.position.y, 0.006f, "rests on the surface with the rest gap");

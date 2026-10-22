@@ -141,6 +141,7 @@ public class PickPlaceTaskRecorder : MonoBehaviour
         watchedPublisher = pub;
         pickWorldPos = pub.transform.position;
         pickWorldRot = pub.transform.rotation;
+        Debug.Log($"PickPlaceTaskRecorder: watching '{pub.objectId}' from its pick pose {pickWorldPos} (parent '{pub.transform.parent?.name}')");
         watchedPublisher.pausePublishing = true;
         gi.selectExited.AddListener(OnGrabReleased);
     }
@@ -150,7 +151,7 @@ public class PickPlaceTaskRecorder : MonoBehaviour
         if (watchedPublisher == null) return;
 
         watchedPublisher.transform.SetPositionAndRotation(pickWorldPos, pickWorldRot);
-        Debug.Log($"PickPlaceTaskRecorder: reset '{watchedPublisher.objectId}' to pick pose");
+        Debug.Log($"PickPlaceTaskRecorder: reset '{watchedPublisher.objectId}' to pick pose {pickWorldPos}");
     }
 
     private void ClearWatchedObject()
@@ -173,6 +174,19 @@ public class PickPlaceTaskRecorder : MonoBehaviour
 
         objectWasPlaced = true;
         Debug.Log($"PickPlaceTaskRecorder: object released — pose will be read from transform when recording stops");
+    }
+
+    /// <summary>
+    /// A stand-in for the XRI release: something other than a VR grab (the editor's mouse drag)
+    /// has put the watched object down. Counts exactly like a hand letting go, so Stop
+    /// Recording sends the pose it is left in.
+    /// </summary>
+    public void NotifyObjectReleased(GameObject obj)
+    {
+        if (!IsRecording || watchedPublisher == null || obj == null) return;
+        if (obj != watchedPublisher.gameObject && !obj.transform.IsChildOf(watchedPublisher.transform)) return;
+        objectWasPlaced = true;
+        Debug.Log("PickPlaceTaskRecorder: object put down (desktop) — pose will be read from transform when recording stops");
     }
 
     private void SendPickPlaceTask(string objectId, Vector3 relPos, Quaternion relRot)

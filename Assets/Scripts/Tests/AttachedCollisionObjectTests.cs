@@ -50,6 +50,7 @@ namespace Erupt.Ros.Tests
         public IEnumerator Attach_ReparentsTheSameObjectAtTheLinkRelativePose()
         {
             yield return Build();
+            AllowAnyAttachJump();
             bus.Inbound(SceneTopic, Box("cube", new Vector3(1f, 0f, 0f)));
             Assert.IsTrue(scene.TryGetObject("cube", out var before));
 
@@ -61,6 +62,62 @@ namespace Erupt.Ros.Tests
             Assert.AreSame(hand, after.transform.parent);
             AssertClose(new Vector3(-0.2f, 0.3f, 0.1f), after.transform.localPosition);
             Assert.IsTrue(scene.attachedIds.Contains("cube"));
+            yield return null;
+        }
+
+        // Every executed step's scene diff and the watcher's echoes restate the attach with
+        // link-relative poses that differ by centimetres between sources; re-placing on each
+        // made the carried part blink in the hand.
+        [UnityTest]
+        public IEnumerator RepeatedAttach_OnTheSameLink_KeepsTheFirstPlacement()
+        {
+            yield return Build();
+            bus.Inbound(SceneTopic, Box("cube", new Vector3(1f, 0f, 0f)));
+            bus.Inbound(AttachTopic, Attached("cube", "fr3_hand", CollisionObjectMsg.ADD, 0.1, 0.2, 0.3));
+            scene.TryGetObject("cube", out var go);
+            Vector3 first = go.transform.localPosition;
+
+            bus.Inbound(AttachTopic, Attached("cube", "fr3_hand", CollisionObjectMsg.ADD, 0.13, 0.2, 0.3));
+            Assert.AreSame(hand, go.transform.parent);
+            AssertClose(first, go.transform.localPosition);
+
+            // A detach and a fresh attach is a new grasp: the new pose applies.
+            bus.Inbound(AttachTopic, Attached("cube", "fr3_hand", CollisionObjectMsg.REMOVE, 0, 0, 0));
+            bus.Inbound(AttachTopic, Attached("cube", "fr3_hand", CollisionObjectMsg.ADD, 0.13, 0.2, 0.3));
+            AssertClose(new Vector3(-0.2f, 0.3f, 0.13f), go.transform.localPosition);
+            yield return null;
+        }
+
+        // The hand closes on the object where it is. A notice whose link-relative pose would
+        // fling the object far away (seen on the first notice of a second carry, up to 0.8 m)
+        // is in some other frame: the object rides the link from where it stands until a
+        // notice consistent with its position arrives.
+        [UnityTest]
+        public IEnumerator FarAttachNotice_KeepsTheObjectWhereItStands_UntilAConsistentOne()
+        {
+            yield return Build();
+            SetPrivate(attachListener, "maxAttachJump", 0.25f);
+            // The cube sits 0.1 m above the hand, i.e. link-local (0, 0.1, 0).
+            Vector3 cubeWorld = hand.position + new Vector3(0f, 0.1f, 0f);
+            bus.Inbound(SceneTopic, Box("cube", cubeWorld));
+            scene.TryGetObject("cube", out var go);
+
+            // 1 m forward in ROS: a metre from where the cube stands -> untrusted; the cube stays
+            // put and unparented (still locked and counted as attached) until a consistent notice.
+            Transform parentBefore = go.transform.parent;
+            LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("would move it"));
+            bus.Inbound(AttachTopic, Attached("cube", "fr3_hand", CollisionObjectMsg.ADD, 1.0, 0.0, 0.0));
+            Assert.AreSame(parentBefore, go.transform.parent);
+            AssertClose(cubeWorld, go.transform.position);
+            Assert.IsTrue(scene.attachedIds.Contains("cube"));
+
+            // ROS (0, 0, 0.1) = Unity link-local (0, 0.1, 0): consistent with where it stands -> applied.
+            bus.Inbound(AttachTopic, Attached("cube", "fr3_hand", CollisionObjectMsg.ADD, 0.0, 0.0, 0.1));
+            AssertClose(new Vector3(0f, 0.1f, 0f), go.transform.localPosition);
+
+            // And from then on restatements change nothing.
+            bus.Inbound(AttachTopic, Attached("cube", "fr3_hand", CollisionObjectMsg.ADD, 0.02, 0.0, 0.1));
+            AssertClose(new Vector3(0f, 0.1f, 0f), go.transform.localPosition);
             yield return null;
         }
 
@@ -307,9 +364,17 @@ namespace Erupt.Ros.Tests
             var attach = host.AddComponent<AttachedCollisionObjectListener>();
             SetPrivate(attach, "sceneListener", scene);
             SetPrivate(attach, "ikController", ik);
+            attachListener = attach;
+            AllowAnyAttachJump();
 
             yield return null; // Start subscribes to the fake bus.
         }
+
+        private AttachedCollisionObjectListener attachListener;
+
+        // The fixtures put cubes a metre from the hand; the listener's sanity limit on the attach
+        // jump (a real hand closes on the object where it is) is lifted unless a test is about it.
+        private void AllowAnyAttachJump() => SetPrivate(attachListener, "maxAttachJump", 10f);
 
         private static void SetPrivate(object target, string field, object value) =>
             target.GetType().GetField(field, BindingFlags.Instance | BindingFlags.NonPublic).SetValue(target, value);

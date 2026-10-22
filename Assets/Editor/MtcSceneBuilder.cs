@@ -52,8 +52,9 @@ public static class MtcSceneBuilder
     private const string FactoryStationRoot = "FR3 Station";
     // The MTC server raises the requested place pose by 0.5 * object_dimensions[0] +
     // place_surface_offset (Panda demo config: 0.125 + 0.0001); cancel it so parts land where
-    // the visitor released them.
+    // the user released them.
     private const float FactoryPlaceHeightOffset = -0.1251f;
+    private const float FactoryGetSolutionTimeout = 15f;
     private const string ArScenePath = "Assets/Scenes/Demo Scenes/AR.unity";
     private const string ArLoadingScenePath = "Assets/Scenes/Demo Scenes/ARLoading.unity";
     private const string KitchenScenePath = "Assets/Scenes/Old Scenes/KitchenFR3.unity";
@@ -424,18 +425,23 @@ public static class MtcSceneBuilder
     // Travel of each sliding door (metres); the outer edges stop just inside the enclosure's side panels.
     private const float DoorTravel = 0.48f;
     // Door panel: 300 x DoorPanelHeight document units at the menu prefab's 0.2 scale (1 unit = 2 mm).
-    private const float DoorPanelHeight = 440f;
+    private const float DoorPanelHeight = 500f;
+    private const string StrayDebugGrabName = "DebugPanelGrab";
 
-    // Cell geometry (world metres; floor y = 0, visitor at the origin facing +z, fr3 base at
+    // Cell geometry (world metres; floor y = 0, user at the origin facing +z, fr3 base at
     // (Fr3BaseX, 0.75, 1) on RobotPedestal). The VF-2 stands behind the robot facing it with its
     // door front at DoorPlaneZ, 3 cm behind the pedestal's front face; the arm reaches over the
     // door sill (0.62 m above the floor) onto the machine table (0.85 m). The robot stands off to
     // the conveyor side of the door opening (-0.27..0.67) so the area directly in front of the
-    // doors stays clear for the visitor to see and reach the fixture; the arm enters the opening
+    // doors stays clear for the user to see and reach the fixture; the arm enters the opening
     // diagonally (the trunnion platter is in the opening's left part, x -0.17; MoveIt checks the
-    // door meshes). Raw stock is stacked on a stand in front of the robot on the visitor's side,
+    // door meshes). Raw stock is stacked on a stand in front of the robot on the user's side,
     // the conveyor runs from the robot's left to the parts table.
-    private const float Fr3BaseX = -0.4f;
+    // 2026-10-21: moved from -0.4 (beside the opening) to 0 after planning against MoveIt: from
+    // beside the opening the ready pose sits inside the wall and the forearm cannot hold a
+    // vertical hand over a vise 24 cm behind the door plane without crossing the opening's edge
+    // (Docs/mtc_diagnostics/VisePlanProbe.cs grid). At x = 0 both billet orientations plan.
+    private const float Fr3BaseX = 0f;
     private static readonly Vector3 PedestalSize = new Vector3(0.6f, 0.75f, 0.44f);
     // Pedestal centre is 3 cm in front of the robot base so its back face clears the voxel-thickened
     // front-panel collision mesh (which reaches 3 cm in front of the enclosure's lower panel).
@@ -475,7 +481,13 @@ public static class MtcSceneBuilder
     private const float ConveyorZ = 0.70f, ConveyorStartX = Fr3BaseX - 0.40f, ConveyorEndX = Fr3BaseX - 2.85f, ConveyorTopY = 0.72f, ConveyorWidth = 0.3f;
     private static readonly Vector3 PartsTableCentre = new Vector3(Fr3BaseX - 3.7f, 0.715f, 0.8f);
     private static readonly Vector3 TableSize = new Vector3(1.6f, 0.06f, 0.9f);
-    private static readonly Vector3 DoorMenuPosition = new Vector3(1.4f, 1.3f, 1.0f);
+    // Panels are placed by where their face should be (world centre of the panel, see
+    // PlaceMenuPanel), in an arc in front of the user's spot at the origin: the two working
+    // panels at 45 degrees either side, eye height, with the robot, the stock stand and the
+    // sightline to the vise clear between them; the placement panel further out on the left
+    // since it is only needed at the start.
+    private static readonly Vector3 DoorMenuPosition = new Vector3(-0.95f, 1.45f, 0.95f);
+    private static readonly Vector3 MtcMenuPosition = new Vector3(0.95f, 1.5f, 0.95f);
     private static readonly Vector3 XrDashboardPosition = new Vector3(-2.2f, 1.39f, 2.4f);
     // Parts rest this far above their support. MTC's "attach object" stage collision-checks the
     // scene with the part already attached to the hand, one stage before it allows object/table
@@ -483,7 +495,7 @@ public static class MtcSceneBuilder
     private const float RestGap = 0.005f;
     private const float Fr3Reach = 0.855f;
 
-    // Robot placement phase (RobotPlacementController): the visitor drags a ring on the floor
+    // Robot placement phase (RobotPlacementController): the user drags a ring on the floor
     // around the pedestal, the robot + pedestal follow it, reach markers show whether the
     // anchors are solvable, Confirm opens the pick-and-place UI. The handle's pivot is the
     // robot axis on the floor; the ring is offset so it circles the pedestal.
@@ -502,7 +514,7 @@ public static class MtcSceneBuilder
     // World x/z the handle may be moved within; z max keeps the pedestal front in front of the door plane.
     private static readonly Vector2 PlacementBoundsMin = new Vector2(-1.2f, -0.2f);
     private static readonly Vector2 PlacementBoundsMax = new Vector2(1.2f, 1.03f);
-    private static readonly Vector3 PlacementMenuPosition = new Vector3(-1.3f, 1.3f, 0.3f);
+    private static readonly Vector3 PlacementMenuPosition = new Vector3(-1.45f, 1.4f, 0.5f);
     // Where the robot stands when the placement phase opens: front-right of the cell, turned away
     // from the machine, ~1.1 m from the ideal spot. The pedestal must clear the stock stand and the
     // conveyor, and the pose must lie inside the bounds (the validator checks both).
@@ -576,7 +588,7 @@ public static class MtcSceneBuilder
         var machine = (GameObject)PrefabUtility.InstantiatePrefab(prefab, scene);
         machine.name = MachineName;
         machine.transform.SetParent(machines.transform, false);
-        // The prefab's front (Blender -Y) is local +z; turn it toward the visitor.
+        // The prefab's front (Blender -Y) is local +z; turn it toward the user.
         machine.transform.SetPositionAndRotation(Vector3.zero, Quaternion.Euler(0f, 180f, 0f));
         var doors = Require<Factory.MachineDoors>(machine);
         if (doors.doors == null || doors.doors.Length != 2 || doors.doors.Any(d => d == null))
@@ -585,7 +597,7 @@ public static class MtcSceneBuilder
         doorBounds.Encapsulate(RendererBounds(doors.doors[1].transform));
         Bounds bodyBounds = RendererBounds(machine.transform);
         if (doorBounds.center.z > bodyBounds.center.z)
-            throw new InvalidOperationException("VF-2 doors are not on the visitor side; check the prefab's front axis");
+            throw new InvalidOperationException("VF-2 doors are not on the user side; check the prefab's front axis");
         machine.transform.position = new Vector3(MachineXOffset - doorBounds.center.x, 0f, DoorPlaneZ - doorBounds.min.z);
         foreach (CollisionObjectPublisher pub in machine.GetComponentsInChildren<CollisionObjectPublisher>(true))
         {
@@ -692,9 +704,16 @@ public static class MtcSceneBuilder
         Line($"ReleasedPartGravity on the station (listener {(gravity.attachedListener != null ? "wired" : "found at runtime")}, player {(gravity.trajectoryPlayer != null ? "wired" : "found at runtime")})");
 
         GameObject doorMenu = BuildDoorMenu(scene, doors, vise, gravity);
-        Line($"Door menu '{doorMenu.name}' at {doorMenu.transform.position}");
+        Line($"Machine panel '{doorMenu.name}' centred at {DoorMenuPosition} (root {doorMenu.transform.position})");
+        UIDocument mtcDoc = c.mtcMenu.GetComponentInChildren<UIDocument>(true)
+                            ?? throw new InvalidOperationException("MTCMenu has no UIDocument");
+        PlaceMenuPanel(c.mtcMenu, mtcDoc, MtcMenuPosition);
+        Line($"MTC dashboard '{c.mtcMenu.name}' centred at {MtcMenuPosition} (root {c.mtcMenu.transform.position})");
 
         SetFloat(c.client, "placeHeightOffsetMeters", FactoryPlaceHeightOffset);
+        // Solutions into the machine carry 19 steps with scene diffs; the default 5 s /get_solution
+        // timeout showed "SOLUTION UNAVAILABLE" on the dashboard while the response was still coming.
+        SetFloat(c.client, "getSolutionTimeoutSeconds", FactoryGetSolutionTimeout);
 
         // The reachability volume rides on the robot base (its meshes hang under BaseTransform);
         // the placement phase shows it with the baked fr3 map while the robot is moved.
@@ -710,10 +729,28 @@ public static class MtcSceneBuilder
         SetBool(visualizer, "useRosMap", true);
         Line($"{ReachVolumeName} active on the fr3 with map '{reachProfile.reachabilityMap.name}'");
 
+        // The VR joint-jog spheres at every robot joint are not part of this demo (the user does
+        // not jog joints here); the end-effector handle stays for the ray-drag interaction.
+        var robotInteraction = c.ikManagerGo.GetComponent<Quest3RobotInteractionController>();
+        if (robotInteraction != null)
+        {
+            SetBool(robotInteraction, "createJointHandles", false);
+            Line("Joint jog handles disabled on the robot interaction controller");
+        }
+
         var reachTargets = new List<Transform> { fixture.Find("DropAnchor") };
         reachTargets.AddRange(stockSlots);
         reachTargets.Add(conveyor.Find("DropAnchor"));
         BuildPlacementStage(scene, c, pedestal, visualizer, doorMenu, reachTargets);
+        BuildMachineDesktopInput(scene, station, vise, doors, gravity, doorMenu);
+
+        // A leftover XRI "UGUI Grab UI" sample instance floated at 2 m over the user's spot with
+        // nothing on it but its grab capsule (2026-10-22); the demo has no use for it.
+        foreach (GameObject stray in scene.GetRootGameObjects().Where(r => r.name == StrayDebugGrabName).ToArray())
+        {
+            UnityEngine.Object.DestroyImmediate(stray);
+            Line($"removed stray '{StrayDebugGrabName}' root");
+        }
 
         // The XR dashboard used to float where the machine now stands; park it beside the machine.
         GameObject dashboardRoot = scene.GetRootGameObjects().FirstOrDefault(r => r.name == "XRDashboard");
@@ -776,7 +813,7 @@ public static class MtcSceneBuilder
         var jaws = new Factory.SlidingPart[2];
         for (int i = 0; i < 2; i++)
         {
-            float side = i == 0 ? -1f : 1f; // -z faces the visitor
+            float side = i == 0 ? -1f : 1f; // -z faces the user
             float faceZ = baseCentre.z + side * ViseOpenGap * 0.5f;
             Transform jaw = Group(i == 0 ? "JawFront" : "JawBack", fixture, new Vector3(baseCentre.x, baseTop, faceZ));
             Box("Body", jaw, new Vector3(baseCentre.x, baseTop + ViseJawSize.y * 0.5f, faceZ + side * (ViseJawPlateThickness + ViseJawSize.z * 0.5f)), ViseJawSize, body);
@@ -817,7 +854,7 @@ public static class MtcSceneBuilder
 
     // A world-space panel on an instance of the planning-menu prefab (the recipe the MTCMenu
     // dashboard uses): the document swapped for 'uxmlPath', the inherited planning UI disabled,
-    // the poke collider sized to the panel, the whole thing turned toward the visitor's spot.
+    // the poke collider sized to the panel, the whole thing turned toward the user's spot.
     private static (GameObject menu, UIDocument doc) BuildPanelMenu(Scene scene, string name, string uxmlPath, float heightUnits, Vector3 position)
     {
         GameObject menuPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(PlanningMenuPrefabPath)
@@ -845,10 +882,24 @@ public static class MtcSceneBuilder
             collider.center = new Vector3(1.5f, -heightUnits / 200f, 0f);
             collider.size = new Vector3(3f, heightUnits / 100f, 0.4f);
         }
-        // A world-space document faces its local -z; turn that toward the visitor's spot.
-        Vector3 toVisitor = new Vector3(-position.x, 0f, -position.z).normalized;
-        menu.transform.SetPositionAndRotation(position, Quaternion.LookRotation(-toVisitor, Vector3.up));
+        PlaceMenuPanel(menu, doc, position);
         return (menu, doc);
+    }
+
+    // Faces the panel toward the user's spot (a world-space document faces its local -z) and
+    // shifts the root so the panel's centre (its poke collider, sized to the panel) sits at
+    // panelCentre; the root's own pivot is the grab handle below the panel.
+    private static void PlaceMenuPanel(GameObject menu, UIDocument doc, Vector3 panelCentre)
+    {
+        Vector3 toUser = new Vector3(-panelCentre.x, 0f, -panelCentre.z).normalized;
+        menu.transform.SetPositionAndRotation(panelCentre, Quaternion.LookRotation(-toUser, Vector3.up));
+        menu.transform.position += panelCentre - PanelCentre(doc);
+    }
+
+    private static Vector3 PanelCentre(UIDocument doc)
+    {
+        var collider = doc != null ? doc.GetComponent<BoxCollider>() : null;
+        return collider != null ? doc.transform.TransformPoint(collider.center) : doc.transform.position;
     }
 
     // ------------------------------------------------------------------ robot placement
@@ -980,6 +1031,39 @@ public static class MtcSceneBuilder
             mouse.lookAt = new Vector3(Fr3BaseX * 0.5f, 0.8f, 1f);
             Line($"{DesktopRigName} added (editor-only mouse drag of the handle)");
         }
+    }
+
+    // Keyboard stand-in for the machine panel and the robot's release (editor only; inert with a
+    // headset): G drops the selected part, C/V clamp/release, O doors, 1/2/3 camera views on the
+    // user's spot, the vise and the panel. Lives on the station next to the vise it drives.
+    private static void BuildMachineDesktopInput(Scene scene, GameObject station, Factory.MachineVise vise, Factory.MachineDoors doors,
+                                                 Factory.ReleasedPartGravity gravity, GameObject doorMenu)
+    {
+        var input = station.AddComponent<Factory.MachineDesktopInput>();
+        SetRef(input, "vise", vise);
+        SetRef(input, "doors", doors);
+        SetRef(input, "gravity", gravity);
+        GameObject rig = scene.GetRootGameObjects().FirstOrDefault(r => r.name == DesktopRigName);
+        SetRef(input, "mouse", rig != null ? rig.GetComponent<DesktopMouseInteractor>() : null);
+        input.editorOnly = true;
+        input.onlyWithoutHeadset = true;
+        Vector3 window = vise.jawWindow.position;
+        Vector3 panel = PanelCentre(doorMenu.GetComponentInChildren<UIDocument>(true));
+        // The document faces its local -z; stand in front of it.
+        Vector3 inFront = panel + doorMenu.transform.forward * -1.1f;
+        var positions = new[] { new Vector3(0f, 1.6f, 0f), window + new Vector3(0.35f, 0.45f, -0.55f), inFront };
+        var targets = new[] { window, window, panel };
+        var so = new SerializedObject(input);
+        SerializedProperty p = so.FindProperty("viewPositions"), t = so.FindProperty("viewTargets");
+        p.arraySize = positions.Length;
+        t.arraySize = targets.Length;
+        for (int i = 0; i < positions.Length; i++)
+        {
+            p.GetArrayElementAtIndex(i).vector3Value = positions[i];
+            t.GetArrayElementAtIndex(i).vector3Value = targets[i];
+        }
+        so.ApplyModifiedPropertiesWithoutUndo();
+        Line($"MachineDesktopInput on the station ({positions.Length} camera views, mouse rig {(rig != null ? "wired" : "found at runtime")})");
     }
 
     // Flat annulus on the floor: top face plus outer and inner walls. Created once as an asset.
@@ -1333,6 +1417,7 @@ public static class MtcSceneBuilder
         Check(recorder != null && RefSet(recorder, "selectionManager") && RefSet(recorder, "worldOrigin") && RefSet(recorder, "pickPlaceAction"), "PickPlaceTaskRecorder wired");
         var client = FindInScene<PickPlaceClient>(scene);
         Check(client != null && Mathf.Abs(new SerializedObject(client).FindProperty("placeHeightOffsetMeters").floatValue - FactoryPlaceHeightOffset) < 1e-4f, "PickPlaceClient place height offset set");
+        Check(client != null && Mathf.Abs(new SerializedObject(client).FindProperty("getSolutionTimeoutSeconds").floatValue - FactoryGetSolutionTimeout) < 1e-4f, "PickPlaceClient /get_solution timeout raised for the machine cell's long solutions");
         var dashboard = FindInScene<MTCDashboardPanel>(scene);
         Check(dashboard != null && RefSet(dashboard, "pickPlaceRecorder") && RefSet(dashboard, "pickPlaceAction") && RefSet(dashboard, "trajectoryPlayer"), "MTCDashboardPanel wired");
         var player = FindInScene<MTCTrajectoryPlayer>(scene);
@@ -1369,7 +1454,7 @@ public static class MtcSceneBuilder
             doorsClosed = l; doorsClosed.Encapsulate(r);
             Check(Mathf.Abs(doorsClosed.min.z - DoorPlaneZ) < 0.01f, $"door front at z = {DoorPlaneZ} (is {doorsClosed.min.z:F3})");
             Check(Mathf.Abs(doorsClosed.center.x - MachineXOffset) < 0.02f, $"door opening centre at x = {MachineXOffset} (is {doorsClosed.center.x:F3})");
-            Check(doorsClosed.center.z < machineBounds.center.z, "doors are on the visitor side of the machine");
+            Check(doorsClosed.center.z < machineBounds.center.z, "doors are on the user side of the machine");
             // Pose the doors open in memory (never saved) to measure the opening.
             foreach (Factory.SlidingPart d in doors.doors) d.Set(1f);
             Bounds lo = RendererBounds(doors.doors[0].transform), ro = RendererBounds(doors.doors[1].transform);
@@ -1430,9 +1515,8 @@ public static class MtcSceneBuilder
         Check(doorDoc != null && doorDoc.visualTreeAsset != null && doorDoc.visualTreeAsset.name == "MachineDoorPanel", "door menu document shows MachineDoorPanel.uxml");
         if (doorMenu != null && machineT != null)
         {
-            Vector3 frontRight = new Vector3(machineBounds.max.x, doorMenu.transform.position.y, DoorPlaneZ);
-            float d = Vector3.Distance(doorMenu.transform.position, frontRight);
-            Check(d < 0.8f && doorMenu.transform.position.z < DoorPlaneZ, $"door menu just outside the machine's front corner ({d:F2} m)");
+            // The machine panel sits in the user's panel arc (checked with the other panels below), in front of the door plane.
+            Check(doorMenu.transform.position.z < DoorPlaneZ, "machine panel in front of the door plane");
         }
         var planningUis = doorMenu != null ? doorMenu.GetComponentsInChildren<MoveItPlanningRequestMenuUI>(true) : new MoveItPlanningRequestMenuUI[0];
         Check(planningUis.All(u => !u.enabled), "door menu's inherited planning UI is disabled");
@@ -1531,6 +1615,7 @@ public static class MtcSceneBuilder
         Check(doorPanel != null && RefIs(doorPanel, "vise", vise) && RefIs(doorPanel, "gravity", gravity), "machine panel drives the vise and shows drops");
         GameObject floor = R("Floor");
         Check(floor != null && floor.GetComponentInChildren<Collider>(true) != null, "floor has a collider to catch dropped parts");
+        Check(R(StrayDebugGrabName) == null, $"no stray '{StrayDebugGrabName}' root (its grab capsule floated over the user's spot)");
 
         // Reach: every pick/place anchor between 0.25 and 0.8 x reach horizontally from the base.
         Vector3 basePos = baseTransform != null ? baseTransform.position : fr3.transform.position;
@@ -1546,11 +1631,13 @@ public static class MtcSceneBuilder
         Transform fixtureAnchor = anchors.FirstOrDefault(a => a.name == "DropAnchor" && fixture != null && a.IsChildOf(fixture));
         if (fixtureAnchor != null)
         {
-            // Sightline from the visitor's eye (origin, 1.6 m) to the fixture, sampled at the robot's depth.
+            // Sightline from the user's eye (origin, 1.6 m) to the fixture, sampled at the robot's depth.
             Vector3 eye = new Vector3(0f, 1.6f, 0f);
             float t = (basePos.z - eye.z) / (fixtureAnchor.position.z - eye.z);
             Vector3 sight = Vector3.Lerp(eye, fixtureAnchor.position, t);
-            Check(Mathf.Abs(sight.x - basePos.x) > 0.25f, $"robot axis is {Mathf.Abs(sight.x - basePos.x):F2} m off the visitor's sightline to the fixture (> 0.25)");
+            // Relaxed from 0.25 to 0.1 on 2026-10-21: the only spot MoveIt can load the vise from is in
+            // front of the opening; the user sees the vise past the robot's side.
+            Check(Mathf.Abs(sight.x - basePos.x) > 0.1f, $"robot axis is {Mathf.Abs(sight.x - basePos.x):F2} m off the user's sightline to the fixture (> 0.1)");
         }
         if (table != null)
         {
@@ -1571,8 +1658,10 @@ public static class MtcSceneBuilder
             // off to the side; door-frame clearance itself is MoveIt's job (the door meshes are
             // collision objects). Keep the base near enough that the diagonal stays shallow.
             Check(openingWidth > 0f && basePos.x > leftEdge - 0.3f && basePos.x < rightEdge + 0.3f, $"robot axis within 0.3 m of the door opening ({leftEdge:F2}..{rightEdge:F2})");
-            Check(openingWidth > 0f && (basePos.x < leftEdge + 0.1f || basePos.x > rightEdge - 0.1f),
-                  $"robot axis ({basePos.x:F2}) leaves the area in front of the door opening clear");
+            // MoveIt needs the shoulder inside the opening's span: from beside it the forearm crosses
+            // the door frame on every place pose (VisePlanProbe grid, 2026-10-21).
+            Check(openingWidth > 0f && basePos.x > leftEdge + 0.1f && basePos.x < rightEdge - 0.1f,
+                  $"robot axis ({basePos.x:F2}) is inside the door opening's span ({leftEdge:F2}..{rightEdge:F2})");
         }
         // The machine's bounding box reaches 0.5 m in front of the doors (chip-conveyor shelf,
         // pendant), so props are tested against the machine's collision-mesh vertices instead.
@@ -1716,9 +1805,28 @@ public static class MtcSceneBuilder
         var placementDoc = placementMenu != null ? placementMenu.GetComponentInChildren<UIDocument>(true) : null;
         Check(placementDoc != null && placementDoc.visualTreeAsset != null && placementDoc.visualTreeAsset.name == "RobotPlacementPanel", "placement menu document shows RobotPlacementPanel.uxml");
         Check(placementMenu != null && placementMenu.GetComponentsInChildren<MoveItPlanningRequestMenuUI>(true).All(u => !u.enabled), "placement menu's inherited planning UI is disabled");
-        Check(placementMenu != null && placementMenu.transform.position.z < DoorPlaneZ && placementMenu.transform.position.x < 0f, "placement menu on the visitor's left, in front of the machine");
+        Check(placementMenu != null && placementMenu.transform.position.z < DoorPlaneZ && placementMenu.transform.position.x < 0f, "placement menu on the user's left, in front of the machine");
         var desktopRig = R(DesktopRigName);
         Check(desktopRig != null && desktopRig.GetComponent<DesktopMouseInteractor>() is DesktopMouseInteractor dm && dm.editorOnly && dm.onlyWithoutHeadset, "desktop mouse rig present and editor-only");
+        // Panels: faces at eye height in an arc in front of the user's spot, clear of the sightline to the vise.
+        foreach ((string name, GameObject menuGo, Vector3 wanted) in new[] { ("placement", placementMenu, PlacementMenuPosition), ("machine", doorMenu, DoorMenuPosition), ("MTC dashboard", R("MTCMenu"), MtcMenuPosition) })
+        {
+            UIDocument menuDoc = menuGo != null ? menuGo.GetComponentInChildren<UIDocument>(true) : null;
+            Vector3 centre = PanelCentre(menuDoc);
+            Check(menuDoc != null && Vector3.Distance(centre, wanted) < 1e-3f, $"{name} panel face centred at {wanted}");
+            Check(menuDoc != null && centre.y > 1.2f && centre.y < 1.7f && Mathf.Abs(centre.x) > 0.6f, $"{name} panel at eye height, off the sightline to the vise");
+            Vector3 toUser = new Vector3(-centre.x, 0f, -centre.z).normalized;
+            Check(menuGo != null && Vector3.Dot(-menuGo.transform.forward, toUser) > 0.99f, $"{name} panel faces the user's spot");
+        }
+        GameObject ikManagerRoot = R("Robot IK Manager");
+        var jogController = ikManagerRoot != null ? ikManagerRoot.GetComponent<Quest3RobotInteractionController>() : null;
+        Check(jogController != null && !new SerializedObject(jogController).FindProperty("createJointHandles").boolValue, "joint jog spheres disabled on the robot");
+        var machineKeys = station.GetComponent<Factory.MachineDesktopInput>();
+        Check(machineKeys != null && machineKeys.editorOnly && machineKeys.onlyWithoutHeadset
+              && RefIs(machineKeys, "vise", vise) && RefIs(machineKeys, "doors", doors) && RefIs(machineKeys, "gravity", gravity)
+              && desktopRig != null && RefIs(machineKeys, "mouse", desktopRig.GetComponent<DesktopMouseInteractor>()),
+              "editor keyboard input for the vise, doors and robot release wired");
+        Check(machineKeys != null && machineKeys.ViewCount == 3, "machine desktop input has three camera views");
 
         Debug.Log(Log.ToString());
         return failures;

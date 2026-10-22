@@ -59,6 +59,9 @@ namespace Erupt.Ros.Tests
             attachListener = host.AddComponent<AttachedCollisionObjectListener>();
             SetPrivate(attachListener, "sceneListener", scene);
             SetPrivate(attachListener, "ikController", ik);
+            // The fixtures put the cube wherever; the listener's sanity limit on the attach jump
+            // (a real hand closes on the object where it is) is not what these tests are about.
+            SetPrivate(attachListener, "maxAttachJump", 10f);
             player = host.AddComponent<MTCTrajectoryPlayer>();
             SetPrivate(player, "ikController", ik);
             SetPrivate(player, "sceneListener", scene);

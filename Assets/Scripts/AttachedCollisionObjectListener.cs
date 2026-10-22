@@ -38,6 +38,18 @@ public class AttachedCollisionObjectListener : MonoBehaviour
     [Tooltip("Seconds to wait after a detach for the re-ADD carrying the place pose before " +
              "letting the object publish again anyway.")]
     [SerializeField] private float resumeTimeout = 2f;
+    [SerializeField, Tooltip("Log attach notices that only restate an existing carry.")]
+    private bool verboseAttachLog = false;
+    [SerializeField, Tooltip("An attach notice whose link-relative pose would move the object further than this (metres) " +
+                             "does not match where the Unity hand is; the object stays put until the hand gets there.")]
+    private float maxAttachJump = 0.25f;
+    [SerializeField, Tooltip("How long (seconds) an inconsistent attach notice is re-checked against the moving hand before it is given up.")]
+    private float pendingAttachSeconds = 3f;
+
+    /// <summary>Brings the mirrored robot up to date before an attach is placed (set by MTCTrajectoryPlayer).</summary>
+    [System.NonSerialized] public System.Action syncRobot;
+    // Inconsistent attach notices, re-tried each frame until the hand reaches the object: id -> (notice, deadline)
+    private readonly Dictionary<string, (AttachedCollisionObjectMsg msg, float deadline)> pendingAttach = new();
 
     [Tooltip("Same wait after a detach applied from the executing solution's step feedback " +
              "(see ApplyExpected): the watcher's own detach and re-ADD are still on their way " +
@@ -49,6 +61,7 @@ public class AttachedCollisionObjectListener : MonoBehaviour
     {
         public GameObject go;
         public bool reparented;
+        public bool placedFromMessage; // the link-relative pose came from a trusted notice
         public Transform originalParent;
         public Vector3 originalLocalScale;
         public readonly List<(Rigidbody rb, bool wasKinematic)> bodies = new();
@@ -98,6 +111,19 @@ public class AttachedCollisionObjectListener : MonoBehaviour
 
     void Update()
     {
+        if (pendingAttach.Count > 0)
+        {
+            foreach (var kv in new List<KeyValuePair<string, (AttachedCollisionObjectMsg msg, float deadline)>>(pendingAttach))
+            {
+                if (Time.time > kv.Value.deadline)
+                {
+                    pendingAttach.Remove(kv.Key);
+                    Debug.LogWarning($"[ACO Listener] The hand never came to '{kv.Key}' within {pendingAttachSeconds:0.#} s of its attach notice; it stays where it is.");
+                    continue;
+                }
+                Attach(kv.Value.msg, retrying: true);
+            }
+        }
         if (pendingResume.Count == 0) return;
 
         expired.Clear();
@@ -156,10 +182,12 @@ public class AttachedCollisionObjectListener : MonoBehaviour
 
     // Idempotent: a repeated attach (new link or relative pose) re-places the object and
     // keeps the state saved by the first one.
-    void Attach(AttachedCollisionObjectMsg msg)
+    void Attach(AttachedCollisionObjectMsg msg, bool retrying = false)
     {
         if (sceneListener == null) return;
         string id = msg.@object.id;
+        if (!retrying) pendingAttach.Remove(id); // a fresh notice supersedes a pending one
+        syncRobot?.Invoke();
 
         if (!sceneListener.TryGetObject(id, out var go))
         {
@@ -194,16 +222,76 @@ public class AttachedCollisionObjectListener : MonoBehaviour
             return;
         }
 
-        Vector3 jumpFrom = go.transform.position;
-        AttachedObjectPlacement.Place(go.transform, link, msg.@object.pose);
+        // A carry does not change the grasp: once the object rides a link, later attach notices
+        // for the same link (every executed step's scene diff, the watcher's own echoes) only
+        // restate it, with link-relative poses that differ by a few centimetres between sources
+        // and made the part blink in the hand. Keep the first placement; re-place only when the
+        // object moves to another link.
+        if (state.reparented && go.transform.parent == link && state.placedFromMessage)
+        {
+            if (verboseAttachLog) Debug.Log($"[ACO Listener] '{id}' already rides '{link.name}'; attach notice restates it.");
+            return;
+        }
+
+        // The hand closed on the object where it is, so the message's link-relative pose must
+        // land it close by. A notice whose pose would fling it far from where it stands (seen on
+        // the first notice of a second carry: up to 0.8 m) is in some other frame; the object
+        // then rides the link from its current world pose until a consistent notice arrives.
+        Vector3 worldPos = go.transform.position;
+        Quaternion worldRot = go.transform.rotation;
+        Transform parentBefore = go.transform.parent;
+        string frame = msg.@object.header?.frame_id ?? "";
+        float jump;
+        if (frame == "world" && worldOrigin != null)
+        {
+            // A notice may restate a re-attached object in the planning frame (its header stays
+            // "world" after a put-down) rather than in the link frame: place it in the world, then ride.
+            Vector3 p = worldOrigin.transform.TransformPoint(RosUnityConversion.RosToUnityPosition(msg.@object.pose.position));
+            Quaternion r = worldOrigin.transform.rotation * RosUnityConversion.RosToUnityQuaternion(msg.@object.pose.orientation);
+            go.transform.SetPositionAndRotation(p, r);
+            go.transform.SetParent(link, worldPositionStays: true);
+            jump = Vector3.Distance(worldPos, p);
+        }
+        else
+        {
+            AttachedObjectPlacement.Place(go.transform, link, msg.@object.pose);
+            jump = Vector3.Distance(worldPos, go.transform.position);
+        }
+        bool trusted = jump <= maxAttachJump;
+        var pm = msg.@object.pose?.position;
+        if (!trusted)
+        {
+            // The hand is not where this notice says the object is (an early or mis-framed notice):
+            // the object stays put, where the user sees it, until a notice consistent with its
+            // position arrives. It is still locked and silent, as MoveIt has it attached.
+            go.transform.SetParent(parentBefore, worldPositionStays: true);
+            go.transform.SetPositionAndRotation(worldPos, worldRot);
+            go.transform.localScale = state.originalLocalScale;
+            if (!retrying)
+            {
+                Debug.LogWarning($"[ACO Listener] Attach notice for '{id}' on '{link.name}' (frame '{frame}', pose ({pm?.x:F3},{pm?.y:F3},{pm?.z:F3})) " +
+                                 $"would move it {jump * 1000f:F0} mm; it stays where it is until the hand gets there.");
+                pendingAttach[id] = (msg, Time.time + pendingAttachSeconds);
+            }
+            state.reparented = false;
+            state.placedFromMessage = false;
+            return;
+        }
+        if (retrying)
+        {
+            pendingAttach.Remove(id);
+            Debug.Log($"[ACO Listener] The hand reached '{id}' {jump * 1000f:F0} mm from its notice's pose; riding now.");
+        }
+        Debug.Log($"[ACO Listener] Attached '{id}' to link '{link.name}' (frame '{frame}', pose ({pm?.x:F3},{pm?.y:F3},{pm?.z:F3}), moved {jump * 1000f:F1} mm onto the notice's pose).");
         state.reparented = true;
-        Debug.Log($"[ACO Listener] Attached '{id}' to link '{link.name}' (moved {Vector3.Distance(jumpFrom, go.transform.position) * 1000f:F1} mm onto the link-relative pose).");
+        state.placedFromMessage = true;
     }
 
     // expected: the detach comes from the executing solution (ApplyExpected), not the watcher.
     void Detach(string id, bool expected)
     {
         if (sceneListener == null) return;
+        pendingAttach.Remove(id);
         bool wasAttached = sceneListener.attachedIds.Remove(id);
 
         if (!attached.TryGetValue(id, out var state))
@@ -274,6 +362,7 @@ public class AttachedCollisionObjectListener : MonoBehaviour
 
         attached.Clear();
         pendingResume.Clear();
+        pendingAttach.Clear();
         expectedDetached.Clear();
         if (ikController != null) ikController.ClearLinkCache();
     }

@@ -209,6 +209,43 @@ namespace Erupt.Ros.Tests
             Assert.AreEqual(OpenGap * 0.5f, vise.CurrentHalfGap, 1e-4f);
         }
 
+        // A real cell interlocks the clamp on "robot clear": with the gripper still between the
+        // jaws (e.g. a retreat that never happened) the jaws must not close on it.
+        [UnityTest]
+        public IEnumerator GripperInTheJaws_CannotBeClamped_UntilItLeaves()
+        {
+            part = Billet(0f, 0f, 0f);
+            // Beside the billet (half width 0.04) but inside the jaw window (half width 0.08). An
+            // articulation root ignores transform writes (TeleportRoot moves it), so place it first.
+            var gripper = new GameObject("fr3_hand");
+            gripper.transform.position = vise.jawWindow.position + new Vector3(0.062f, 0.05f, 0f);
+            var finger = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            finger.transform.SetParent(gripper.transform, false);
+            finger.transform.localScale = new Vector3(0.02f, 0.04f, 0.02f);
+            var body = gripper.AddComponent<ArticulationBody>();
+            body.immovable = true; // a free articulation root would fall and be shoved by the billet
+            body.useGravity = false;
+            // A new articulation body joins the physics scene on the next simulation step.
+            yield return new WaitForFixedUpdate();
+            yield return null;
+            vise.ScanPresence();
+
+            Assert.AreSame(part, vise.PresentPart);
+            Assert.IsTrue(vise.RobotInJaws, "a robot link inside the window is detected");
+            Assert.IsFalse(vise.CanClamp);
+            StringAssert.Contains("robot not clear", vise.Describe());
+            vise.Clamp();
+            yield return null;
+            Assert.AreEqual(MachineVise.ViseState.Open, vise.State, "the jaws did not close on the gripper");
+
+            body.TeleportRoot(gripper.transform.position + Vector3.up * 0.5f, gripper.transform.rotation);
+            yield return new WaitForFixedUpdate();
+            vise.ScanPresence();
+            Assert.IsFalse(vise.RobotInJaws);
+            Assert.IsTrue(vise.CanClamp, "clamp allowed once the robot is clear");
+            Object.DestroyImmediate(gripper);
+        }
+
         [UnityTest]
         public IEnumerator PartStillInTheGripper_CannotBeClamped()
         {

@@ -81,9 +81,11 @@ namespace Factory
         /// <summary>The part currently between the jaw faces (closest to the centre), or null.</summary>
         public GameObject PresentPart { get; private set; }
         public bool PresentPartHeldByRobot { get; private set; }
+        /// <summary>A robot link (gripper) is inside the jaw window: a real cell interlocks the clamp on "robot clear".</summary>
+        public bool RobotInJaws { get; private set; }
         public bool IsMoving => State == ViseState.Closing || State == ViseState.Opening;
         public bool IsClosed => State == ViseState.Clamped || State == ViseState.ClampedPoor || State == ViseState.Empty;
-        public bool CanClamp => State == ViseState.Open && !PresentPartHeldByRobot;
+        public bool CanClamp => State == ViseState.Open && !PresentPartHeldByRobot && !RobotInJaws;
         public bool CanRelease => IsClosed;
         /// <summary>Jaw face half-gap at the current jaw travel (metres).</summary>
         public float CurrentHalfGap => HalfGapAt(jaws != null && jaws.Length > 0 && jaws[0] != null ? jaws[0].openAmount : 0f);
@@ -119,10 +121,11 @@ namespace Factory
         /// <summary>Re-scan the jaw window now (the panel and tests call it after moving a part).</summary>
         public void ScanPresence()
         {
-            GameObject found = FindPartInWindow(out bool held);
-            bool changed = found != PresentPart || held != PresentPartHeldByRobot;
+            GameObject found = FindPartInWindow(out bool held, out bool robot);
+            bool changed = found != PresentPart || held != PresentPartHeldByRobot || robot != RobotInJaws;
             PresentPart = found;
             PresentPartHeldByRobot = held;
+            RobotInJaws = robot;
             if (changed)
             {
                 ApplyLamps();
@@ -130,9 +133,10 @@ namespace Factory
             }
         }
 
-        GameObject FindPartInWindow(out bool heldByRobot)
+        GameObject FindPartInWindow(out bool heldByRobot, out bool robotInJaws)
         {
             heldByRobot = false;
+            robotInJaws = false;
             if (jawWindow == null) return null;
             float half = Mathf.Max(0.01f, openGap * 0.5f);
             Vector3 extents = new Vector3(jawWidth * 0.5f, half, half);
@@ -144,6 +148,8 @@ namespace Factory
             foreach (Collider hit in hits)
             {
                 if (hit == null || hit.transform.IsChildOf(transform)) continue;
+                // Robot links are articulation bodies; parts and props are not.
+                if (hit.GetComponentInParent<ArticulationBody>() != null) { robotInJaws = true; continue; }
                 var pub = hit.GetComponentInParent<CollisionObjectPublisher>();
                 if (pub == null || pub == republishOnMove) continue;
                 if (pub.GetComponent<Rigidbody>() == null) continue; // static props are not parts
@@ -163,7 +169,7 @@ namespace Factory
         {
             if (!CanClamp) return;
             ScanPresence();
-            if (PresentPartHeldByRobot) return;
+            if (PresentPartHeldByRobot || RobotInJaws) return;
             if (motion != null) StopCoroutine(motion);
             motion = StartCoroutine(ClampRoutine(PresentPart));
         }
@@ -401,7 +407,7 @@ namespace Factory
 
         void ApplyLamps()
         {
-            Tint(presentLamp, PresentPart != null ? (PresentPartHeldByRobot ? lampWarn : lampGood) : lampOff);
+            Tint(presentLamp, PresentPart != null ? (PresentPartHeldByRobot || RobotInJaws ? lampWarn : lampGood) : (RobotInJaws ? lampWarn : lampOff));
             Color clamp = State switch
             {
                 ViseState.Clamped => lampGood,
@@ -429,6 +435,7 @@ namespace Factory
             switch (State)
             {
                 case ViseState.Open:
+                    if (RobotInJaws) return PresentPart == null ? "Jaws open, the gripper is in the jaws: robot not clear" : $"{PartId(PresentPart)} between the jaws, the gripper is still there: robot not clear";
                     if (PresentPart == null) return "Jaws open, nothing between them";
                     return PresentPartHeldByRobot ? $"{PartId(PresentPart)} between the jaws, still in the gripper" : $"{PartId(PresentPart)} between the jaws";
                 case ViseState.Closing: return "Clamping...";

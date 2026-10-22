@@ -20,7 +20,7 @@
                 <ui:Button text="Clamp" name="viseClampButton" selectable="false" focusable="false" class="mtc-button mtc-button--primary" style="flex-grow: 1; margin-top: 6px; margin-bottom: 6px; margin-right: 4px; height: 48px; font-size: 18px;" />
                 <ui:Button text="Release" name="viseReleaseButton" selectable="false" focusable="false" class="mtc-button mtc-button--danger" style="flex-grow: 1; margin-top: 6px; margin-bottom: 6px; margin-left: 4px; height: 48px; font-size: 18px;" />
             </ui:VisualElement>
-            <ui:Label text="Set the part down between the open jaws, then Clamp: the jaws centre it and square it to the plates. Release before an unload." class="mtc-empty" />
+            <ui:Label text="Set the part between the open jaws, then Clamp. Release before an unload." class="mtc-empty" />
         </ui:VisualElement>
     </ui:VisualElement>
 </ui:UXML>

@@ -76,7 +76,7 @@ public static class ViseProbe
             if (part == null) { Exit(2); return; }
             var pub = part.GetComponent<CollisionObjectPublisher>();
 
-            // --- hover release, skewed and off centre: the visitor's rough place pose -------------
+            // --- hover release, skewed and off centre: the user's rough place pose -------------
             Quaternion skew = Quaternion.AngleAxis(14f, Vector3.up); // 5 cm side across the jaws (the baked billets are yawed -90 with the base)
             Vector3 hover = window.position + new Vector3(0.012f, 0.03f + 0.045f, 0.015f);
             part.transform.SetPositionAndRotation(hover, skew);
@@ -90,8 +90,17 @@ public static class ViseProbe
                 if (!c.transform.IsChildOf(vise.transform) && c.gameObject != part)
                     Log($"collider in the jaw window: {TPath(c.transform)} ({c.GetType().Name}, trigger {c.isTrigger}, bounds {c.bounds.min} .. {c.bounds.max})");
 
+            // The desktop stand-in: select the part (as a mouse click would) and press G.
+            var keys = UnityEngine.Object.FindFirstObjectByType<Factory.MachineDesktopInput>();
+            Check(keys != null && keys.Vise == vise && keys.Gravity == gravity, "MachineDesktopInput wired to the vise and gravity");
+            Check(keys != null && keys.JumpToView(1), "camera view 2 (vise) jumps");
             bool wasPaused = pub.pausePublishing;
-            gravity.Drop(part);
+            if (keys != null && SelectionManager.Instance != null)
+            {
+                SelectionManager.Instance.SetSelectedObject(part);
+                Check(keys.DropSelected(), "G drops the selected part");
+            }
+            else gravity.Drop(part);
             Check(gravity.IsSettling(part) && !part.GetComponent<Rigidbody>().isKinematic, "released part is a dynamic body");
             float t0 = Time.time;
             while (gravity.IsSettling(part) && Time.time - t0 < 6f) await Task.Delay(50);

@@ -240,6 +240,7 @@ public class CollisionObjectsListenerSimple : MonoBehaviour
                 // Post-detach re-add: take the place pose, keep the Unity-owned geometry.
                 ApplyWorldPose(unityOwnedObject.transform, co.pose);
                 MarkPoseAsPublished(unityOwnedObject);
+                Debug.Log($"[CO Listener] '{co.id}' put down by MoveIt at {unityOwnedObject.transform.position} yaw {unityOwnedObject.transform.eulerAngles.y:F1}.");
                 OnObjectUpdated?.Invoke(co.id);
                 return;
             }

@@ -154,7 +154,7 @@ public class MTCDashboardPanel : MonoBehaviour
             selectionManager.OnObjectSelected -= OnSelectionChanged;
     }
 
-    // The Plan tab mirrors the live selection so the visitor can see which object a
+    // The Plan tab mirrors the live selection so the user can see which object a
     // recording will use before pressing Start Recording.
     private void OnSelectionChanged(GameObject selected)
     {
