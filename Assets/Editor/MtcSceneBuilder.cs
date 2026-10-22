@@ -134,10 +134,29 @@ public static class MtcSceneBuilder
         }
     }
 
+    [MenuItem("ERUPT/Scenes/Dress FactoryDemo hall")]
+    public static void DressFactoryHall()
+    {
+        if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+            return;
+        Log.Clear();
+        try
+        {
+            DressFactoryHallScene();
+            Debug.Log("MtcSceneBuilder: done.\n" + Log);
+        }
+        catch (Exception e)
+        {
+            Debug.LogError("MtcSceneBuilder: FAILED.\n" + Log + "\n" + e);
+            throw;
+        }
+    }
+
     public static void BuildFactoryBatch() => Batch(BuildFactoryScene);
     public static void RelayoutFactoryBatch() => Batch(RelayoutFactoryScene);
     public static void ValidateFactoryBatch() => Batch(() => { if (ValidateFactory() > 0) throw new InvalidOperationException("validation failed"); });
     public static void RenderFactoryShotsBatch() => Batch(() => RenderFactoryShots(Environment.GetEnvironmentVariable("FACTORY_SHOT_DIR")));
+    public static void DressFactoryHallBatch() => Batch(DressFactoryHallScene);
 
     private static void Batch(Action action)
     {
@@ -197,6 +216,17 @@ public static class MtcSceneBuilder
             throw new InvalidOperationException($"{FactoryScenePath} has no 'fr3'; run Build FactoryDemo MTC station first");
         Composition c = ComposeExisting(factory);
         LayoutVf2Cell(factory, c);
+        EditorSceneManager.MarkSceneDirty(factory);
+        if (!EditorSceneManager.SaveScene(factory))
+            throw new InvalidOperationException($"Could not save {FactoryScenePath}");
+        Line($"Saved {FactoryScenePath}");
+    }
+
+    // Rebuilds only the hall around the cell (shell, props, sky, sun); the cell is untouched.
+    private static void DressFactoryHallScene()
+    {
+        Scene factory = EditorSceneManager.OpenScene(FactoryScenePath, OpenSceneMode.Single);
+        BuildFactoryHall(factory);
         EditorSceneManager.MarkSceneDirty(factory);
         if (!EditorSceneManager.SaveScene(factory))
             throw new InvalidOperationException($"Could not save {FactoryScenePath}");
@@ -761,6 +791,8 @@ public static class MtcSceneBuilder
             Line($"XRDashboard moved to {XrDashboardPosition}");
         }
 
+        BuildFactoryHall(scene);
+
         EditorUtility.SetDirty(station);
         Line($"Cell built: '{MachineName}', '{DoorMenuName}', '{FactoryStationRoot}'");
     }
@@ -1127,6 +1159,240 @@ public static class MtcSceneBuilder
         for (int i = 0; p != null && i < p.arraySize; i++)
             list.Add(p.GetArrayElementAtIndex(i).objectReferenceValue);
         return list;
+    }
+
+    // ------------------------------------------------------------------ factory hall
+
+    // The cell stands in a clean, roomy machine hall built from primitives (the industrial pack
+    // only ships exterior shells): HallSize interior, light cladding over a dark dado, a window
+    // band under the eaves that shows the sky, steel columns, trusses and purlins under a flat
+    // roof with skylight strips and a grid of high-bay lamps, a roller door and a personnel door
+    // in the wall behind the machine, yellow floor lines around the demo, and a few of the pack's
+    // tidier props along the walls. The hall shell casts no shadows so the directional light
+    // reads as skylight; the user at the origin has ~14 m behind, ~18 m ahead and 20 m to each
+    // side. Nothing but the floor lines is inside HallKeepClear (x -6..6, z -6..8).
+    private const string HallRootName = "Environment";
+    private const string PackRoot = "Assets/RPG_FPS_game_assets_industrial";
+    private const string HallSkyboxPath = PackRoot + "/Textures/Skyboxes/Skybox_v9.mat";
+    private const float HallSkyRotation = 126f;
+    private static readonly Vector3 HallCentre = new Vector3(0f, 0f, 2f);
+    private static readonly Vector3 HallSize = new Vector3(40f, 9f, 32f); // interior width, clear height, depth
+    private const float WallThickness = 0.3f, DadoHeight = 1.2f, WindowSillY = 5.5f, WindowHeadY = 7.5f, MullionPitch = 4f, MullionWidth = 0.3f;
+    private const float ColumnPitch = 8f, ColumnSize = 0.4f;
+    private const float TrussPitch = 8f, TrussHeight = 0.6f, TrussWidth = 0.35f, PurlinPitch = 8f, PurlinWidth = 0.25f, PurlinHeight = 0.3f;
+    private const float SkylightWidth = 2.5f, LampPitch = 8f, LampSize = 0.7f, LampY = 7.6f;
+    private static readonly Vector2 RollerDoorSize = new Vector2(5f, 4.5f);
+    private const float RollerDoorX = 9f, PersonnelDoorX = -12f;
+    private static readonly Bounds HallKeepClear = new Bounds(new Vector3(0f, 10f, 1f), new Vector3(12f, 40f, 14f));
+    private static readonly Rect FloorLineRect = Rect.MinMaxRect(-5.5f, -2.5f, 4.5f, 6.5f);
+    private const float FloorLineWidth = 0.08f, FloorLineHeight = 0.002f;
+    private static readonly Color HallSunColor = new Color(1f, 0.97f, 0.92f);
+    private const float HallSunIntensity = 1.1f, HallAmbientIntensity = 0.85f;
+
+    private readonly struct HallProp
+    {
+        public readonly string prefab; public readonly Vector3 position; public readonly float yaw;
+        public HallProp(string prefab, float x, float y, float z, float yaw = 0f) { this.prefab = prefab; position = new Vector3(x, y, z); this.yaw = yaw; }
+    }
+
+    // Pack props (the clean ones), seated on the floor by their render bounds; y > 0 mounts on a wall.
+    private static readonly HallProp[] HallProps =
+    {
+        // Stock along the back wall, either side of the roller door.
+        new HallProp("Other_props/Palets/Bags_on_pallet_v1/Bags_on_pallet_v1_1.prefab", 14.5f, 0f, 16.6f),
+        new HallProp("Other_props/Palets/Palet_v1/Palet_v1_set.prefab", 17.8f, 0f, 16.7f),
+        new HallProp("Barrels/Barrel_v3/Barrel_v3_quadro.prefab", -16.5f, 0f, 16.9f),
+        new HallProp("Boxes/Wooden_box_v1/Wooden_box_v1_LD2square.prefab", -18.8f, 0f, 17.2f),
+        // Switchgear on the left wall, pallets along the right wall, wall fans up high.
+        new HallProp("Other_props/Electric_box/Electric_box_v3/Electric_box_v3.prefab", -19f, 0f, -7f, 90f),
+        new HallProp("Other_props/Palets/Bags_on_pallet_v1/Bags_on_pallet_v1_2.prefab", 19.1f, 0f, -8f, 90f),
+        new HallProp("Other_props/Palets/Palet_v1/Palet_v1_set.prefab", 19f, 0f, -4.4f, 90f),
+        new HallProp("Other_props/Fans/Fan_v1/Fan_v1_1.prefab", -19.85f, 4f, 6f, 0f),
+        new HallProp("Other_props/Fans/Fan_v1/Fan_v1_1.prefab", 19.85f, 4f, 6f, 180f),
+    };
+
+    // Replaces the 'Environment' root, fits the Floor to the hall and sets sky, ambient and sun.
+    private static void BuildFactoryHall(Scene scene)
+    {
+        foreach (GameObject old in scene.GetRootGameObjects().Where(r => r.name == HallRootName).ToArray())
+        {
+            UnityEngine.Object.DestroyImmediate(old);
+            Line($"Removed previous '{HallRootName}'");
+        }
+        var root = new GameObject(HallRootName);
+        SceneManager.MoveGameObjectToScene(root, scene);
+
+        Material wall = MakeMaterial("HallWall", new Color(0.84f, 0.85f, 0.86f), 0.2f, 0f);
+        Material dado = MakeMaterial("HallDado", new Color(0.27f, 0.33f, 0.42f), 0.3f, 0f);
+        Material roof = MakeMaterial("HallRoof", new Color(0.88f, 0.89f, 0.90f), 0.15f, 0f); // underside is lit by ambient only
+        Material steel = MakeMaterial("HallSteel", new Color(0.36f, 0.41f, 0.49f), 0.5f, 0.4f);
+        Material door = MakeMaterial("HallDoor", new Color(0.46f, 0.53f, 0.63f), 0.4f, 0.3f);
+        Material doorDark = MakeMaterial("HallDoorTrim", new Color(0.22f, 0.25f, 0.30f), 0.4f, 0.3f);
+        Material lamp = MakeEmissiveMaterial("HallLamp", new Color(0.9f, 0.9f, 0.88f), new Color(1f, 0.98f, 0.94f));
+        Material skylight = MakeEmissiveMaterial("HallSkylight", new Color(0.8f, 0.85f, 0.9f), new Color(0.88f, 0.93f, 1f));
+        Material line = MakeMaterial("FloorLine", new Color(0.95f, 0.78f, 0.10f), 0.3f, 0f);
+        Material floorMat = MakeMaterial("FactoryFloor", new Color(0.50f, 0.51f, 0.53f), 0.3f, 0f);
+
+        // Floor: the existing root plane, fitted to the hall interior.
+        GameObject floor = Root(scene, "Floor");
+        floor.transform.position = HallCentre;
+        floor.transform.rotation = Quaternion.identity;
+        floor.transform.localScale = new Vector3(HallSize.x / 10f, 1f, HallSize.z / 10f);
+        foreach (MeshRenderer fr in floor.GetComponentsInChildren<MeshRenderer>(true)) fr.sharedMaterial = floorMat;
+        EditorUtility.SetDirty(floor);
+        Line($"Floor fitted to the hall: {HallSize.x} x {HallSize.z} m at {HallCentre}");
+
+        float xMin = HallCentre.x - HallSize.x * 0.5f, xMax = HallCentre.x + HallSize.x * 0.5f;
+        float zMin = HallCentre.z - HallSize.z * 0.5f, zMax = HallCentre.z + HallSize.z * 0.5f;
+        float h = HallSize.y, t = WallThickness;
+
+        // --- walls: dado, cladding up to the sill, window band (open, mullions only), eaves strip ---
+        Transform walls = Group("Walls", root.transform, Vector3.zero);
+        void WallRun(string name, Vector3 centreLine, Vector3 along, float length, Vector3 outward)
+        {
+            Vector3 thick = outward * (t * 0.5f);
+            Vector3 Size(float len, float height) => new Vector3(Mathf.Abs(along.x) * len + Mathf.Abs(outward.x) * t, height, Mathf.Abs(along.z) * len + Mathf.Abs(outward.z) * t);
+            Box($"{name} Dado", walls, centreLine + thick + Vector3.up * (DadoHeight * 0.5f), Size(length, DadoHeight), dado);
+            Box($"{name} Lower", walls, centreLine + thick + Vector3.up * ((DadoHeight + WindowSillY) * 0.5f), Size(length, WindowSillY - DadoHeight), wall);
+            Box($"{name} Eaves", walls, centreLine + thick + Vector3.up * ((WindowHeadY + h) * 0.5f), Size(length, h - WindowHeadY), wall);
+            int mullions = Mathf.RoundToInt(length / MullionPitch);
+            for (int i = 0; i <= mullions; i++)
+            {
+                Vector3 at = centreLine + along * (-length * 0.5f + i * length / mullions);
+                Box($"{name} Mullion {i}", walls, at + thick + Vector3.up * ((WindowSillY + WindowHeadY) * 0.5f), Size(MullionWidth, WindowHeadY - WindowSillY), steel);
+            }
+        }
+        WallRun("Back Wall", new Vector3(HallCentre.x, 0f, zMax), Vector3.right, HallSize.x, Vector3.forward);
+        WallRun("Front Wall", new Vector3(HallCentre.x, 0f, zMin), Vector3.right, HallSize.x, Vector3.back);
+        WallRun("Left Wall", new Vector3(xMin, 0f, HallCentre.z), Vector3.forward, HallSize.z, Vector3.left);
+        WallRun("Right Wall", new Vector3(xMax, 0f, HallCentre.z), Vector3.forward, HallSize.z, Vector3.right);
+        // Corner posts close the window band where two walls meet.
+        foreach (float cx in new[] { xMin, xMax }) foreach (float cz in new[] { zMin, zMax })
+            Box("Corner", walls, new Vector3(cx + (cx < HallCentre.x ? t : -t) * 0.5f, h * 0.5f, cz + (cz < HallCentre.z ? t : -t) * 0.5f), new Vector3(t, h, t), wall);
+
+        // --- roof slab, trusses across x, purlins along z, skylight strips between the trusses ---
+        Transform structure = Group("Structure", root.transform, Vector3.zero);
+        Box("Roof", structure, new Vector3(HallCentre.x, h + t * 0.5f, HallCentre.z), new Vector3(HallSize.x + 2f * t, t, HallSize.z + 2f * t), roof);
+        var trussZ = new List<float>();
+        for (float z = zMin + TrussPitch; z < zMax - 1f; z += TrussPitch) trussZ.Add(z);
+        foreach (float z in trussZ)
+            Box("Truss", structure, new Vector3(HallCentre.x, h - PurlinHeight - TrussHeight * 0.5f, z), new Vector3(HallSize.x, TrussHeight, TrussWidth), steel);
+        for (float x = xMin + PurlinPitch * 0.5f; x < xMax; x += PurlinPitch)
+            Box("Purlin", structure, new Vector3(x, h - PurlinHeight * 0.5f, HallCentre.z), new Vector3(PurlinWidth, PurlinHeight, HallSize.z), steel);
+        var bayZ = new List<float> { (zMin + trussZ[0]) * 0.5f };
+        for (int i = 1; i < trussZ.Count; i++) bayZ.Add((trussZ[i - 1] + trussZ[i]) * 0.5f);
+        bayZ.Add((trussZ[trussZ.Count - 1] + zMax) * 0.5f);
+        foreach (float z in bayZ)
+            Box("Skylight", structure, new Vector3(HallCentre.x, h - 0.03f, z), new Vector3(HallSize.x - 4f, 0.05f, SkylightWidth), skylight);
+        // Columns on the long walls at the column pitch, inner face flush with the cladding.
+        for (float x = xMin + ColumnPitch; x < xMax - 1f; x += ColumnPitch)
+        {
+            Box("Column", structure, new Vector3(x, h * 0.5f, zMin + ColumnSize * 0.5f), new Vector3(ColumnSize, h, ColumnSize), steel);
+            Box("Column", structure, new Vector3(x, h * 0.5f, zMax - ColumnSize * 0.5f), new Vector3(ColumnSize, h, ColumnSize), steel);
+        }
+        for (float z = zMin + ColumnPitch; z < zMax - 1f; z += ColumnPitch)
+        {
+            Box("Column", structure, new Vector3(xMin + ColumnSize * 0.5f, h * 0.5f, z), new Vector3(ColumnSize, h, ColumnSize), steel);
+            Box("Column", structure, new Vector3(xMax - ColumnSize * 0.5f, h * 0.5f, z), new Vector3(ColumnSize, h, ColumnSize), steel);
+        }
+
+        // --- high-bay lamps on short stems ---
+        Transform lamps = Group("Lamps", root.transform, Vector3.zero);
+        int lampCount = 0;
+        for (float x = xMin + LampPitch * 0.5f; x < xMax; x += LampPitch)
+            for (float z = zMin + LampPitch * 0.5f; z < zMax; z += LampPitch)
+            {
+                Box("Lamp", lamps, new Vector3(x, LampY, z), new Vector3(LampSize, 0.12f, LampSize), lamp);
+                Box("Lamp Stem", lamps, new Vector3(x, (LampY + h) * 0.5f, z), new Vector3(0.05f, h - LampY, 0.05f), steel);
+                lampCount++;
+            }
+
+        // --- doors on the back wall: a closed roller door and a personnel door ---
+        Transform doors = Group("Doors", root.transform, Vector3.zero);
+        float doorZ = zMax - 0.06f;
+        Box("Roller Door", doors, new Vector3(RollerDoorX, RollerDoorSize.y * 0.5f, doorZ), new Vector3(RollerDoorSize.x, RollerDoorSize.y, 0.1f), door);
+        Box("Roller Door Frame", doors, new Vector3(RollerDoorX, RollerDoorSize.y + 0.15f, doorZ - 0.05f), new Vector3(RollerDoorSize.x + 0.6f, 0.3f, 0.2f), doorDark);
+        for (float y = 0.5f; y < RollerDoorSize.y - 0.2f; y += 0.5f)
+            Box("Roller Door Slat", doors, new Vector3(RollerDoorX, y, doorZ - 0.055f), new Vector3(RollerDoorSize.x, 0.03f, 0.01f), doorDark);
+        Box("Personnel Door", doors, new Vector3(PersonnelDoorX, 1.05f, doorZ), new Vector3(1f, 2.1f, 0.1f), doorDark);
+        Box("Personnel Door Frame", doors, new Vector3(PersonnelDoorX, 2.15f, doorZ - 0.02f), new Vector3(1.2f, 0.1f, 0.14f), doorDark);
+
+        // --- yellow floor lines around the demo ---
+        Transform lines = Group("FloorMarkings", root.transform, Vector3.zero);
+        float ly = FloorLineHeight * 0.5f;
+        Box("Line Front", lines, new Vector3(FloorLineRect.center.x, ly, FloorLineRect.yMin), new Vector3(FloorLineRect.width + FloorLineWidth, FloorLineHeight, FloorLineWidth), line);
+        Box("Line Back", lines, new Vector3(FloorLineRect.center.x, ly, FloorLineRect.yMax), new Vector3(FloorLineRect.width + FloorLineWidth, FloorLineHeight, FloorLineWidth), line);
+        Box("Line Left", lines, new Vector3(FloorLineRect.xMin, ly, FloorLineRect.center.y), new Vector3(FloorLineWidth, FloorLineHeight, FloorLineRect.height), line);
+        Box("Line Right", lines, new Vector3(FloorLineRect.xMax, ly, FloorLineRect.center.y), new Vector3(FloorLineWidth, FloorLineHeight, FloorLineRect.height), line);
+        foreach (Collider lc in lines.GetComponentsInChildren<Collider>(true)) UnityEngine.Object.DestroyImmediate(lc);
+
+        // --- pack props ---
+        Transform props = Group("Props", root.transform, Vector3.zero);
+        foreach (HallProp prop in HallProps)
+        {
+            GameObject go = PlaceHallProp(props, prop);
+            Bounds b = RendererBounds(go.transform);
+            if (b.Intersects(HallKeepClear))
+                throw new InvalidOperationException($"hall prop '{go.name}' at {prop.position} intrudes on the keep-clear zone around the cell ({b.min} .. {b.max})");
+            if (b.min.x < xMin - 0.01f || b.max.x > xMax + 0.01f || b.min.z < zMin - 0.01f || b.max.z > zMax + 0.01f)
+                throw new InvalidOperationException($"hall prop '{go.name}' at {prop.position} pokes through a wall ({b.min} .. {b.max})");
+        }
+
+        // The shell casts no shadows: the sun stands in for the skylights and must reach the floor.
+        // (The lamps too: their shadows were floating diamonds on the floor.)
+        foreach (Transform shell in new[] { walls, structure, lamps })
+            foreach (MeshRenderer r in shell.GetComponentsInChildren<MeshRenderer>(true))
+                r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        foreach (Transform tr in root.GetComponentsInChildren<Transform>(true))
+            GameObjectUtility.SetStaticEditorFlags(tr.gameObject, StaticEditorFlags.BatchingStatic | StaticEditorFlags.OccludeeStatic | StaticEditorFlags.OccluderStatic);
+        Line($"Hall {HallSize.x} x {HallSize.z} x {HallSize.y} m: {walls.childCount} wall pieces, {structure.childCount} structure pieces, {lampCount} lamps, {HallProps.Length} props (batching static, shell casts no shadows)");
+
+        // Sky (seen through the window band), ambient and sun; no fog indoors.
+        var sky = AssetDatabase.LoadAssetAtPath<Material>(HallSkyboxPath) ?? throw new InvalidOperationException($"missing {HallSkyboxPath}");
+        sky.SetFloat("_Rotation", HallSkyRotation);
+        EditorUtility.SetDirty(sky);
+        RenderSettings.skybox = sky;
+        RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Skybox;
+        RenderSettings.ambientIntensity = HallAmbientIntensity;
+        RenderSettings.fog = false;
+        Light sun = FindAllInScene<Light>(scene).FirstOrDefault(l => l.type == LightType.Directional)
+                    ?? throw new InvalidOperationException("FactoryDemo has no directional light");
+        sun.color = HallSunColor;
+        sun.intensity = HallSunIntensity;
+        sun.shadows = LightShadows.Soft;
+        RenderSettings.sun = sun;
+        EditorUtility.SetDirty(sun);
+        foreach (Camera cam in FindAllInScene<Camera>(scene))
+        {
+            cam.clearFlags = CameraClearFlags.Skybox;
+            EditorUtility.SetDirty(cam);
+        }
+        AssetDatabase.SaveAssets();
+        Line($"Sky '{sky.name}' through the windows, skybox ambient {HallAmbientIntensity}, sun {HallSunIntensity} with soft shadows, fog off; cameras clear to the skybox");
+    }
+
+    // Instantiates a pack prefab, yaws it and seats its render bounds at position.y.
+    private static GameObject PlaceHallProp(Transform parent, HallProp prop)
+    {
+        string path = PackRoot + "/" + prop.prefab;
+        var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path) ?? throw new InvalidOperationException($"missing {path}");
+        var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab, parent.gameObject.scene);
+        go.transform.SetParent(parent, false);
+        go.transform.rotation = Quaternion.Euler(0f, prop.yaw, 0f);
+        go.transform.position = prop.position;
+        Bounds b = RendererBounds(go.transform);
+        go.transform.position += new Vector3(prop.position.x - b.center.x, prop.position.y - b.min.y, prop.position.z - b.center.z);
+        return go;
+    }
+
+    private static Material MakeEmissiveMaterial(string name, Color color, Color emission)
+    {
+        Material mat = MakeMaterial(name, color, 0.2f, 0f);
+        mat.EnableKeyword("_EMISSION");
+        mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+        mat.SetColor("_EmissionColor", emission);
+        EditorUtility.SetDirty(mat);
+        return mat;
     }
 
     // ------------------------------------------------------------------ VF-2 prefab
@@ -1828,6 +2094,67 @@ public static class MtcSceneBuilder
               "editor keyboard input for the vise, doors and robot release wired");
         Check(machineKeys != null && machineKeys.ViewCount == 3, "machine desktop input has three camera views");
 
+        // --- the hall --------------------------------------------------------------------
+        GameObject hall = R(HallRootName);
+        Check(hall != null, $"root '{HallRootName}' present");
+        float hxMin = HallCentre.x - HallSize.x * 0.5f, hxMax = HallCentre.x + HallSize.x * 0.5f, hzMin = HallCentre.z - HallSize.z * 0.5f, hzMax = HallCentre.z + HallSize.z * 0.5f;
+        Bounds padBounds = floor != null ? RendererBounds(floor.transform) : new Bounds();
+        Check(floor != null && padBounds.min.x <= hxMin + 0.01f && padBounds.max.x >= hxMax - 0.01f && padBounds.min.z <= hzMin + 0.01f && padBounds.max.z >= hzMax - 0.01f, "floor covers the whole hall interior");
+        Check(floor != null && padBounds.Contains(new Vector3(0f, 0f, 0f)) && padBounds.Contains(new Vector3(PartsTableCentre.x, 0f, PartsTableCentre.z)), "floor covers the user's spot and the parts table");
+        Check(HallSize.x >= 30f && HallSize.z >= 24f && HallSize.y >= 7f && -hzMin >= 10f && hzMax >= 14f && -hxMin >= 15f, "hall is roomy around the user's spot (>=10 m behind, >=14 m ahead, >=15 m to the sides, >=7 m high)");
+        if (hall != null)
+        {
+            Transform walls = hall.transform.Find("Walls"), structure = hall.transform.Find("Structure"), lamps = hall.transform.Find("Lamps"), hallProps = hall.transform.Find("Props"), markings = hall.transform.Find("FloorMarkings"), hallDoors = hall.transform.Find("Doors");
+            Check(walls != null && structure != null && lamps != null && hallProps != null && markings != null && hallDoors != null, "hall groups Walls/Structure/Lamps/Doors/FloorMarkings/Props present");
+            if (walls != null && structure != null)
+            {
+                Bounds shell = RendererBounds(walls);
+                Check(shell.min.x <= hxMin - WallThickness + 0.01f && shell.max.x >= hxMax + WallThickness - 0.01f && shell.min.z <= hzMin - WallThickness + 0.01f && shell.max.z >= hzMax + WallThickness - 0.01f && shell.max.y >= HallSize.y - 0.01f, "walls enclose the hall interior up to the eaves");
+                Check(walls.GetComponentsInChildren<Transform>(true).All(w => !(w.name.EndsWith("Dado") || w.name.EndsWith("Lower") || w.name.EndsWith("Eaves")) || (RendererBounds(w).min.x >= hxMin - WallThickness - 0.01f && RendererBounds(w).max.x <= hxMax + WallThickness + 0.01f)), "no wall piece reaches into the interior");
+                Transform roof = structure.Find("Roof");
+                Check(roof != null && RendererBounds(roof).min.y >= HallSize.y - 0.01f, "roof slab sits at the clear height");
+                int skylights = structure.GetComponentsInChildren<Transform>(true).Count(x => x.name == "Skylight");
+                Check(skylights >= 3 && lamps.childCount >= 2 * 12, $"skylights ({skylights}) and lamps ({lamps.childCount / 2}) light the hall");
+                Check(walls.GetComponentsInChildren<MeshRenderer>(true).Concat(structure.GetComponentsInChildren<MeshRenderer>(true)).Concat(lamps.GetComponentsInChildren<MeshRenderer>(true)).All(r => r.shadowCastingMode == UnityEngine.Rendering.ShadowCastingMode.Off), "hall shell and lamps cast no shadows (sun = skylight)");
+                int mullions = walls.GetComponentsInChildren<Transform>(true).Count(x => x.name.Contains("Mullion"));
+                Check(mullions >= 30, $"window band is open between the mullions ({mullions})");
+            }
+            if (hallProps != null)
+            {
+                Check(hallProps.childCount == HallProps.Length, $"hall holds {HallProps.Length} props (has {hallProps.childCount})");
+                foreach (Transform child in hallProps)
+                {
+                    Bounds b = RendererBounds(child);
+                    Check(!b.Intersects(HallKeepClear), $"prop '{child.name}' stays outside the keep-clear zone x {HallKeepClear.min.x}..{HallKeepClear.max.x}, z {HallKeepClear.min.z}..{HallKeepClear.max.z}");
+                    Check(b.min.x >= hxMin - 0.01f && b.max.x <= hxMax + 0.01f && b.min.z >= hzMin - 0.01f && b.max.z <= hzMax + 0.01f, $"prop '{child.name}' is inside the walls");
+                }
+            }
+            if (hallDoors != null)
+            {
+                Bounds rd = RendererBounds(hallDoors.Find("Roller Door"));
+                Check(rd.size.x >= 4f && rd.size.y >= 4f && rd.max.z <= hzMax + 0.01f && rd.min.z >= hzMax - 0.2f, "roller door on the back wall, big enough for a forklift");
+            }
+            Check(markings != null && markings.childCount == 4 && markings.GetComponentsInChildren<Collider>(true).Length == 0 && RendererBounds(markings).max.y < 0.005f, "four flat floor lines without colliders");
+            int renderers = 0, urpShaded = 0, staticCount = 0;
+            foreach (Renderer r in hall.GetComponentsInChildren<Renderer>(true))
+            {
+                renderers++;
+                if (r.sharedMaterials.All(m => m != null && m.shader != null && m.shader.name.StartsWith("Universal Render Pipeline/"))) urpShaded++;
+                if ((GameObjectUtility.GetStaticEditorFlags(r.gameObject) & StaticEditorFlags.BatchingStatic) != 0) staticCount++;
+            }
+            Check(renderers > 0 && urpShaded == renderers, $"every hall renderer uses a URP shader ({urpShaded}/{renderers}; the pack ships built-in Mobile/Diffuse materials)");
+            Check(renderers > 0 && staticCount == renderers, $"every hall renderer is batching-static ({staticCount}/{renderers})");
+            int hallTris = hall.GetComponentsInChildren<MeshFilter>(true).Where(mf => mf.sharedMesh != null).Sum(mf => mf.sharedMesh.triangles.Length / 3);
+            Check(hallTris < 20000, $"hall geometry is light ({hallTris} triangles)");
+            Check(hall.GetComponentsInChildren<CollisionObjectPublisher>(true).Length == 0, "nothing in the hall publishes collision objects");
+        }
+        Check(RenderSettings.skybox != null && RenderSettings.skybox.name == "Skybox_v9", "skybox is the pack's clear-sky Skybox_v9 (seen through the window band)");
+        Check(RenderSettings.ambientMode == UnityEngine.Rendering.AmbientMode.Skybox, "ambient light comes from the skybox");
+        Check(!RenderSettings.fog, "no fog indoors");
+        Light sunLight = FindAllInScene<Light>(scene).FirstOrDefault(l => l.type == LightType.Directional);
+        Check(sunLight != null && RenderSettings.sun == sunLight && sunLight.shadows != LightShadows.None, "the directional light is the sun and casts shadows");
+        Check(FindAllInScene<Camera>(scene).All(cam => cam.clearFlags == CameraClearFlags.Skybox), "every camera clears to the skybox");
+
         Debug.Log(Log.ToString());
         return failures;
     }
@@ -1860,8 +2187,7 @@ public static class MtcSceneBuilder
         System.IO.Directory.CreateDirectory(dir);
         var camGo = new GameObject("ShotCam");
         var cam = camGo.AddComponent<Camera>();
-        cam.clearFlags = CameraClearFlags.SolidColor;
-        cam.backgroundColor = new Color(0.16f, 0.18f, 0.22f);
+        cam.clearFlags = CameraClearFlags.Skybox;
         cam.fieldOfView = 70f;
         var rt = new RenderTexture(1600, 1000, 24);
         var closedShots = new (string, Vector3, Vector3)[]
@@ -1885,6 +2211,19 @@ public static class MtcSceneBuilder
             ("machine_low", new Vector3(-1.5f, 0.3f, -0.5f), new Vector3(0f, 0.8f, 2f)),
             ("placement", new Vector3(0f, 2.4f, -1.6f), new Vector3(0f, 0.3f, 1.0f)),
             ("placement_menu", new Vector3(-0.3f, 1.5f, -0.9f), new Vector3(-1.3f, 1.3f, 0.3f)),
+            // The hall: what the user sees turning on the spot, plus overviews from under the roof.
+            ("hall_front", new Vector3(0f, 1.6f, 0f), new Vector3(0f, 2.5f, 20f)),
+            ("hall_front_left", new Vector3(0f, 1.6f, 0f), new Vector3(-14f, 2.5f, 14f)),
+            ("hall_left", new Vector3(0f, 1.6f, 0f), new Vector3(-20f, 2.5f, 0f)),
+            ("hall_back_left", new Vector3(0f, 1.6f, 0f), new Vector3(-14f, 2f, -14f)),
+            ("hall_back", new Vector3(0f, 1.6f, 0f), new Vector3(0f, 2f, -20f)),
+            ("hall_back_right", new Vector3(0f, 1.6f, 0f), new Vector3(14f, 2f, -14f)),
+            ("hall_right", new Vector3(0f, 1.6f, 0f), new Vector3(20f, 2.5f, 0f)),
+            ("hall_front_right", new Vector3(0f, 1.6f, 0f), new Vector3(14f, 2.5f, 14f)),
+            ("hall_up", new Vector3(0f, 1.6f, 0f), new Vector3(0f, 12f, 4f)),
+            ("hall_overview", new Vector3(-16f, 7.5f, -12f), new Vector3(0f, 1f, 4f)),
+            ("hall_overview_right", new Vector3(17f, 7.5f, 16f), new Vector3(0f, 1f, 1f)),
+            ("hall_top", new Vector3(0f, 8.6f, 2f), new Vector3(0f, 0f, 2.01f)),
         };
         var openShots = new (string, Vector3, Vector3)[]
         {
