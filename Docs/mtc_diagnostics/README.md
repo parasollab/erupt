@@ -116,32 +116,63 @@ the door plane. Grid: x <= -0.1 fails on link5, x >= 0.2 at z 1.0 (and everythin
 the retreat; x = 0, z = 1.0 gives 20-21/24 and plans both billet orientations into the jaws with 3 solutions each
 (every stage incl. move home). The conveyor control fails there only because the conveyor stayed 1 m away.
 
-## Recording the whole load as a video (`DemoVideoProbe.cs`)
+## Demo guide (`GuideProbe.cs`)
 
-Same copy-to-`Assets/Editor/` recipe, ROS stack up, run **without** `-nographics` (frames are rendered):
+Same copy-to-`Assets/Editor/` recipe, run **without** `-nographics` (the card, the highlight frames and the
+chevron are rendered into screenshots); no ROS needed:
 
 ```
-PROBE_OUT=/tmp/demo_video "/Applications/Unity/Hub/Editor/6000.2.1f1/Unity.app/Contents/MacOS/Unity" -batchmode \
-  -projectPath "$PWD" -executeMethod DemoVideoProbe.Run -logFile /tmp/video.log
-cd /tmp/demo_video && python3 - <<'PY'
-# captions.txt (frame<TAB>caption) -> captions.srt at 12 fps; see the session notes for the full snippet
-PY
-ffmpeg -framerate 12 -i frames/frame_%05d.jpg -vf "subtitles=captions.srt" -c:v libx264 -pix_fmt yuv420p -crf 20 demo_pipeline.mp4
+PROBE_OUT=/tmp/probe "/Applications/Unity/Hub/Editor/6000.2.1f1/Unity.app/Contents/MacOS/Unity" -batchmode \
+  -projectPath "$PWD" -executeMethod GuideProbe.Run -logFile /tmp/probe.log
+grep '\[PROBE' /tmp/probe.log
 ```
 
-A scripted camera records 1280x720 JPEG frames at 12 fps while the probe plays the demo end to end:
-drags the placement ring from the start pose to the ideal spot and confirms, opens the doors, selects the
-top billet, Start Recording, carries it over the open jaws (10 deg skewed) and lets go, Stop Recording
-(the goal goes out, the billet returns to the stack), waits for the plan, previews the first solution
-(the part drops in the preview too), executes it (the drop comes from the executing solution's detach),
-clamps, shows the machine panel and releases. `frames/captions.txt` has one caption per frame for the
-subtitle file. Verified 2026-10-21 from the x = 0 robot spot: plan 3 solutions, execute succeeded,
-drop 40 mm flat, clamped "squared from 26 deg, stickout 35 mm", 675 frames = 56 s.
+It plays `FactoryDemo` and walks the self-guided flow the way a first-time user would, checking `Factory.DemoGuide`
+at every step: Welcome (card lower right of the eye, the placement panel shows only a Begin button, framed, chevron pointing at it), Begin -> PlaceRobot (the unload steps after Clamp are exercised by the video probe, not here) (ring framed,
+off-screen chevron shown when the head turns away and hidden when looking at the ring, the card glides after the
+head), nudge to the ideal spot -> ConfirmPlacement (frame + pulsing class on the Confirm button, button-sized at
+the lower part of the panel), Confirm -> OpenDoors (frame on the now-shown machine panel), doors -> SelectBillet
+(top billet framed), select -> GrabBillet, `GuidedRecording.NotifyGrabbed` -> recording started -> CarryToVise
+(jaw opening framed), billet set between the jaws -> ReleaseInVise, `NotifyReleased` -> the recording stops after
+the settle and the plan goes out (with ROS up: Planning -> Execute with the best solution selected and the Execute
+button framed; offline: refused, the guide offers the billet again and the card shows ROBOT OFFLINE after the grace
+period), the stuck timers shortened by reflection on the SelectBillet step -> hint and "ask for help" lines, a billet
+under the floor / outside the working area -> back on the stand (`PartRecovery`), `DemoReset.Restart` -> placement
+phase at the start pose, doors closing, vise open, guide on Welcome. Screenshots in `PROBE_OUT`: `guide_welcome`,
+`guide_place_ring`, `guide_offscreen_chevron`, `guide_confirm_button`, `guide_confirm_closeup`, `guide_open_doors`,
+`guide_select_billet`, `guide_carry_to_vise`, `guide_vise_closeup`, `guide_card_hint`, `guide_card_offline`,
+`guide_restarted`. Verified 2026-10-23: 55 checks, 0 failures (ROS up). Play-mode tests for the step order and the
+auto-recording: `-runTests -testPlatform PlayMode -testFilter "DemoGuideStepsTests|GuidedRecordingTests"`.
 
-Things that look odd in the footage but are not bugs: the cyan sphere at the gripper is the robot's IK
-jog handle (`Quest3RobotInteractionController` hides it only while a preview plays or a solution
-executes); after "move home" the hand hovers just in front of and above the vise because the ready
-pose reaches 0.31 m forward from a base 0.25 m before the door plane.
+## Recording the demo as a video (`DemoVideoProbe.cs`)
+
+Same copy-to-`Assets/Editor/` recipe, ROS stack up, run **without** `-nographics` (frames are rendered). Two
+versions of the same walkthrough, from one switch: `VIDEO_GUIDE=1` keeps the instruction card, the target frames
+and the off-screen chevron on camera (they follow the video camera as they would the headset; the card and chevron
+are drawn by a URP overlay camera stacked on the video camera so scene geometry never hides them); `VIDEO_GUIDE=0`
+hides them (the guide still runs underneath: Begin, auto-recording and auto-selection are the demo's behaviour).
+
+```
+VIDEO_GUIDE=1 PROBE_OUT=/tmp/video_guide "/Applications/Unity/Hub/Editor/6000.2.1f1/Unity.app/Contents/MacOS/Unity" \
+  -batchmode -projectPath "$PWD" -executeMethod DemoVideoProbe.Run -logFile /tmp/video.log
+# captions.txt (frame<TAB>caption) -> captions.srt at 15 fps, then
+ffmpeg -framerate 15 -i frames/frame_%05d.jpg -vf "subtitles=captions.srt:force_style='Alignment=1,FontSize=20,MarginL=40,MarginV=30'" \
+  -c:v libx264 -pix_fmt yuv420p -crf 20 factory_demo_with_guide.mp4
+```
+
+The walkthrough is the self-guided flow (2026-10-23): Begin on the placement panel, drag the ring to the ideal spot,
+Confirm, Open Doors, select the top billet, `GuidedRecording.NotifyGrabbed` (the grab starts the recording), carry it
+over the open jaws (10 deg skewed) and `NotifyReleased` (the recording stops after the settle and the plan goes out;
+the dashboard selects the best solution and shows the Solutions tab), Execute (the part drops into the jaws when the
+gripper opens), Clamp, the machine panel, Close Doors, the machining timer (`DemoGuide.machiningSeconds`), Open Doors, Release, select the finished part, grab (records again, zone = conveyor), let go on the belt, Execute (the part drops onto the belt), done. Panel close-ups are framed with the panel left of centre
+so the card's corner never covers the button being pressed. 1920x1080 at 15 fps, JPEG 95, 4x MSAA; ~120 s, 24
+captions. Recorded 2026-10-23 for both versions: load and unload each planned 3 solutions and executed, drops 15 mm
+flat, yaw exact, clamped squared from 10 deg; `~/Desktop/factory_demo_with_guide.mp4` and
+`~/Desktop/factory_demo_without_guide.mp4`. The earlier version of the probe (preview, solution browsing by yaw)
+is in git history before this date.
+
+Things that look odd in the footage but are not bugs: after "move home" the hand hovers just in front of and above
+the vise because the ready pose reaches 0.31 m forward from a base 0.25 m before the door plane.
 
 ### Choosing recording cameras (`CameraScoutProbe.cs`)
 

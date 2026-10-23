@@ -1,10 +1,14 @@
 // Headless walkthrough of the FactoryDemo cell, recorded as frames. Not part of the project: copy to
 // Assets/Editor/ to use (see README). Needs the ROS stack; run WITHOUT -nographics (frames are rendered).
-// Placement phase -> doors -> load demonstration -> plan -> preview -> execute (the part drops into
-// the jaws) -> clamp -> panel -> release -> unload demonstration (vise to conveyor) -> plan -> execute
-// (the part drops onto the belt). Every step the user would do on a panel is done by pressing that
-// panel's button on camera (a pointer dot slides onto it, the button flashes, the button's own click
-// handler runs). Frames go to PROBE_OUT/frames, stitched by ffmpeg.
+// The self-guided flow (Factory.DemoGuide): Begin -> placement -> confirm -> doors -> select the top
+// billet -> grabbing it records -> let go between the jaws (the plan goes out, the best solution is
+// selected) -> execute (the part drops into the jaws) -> clamp -> close the doors -> the job runs ->
+// open the doors -> release -> select the finished part -> grab (records) -> let go on the conveyor ->
+// execute (the part drops onto the belt) -> done. Every step
+// the user would do on a panel is done by pressing that panel's button on camera (a pointer dot slides
+// onto it, the button flashes, the button's own click handler runs). VIDEO_GUIDE=1 keeps the instruction
+// card, the target highlight and the off-screen chevron on camera (they follow the video camera as they
+// would the headset); VIDEO_GUIDE=0 hides them. Frames go to PROBE_OUT/frames, stitched by ffmpeg.
 using System;
 using System.IO;
 using System.Linq;
@@ -47,7 +51,8 @@ public static class DemoVideoProbe
     static void Exit(int code) { recording = false; Log("exit " + code); EditorApplication.Exit(code); }
 
     // ---------------------------------------------------------------- camera / frames
-    static Camera cam;
+    static Camera cam, overlayCam;
+    const int OverlayLayer = 31; // the guide card and chevron: drawn over everything, as the headset shows them
     static RenderTexture rt;
     static Texture2D tex;
     static string framesDir;
@@ -80,6 +85,47 @@ public static class DemoVideoProbe
         rt = new RenderTexture(Width, Height, 24) { antiAliasing = 4 };
         tex = new Texture2D(Width, Height, TextureFormat.RGB24, false);
         cam.targetTexture = rt;
+        cam.cullingMask = ~(1 << OverlayLayer);
+        // The card and the off-screen chevron are head-locked in the headset and never hidden by the
+        // scene; a second pass with depth cleared draws them on top of the main render.
+        // URP: a standalone depth-only camera leaves the colour buffer uninitialised, so the overlay
+        // is a URP overlay camera stacked on the base one (set up by reflection: the editor assembly
+        // does not reference the URP runtime).
+        var overlayGo = new GameObject("VideoOverlayCam");
+        overlayGo.transform.SetParent(camGo.transform, false);
+        overlayCam = overlayGo.AddComponent<Camera>();
+        overlayCam.CopyFrom(cam);
+        overlayCam.clearFlags = CameraClearFlags.Depth;
+        overlayCam.cullingMask = 1 << OverlayLayer;
+        overlayCam.targetTexture = null;
+        Type dataType = Type.GetType("UnityEngine.Rendering.Universal.UniversalAdditionalCameraData, Unity.RenderPipelines.Universal.Runtime");
+        Type renderTypeEnum = Type.GetType("UnityEngine.Rendering.Universal.CameraRenderType, Unity.RenderPipelines.Universal.Runtime");
+        if (dataType != null && renderTypeEnum != null)
+        {
+            // Explicit null checks: a missing component is a fake-null object that ?? does not catch.
+            Component baseData = camGo.GetComponent(dataType);
+            if (baseData == null) baseData = camGo.AddComponent(dataType);
+            Component overData = overlayGo.GetComponent(dataType);
+            if (overData == null) overData = overlayGo.AddComponent(dataType);
+            dataType.GetProperty("renderType").SetValue(overData, Enum.Parse(renderTypeEnum, "Overlay"));
+            // (overlay cameras clear depth by default; clearDepth has no public setter)
+            var stack = (System.Collections.IList)dataType.GetProperty("cameraStack").GetValue(baseData);
+            stack.Add(overlayCam);
+            Log("overlay camera stacked on the video camera (URP)");
+        }
+        else Log("URP camera data type not found; the guide card may be hidden by scene geometry");
+        foreach (var f in UnityEngine.Object.FindObjectsByType<Factory.GuideHeadFollow>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            f.targetCamera = cam; f.Snap();
+            foreach (Transform t in f.GetComponentsInChildren<Transform>(true)) t.gameObject.layer = OverlayLayer;
+        }
+        foreach (var o in UnityEngine.Object.FindObjectsByType<Factory.GuideOffscreenIndicator>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            o.targetCamera = cam;
+            Transform chevron = o.transform.Find("Offscreen Chevron");
+            if (chevron != null) chevron.gameObject.layer = OverlayLayer;
+        }
+        foreach (var h in UnityEngine.Object.FindObjectsByType<Factory.GuideTargetHighlight>(FindObjectsInactive.Include, FindObjectsSortMode.None)) h.targetCamera = cam;
         float last = Time.realtimeSinceStartup;
         while (recording)
         {
@@ -91,7 +137,7 @@ public static class DemoVideoProbe
             if (!recording || cam == null) break;
             cam.transform.position = CurrentPos();
             cam.transform.LookAt(CurrentLook());
-            cam.Render();
+            cam.Render(); // renders its URP stack: the overlay pass draws the card and chevron on top
             RenderTexture.active = rt;
             tex.ReadPixels(new Rect(0, 0, Width, Height), 0, 0);
             tex.Apply();
@@ -151,7 +197,9 @@ public static class DemoVideoProbe
         Vector3 facing = PanelFacing(doc);
         if (cutToPanel)
         {
-            SetView(centre + facing * 1.0f, centre, 1.0f, text);
+            // The panel sits left of centre so the guide card (lower right of the view) never covers it.
+            Vector3 shift = doc.transform.right * 0.28f;
+            SetView(centre + facing * 1.0f + shift, centre + shift, 1.0f, text);
             await Hold(1.1f);
         }
         else if (text != null) caption = text;
@@ -237,14 +285,21 @@ public static class DemoVideoProbe
     /// let go, Stop Recording, then watch the dashboard while MTC plans. Returns the chosen solution
     /// id (the one whose place yaw is closest to the demonstration) or null when planning failed.
     /// </summary>
+    static Factory.GuidedRecording guided;
+    static Factory.DemoGuide guideRef;
+
     static async Task<uint?> DemonstrateAndPlan(GameObject part, Vector3 hover, Quaternion hoverRot, Vector3 carryView, Vector3 carryLook,
-                                                 string recordCaption, string stopCaption, string planCaption, string browseCaption)
+                                                 string selectCaption, string recordCaption, string stopCaption, string planCaption, string browseCaption)
     {
-        SelectionManager.Instance?.SetSelectedObject(part);
-        await Hold(0.5f);
-        await Press(dashboardDoc, "mtcPlanRecordButton", recordCaption);
-        SetView(side, sideLook, 1.0f);
+        SetView(side, sideLook, 1.0f, selectCaption);
         await Hold(1.0f);
+        SelectionManager.Instance?.SetSelectedObject(part);
+        await Hold(1.5f);
+        caption = recordCaption; Log("caption: " + recordCaption);
+        guided.NotifyGrabbed(part); // the hand closes on the selected billet: the recording starts
+        guideRef.ExternalGrab = part; // and the guide sees it in a hand while the probe carries it
+        await Hold(0.8f);
+        Log($"grab: recording={recorder.IsRecording} startedByGuide={guided.StartedByGuide}");
         SetView(carryView, carryLook, 2.5f);
         Vector3 p0 = part.transform.position;
         Quaternion r0 = part.transform.rotation;
@@ -260,8 +315,13 @@ public static class DemoVideoProbe
         part.transform.SetPositionAndRotation(hover, hoverRot);
         lastDemonstratedYaw = hoverRot.eulerAngles.y;
         await Hold(1.0f);
-        recorder.NotifyObjectReleased(part);
-        await Press(dashboardDoc, "mtcPlanRecordButton", stopCaption);
+        caption = stopCaption; Log("caption: " + stopCaption);
+        guideRef.ExternalGrab = null;
+        guided.NotifyReleased(part); // the hand opens in the target zone: the recording stops after the settle
+        ts = Time.realtimeSinceStartup;
+        while (recorder.IsRecording && Time.realtimeSinceStartup - ts < 5f) await Task.Delay(100);
+        Log($"release: recording={recorder.IsRecording} after {Time.realtimeSinceStartup - ts:F1} s; client {client.Phase}");
+        await Hold(1.0f);
 
         SetView(dashboardView, dashboardLook, 1.0f, planCaption);
         ts = Time.realtimeSinceStartup;
@@ -271,56 +331,14 @@ public static class DemoVideoProbe
         if (client.SolutionIds.Count == 0) { caption = "   Planning failed: " + client.LastStatus; await DumpStatistics(); await Hold(3f); return null; }
         await Hold(1.0f);
 
-        // Fetch every solution at once (each /get_solution reply is several MB of scene diffs and
-        // takes ~7 s) so the browsing below reads from the cache and the rows change promptly.
-        var prefetches = client.SolutionIds.ToArray().Select(id =>
-        {
-            var tcs = new TaskCompletionSource<bool>();
-            client.FetchSolution(id, _ => tcs.TrySetResult(true), err => { Log($"solution {id} prefetch failed: {err}"); tcs.TrySetResult(false); });
-            return tcs.Task;
-        }).ToArray();
-        float tf = Time.realtimeSinceStartup;
-        await Task.WhenAny(Task.WhenAll(prefetches), Task.Delay(40000));
-        Log($"prefetched {prefetches.Count(t => t.IsCompleted && t.Result)}/{prefetches.Length} solutions in {Time.realtimeSinceStartup - tf:F1} s");
-
-        // The server samples the place yaw (the part is a box, so any 90-degree multiple is "the
-        // same" to it): browse the solutions on the Solutions tab, selecting each in turn as a
-        // user would, and keep the one that puts the part down closest to the demonstrated yaw.
-        await Press(dashboardDoc, "mtcTabSolutions", browseCaption, cutToPanel: false);
+        // Guided mode: the dashboard selects the best (first) solution and shows the Solutions tab on
+        // its own; wait for the fetch (each /get_solution reply is several MB and takes ~7 s).
+        caption = browseCaption; Log("caption: " + browseCaption);
         uint sid = client.SolutionIds[0];
-        float bestSkew = float.MaxValue;
-        string partId = part.GetComponent<CollisionObjectPublisher>().objectId;
-        Transform originT = part.GetComponent<CollisionObjectPublisher>().worldOrigin.transform;
-        float tb = Time.realtimeSinceStartup;
-        foreach (uint id in client.SolutionIds.ToArray())
-        {
-            dashboard.SelectSolution(id);
-            float tsel = Time.realtimeSinceStartup;
-            while ((dashboard.SelectedSolution == null || dashboard.SelectedSolutionId != id) && Time.realtimeSinceStartup - tsel < 25f) await Task.Delay(100);
-            SolutionMsg candidate = dashboard.SelectedSolutionId == id ? dashboard.SelectedSolution : null;
-            if (candidate == null) { Log($"solution {id}: not fetched"); continue; }
-            float skew = float.NaN;
-            foreach (var sub in candidate.sub_trajectory ?? Array.Empty<SubTrajectoryMsg>())
-                foreach (var co in sub.scene_diff?.world?.collision_objects ?? Array.Empty<RosMessageTypes.Moveit.CollisionObjectMsg>())
-                {
-                    if (co.id != partId || co.pose == null) continue;
-                    Quaternion worldRot = originT.rotation * RosUnityConversion.RosToUnityQuaternion(co.pose.orientation);
-                    Vector3 f = worldRot * Vector3.right; f.y = 0f;
-                    Vector3 g = hoverRot * Vector3.right; g.y = 0f;
-                    float a = Vector3.SignedAngle(g, f, Vector3.up);
-                    skew = Mathf.Abs(Mathf.Repeat(a + 45f, 90f) - 45f);
-                }
-            Log($"solution {id}: placed yaw off the demonstration by {(float.IsNaN(skew) ? -1f : skew):F1} deg");
-            if (!float.IsNaN(skew) && skew < bestSkew) { bestSkew = skew; sid = id; }
-            await Hold(0.6f);
-        }
-        Log($"chosen solution {sid} (skew {bestSkew:F1} deg) after browsing for {Time.realtimeSinceStartup - tb:F1} s");
-        if (dashboard.SelectedSolutionId != sid)
-        {
-            dashboard.SelectSolution(sid);
-            float tsel = Time.realtimeSinceStartup;
-            while (dashboard.SelectedSolutionId != sid || dashboard.SelectedSolution == null) { if (Time.realtimeSinceStartup - tsel > 20f) break; await Task.Delay(100); }
-        }
+        float tsel = Time.realtimeSinceStartup;
+        while ((dashboard.SelectedSolutionId == null || dashboard.SelectedSolution == null) && Time.realtimeSinceStartup - tsel < 30f) await Task.Delay(100);
+        if (dashboard.SelectedSolutionId != null) sid = dashboard.SelectedSolutionId.Value;
+        Log($"auto-selected solution {sid} (fetched={dashboard.SelectedSolution != null}) after {Time.realtimeSinceStartup - tsel:F1} s");
         await Hold(0.8f);
         return sid;
     }
@@ -349,7 +367,6 @@ public static class DemoVideoProbe
         Action<GameObject> onDrop = _ => { dropSeen = true; SetView(dropView, dropLook, 0.6f); };
         gravity.DropStarted += onDrop;
         await Press(dashboardDoc, "mtcExecuteButton", text, cutToPanel: true);
-        await Press(dashboardDoc, "mtcTabPlan", null, cutToPanel: false);
         SetView(side, sideLook, 1.2f);
         float ts = Time.realtimeSinceStartup;
         while (client.Phase == PickPlacePhase.Idle && Time.realtimeSinceStartup - ts < 10f) await Task.Delay(100);
@@ -393,8 +410,21 @@ public static class DemoVideoProbe
             var panel = UnityEngine.Object.FindFirstObjectByType<Factory.MachineDoorPanel>(FindObjectsInactive.Include);
             var placementPanel = UnityEngine.Object.FindFirstObjectByType<Factory.RobotPlacementPanel>(FindObjectsInactive.Include);
             var doorsCtl = UnityEngine.Object.FindFirstObjectByType<Factory.MachineDoors>();
+            guided = UnityEngine.Object.FindFirstObjectByType<Factory.GuidedRecording>();
+            var guide = UnityEngine.Object.FindFirstObjectByType<Factory.DemoGuide>();
+            guideRef = guide;
+            bool showGuide = Environment.GetEnvironmentVariable("VIDEO_GUIDE") != "0";
+            if (!showGuide)
+            {
+                // The plain version: the step director keeps running (the Begin button, auto-recording and
+                // auto-selection are the demo's behaviour) but nothing of the guide is on camera.
+                foreach (var card in UnityEngine.Object.FindObjectsByType<Factory.GuideInstructionCard>(FindObjectsInactive.Include, FindObjectsSortMode.None)) card.transform.root.gameObject.SetActive(false);
+                foreach (var h in UnityEngine.Object.FindObjectsByType<Factory.GuideTargetHighlight>(FindObjectsInactive.Include, FindObjectsSortMode.None)) h.enabled = false;
+                foreach (var o in UnityEngine.Object.FindObjectsByType<Factory.GuideOffscreenIndicator>(FindObjectsInactive.Include, FindObjectsSortMode.None)) o.enabled = false;
+            }
+            Log($"guide on camera: {showGuide}");
             Transform conveyorAnchor = GameObject.Find("FR3 Station")?.transform.Find("Conveyor/DropAnchor");
-            if (ctl == null || vise == null || gravity == null || set == null || recorder == null || player == null || dashboard == null || panel == null || placementPanel == null || conveyorAnchor == null)
+            if (ctl == null || vise == null || gravity == null || set == null || recorder == null || player == null || dashboard == null || panel == null || placementPanel == null || conveyorAnchor == null || guided == null || guide == null)
             { Log("scene incomplete"); Exit(2); return; }
             machineDoc = panel.GetComponent<UIDocument>();
             dashboardDoc = dashboard.GetComponent<UIDocument>();
@@ -463,8 +493,14 @@ public static class DemoVideoProbe
                 return;
             }
 
-            // --- 1. placement phase: the robot starts off its spot; drag the ring to the ideal spot ---
-            SetView(wide, wideLook, 0.1f, "1. Placement: the user drags the ring until the reach markers turn green");
+            // --- 1. begin ---
+            SetView(wide, wideLook, 0.1f, "1. The guide: a card in the user's view says what to do next and the next thing to touch is framed");
+            await Hold(2.5f);
+            await Press(placementDoc, "placementBeginButton", "   Begin on the placement panel: the first lesson is pointing at a panel and pulling the trigger");
+            await Hold(0.8f);
+
+            // --- 2. placement phase: the robot starts off its spot; drag the ring to the ideal spot ---
+            SetView(wide, wideLook, 1.0f, "2. Placement: drag the ring until all six reach markers turn green");
             await Hold(2.0f);
             Pose start = ctl.StartHandlePose, ideal = ctl.DefaultHandlePose;
             float dur = 4f, ts = Time.realtimeSinceStartup;
@@ -475,81 +511,100 @@ public static class DemoVideoProbe
                 await Task.Delay(30);
             }
             ctl.Handle.SetPositionAndRotation(ideal.position, ideal.rotation);
-            await Hold(1.0f);
-            Log($"robot at {ctl.BaseDescription()}; markers {ctl.Markers?.ReachableCount}/{ctl.Markers?.Count}");
-            await Press(placementDoc, "placementConfirmButton", "   Confirm placement: the planning scene is sent to MoveIt");
+            await Hold(1.5f);
+            Log($"robot at {ctl.BaseDescription()}; markers {ctl.Markers?.ReachableCount}/{ctl.Markers?.Count}; guide step {guide.Step}");
+            await Press(placementDoc, "placementConfirmButton", "3. Confirm placement: the planning scene is sent to MoveIt");
             await Hold(1.0f);
 
-            // --- 2. doors ---
-            await Press(machineDoc, "doorOpenButton", "2. Open the enclosure doors from the machine panel");
+            // --- 4. doors ---
+            await Press(machineDoc, "doorOpenButton", "4. Open the enclosure doors from the machine panel");
             SetView(doorsView, doorsLook, 0.5f);
             await Hold(3.8f);
             SetView(side, sideLook, 1.2f);
             await Hold(1.2f);
 
-            // --- 3/4. load demonstration + plan ---
+            // --- 5/6/7. select, grab (records), release in the jaws (plans) ---
             GameObject part = set.Parts.LastOrDefault(p => p != null);
             // Let go 1.5 cm above the seated height: a careful release, under the panel's 2 cm drop warning.
             Vector3 hover = window.position + new Vector3(0.01f, 0.03f + 0.005f + 0.015f, 0.012f);
             Quaternion hoverRot = Quaternion.AngleAxis(10f, Vector3.up); // 5 cm side across the jaws, skewed 10 deg
             uint? sid = await DemonstrateAndPlan(part, hover, hoverRot, viseClose, window.position,
-                "3. Start Recording, carry the billet over the open jaws, let go: that is the place pose",
-                "   Stop Recording: the billet returns to the stack while MTC plans the pick and place",
-                "4. MoveIt Task Constructor plans the load: the dashboard shows the planning status, then the solutions",
-                "5. Solutions tab: the user looks through the solutions and keeps the one that sets the billet down closest to the demonstration");
+                "5. Select the top billet: point at it and pull the trigger",
+                "6. Grab it: picking the billet up starts the pick-and-place recording on its own",
+                "   Let go between the open jaws: the recording stops and the plan goes out; the billet returns to the stack",
+                "7. MoveIt Task Constructor plans the load; the dashboard shows the planning status",
+                "   The best solution is selected and shown on its own: nothing to browse");
             if (sid == null) { Exit(5); return; }
 
-            // --- 5. preview, 6. execute ---
-            await PreviewSelected(viseClose, window.position, "   Preview: a ghost run where the part drops as the hand opens");
-            await ExecuteSelected(part, viseClose, window.position, "6. Execute: the robot loads the billet; the part falls onto the parallels when the gripper opens", fromSolutionsTab: true);
+            // --- 8. execute ---
+            Log($"guide step before execute: {guide.Step}");
+            await ExecuteSelected(part, viseClose, window.position, "8. Execute: the robot loads the billet; the part falls onto the parallels when the gripper opens", fromSolutionsTab: true);
+            Log($"guide step after execute: {guide.Step}");
 
-            // --- 7. clamp ---
+            // --- 9. clamp ---
             vise.ScanPresence();
-            await Press(machineDoc, "viseClampButton", "7. Clamp: the self-centring jaws square the billet and centre it");
+            await Press(machineDoc, "viseClampButton", "9. Clamp: the self-centring jaws square the billet and centre it");
             SetView(viseClose, window.position, 0.8f);
             await Hold(0.5f);
             while (vise.IsMoving) await Task.Delay(100);
-            Log($"vise: {vise.State} - {vise.Describe()}");
+            Log($"vise: {vise.State} - {vise.Describe()}; guide step {guide.Step}");
             await Hold(2.0f);
-
-            // --- 8. panel ---
             {
                 Vector3 pp = PanelCentre(machineDoc);
-                SetView(pp + PanelFacing(machineDoc) * 1.0f, pp, 1.5f, "8. The machine panel reports the clamp and the drop (machining would happen here)");
-                await Hold(4.0f);
+                Vector3 shift = machineDoc.transform.right * 0.28f;
+                SetView(pp + PanelFacing(machineDoc) * 1.0f + shift, pp + shift, 1.5f, "   The machine panel reports the clamp and the drop");
+                await Hold(3.0f);
             }
 
-            // --- 9. release ---
-            await Press(machineDoc, "viseReleaseButton", "9. Release the vise for the unload", cutToPanel: false);
+            // --- 10. close the doors: the job runs ---
+            await Press(machineDoc, "doorCloseButton", "10. Close the doors: the machine runs the job", cutToPanel: false);
+            SetView(doorsView, doorsLook, 0.8f);
+            await Hold(3.8f);
+            Log($"guide step after closing: {guide.Step}");
+            caption = "   Machining: the guide waits for the job to finish"; Log("caption: " + caption);
+            ts = Time.realtimeSinceStartup;
+            while (!guide.Machined && Time.realtimeSinceStartup - ts < guide.MachiningSeconds + 10f) await Task.Delay(200);
+            Log($"machined={guide.Machined} after {Time.realtimeSinceStartup - ts:F1} s; guide step {guide.Step}");
+            await Hold(0.5f);
+
+            // --- 11/12. open the doors, release the vise ---
+            await Press(machineDoc, "doorOpenButton", "11. The job is done: open the doors to unload");
+            SetView(doorsView, doorsLook, 0.5f);
+            await Hold(3.8f);
+            await Press(machineDoc, "viseReleaseButton", "12. Release the vise so the robot can take the part");
             SetView(viseClose, window.position, 1.2f);
             await Hold(0.5f);
             while (vise.IsMoving) await Task.Delay(100);
-            await Hold(1.5f);
+            await Hold(1.0f);
+            Log($"guide step before the unload: {guide.Step}; machined billet {guide.MachinedBillet?.name}");
 
-            // --- 10/11. unload demonstration + plan: from the vise onto the conveyor ---
+            // --- 13/14/15. unload demonstration + plan: from the vise onto the conveyor ---
             Vector3 beltHover = belt + Vector3.up * 0.015f;
             Quaternion beltRot = part.transform.rotation; // squared by the vise; set it on the belt as it is
             uint? sid2 = await DemonstrateAndPlan(part, beltHover, beltRot, beltView, beltLook,
-                "10. Unload: Start Recording, carry the billet from the vise onto the conveyor, let go",
-                "   Stop Recording: the billet returns to the vise while MTC plans the unload",
-                "11. MTC plans the unload from the open jaws to the belt",
-                "   The user picks the unload solution the same way");
+                "13. Select the finished part in the vise: point at it and pull the trigger",
+                "   Grab it: picking it up starts the recording again",
+                "14. Let go on the conveyor belt: the recording stops and the unload plan goes out; the part returns to the vise",
+                "15. MTC plans the unload from the open jaws to the belt",
+                "   The best solution is selected on its own");
             if (sid2 == null)
             {
                 Log("unload plan failed; demonstrating again");
                 await Hold(1.0f);
                 sid2 = await DemonstrateAndPlan(part, beltHover, beltRot, beltView, beltLook,
-                    "10. Unload (again): Start Recording, carry the billet from the vise onto the conveyor, let go",
-                    "   Stop Recording: the billet returns to the vise while MTC plans the unload",
-                    "11. MTC plans the unload from the open jaws to the belt",
-                    "   The user picks the unload solution the same way");
+                    "13. Select the finished part in the vise (again)",
+                    "   Grab it: picking it up starts the recording again",
+                    "14. Let go on the conveyor belt: the recording stops and the unload plan goes out",
+                    "15. MTC plans the unload from the open jaws to the belt",
+                    "   The best solution is selected on its own");
                 if (sid2 == null) { Exit(6); return; }
             }
 
-            // --- 12. execute the unload ---
-            await ExecuteSelected(part, beltView, beltLook, "12. Execute: the robot lifts the billet out of the vise and sets it on the conveyor", fromSolutionsTab: false);
-            SetView(wide, wideLook, 2.0f, "   Loaded, clamped, released and unloaded: the whole cycle from one demonstration each way");
-            await Hold(3.5f);
+            // --- 16. execute the unload: done ---
+            await ExecuteSelected(part, beltView, beltLook, "16. Execute: the robot lifts the part out of the vise and sets it on the conveyor", fromSolutionsTab: true);
+            Log($"guide step at the end: {guide.Step}");
+            SetView(wide, wideLook, 2.0f, "   Demo finished: loaded, machined and unloaded, one guided step at a time");
+            await Hold(4.0f);
 
             recording = false;
             await Hold(0.3f);

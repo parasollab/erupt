@@ -3,6 +3,11 @@
     <ui:VisualElement name="placementRoot" class="mtc-root" style="flex-grow: 1;">
         <ui:Label text="Robot placement" name="placementTitleLabel" class="mtc-title" />
         <ui:Label text="Move the robot to where it can reach everything" name="placementStatusLabel" class="mtc-task" style="white-space: normal;" />
+        <ui:VisualElement name="placementBeginPanel" class="mtc-panel" style="display: none;">
+            <ui:Label text="WELCOME" class="mtc-section" />
+            <ui:Label text="You will teach the robot to load a part into the milling machine. Press Begin when you are ready." class="mtc-empty" style="white-space: normal;" />
+            <ui:Button text="Begin" name="placementBeginButton" selectable="false" focusable="false" class="mtc-button mtc-button--primary" style="flex-grow: 0; margin-top: 10px; height: 56px; font-size: 22px;" />
+        </ui:VisualElement>
         <ui:VisualElement name="placementEditPanel" class="mtc-panel">
             <ui:Label text="POSITION (forward = toward the machine)" class="mtc-section" />
             <ui:VisualElement style="flex-direction: row; margin-bottom: 4px;">
@@ -24,6 +29,9 @@
             <ui:Label text="PLACEMENT" class="mtc-section" />
             <ui:Button text="Reposition robot" name="placementRepositionButton" selectable="false" focusable="false" class="mtc-button mtc-button--danger" style="flex-grow: 0; margin-top: 6px; margin-bottom: 6px; height: 48px; font-size: 18px;" />
             <ui:Label text="Available once no plan is recording or executing." name="placementRepositionHint" class="mtc-empty" style="white-space: normal;" />
+            <ui:Label text="NEXT USER" class="mtc-section" style="margin-top: 14px;" />
+            <ui:Button text="Restart demo" name="placementRestartButton" selectable="false" focusable="false" class="mtc-button mtc-button--danger" style="flex-grow: 0; margin-top: 6px; margin-bottom: 6px; height: 48px; font-size: 18px;" />
+            <ui:Label text="Everything back to the start: billets on the stand, vise open, doors closed, robot at its start spot, guide on step 1." class="mtc-empty" style="white-space: normal;" />
         </ui:VisualElement>
     </ui:VisualElement>
 </ui:UXML>

@@ -18,7 +18,7 @@
             <ui:Label text="PICK &amp; PLACE RECORDING" class="mtc-section" />
             <ui:Label text="Selected object" class="mtc-field-label" />
             <ui:Label text="---" name="mtcPlanObjectIdLabel" class="mtc-field-value" />
-            <ui:Label text="Select a part, start recording, then grab it and release it where it should go." class="mtc-empty" />
+            <ui:Label text="Select a part, start recording, then grab it and release it where it should go." name="mtcPlanHintLabel" class="mtc-empty" />
             <ui:Button text="Start Recording" name="mtcPlanRecordButton" selectable="false" focusable="false" class="mtc-button mtc-button--record" style="flex-grow: 0; margin-top: 6px; margin-bottom: 6px;" />
             <ui:Button text="Cancel Planning" name="mtcPlanCancelButton" selectable="false" focusable="false" class="mtc-button mtc-button--danger" style="flex-grow: 0;" />
             <ui:Label text="Idle" name="mtcPlanStatusLabel" class="mtc-status" />

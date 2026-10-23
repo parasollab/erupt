@@ -88,6 +88,11 @@ public class DesktopMouseInteractor : MonoBehaviour
     /// <summary>The shape a left-drag is moving right now, or null.</summary>
     public Transform Dragged => _dragged;
 
+    /// <summary>A left-drag started moving a collision-object shape (the desktop's "grab").</summary>
+    public event System.Action<GameObject> DragStarted;
+    /// <summary>A left-drag put a collision-object shape down (the desktop's "release").</summary>
+    public event System.Action<GameObject> DragEnded;
+
     void ApplyCameraPose(Vector3 cameraWorldPosition)
     {
         Quaternion camRelRot = Quaternion.Inverse(_rig.rotation) * targetCamera.transform.rotation;
@@ -209,6 +214,7 @@ public class DesktopMouseInteractor : MonoBehaviour
         _dragPlane = new Plane(planeNormal, hit.point);
         _dragOffset = target.position - hit.point;
         if (selectOnClick) SelectionManager.Instance?.SetSelectedObject(target.gameObject);
+        DragStarted?.Invoke(publisher.gameObject);
     }
 
     void UpdateDrag(float scroll)
@@ -234,8 +240,10 @@ public class DesktopMouseInteractor : MonoBehaviour
         if (_draggedPublisher != null) _draggedPublisher.ForceRepublish();
         // A mouse drag ending is the desktop's "hand let go": the recorder takes the pose from here.
         if (_draggedPublisher != null && recorder != null) recorder.NotifyObjectReleased(_draggedPublisher.gameObject);
+        GameObject released = _draggedPublisher != null ? _draggedPublisher.gameObject : null;
         _dragged = null;
         _draggedPublisher = null;
+        if (released != null) DragEnded?.Invoke(released);
     }
 
     void OnGUI()

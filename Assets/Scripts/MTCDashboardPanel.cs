@@ -24,6 +24,9 @@ public class MTCDashboardPanel : MonoBehaviour
     [SerializeField] private MTCTrajectoryPlayer trajectoryPlayer;
     [Tooltip("Shows the live selection on the Plan tab; found in the scene when empty.")]
     [SerializeField] private SelectionManager selectionManager;
+    [Tooltip("Guided demo: the record button is hidden (grabbing a part records on its own), and as soon as a " +
+             "plan arrives its best solution is selected and the Solutions tab shown so Execute is one press away.")]
+    [SerializeField] private bool guidedMode = false;
 
     private static readonly Color DoneColor = new(0.55f, 0.85f, 0.55f);
 
@@ -33,7 +36,7 @@ public class MTCDashboardPanel : MonoBehaviour
     private Label solutionsTitle;
 
     private Button recordButton, planCancelButton;
-    private Label planObjectIdLabel, planStatusLabel, taskIdLabel;
+    private Label planObjectIdLabel, planStatusLabel, planHintLabel, taskIdLabel;
 
     private VisualElement stageTreeContainer, stageSolutionsContainer;
 
@@ -56,6 +59,7 @@ public class MTCDashboardPanel : MonoBehaviour
     public uint? SelectedSolutionId { get; private set; }
     public SolutionMsg SelectedSolution { get; private set; }
     public VisualElement Root => root;
+    public bool GuidedMode => guidedMode;
 
     private PickPlaceClient Client => pickPlaceAction;
     private bool Busy => Client != null && Client.Busy;
@@ -171,7 +175,7 @@ public class MTCDashboardPanel : MonoBehaviour
             : $"{selected.name} (not a planning-scene object)";
         if (planStatusLabel != null && pickPlaceRecorder != null && !pickPlaceRecorder.IsRecording && !Busy)
             planStatusLabel.text = publisher != null && grabbable
-                ? "Start Recording, grab it, drop it where it should go, Stop Recording"
+                ? (guidedMode ? "Grab it and let go where it should go" : "Start Recording, grab it, drop it where it should go, Stop Recording")
                 : "Select a part on the tray first";
     }
 
@@ -195,8 +199,16 @@ public class MTCDashboardPanel : MonoBehaviour
 
         planObjectIdLabel = root.Q<Label>("mtcPlanObjectIdLabel");
         planStatusLabel = root.Q<Label>("mtcPlanStatusLabel");
+        planHintLabel = root.Q<Label>("mtcPlanHintLabel");
         recordButton = root.Q<Button>("mtcPlanRecordButton");
         if (recordButton != null) recordButton.clicked += OnRecordClicked;
+        if (guidedMode)
+        {
+            // Grabbing a selected part starts the recording and letting go of it in place stops it
+            // (Factory.GuidedRecording); the manual button would only confuse a first-time user.
+            if (recordButton != null) recordButton.style.display = DisplayStyle.None;
+            if (planHintLabel != null) planHintLabel.text = "Select a part, grab it and let go of it where it should go. The plan is sent when you let go.";
+        }
         planCancelButton = root.Q<Button>("mtcPlanCancelButton");
         if (planCancelButton != null) planCancelButton.clicked += Cancel;
 
@@ -290,6 +302,14 @@ public class MTCDashboardPanel : MonoBehaviour
     private void RefreshControls()
     {
         bool busy = Busy;
+        if (guidedMode && !busy && SelectedSolutionId == null && Client != null && Client.SolutionIds.Count > 0)
+        {
+            // A plan just finished: pick its best solution and bring Execute into view. SelectSolution
+            // refreshes the list, which refreshes the controls again with the id already set.
+            SelectSolution(Client.SolutionIds[0]);
+            ShowTab(panelSolutions);
+            return;
+        }
         bool recording = pickPlaceRecorder != null && pickPlaceRecorder.IsRecording;
         if (recordButton != null)
         {

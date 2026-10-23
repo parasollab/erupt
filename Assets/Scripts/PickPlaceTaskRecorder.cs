@@ -117,6 +117,22 @@ public class PickPlaceTaskRecorder : MonoBehaviour
         Debug.Log("PickPlaceTaskRecorder: recording stopped");
     }
 
+    /// <summary>
+    /// Stops the recording without sending anything: the watched object goes back to its pick
+    /// pose and the UIs hear OnRecordingDiscarded (demo restart, guided recording abandoned).
+    /// </summary>
+    public void CancelRecording()
+    {
+        if (!IsRecording) return;
+
+        IsRecording = false;
+        selectionManager.OnObjectSelected -= OnObjectSelected;
+        ResetWatchedObjectToPickPose();
+        ClearWatchedObject();
+        Debug.Log("PickPlaceTaskRecorder: recording cancelled");
+        OnRecordingDiscarded?.Invoke("recording cancelled");
+    }
+
     private void OnObjectSelected(GameObject obj)
     {
         ClearWatchedObject();

@@ -1,0 +1,14 @@
+<ui:UXML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ui="UnityEngine.UIElements" noNamespaceSchemaLocation="../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
+    <Style src="MTCDashboard.uss" />
+    <ui:VisualElement name="guideRoot" class="mtc-root" style="flex-grow: 1; padding-top: 8px; padding-bottom: 10px; padding-left: 14px; padding-right: 14px; border-radius: 12px; border-width: 2px; border-color: rgb(90, 150, 230);">
+        <ui:VisualElement style="flex-direction: row; justify-content: space-between; flex-shrink: 0;">
+            <ui:Label text="STEP 1 OF 10" name="guideStepLabel" class="mtc-section" style="margin: 0; color: rgb(140, 180, 255);" />
+            <ui:Label text="" name="guideStatusLabel" class="mtc-section" style="margin: 0; color: rgb(255, 120, 100); display: none;" />
+        </ui:VisualElement>
+        <ui:Label text="Welcome" name="guideTitleLabel" style="font-size: 19px; -unity-font-style: bold; color: rgb(255, 255, 255); white-space: normal; margin-top: 2px; flex-shrink: 0;" />
+        <ui:Label text="" name="guideInstructionLabel" style="font-size: 14px; color: rgb(238, 238, 242); white-space: normal; margin-top: 6px; flex-shrink: 0;" />
+        <ui:Label text="" name="guideControllerLabel" style="font-size: 11px; color: rgb(140, 180, 255); white-space: normal; margin-top: 8px; flex-shrink: 0; display: none;" />
+        <ui:Label text="" name="guideHintLabel" style="font-size: 11px; color: rgb(255, 205, 60); white-space: normal; margin-top: 6px; flex-shrink: 0; display: none;" />
+        <ui:Label text="" name="guideNoticeLabel" style="font-size: 11px; color: rgb(255, 150, 130); white-space: normal; margin-top: 6px; flex-shrink: 0; display: none;" />
+    </ui:VisualElement>
+</ui:UXML>

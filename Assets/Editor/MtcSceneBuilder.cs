@@ -551,6 +551,27 @@ public static class MtcSceneBuilder
     private static readonly Vector2 PlacementStartOffset = new Vector2(0.8f, -0.8f);
     private const float PlacementStartYaw = 35f;
 
+    // Demo guide (Factory.DemoGuide and friends): the step director root, its head-following
+    // instruction card (a stripped planning-menu panel, GuideCard.uxml), the target highlight and
+    // the off-screen chevron, auto-recording of grabs, lost-billet recovery and the restart.
+    private const string GuideRootName = "DemoGuide";
+    private const string GuideCardName = "GuideCard";
+    private const string GuideCardUxmlPath = "Assets/UI Toolkit/GuideCard.uxml";
+    private const float GuideCardHeight = 270f; // document units (300 wide): 0.6 x 0.54 m at the prefab's 0.2 scale, room for title + 4 lines + hint + notice
+    // Card centre in the camera's local frame: lower right of the view, so it covers neither the
+    // stock stand and vise in the middle nor the buttons the guide points at (Open Doors top-left of
+    // the left panel, Execute bottom-left of the right panel).
+    private static readonly Vector3 GuideCardOffset = new Vector3(0.5f, -0.36f, 1.5f);
+    private const float GuideHintAfterSeconds = 30f, GuideHelpAfterSeconds = 75f;
+    // The machine "runs the job" this long with the doors closed before the guide moves on to the unload.
+    private const float GuideMachiningSeconds = 8f;
+    private const float ConveyorZoneRadius = 0.25f; // around the conveyor's DropAnchor: where the unload release counts
+    private static readonly Color GuideHighlightColor = new Color(1f, 0.8f, 0.2f);
+    // A billet outside this box (or under the floor) goes back to the stand: the cell plus the
+    // conveyor run, nothing behind the machine or beyond the hall's floor lines.
+    private static readonly Bounds PartWorkingArea = new Bounds(new Vector3(-1.5f, 1.2f, 0.4f), new Vector3(8f, 4f, 7f));
+    private const float PartFloorY = -0.05f;
+
     // Maps Blender-frame vectors (x right, y back, z up as exported) into the prefab's local frame,
     // read from the Axis_X/Y/Z empties bl_assemble.py / bl_export_urdf.py put in every FBX.
     private sealed class AxisMap
@@ -589,7 +610,7 @@ public static class MtcSceneBuilder
 
     private static void LayoutVf2Cell(Scene scene, Composition c)
     {
-        foreach (string name in new[] { "Machines", FactoryStationRoot, DoorMenuName, PlacementRootName, PlacementHandleName, ReachMarkersName, PlacementMenuName })
+        foreach (string name in new[] { "Machines", FactoryStationRoot, DoorMenuName, PlacementRootName, PlacementHandleName, ReachMarkersName, PlacementMenuName, GuideRootName, GuideCardName })
         {
             GameObject old = scene.GetRootGameObjects().FirstOrDefault(r => r.name == name);
             if (old == null) continue;
@@ -771,8 +792,11 @@ public static class MtcSceneBuilder
         var reachTargets = new List<Transform> { fixture.Find("DropAnchor") };
         reachTargets.AddRange(stockSlots);
         reachTargets.Add(conveyor.Find("DropAnchor"));
-        BuildPlacementStage(scene, c, pedestal, visualizer, doorMenu, reachTargets);
+        (Factory.RobotPlacementController placementController, Factory.RobotPlacementPanel placementPanel, GameObject placementHandle) =
+            BuildPlacementStage(scene, c, pedestal, visualizer, doorMenu, reachTargets);
         BuildMachineDesktopInput(scene, station, vise, doors, gravity, doorMenu);
+        BuildDemoGuide(scene, c, placementController, placementPanel, placementHandle, doorMenu.GetComponentInChildren<Factory.MachineDoorPanel>(true),
+                       doors, vise, gravity, billets, conveyor.Find("DropAnchor"));
 
         // A leftover XRI "UGUI Grab UI" sample instance floated at 2 m over the user's spot with
         // nothing on it but its grab capsule (2026-10-22); the demo has no use for it.
@@ -939,8 +963,8 @@ public static class MtcSceneBuilder
     // The placement phase: floor handle (ring around the pedestal, XRI far/near grab sliding on
     // world x/z), reach markers on the anchors, the controller that moves robot + pedestal after
     // the handle and gates the MTC / door menus, its panel, and a desktop mouse rig for editor runs.
-    private static void BuildPlacementStage(Scene scene, Composition c, GameObject pedestal, ReachabilityVolumeVisualizer visualizer,
-                                            GameObject doorMenu, List<Transform> targets)
+    private static (Factory.RobotPlacementController controller, Factory.RobotPlacementPanel panel, GameObject handle) BuildPlacementStage(
+        Scene scene, Composition c, GameObject pedestal, ReachabilityVolumeVisualizer visualizer, GameObject doorMenu, List<Transform> targets)
     {
         if (targets.Any(t => t == null))
             throw new InvalidOperationException("placement targets incomplete (fixture / conveyor DropAnchor missing)");
@@ -1063,6 +1087,108 @@ public static class MtcSceneBuilder
             mouse.lookAt = new Vector3(Fr3BaseX * 0.5f, 0.8f, 1f);
             Line($"{DesktopRigName} added (editor-only mouse drag of the handle)");
         }
+        return (controller, panel, handle);
+    }
+
+    // The guide: one root holding the step director, auto-recording, billet recovery and the
+    // restart, with the highlight and chevron as children; a head-following card built from the
+    // planning-menu recipe with everything interactive stripped off (it is read, never pressed).
+    private static void BuildDemoGuide(Scene scene, Composition c, Factory.RobotPlacementController placement, Factory.RobotPlacementPanel placementPanel,
+                                       GameObject handle, Factory.MachineDoorPanel doorPanel, Factory.MachineDoors doors, Factory.MachineVise vise,
+                                       Factory.ReleasedPartGravity gravity, Factory.GrabbablePartSet billets, Transform conveyorAnchor)
+    {
+        if (doorPanel == null) throw new InvalidOperationException("door menu has no MachineDoorPanel");
+        if (conveyorAnchor == null) throw new InvalidOperationException("conveyor has no DropAnchor for the unload");
+        GameObject rig = scene.GetRootGameObjects().FirstOrDefault(r => r.name == DesktopRigName);
+        DesktopMouseInteractor mouse = rig != null ? rig.GetComponent<DesktopMouseInteractor>() : null;
+        var player = Require<MTCTrajectoryPlayer>(c.fr3);
+        Material highlightMat = MakeUnlitMaterial("GuideHighlight", GuideHighlightColor);
+
+        var root = new GameObject(GuideRootName);
+        SceneManager.MoveGameObjectToScene(root, scene);
+        var guide = root.AddComponent<Factory.DemoGuide>();
+        SetRef(guide, "placement", placement);
+        SetRef(guide, "doors", doors);
+        SetRef(guide, "vise", vise);
+        SetRef(guide, "gravity", gravity);
+        SetRef(guide, "billets", billets);
+        SetRef(guide, "client", c.client);
+        SetRef(guide, "recorder", c.recorder);
+        SetRef(guide, "selection", c.selection);
+        SetRef(guide, "mouse", mouse);
+        SetRef(guide, "placementHandle", handle.transform);
+        SetRef(guide, "placementPanel", placementPanel);
+        SetRef(guide, "doorPanel", doorPanel);
+        SetRef(guide, "dashboard", c.dashboard);
+        // The welcome step ends on the placement panel's Begin button (its first lesson: point at a panel, pull the trigger).
+        SetRef(placementPanel, "guide", guide);
+        SetFloat(guide, "hintAfterSeconds", GuideHintAfterSeconds);
+        SetFloat(guide, "helpAfterSeconds", GuideHelpAfterSeconds);
+        SetFloat(guide, "machiningSeconds", GuideMachiningSeconds);
+        SetRef(guide, "conveyorAnchor", conveyorAnchor);
+        SetFloat(guide, "conveyorZoneRadius", ConveyorZoneRadius);
+
+        var recording = root.AddComponent<Factory.GuidedRecording>();
+        SetRef(guide, "recording", recording);
+        SetRef(recording, "recorder", c.recorder);
+        SetRef(recording, "client", c.client);
+        SetRef(recording, "billets", billets);
+        SetRef(recording, "placement", placement);
+        SetRef(recording, "selection", c.selection);
+        SetRef(recording, "mouse", mouse);
+        SetRef(recording, "targetVise", vise);
+        SetRef(recording, "conveyorAnchor", conveyorAnchor);
+        SetFloat(recording, "conveyorZoneRadius", ConveyorZoneRadius);
+
+        var recovery = root.AddComponent<Factory.PartRecovery>();
+        SetRef(recovery, "billets", billets);
+        SetRef(recovery, "gravity", gravity);
+        SetRef(recovery, "mouse", mouse);
+        var rso = new SerializedObject(recovery);
+        Prop(rso, "workingArea").boundsValue = PartWorkingArea;
+        Prop(rso, "floorY").floatValue = PartFloorY;
+        rso.ApplyModifiedPropertiesWithoutUndo();
+
+        var reset = root.AddComponent<Factory.DemoReset>();
+        SetRef(reset, "placement", placement);
+        SetRef(reset, "client", c.client);
+        SetRef(reset, "recorder", c.recorder);
+        SetRef(reset, "trajectoryPlayer", player);
+        SetRef(reset, "doors", doors);
+        SetRef(reset, "vise", vise);
+        SetRef(reset, "parts", recovery);
+        SetRef(reset, "guide", guide);
+        SetRef(reset, "selection", c.selection);
+        SetRef(placementPanel, "reset", reset);
+
+        var highlight = root.AddComponent<Factory.GuideTargetHighlight>();
+        SetRef(highlight, "guide", guide);
+        SetRef(highlight, "material", highlightMat);
+        var offscreen = root.AddComponent<Factory.GuideOffscreenIndicator>();
+        SetRef(offscreen, "guide", guide);
+        SetRef(offscreen, "material", highlightMat);
+
+        // Grabs record on their own; the dashboard's record button goes and the best solution is
+        // selected for Execute as soon as a plan arrives.
+        SetBool(c.dashboard, "guidedMode", true);
+        Line($"{GuideRootName}: director, auto-recording, billet recovery (area {PartWorkingArea.min}..{PartWorkingArea.max}), restart, highlight, chevron");
+
+        // --- the card -------------------------------------------------------------------------
+        (GameObject card, UIDocument doc) = BuildPanelMenu(scene, GuideCardName, GuideCardUxmlPath, GuideCardHeight, new Vector3(0f, 1.2f, 1.3f));
+        PrefabUtility.UnpackPrefabInstance(card, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
+        foreach (Type t in new[] { typeof(XRSimpleInteractable), typeof(UnityEngine.XR.Interaction.Toolkit.Filtering.XRPokeFilter), typeof(MoveItPlanningRequestMenuUI), typeof(BoxCollider) })
+            foreach (Component comp in doc.GetComponents(t)) UnityEngine.Object.DestroyImmediate(comp);
+        foreach (Type t in new[] { typeof(XRGrabInteractable), typeof(XRGeneralGrabTransformer), typeof(UnityEngine.XR.Interaction.Toolkit.UI.LazyFollow), typeof(Rigidbody), typeof(BoxCollider), typeof(SkinnedMeshRenderer) })
+            foreach (Component comp in card.GetComponents(t)) UnityEngine.Object.DestroyImmediate(comp);
+        // Panel centre on the root's origin so the follow places the centre of the card.
+        doc.transform.localPosition = new Vector3(-1.5f, GuideCardHeight / 200f, 0f);
+        var follow = card.AddComponent<Factory.GuideHeadFollow>();
+        follow.offset = GuideCardOffset;
+        var cardUi = doc.gameObject.AddComponent<Factory.GuideInstructionCard>();
+        SetRef(cardUi, "uiDocument", doc);
+        SetRef(cardUi, "guide", guide);
+        Line($"{GuideCardName}: {GuideCardUxmlPath} {300}x{GuideCardHeight} following the head at camera offset {GuideCardOffset}; " +
+             $"{card.GetComponentsInChildren<Component>(true).Count(x => x is Collider || x is XRBaseInteractable)} interactive component(s) left");
     }
 
     // Keyboard stand-in for the machine panel and the robot's release (editor only; inert with a
@@ -1615,6 +1741,21 @@ public static class MtcSceneBuilder
         return mat;
     }
 
+    private static Material MakeUnlitMaterial(string name, Color color)
+    {
+        string path = $"{FactoryMaterialFolder}/{name}.mat";
+        var mat = AssetDatabase.LoadAssetAtPath<Material>(path);
+        if (mat == null)
+        {
+            Shader shader = Shader.Find("Universal Render Pipeline/Unlit") ?? throw new InvalidOperationException("URP Unlit shader not found");
+            mat = new Material(shader);
+            AssetDatabase.CreateAsset(mat, path);
+        }
+        mat.SetColor("_BaseColor", color);
+        EditorUtility.SetDirty(mat);
+        return mat;
+    }
+
     private static void SetFloat(Component target, string field, float value)
     {
         var so = new SerializedObject(target);
@@ -2093,6 +2234,73 @@ public static class MtcSceneBuilder
               && desktopRig != null && RefIs(machineKeys, "mouse", desktopRig.GetComponent<DesktopMouseInteractor>()),
               "editor keyboard input for the vise, doors and robot release wired");
         Check(machineKeys != null && machineKeys.ViewCount == 3, "machine desktop input has three camera views");
+
+        // --- the demo guide ----------------------------------------------------------------
+        GameObject guideRoot = R(GuideRootName), card = R(GuideCardName);
+        Check(guideRoot != null && guideRoot.activeSelf, $"root '{GuideRootName}' present and active");
+        Check(card != null && card.activeSelf, $"root '{GuideCardName}' present and active");
+        var guide = guideRoot != null ? guideRoot.GetComponent<Factory.DemoGuide>() : null;
+        Check(guide != null && RefIs(guide, "placement", placement) && RefIs(guide, "doors", doors) && RefIs(guide, "vise", vise) && RefIs(guide, "gravity", gravity)
+              && RefIs(guide, "billets", billets) && RefIs(guide, "client", client) && RefIs(guide, "recorder", recorder) && RefIs(guide, "dashboard", dashboard)
+              && RefIs(guide, "placementPanel", placementPanel) && RefIs(guide, "doorPanel", doorPanel) && handleGo != null && RefIs(guide, "placementHandle", handleGo.transform),
+              "DemoGuide reads the placement, doors, vise, gravity, billets, client, recorder and the three panels");
+        Check(guide != null && placementPanel != null && RefIs(placementPanel, "guide", guide), "placement panel's Begin button ends the guide's welcome step");
+        Check(placementDoc != null && placementDoc.visualTreeAsset != null && placementDoc.visualTreeAsset.Instantiate().Q<Button>("placementBeginButton") != null, "placement panel has a Begin button");
+        if (guide != null)
+        {
+            var gso = new SerializedObject(guide);
+            Check(gso.FindProperty("hintAfterSeconds").floatValue > 10f && gso.FindProperty("helpAfterSeconds").floatValue > gso.FindProperty("hintAfterSeconds").floatValue,
+                  "stuck hints escalate: hint first, then ask for help");
+        }
+        var guidedRec = guideRoot != null ? guideRoot.GetComponent<Factory.GuidedRecording>() : null;
+        Transform conveyorDrop = station.transform.Find("Conveyor/DropAnchor");
+        Check(guidedRec != null && RefIs(guidedRec, "recorder", recorder) && RefIs(guidedRec, "client", client) && RefIs(guidedRec, "billets", billets)
+              && RefIs(guidedRec, "placement", placement) && RefIs(guidedRec, "targetVise", vise) && conveyorDrop != null && RefIs(guidedRec, "conveyorAnchor", conveyorDrop) && guidedRec.AutoRecord,
+              "GuidedRecording records grabs of the billets and stops on a release in the vise (load) or on the conveyor (unload)");
+        Check(guide != null && RefIs(guide, "recording", guidedRec) && conveyorDrop != null && RefIs(guide, "conveyorAnchor", conveyorDrop)
+              && new SerializedObject(guide).FindProperty("machiningSeconds").floatValue > 2f, "DemoGuide switches the recording zone and times the job for the unload");
+        var recovery = guideRoot != null ? guideRoot.GetComponent<Factory.PartRecovery>() : null;
+        Check(recovery != null && RefIs(recovery, "billets", billets) && RefIs(recovery, "gravity", gravity), "PartRecovery watches the billets");
+        if (recovery != null)
+        {
+            Bounds area = new SerializedObject(recovery).FindProperty("workingArea").boundsValue;
+            foreach (string n in new[] { "RawStockStand", "Conveyor", "MachineFixture", "PartsTable" })
+            {
+                Transform t = station.transform.Find(n);
+                Check(t != null && area.Contains(RendererBounds(t).center), $"billet working area covers '{n}'");
+            }
+            Check(area.max.z < HallKeepClear.max.z && area.min.x > -HallSize.x * 0.5f, "billet working area stays inside the hall");
+        }
+        var demoReset = guideRoot != null ? guideRoot.GetComponent<Factory.DemoReset>() : null;
+        Check(demoReset != null && RefIs(demoReset, "placement", placement) && RefIs(demoReset, "client", client) && RefIs(demoReset, "recorder", recorder)
+              && RefIs(demoReset, "trajectoryPlayer", player) && RefIs(demoReset, "doors", doors) && RefIs(demoReset, "vise", vise)
+              && RefIs(demoReset, "parts", recovery) && RefIs(demoReset, "guide", guide), "DemoReset wired to everything it puts back");
+        Check(placementPanel != null && RefIs(placementPanel, "reset", demoReset), "placement panel's Restart demo button drives DemoReset");
+        var highlight = guideRoot != null ? guideRoot.GetComponent<Factory.GuideTargetHighlight>() : null;
+        var offscreen = guideRoot != null ? guideRoot.GetComponent<Factory.GuideOffscreenIndicator>() : null;
+        Check(highlight != null && RefIs(highlight, "guide", guide) && RefSet(highlight, "material"), "target highlight bound to the guide with a serialized material");
+        Check(offscreen != null && RefIs(offscreen, "guide", guide) && RefSet(offscreen, "material"), "off-screen chevron bound to the guide with a serialized material");
+        Check(highlight != null && RefName(highlight, "material") == "GuideHighlight"
+              && AssetDatabase.LoadAssetAtPath<Material>($"{FactoryMaterialFolder}/GuideHighlight.mat") is Material gm && gm.shader != null && gm.shader.name.Contains("Unlit"),
+              "guide material is an unlit asset");
+        Check(dashboard != null && new SerializedObject(dashboard).FindProperty("guidedMode").boolValue, "MTC dashboard in guided mode (record button hidden, best solution auto-selected)");
+        if (card != null)
+        {
+            UIDocument cardDoc = card.GetComponentInChildren<UIDocument>(true);
+            Check(cardDoc != null && cardDoc.visualTreeAsset != null && cardDoc.visualTreeAsset.name == "GuideCard", "card document shows GuideCard.uxml");
+            Check(card.GetComponentsInChildren<Collider>(true).Length == 0 && card.GetComponentsInChildren<XRBaseInteractable>(true).Length == 0
+                  && card.GetComponentsInChildren<Rigidbody>(true).Length == 0 && card.GetComponentsInChildren<Renderer>(true).Length == 0,
+                  "card has nothing to grab, poke or bump into");
+            var followComp = card.GetComponent<Factory.GuideHeadFollow>();
+            Check(followComp != null && followComp.offset.z > 0.8f && followComp.offset.y < -0.2f && followComp.offset.x > 0.3f, "card follows the head, lower right of the view");
+            var cardUi = card.GetComponentInChildren<Factory.GuideInstructionCard>(true);
+            Check(cardUi != null && RefIs(cardUi, "guide", guide) && RefIs(cardUi, "uiDocument", cardDoc), "GuideInstructionCard bound to the guide");
+            Check(cardDoc != null && Vector3.Distance(PanelCentre(cardDoc), card.transform.position) < 1e-3f || (cardDoc != null && cardDoc.GetComponent<BoxCollider>() == null
+                  && Vector3.Distance(cardDoc.transform.localPosition, new Vector3(-1.5f, GuideCardHeight / 200f, 0f)) < 1e-3f), "card panel is centred on its root");
+            Check(placement != null && !ArrayRefs(placement, "gatedObjects").Contains(card) && !ArrayRefs(placement, "placementObjects").Contains(card), "card is shown in both phases");
+        }
+        Check(AssetDatabase.LoadAssetAtPath<StyleSheet>("Assets/UI Toolkit/MTCDashboard.uss") != null
+              && System.IO.File.ReadAllText("Assets/UI Toolkit/MTCDashboard.uss").Contains(".guide-pulse"), "stylesheet defines the guide-pulse class the highlight blinks");
 
         // --- the hall --------------------------------------------------------------------
         GameObject hall = R(HallRootName);

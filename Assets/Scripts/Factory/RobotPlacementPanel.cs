@@ -13,15 +13,20 @@ namespace Factory
     {
         [SerializeField] private UIDocument uiDocument;
         [SerializeField] private RobotPlacementController controller;
+        [SerializeField, Tooltip("\"Restart demo\" puts everything back for the next user; optional.")]
+        private DemoReset reset;
+        [SerializeField, Tooltip("While the guide is on its welcome step the panel shows only a Begin button; optional.")]
+        private DemoGuide guide;
 
         private VisualElement root;
-        private VisualElement editPanel, confirmedPanel;
+        private VisualElement beginPanel, editPanel, confirmedPanel;
         private Label statusLabel, warningLabel, repositionHint;
-        private Button nudgeLeft, nudgeRight, nudgeToward, nudgeAway, turnLeft, turnRight, resetButton, confirmButton, repositionButton;
+        private Button nudgeLeft, nudgeRight, nudgeToward, nudgeAway, turnLeft, turnRight, resetButton, confirmButton, repositionButton, restartButton, beginButton;
         private IVisualElementScheduledItem poll;
         private Coroutine bindWhenReady;
 
         public RobotPlacementController Controller => controller;
+        public DemoGuide Guide => guide;
 
         private void OnEnable()
         {
@@ -52,6 +57,8 @@ namespace Factory
 
         private void Bind()
         {
+            beginPanel = root.Q<VisualElement>("placementBeginPanel");
+            beginButton = root.Q<Button>("placementBeginButton");
             editPanel = root.Q<VisualElement>("placementEditPanel");
             confirmedPanel = root.Q<VisualElement>("placementConfirmedPanel");
             statusLabel = root.Q<Label>("placementStatusLabel");
@@ -66,6 +73,7 @@ namespace Factory
             resetButton = root.Q<Button>("placementResetButton");
             confirmButton = root.Q<Button>("placementConfirmButton");
             repositionButton = root.Q<Button>("placementRepositionButton");
+            restartButton = root.Q<Button>("placementRestartButton");
 
             // The user stands at the origin facing +z with the machine beyond the robot, so
             // "left" is world -x, "toward the machine" is world +z.
@@ -78,6 +86,9 @@ namespace Factory
             if (resetButton != null) resetButton.clicked += OnReset;
             if (confirmButton != null) confirmButton.clicked += OnConfirm;
             if (repositionButton != null) repositionButton.clicked += OnReposition;
+            if (restartButton != null) restartButton.clicked += OnRestart;
+            if (beginButton != null) beginButton.clicked += OnBegin;
+            if (guide != null) guide.StepChanged += OnGuideStepChanged;
             if (controller != null)
             {
                 controller.PhaseChanged += OnPhaseChanged;
@@ -103,6 +114,9 @@ namespace Factory
             if (resetButton != null) resetButton.clicked -= OnReset;
             if (confirmButton != null) confirmButton.clicked -= OnConfirm;
             if (repositionButton != null) repositionButton.clicked -= OnReposition;
+            if (restartButton != null) restartButton.clicked -= OnRestart;
+            if (beginButton != null) beginButton.clicked -= OnBegin;
+            if (guide != null) guide.StepChanged -= OnGuideStepChanged;
             if (controller != null)
             {
                 controller.PhaseChanged -= OnPhaseChanged;
@@ -114,7 +128,7 @@ namespace Factory
             }
             poll?.Pause();
             poll = null;
-            nudgeLeft = nudgeRight = nudgeToward = nudgeAway = turnLeft = turnRight = resetButton = confirmButton = repositionButton = null;
+            nudgeLeft = nudgeRight = nudgeToward = nudgeAway = turnLeft = turnRight = resetButton = confirmButton = repositionButton = restartButton = beginButton = null;
         }
 
         private void OnNudgeLeft() => controller?.NudgeStep(-1f, 0f);
@@ -126,6 +140,9 @@ namespace Factory
         private void OnReset() => controller?.ResetToStart();
         private void OnConfirm() { controller?.Confirm(); Refresh(); }
         private void OnReposition() { controller?.BeginReposition(); Refresh(); }
+        private void OnRestart() { reset?.Restart(); Refresh(); }
+        private void OnBegin() { guide?.CompleteWelcome(); Refresh(); }
+        private void OnGuideStepChanged(GuideStep _) => Refresh();
         private void OnPhaseChanged(RobotPlacementController.PlacementPhase _) => Refresh();
         private void OnClientStatus(string _) => Refresh();
 
@@ -139,15 +156,18 @@ namespace Factory
                 return;
             }
             bool placing = controller.Phase == RobotPlacementController.PlacementPhase.Placing;
-            if (editPanel != null) editPanel.style.display = placing ? DisplayStyle.Flex : DisplayStyle.None;
-            if (confirmedPanel != null) confirmedPanel.style.display = placing ? DisplayStyle.None : DisplayStyle.Flex;
+            // On the guide's welcome step the panel is just a Begin button; the placement controls follow.
+            bool welcome = guide != null && !guide.WelcomeDone;
+            if (beginPanel != null) beginPanel.style.display = welcome ? DisplayStyle.Flex : DisplayStyle.None;
+            if (editPanel != null) editPanel.style.display = placing && !welcome ? DisplayStyle.Flex : DisplayStyle.None;
+            if (confirmedPanel != null) confirmedPanel.style.display = placing || welcome ? DisplayStyle.None : DisplayStyle.Flex;
 
             ReachTargetMarkerSet markers = controller.Markers;
             string reach = markers != null && markers.Count > 0 ? $"{markers.ReachableCount} / {markers.Count} targets reachable" : "";
             if (statusLabel != null)
             {
                 string phase = placing ? (controller.HandleGrabbed ? "Moving the robot..." : "Move the robot to where it can reach everything") : "Robot placed";
-                statusLabel.text = string.IsNullOrEmpty(reach) ? phase : $"{phase}\n{reach}";
+                statusLabel.text = welcome ? "Press Begin to start" : string.IsNullOrEmpty(reach) ? phase : $"{phase}\n{reach}";
             }
             if (warningLabel != null)
             {
@@ -164,6 +184,11 @@ namespace Factory
             resetButton?.SetEnabled(canEdit);
             confirmButton?.SetEnabled(controller.CanConfirm);
             repositionButton?.SetEnabled(controller.CanReposition);
+            if (restartButton != null)
+            {
+                restartButton.style.display = reset != null ? DisplayStyle.Flex : DisplayStyle.None;
+                restartButton.SetEnabled(reset != null && !reset.InProgress);
+            }
             if (repositionHint != null)
                 repositionHint.text = controller.CanReposition ? "Moves the robot again; the planning scene is re-sent on confirm."
                                                               : "Available once no plan is recording or executing.";
