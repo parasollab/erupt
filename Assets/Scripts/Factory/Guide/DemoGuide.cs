@@ -43,7 +43,7 @@ namespace Factory
         [Header("Timing")]
         [SerializeField, Tooltip("Seconds in one step before the extra hint line appears and the highlight pulses faster.")]
         private float hintAfterSeconds = 30f;
-        [SerializeField, Tooltip("Seconds in one step before the card suggests asking the person nearby.")]
+        [SerializeField, Tooltip("Seconds in one step before the card suggests asking the demonstration administrator.")]
         private float helpAfterSeconds = 75f;
         [SerializeField, Tooltip("The connection counts as lost only after this many seconds without a ready planning action.")]
         private float offlineGraceSeconds = 8f;
@@ -220,10 +220,36 @@ namespace Factory
             }
             else if (before == PickPlacePhase.Planning && client.LastOutcome != PickPlaceOutcome.Succeeded && client.LastOutcome != PickPlaceOutcome.Canceled)
             {
-                Notify(client.LastOutcome == PickPlaceOutcome.Unavailable || client.LastOutcome == PickPlaceOutcome.Disconnected
-                    ? "The robot is not connected, so it could not plan. Ask the person next to you."
-                    : "The robot could not find a way to do that. Try again: set the billet lower and centred between the jaws.");
+                if (client.LastOutcome == PickPlaceOutcome.Unavailable || client.LastOutcome == PickPlaceOutcome.Disconnected)
+                    Notify("The robot is not connected, so it could not plan. Ask the demonstration administrator.");
+                else if (FailedBeforeMoving(out string stage))
+                    Notify($"The robot cannot move from where it stands ('{stage}' failed): its arm is touching the machine or the stand. " +
+                           "Press 'Move the robot again' on the panel to your left and place it a little further from the machine.");
+                else
+                    Notify("The robot could not find a way to do that. Try again: set the billet lower and centred between the jaws.");
             }
+        }
+
+        // A plan that dies in its first motion ("open hand", or the current-state check) started from a
+        // robot state in collision: the base stands where the resting arm intersects the cell.
+        private bool FailedBeforeMoving(out string stageName)
+        {
+            stageName = null;
+            if (client == null || client.Description == null || client.Statistics == null || client.Description.stages == null || client.Statistics.stages == null) return false;
+            foreach (var desc in client.Description.stages)
+            {
+                if (desc == null || desc.name == null) continue;
+                string n = desc.name.ToLowerInvariant();
+                if (n != "open hand" && n != "current state") continue;
+                foreach (var st in client.Statistics.stages)
+                {
+                    if (st == null || st.id != desc.id) continue;
+                    bool solved = st.solved != null && st.solved.Length > 0;
+                    bool failed = (st.failed != null && st.failed.Length > 0) || st.num_failed > 0;
+                    if (!solved && failed) { stageName = desc.name; return true; }
+                }
+            }
+            return false;
         }
 
         private void OnPartSettled(ReleasedPartGravity.DropReport report)
@@ -274,6 +300,9 @@ namespace Factory
                 welcomeDone = WelcomeDone,
                 placing = placement != null && placement.Phase == RobotPlacementController.PlacementPhase.Placing,
                 handleGrabbed = placement != null && placement.HandleGrabbed,
+                robotBlocked = placement != null && !placement.RobotClear,
+                robotBlockedBy = placement != null ? placement.RobotBlockedBy : null,
+                robotTooFar = placement != null && !placement.MachineInReach,
                 reachable = placement != null && placement.Markers != null ? placement.Markers.ReachableCount : 0,
                 targetCount = placement != null && placement.Markers != null ? placement.Markers.Count : 0,
                 doorsOpen = doors != null && doors.IsOpen,
@@ -284,6 +313,7 @@ namespace Factory
                 recording = recorder != null && recorder.IsRecording,
                 clientPhase = client != null ? client.Phase : PickPlacePhase.Idle,
                 solutionCount = client != null && client.SolutionIds != null ? client.SolutionIds.Count : 0,
+                solutionLoading = dashboard != null && dashboard.GuidedMode && !dashboard.SolutionReady,
                 loadedByRobot = LoadedByRobot,
                 partSettling = gravity != null && gravity.SettlingCount > 0,
                 viseClosed = vise != null && vise.IsClosed,
@@ -306,6 +336,7 @@ namespace Factory
             s.billetOnConveyor = MachinedBillet != null && !s.billetGrabbed
                                  && GuidedRecording.OnConveyor(conveyorAnchor, MachinedBillet.transform.position, conveyorZoneRadius);
             if (Machined && !_unloadPlanned) s.solutionCount = 0; // the load's solutions are not the unload's
+            if (s.solutionCount == 0) s.solutionLoading = false;
             if (recording != null)
                 recording.Zone = Machined ? GuidedRecording.RecordingZone.Conveyor : GuidedRecording.RecordingZone.Vise;
 
@@ -336,7 +367,8 @@ namespace Factory
 
         // The fields Describe() varies its text on.
         private static bool SameText(in GuideSignals a, in GuideSignals b) =>
-            a.handleGrabbed == b.handleGrabbed && a.reachable == b.reachable && a.doorsMoving == b.doorsMoving
+            a.handleGrabbed == b.handleGrabbed && a.reachable == b.reachable && a.doorsMoving == b.doorsMoving && a.solutionLoading == b.solutionLoading
+            && a.robotBlocked == b.robotBlocked && a.robotBlockedBy == b.robotBlockedBy && a.robotTooFar == b.robotTooFar
             && a.billetGrabbed == b.billetGrabbed && a.recording == b.recording && a.robotInJaws == b.robotInJaws;
 
         private void ResolveTarget(GuideStep step, in GuideSignals s)

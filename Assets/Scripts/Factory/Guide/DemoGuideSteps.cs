@@ -18,7 +18,7 @@ namespace Factory
         Executing,        // the robot is moving
         Clamp,            // "Clamp" on the machine panel
         CloseDoors,       // "Close Doors" on the machine panel: the job runs
-        Machining,        // the machine runs the job (a timer)
+        Machining,        // where the real machine would run the job (a short timer; the card says it is not simulated)
         OpenDoorsToUnload,// "Open Doors" again
         ReleaseVise,      // "Release" on the machine panel
         SelectMachinedBillet, // point at the billet in the vise, pull the trigger
@@ -45,6 +45,9 @@ namespace Factory
         public bool placing;          // RobotPlacementController.Phase == Placing
         public bool handleGrabbed;
         public int reachable, targetCount;
+        public bool robotBlocked;     // the robot's resting pose intersects the cell where it stands (RobotClearanceCheck)
+        public bool robotTooFar;      // the vise is beyond the distance the planner can place through the door
+        public string robotBlockedBy; // "link / obstacle" for the card
         public bool doorsOpen, doorsMoving;
         public bool billetSelected;   // the selection is one of the billets
         public bool billetGrabbed;    // a billet is in a hand (XRI grab or the editor's mouse drag)
@@ -52,6 +55,7 @@ namespace Factory
         public bool recording;
         public PickPlacePhase clientPhase;
         public int solutionCount;
+        public bool solutionLoading;  // solutions listed but the chosen one not fetched yet (guided dashboard)
         public bool loadedByRobot;    // the load execution finished successfully (guide bookkeeping)
         public bool machined;         // the job ran with the doors closed (guide bookkeeping, timer)
         public bool unloaded;         // the unload execution finished and the part came to rest (guide bookkeeping)
@@ -86,7 +90,7 @@ namespace Factory
             if (!s.welcomeDone) return GuideStep.Welcome;
             if (s.placing)
             {
-                if (s.handleGrabbed || s.reachable < s.targetCount) return GuideStep.PlaceRobot;
+                if (s.handleGrabbed || s.reachable < s.targetCount || s.robotBlocked || s.robotTooFar) return GuideStep.PlaceRobot;
                 return GuideStep.ConfirmPlacement;
             }
             if (s.unloaded) return GuideStep.Done;
@@ -95,7 +99,7 @@ namespace Factory
                 // The unload: the planner and the robot first, then the doors, the vise, the billet.
                 if (s.clientPhase == PickPlacePhase.Executing || s.partSettling) return GuideStep.ExecutingUnload;
                 if (s.clientPhase == PickPlacePhase.Planning) return GuideStep.PlanningUnload;
-                if (s.solutionCount > 0) return GuideStep.ExecuteUnload;
+                if (s.solutionCount > 0) return s.solutionLoading ? GuideStep.PlanningUnload : GuideStep.ExecuteUnload;
                 if (!s.doorsOpen) return GuideStep.OpenDoorsToUnload;
                 if (s.viseClosed) return GuideStep.ReleaseVise;
                 if (s.billetGrabbed) return GuideStep.CarryToConveyor;
@@ -110,7 +114,7 @@ namespace Factory
             }
             if (s.clientPhase == PickPlacePhase.Executing || (s.loadedByRobot && s.partSettling)) return GuideStep.Executing;
             if (s.clientPhase == PickPlacePhase.Planning) return GuideStep.Planning;
-            if (s.solutionCount > 0) return GuideStep.Execute;
+            if (s.solutionCount > 0) return s.solutionLoading ? GuideStep.Planning : GuideStep.Execute;
             if (!s.doorsOpen) return GuideStep.OpenDoors;
             if (s.billetGrabbed) return GuideStep.CarryToVise;
             if (s.recording) return s.billetInVise ? GuideStep.ReleaseInVise : GuideStep.CarryToVise;
@@ -178,6 +182,19 @@ namespace Factory
         /// <summary>Steps after the job ran: the unload.</summary>
         public static bool IsUnload(GuideStep step) => step >= GuideStep.OpenDoorsToUnload && step <= GuideStep.ExecutingUnload;
 
+        /// <summary>"link / obstacle" from the clearance check as the card says it.</summary>
+        public static string Obstacle(string blockedBy)
+        {
+            if (string.IsNullOrEmpty(blockedBy)) return "something";
+            string obstacle = blockedBy.Contains("/") ? blockedBy.Substring(blockedBy.IndexOf('/') + 1).Trim() : blockedBy;
+            string lower = obstacle.ToLowerInvariant();
+            if (lower.StartsWith("vf2") || lower.Contains("door") || lower.Contains("body") || lower.Contains("machine")) return "the machine";
+            if (lower.Contains("stock") || lower.Contains("stand") || lower.Contains("blank")) return "the stock stand";
+            if (lower.Contains("conveyor")) return "the conveyor";
+            if (lower.Contains("vise") || lower.Contains("jaw") || lower.Contains("fixture")) return "the vise";
+            return obstacle;
+        }
+
         const string Trigger = "TRIGGER = the front button under your index finger.";
         const string Grip = "GRIP = the side button under your middle finger.";
         const string PointAndTrigger = "Point the ray at the button and pull the TRIGGER.";
@@ -195,16 +212,28 @@ namespace Factory
                 case GuideStep.PlaceRobot:
                     if (s.handleGrabbed)
                         return new GuideText("Place the robot",
-                            $"Keep dragging. {s.reachable} of {s.targetCount} markers are green. Let go of the GRIP when they all are.",
-                            "Hold GRIP to keep dragging; release it to let go.",
+                            $"Keep dragging. {s.reachable} of {s.targetCount} markers are green, so the robot can reach those spots." +
+                            (s.robotBlocked ? " The ring is red: the robot would touch " + Obstacle(s.robotBlockedBy) + " here." : s.robotTooFar ? " The ring is red: too far from the machine to reach the vise, come closer to the doors." : "") +
+                            " Let go of the GRIP when all six are green and the ring is blue.",
+                            "Hold GRIP to keep dragging; turn your wrist to turn the robot; release to let go.",
                             "The spot right in front of the machine doors, centred, reaches everything.");
+                    if (s.reachable >= s.targetCount && !s.robotBlocked && s.robotTooFar)
+                        return new GuideText("Place the robot",
+                            "All six markers are green, but the ring is red: from here the robot cannot reach into the machine to the vise. Drag the ring closer to the machine doors until the ring turns blue.",
+                            Grip + " Point at the ring first.",
+                            "Right in front of the doors, centred, about a step away from them.");
+                    if (s.reachable >= s.targetCount && s.robotBlocked)
+                        return new GuideText("Place the robot",
+                            $"All six markers are green, but the ring is red: standing here the robot's arm touches {Obstacle(s.robotBlockedBy)}, so it could not move. Drag the ring a little away from it until the ring turns blue.",
+                            Grip + " Point at the ring first. Turn your wrist to turn the robot.",
+                            "Centre the robot in front of the machine doors, a step back from them, square to the machine.");
                     return new GuideText("Place the robot",
-                        "Point the ray at the blue ring on the floor, hold the GRIP and drag the robot until all six markers turn green.",
-                        Grip + " Point at the ring first.",
-                        "The markers turn green when the robot can reach them. Try the spot right in front of the machine doors.");
+                        "The six floating balls mark the places the robot must reach: the billets on the stand, the vise inside the machine and the conveyor. Red means out of reach. Point the ray at the blue ring on the floor, hold the GRIP and drag the robot until all six turn green.",
+                        Grip + " Point at the ring first. Turn your wrist to turn the robot.",
+                        "A marker turns green when the robot can reach it from where it stands. Try the spot right in front of the machine doors.");
                 case GuideStep.ConfirmPlacement:
                     return new GuideText("Confirm the placement",
-                        "All six markers are green. Press 'Confirm placement' on the panel to your left.",
+                        "All six markers are green: the robot can reach the stand, the vise and the conveyor from here. Press 'Confirm placement' on the panel to your left.",
                         PointAndTrigger,
                         "The panel is on your left. The ray comes out of the front of the controller.");
                 case GuideStep.OpenDoors:
@@ -239,9 +268,11 @@ namespace Factory
                         "Good. Hold still a moment: the robot is reading where you put it...",
                         "", "");
                 case GuideStep.Planning:
+                    if (s.solutionLoading)
+                        return new GuideText("The robot is thinking", "The robot found a way. Loading the motion...", "", "");
                     return new GuideText("The robot is thinking",
                         robotOnline ? "The robot is planning how to do the same move. This takes a few seconds."
-                                    : "Waiting for the robot connection... (ask the person next to you)",
+                                    : "Waiting for the robot connection... (ask the demonstration administrator)",
                         "", "");
                 case GuideStep.Execute:
                     return new GuideText("Let the robot do it",
@@ -267,7 +298,9 @@ namespace Factory
                         PointAndTrigger,
                         "The machine panel on your left, the red 'Close Doors' button.");
                 case GuideStep.Machining:
-                    return new GuideText("Machining", "The machine is running the job. Wait for it to finish...", "", "");
+                    return new GuideText("Machining (not simulated)",
+                        "This is where the real machine would mill the part. The demo does not simulate the cut; it moves on to unloading in a moment.",
+                        "", "");
                 case GuideStep.OpenDoorsToUnload:
                     if (s.doorsMoving)
                         return new GuideText("Unload the machine", "The doors are moving...", "", "");
@@ -305,9 +338,11 @@ namespace Factory
                         "Good. Hold still a moment: the robot is reading where you put it...",
                         "", "");
                 case GuideStep.PlanningUnload:
+                    if (s.solutionLoading)
+                        return new GuideText("The robot is thinking", "The robot found a way. Loading the motion...", "", "");
                     return new GuideText("The robot is thinking",
                         robotOnline ? "The robot is planning how to unload the part. This takes a few seconds."
-                                    : "Waiting for the robot connection... (ask the person next to you)",
+                                    : "Waiting for the robot connection... (ask the demonstration administrator)",
                         "", "");
                 case GuideStep.ExecuteUnload:
                     return new GuideText("Let the robot do it",

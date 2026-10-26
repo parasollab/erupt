@@ -120,12 +120,35 @@ public static class GuideProbe
             mouse.JumpTo(new Vector3(0f, 1.6f, -0.8f), new Vector3(0f, 0.8f, 1f));
             await Task.Delay(300);
 
+            // Walk up to the machine: the card's spot lies inside it; the card must come forward and shrink.
+            mouse.JumpTo(new Vector3(0.1f, 1.55f, 0.75f), new Vector3(0.1f, 1.1f, 2.5f));
+            await Task.Delay(1500);
+            float occludedDist = Vector3.Distance(follow.transform.position, cam.transform.position);
+            Check(follow.Occluded && follow.ScaleFactor < 0.9f && occludedDist < follow.offset.magnitude * 0.9f,
+                  $"card pulled in front of the machine (scale {follow.ScaleFactor:F2}, {occludedDist:F2} m from the eye)");
+            Shot(outDir, "guide_card_occlusion", cam);
+            mouse.JumpTo(new Vector3(0f, 1.6f, -0.8f), new Vector3(0f, 0.8f, 1f));
+            await Task.Delay(1500);
+            Check(!follow.Occluded && Mathf.Abs(follow.ScaleFactor - 1f) < 0.02f, $"card back at full size away from the machine (scale {follow.ScaleFactor:F2})");
+
             Vector3 toIdeal = ctl.DefaultHandlePose.position - ctl.Handle.position;
             ctl.Nudge(toIdeal.x, toIdeal.z);
             ctl.Rotate(-Mathf.DeltaAngle(ctl.DefaultHandlePose.rotation.eulerAngles.y, ctl.Handle.rotation.eulerAngles.y));
             await Task.Delay(300);
             Check(ctl.Markers.ReachableCount == ctl.Markers.Count, "all markers reachable at the ideal spot");
+            Check(ctl.RobotClear, $"robot clear of the cell at the ideal spot ({ctl.RobotBlockedBy ?? "clear"})");
             Check(guide.Step == GuideStep.ConfirmPlacement, $"all green -> ConfirmPlacement (is {guide.Step})");
+            // 20 cm left and turned 20 deg: every marker is still green but the resting arm intersects the machine;
+            // the ring must go red, the guide must stay on PlaceRobot and say so.
+            ctl.Nudge(-0.2f, 0f); ctl.Rotate(-20f);
+            await Task.Delay(400);
+            Log($"blocked spot: markers {ctl.Markers.ReachableCount}/{ctl.Markers.Count}, clear {ctl.RobotClear} ({ctl.RobotBlockedBy})");
+            Check(!ctl.RobotClear, $"20 cm left + 20 deg: the robot touches the cell ({ctl.RobotBlockedBy})");
+            Check(guide.Step == GuideStep.PlaceRobot && card.InstructionText != null && card.InstructionText.Contains("ring is red"), $"guide stays on PlaceRobot and explains the red ring (step {guide.Step}: '{card.InstructionText}')");
+            Shot(outDir, "guide_place_blocked", cam);
+            ctl.Nudge(0.2f, 0f); ctl.Rotate(20f);
+            await Task.Delay(400);
+            Check(ctl.RobotClear && guide.Step == GuideStep.ConfirmPlacement, $"back at the ideal spot: clear again, ConfirmPlacement (is {guide.Step})");
             Check(guide.TargetDocument != null && guide.TargetElementName == "placementConfirmButton", "target is the Confirm button");
             await Task.Delay(600);
             Check(highlight.Visible && highlight.PulsedElement != null && highlight.PulsedElement.name == "placementConfirmButton", "Confirm button framed and pulsing");

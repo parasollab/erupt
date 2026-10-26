@@ -6,13 +6,13 @@
   <Project Path="Unity.Robotics.UrdfImporter.csproj" />
   <Project Path="Erupt.Interaction.Core.csproj" />
   <Project Path="RADER.csproj" />
+  <Project Path="Erupt.Ros.Tests.csproj" />
   <Project Path="Erupt.Ui.Tests.csproj" />
   <Project Path="Unity.XR.Interaction.Toolkit.Samples.DeviceSimulator.csproj" />
   <Project Path="Erupt.Interaction.Tests.csproj" />
   <Project Path="Unity.Robotics.ROSTCPConnector.Editor.csproj" />
   <Project Path="Unity.Robotics.Visualizations.csproj" />
   <Project Path="AprilTag.Runtime.csproj" />
-  <Project Path="Erupt.Ros.Tests.csproj" />
   <Project Path="XRViz.Editor.csproj" />
   <Project Path="Erupt.Interaction.Backends.OpenXR.csproj" />
   <Project Path="Unity.XR.Interaction.Toolkit.Samples.Hands.csproj" />

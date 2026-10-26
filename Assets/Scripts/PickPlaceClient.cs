@@ -446,6 +446,18 @@ public class PickPlaceClient : MonoBehaviour
         return colon < 0 ? taskId : taskId.Substring(0, colon);
     }
 
+    /// <summary>
+    /// Drops the current task (solution ids, caches, description) without starting a new plan,
+    /// as if no plan had been made: the demo restart and a robot reposition, after which the
+    /// listed solutions belong to a scene that no longer exists. Refused while a goal is active.
+    /// </summary>
+    public bool ForgetTask()
+    {
+        if (Busy) return false;
+        BeginTask();
+        return true;
+    }
+
     private void BeginTask()
     {
         taskGeneration++;

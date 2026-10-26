@@ -58,6 +58,14 @@ public class MTCDashboardPanel : MonoBehaviour
     /// <summary>Solution chosen in the browser; its message arrives with the /get_solution response.</summary>
     public uint? SelectedSolutionId { get; private set; }
     public SolutionMsg SelectedSolution { get; private set; }
+    /// <summary>
+    /// The selected solution has been fetched (its steps are known), or its fetch has given up:
+    /// guided mode offers Execute only then, so the execute goal never queues behind a multi-MB
+    /// /get_solution reply on the same connection. Execution itself only needs the id.
+    /// </summary>
+    public bool SolutionReady => SelectedSolutionId != null && (SelectedSolution != null || _fetchGaveUp);
+    private bool _fetchGaveUp;      // the guided auto-selection's fetch timed out: no retry loop, Execute allowed
+    private bool _autoSelectedTask; // guided mode auto-selects once per task
     public VisualElement Root => root;
     public bool GuidedMode => guidedMode;
 
@@ -302,10 +310,12 @@ public class MTCDashboardPanel : MonoBehaviour
     private void RefreshControls()
     {
         bool busy = Busy;
-        if (guidedMode && !busy && SelectedSolutionId == null && Client != null && Client.SolutionIds.Count > 0)
+        if (guidedMode && !busy && SelectedSolutionId == null && !_autoSelectedTask && Client != null && Client.SolutionIds.Count > 0)
         {
             // A plan just finished: pick its best solution and bring Execute into view. SelectSolution
-            // refreshes the list, which refreshes the controls again with the id already set.
+            // refreshes the list, which refreshes the controls again with the id already set. Once per
+            // task: a fetch that times out must not re-select and re-fetch forever (headset Wi-Fi).
+            _autoSelectedTask = true;
             SelectSolution(Client.SolutionIds[0]);
             ShowTab(panelSolutions);
             return;
@@ -323,7 +333,9 @@ public class MTCDashboardPanel : MonoBehaviour
         if (planCancelButton != null)
             planCancelButton.text = Client?.Phase == PickPlacePhase.Executing ? "Cancel Execution" : "Cancel Planning";
         cancelExecuteButton?.SetEnabled(busy);
-        executeButton?.SetEnabled(!busy && SelectedSolutionId != null && Client != null && Client.ExecutionAvailable);
+        // Guided mode waits for the fetch: a several-MB /get_solution reply still streaming in shares the TCP
+        // connection with the execute goal and its feedback, which showed as seconds of lag after the press.
+        executeButton?.SetEnabled(!busy && SelectedSolutionId != null && (!guidedMode || SolutionReady) && Client != null && Client.ExecutionAvailable);
         RefreshProgress();
         RefreshStages();
         RefreshBreakdown();
@@ -574,6 +586,8 @@ public class MTCDashboardPanel : MonoBehaviour
         StageSolutionStatus = null;
         SelectedSolutionId = null;
         SelectedSolution = null;
+        _fetchGaveUp = false;
+        _autoSelectedTask = false;
         hasSelectedStage = false;
         stageSolutionsContainer?.Clear();
         RefreshAll();
@@ -626,10 +640,20 @@ public class MTCDashboardPanel : MonoBehaviour
                 SelectedSolution = solution;
                 RefreshSolutionList();
                 RefreshStageSolutions(); // the selected stage can now be previewed in it
+                RefreshControls();       // guided mode: Execute becomes available now
             },
             message =>
             {
                 if (SelectedSolutionId != solutionId) return;
+                if (guidedMode)
+                {
+                    // Keep the id: Execute works by id, only the preview / breakdown need the steps.
+                    _fetchGaveUp = true;
+                    if (execStatusLabel != null) execStatusLabel.text = $"Solution {solutionId} details unavailable ({message}); Execute still works.";
+                    RefreshSolutionList();
+                    RefreshControls();
+                    return;
+                }
                 SelectedSolutionId = null;
                 if (execStatusLabel != null) execStatusLabel.text = $"Solution {solutionId} unavailable: {message}";
                 RefreshSolutionList();

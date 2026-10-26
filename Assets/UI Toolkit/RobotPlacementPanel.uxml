@@ -26,12 +26,12 @@
             <ui:Button text="Confirm placement" name="placementConfirmButton" selectable="false" focusable="false" class="mtc-button mtc-button--primary" style="flex-grow: 0; height: 48px; font-size: 18px;" />
         </ui:VisualElement>
         <ui:VisualElement name="placementConfirmedPanel" class="mtc-panel" style="display: none;">
-            <ui:Label text="PLACEMENT" class="mtc-section" />
-            <ui:Button text="Reposition robot" name="placementRepositionButton" selectable="false" focusable="false" class="mtc-button mtc-button--danger" style="flex-grow: 0; margin-top: 6px; margin-bottom: 6px; height: 48px; font-size: 18px;" />
-            <ui:Label text="Available once no plan is recording or executing." name="placementRepositionHint" class="mtc-empty" style="white-space: normal;" />
-            <ui:Label text="NEXT USER" class="mtc-section" style="margin-top: 14px;" />
-            <ui:Button text="Restart demo" name="placementRestartButton" selectable="false" focusable="false" class="mtc-button mtc-button--danger" style="flex-grow: 0; margin-top: 6px; margin-bottom: 6px; height: 48px; font-size: 18px;" />
+            <ui:Label text="NEXT USER" class="mtc-section" />
+            <ui:Button text="Restart demo" name="placementRestartButton" selectable="false" focusable="false" class="mtc-button mtc-button--primary" style="flex-grow: 0; margin-top: 6px; margin-bottom: 6px; height: 56px; font-size: 20px;" />
             <ui:Label text="Everything back to the start: billets on the stand, vise open, doors closed, robot at its start spot, guide on step 1." class="mtc-empty" style="white-space: normal;" />
+            <ui:Label text="ADJUST" class="mtc-section" style="margin-top: 40px;" />
+            <ui:Button text="Move the robot again" name="placementRepositionButton" selectable="false" focusable="false" class="mtc-button" style="flex-grow: 0; margin-top: 6px; margin-bottom: 6px; height: 36px; font-size: 14px;" />
+            <ui:Label text="Keeps everything else as it is. Available once no plan is recording or executing." name="placementRepositionHint" class="mtc-empty" style="white-space: normal;" />
         </ui:VisualElement>
     </ui:VisualElement>
 </ui:UXML>

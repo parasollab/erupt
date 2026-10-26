@@ -20,6 +20,26 @@ namespace Erupt.Ros.Tests
         };
 
         [Test]
+        public void Placement_StaysOnPlaceRobot_WhileTheRobotTouchesTheCell()
+        {
+            var s = new GuideSignals { welcomeDone = true, placing = true, reachable = 6, targetCount = 6, robotBlocked = true, robotBlockedBy = "fr3_link6 / vf2_body" };
+            Assert.AreEqual(GuideStep.PlaceRobot, DemoGuideSteps.Resolve(s), "all green but the arm touches the machine: not confirmable yet");
+            GuideText t = DemoGuideSteps.Describe(GuideStep.PlaceRobot, s, true);
+            StringAssert.Contains("ring is red", t.instruction);
+            StringAssert.Contains("the machine", t.instruction);
+            s.handleGrabbed = true;
+            StringAssert.Contains("the machine", DemoGuideSteps.Describe(GuideStep.PlaceRobot, s, true).instruction);
+            s.handleGrabbed = false; s.robotBlocked = false;
+            Assert.AreEqual(GuideStep.ConfirmPlacement, DemoGuideSteps.Resolve(s));
+            s.robotTooFar = true;
+            Assert.AreEqual(GuideStep.PlaceRobot, DemoGuideSteps.Resolve(s), "too far from the machine: not confirmable");
+            StringAssert.Contains("closer", DemoGuideSteps.Describe(GuideStep.PlaceRobot, s, true).instruction);
+            s.robotTooFar = false;
+            Assert.AreEqual("the stock stand", DemoGuideSteps.Obstacle("fr3_hand / RawStockStand"));
+            Assert.AreEqual("something", DemoGuideSteps.Obstacle(null));
+        }
+
+        [Test]
         public void FreshScene_StartsWithTheWelcome()
         {
             var s = new GuideSignals { placing = true, targetCount = 6 };
@@ -73,7 +93,10 @@ namespace Erupt.Ros.Tests
             s.billetSelected = true;
             s.clientPhase = PickPlacePhase.Planning;
             Assert.AreEqual(GuideStep.Planning, DemoGuideSteps.Resolve(s));
-            s.clientPhase = PickPlacePhase.Idle; s.solutionCount = 3;
+            s.clientPhase = PickPlacePhase.Idle; s.solutionCount = 3; s.solutionLoading = true;
+            Assert.AreEqual(GuideStep.Planning, DemoGuideSteps.Resolve(s), "solutions listed but not fetched yet: still waiting");
+            StringAssert.Contains("Loading", DemoGuideSteps.Describe(GuideStep.Planning, s, true).instruction);
+            s.solutionLoading = false;
             Assert.AreEqual(GuideStep.Execute, DemoGuideSteps.Resolve(s));
             s.clientPhase = PickPlacePhase.Executing;
             Assert.AreEqual(GuideStep.Executing, DemoGuideSteps.Resolve(s));

@@ -16,7 +16,7 @@ namespace Factory
         [SerializeField] private UIDocument uiDocument;
         [SerializeField] private DemoGuide guide;
         [SerializeField, Tooltip("Shown on the hint line after the second escalation.")]
-        private string helpLine = "Stuck? Ask the person next to you.";
+        private string helpLine = "Stuck? Ask the demonstration administrator.";
 
         private VisualElement root;
         private Label stepLabel, statusLabel, titleLabel, instructionLabel, controllerLabel, hintLabel, noticeLabel;
@@ -86,11 +86,15 @@ namespace Factory
             Set(statusLabel, guide.RobotOnline ? "" : "ROBOT OFFLINE");
             Set(titleLabel, text.title);
             Set(instructionLabel, text.instruction);
-            Set(controllerLabel, text.controller);
 
+            // The panel cannot grow, so at most one block sits under the instruction besides the
+            // help line: the controller line while the step is fresh, the hint once the user has
+            // been on it a while, and a notice (plan failed, part fell) in place of either.
+            bool hasNotice = !string.IsNullOrEmpty(guide.Notice);
             string hint = "";
-            if (guide.Escalation >= 1 && !string.IsNullOrEmpty(text.hint)) hint = text.hint;
+            if (!hasNotice && guide.Escalation >= 1 && !string.IsNullOrEmpty(text.hint)) hint = text.hint;
             if (guide.Escalation >= 2) hint = string.IsNullOrEmpty(hint) ? helpLine : hint + "\n" + helpLine;
+            Set(controllerLabel, hasNotice || guide.Escalation >= 1 ? "" : text.controller);
             Set(hintLabel, hint);
             Set(noticeLabel, guide.Notice ?? "");
         }

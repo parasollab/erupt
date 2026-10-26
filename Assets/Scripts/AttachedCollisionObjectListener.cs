@@ -157,6 +157,32 @@ public class AttachedCollisionObjectListener : MonoBehaviour
     }
 
     /// <summary>
+    /// Puts every object still held under a robot link back under its own parent, at once, with
+    /// its publisher live (demo restart). The caller clears the planning scene itself
+    /// (<see cref="CollisionObjectPublisher.DetachAllFromRobot"/>); MoveIt's re-ADD at the gripper pose is skipped
+    /// as any echo of a Unity-owned object is (the object's own publisher moves it next), so no re-ADD pose is awaited
+    /// and the watcher's later detach notices find nothing to do. Returns how many were released.
+    /// </summary>
+    public int ReleaseAll()
+    {
+        int n = 0;
+        foreach (var kv in attached)
+        {
+            sceneListener?.attachedIds.Remove(kv.Key);
+            sceneListener?.awaitingDetachPose.Remove(kv.Key);
+            if (kv.Value.go == null) continue;
+            Restore(kv.Value, keepSilent: false);
+            n++;
+            Debug.Log($"[ACO Listener] Released '{kv.Key}' (restart).");
+        }
+        attached.Clear();
+        pendingAttach.Clear();
+        pendingResume.Clear();
+        expectedDetached.Clear();
+        return n;
+    }
+
+    /// <summary>
     /// Applies an attach (operation ADD) or detach (REMOVE) that the executing solution says
     /// has just happened: the server reports each solution step done the moment MoveIt applies
     /// its scene diff, which reaches Unity well before the planning-scene watcher's notice on

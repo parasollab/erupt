@@ -239,3 +239,55 @@ put the billet back (or the preview restored it) the publisher sent a position o
 new poses, inside the platter. `ReleasedPartGravity` had switched the billet's rigidbody to `Interpolate` for the fall and
 left it there; an interpolating kinematic body reports a blended transform for one frame after every teleport. The drop
 routine now restores the previous interpolation mode when the part freezes.
+
+## Second run after "Restart demo" (`SecondRunProbe.cs`)
+
+Same copy-to-`Assets/Editor/` recipe, ROS stack up, run **without** `-nographics`. Reproduces "planning always fails on
+the second run": `RUN1=full` (default) does load plan + execute, clamp, close, machining, open, release, unload plan +
+execute, then `DemoReset.Restart` and the load again; `RUN1=load` stops after the load execution; `RUN1=plan` after the
+load plan; `RUN1=cancel` restarts 4 s into the load execution (the billet attached in MoveIt). `RUN2_DX` / `RUN2_YAW`
+offset every later placement from the ideal spot; `RUNS=N` repeats the cycle (default 2), `CANCEL_AT` sets when the
+mid-execution restart happens. Logs each plan's outcome, status and MTC stage statistics plus the
+publishers' attached flags, the vise and the billets before every plan.
+
+```
+RUN1=cancel "/Applications/Unity/Hub/Editor/6000.2.1f1/Unity.app/Contents/MacOS/Unity" -batchmode \
+  -projectPath "$PWD" -executeMethod SecondRunProbe.Run -logFile /tmp/secondrun.log
+grep '\[PROBE' /tmp/secondrun.log
+```
+
+2026-10-26: `full` passed (3 plans, 2 executions, restart, plan OK) but `cancel` reproduced it: after the cancelled
+execution MoveIt kept `blank_4` attached to `fr3_link8`, every later plan aborted in 0.3 s with `grasp pose IK`
+0/25, and the attached body survived into the next Unity session (its first plan failed too, and the ACO listener
+rebuilt/destroyed the billet). Fix: `DemoReset` releases attached objects locally (`AttachedCollisionObjectListener.ReleaseAll`)
+and detaches every body from the robot in one `/apply_planning_scene` robot_state diff
+(`CollisionObjectPublisher.DetachAllFromRobot`); `RobotPlacementController` does the same once at start when the planner
+comes up. Everything is re-ADDed on Confirm. Not a remove-all: the watcher echoes world REMOVEs and the scene listener
+destroys the Unity object behind a REMOVE of an id it owns (a first attempt with detach + remove-all deleted every billet).
+
+Later the same day, `RUNS=3 RUN1=full` passed (three loads, two unloads, two restarts) but `RUNS=3 RUN1=cancel CANCEL_AT=7`
+(restart a second after the robot let go of the billet) failed the next plan after 5.6 s with `place pose IK` 0/160: the
+billet was still "settling" so `PartRecovery.ReturnAll` skipped it and it stayed in the vise, where every place pose then
+collided. `DemoReset` now calls `ReturnAll(force: true)` (only a part in a hand is skipped) and rescans the vise. Exit codes: 0 second plan OK, 5 first plan failed, 6 second plan OK only on retry, 7 both failed.
+
+### Planning fails at a hand-placed robot (2026-10-26, night)
+
+`RUNS=2 RUN1=plan RUN2_DX=-0.2 RUN2_YAW=-20` reproduced "planning consistently fails" in VR: at the ideal spot a plan
+succeeds; 20 cm left and turned 20 deg, with all six reach markers green, every plan aborts in 0.2 s at `open hand`
+(0/1). The probe's `/check_state_validity` query after Confirm (`RobotClearanceCheck.QueryRosStateValidity`) names the
+reason: `vf2_body <-> panda_hand` (41 mm), link6, link7 and a finger, i.e. the resting arm stands inside the machine
+body, so MTC's first motion starts in collision. Neither dx nor yaw alone fails. Fixes: `RobotClearanceCheck` on the
+reach-markers root boxes every robot collider and overlaps it with the station + machine colliders (the machine's
+collision meshes now also carry query-only MeshColliders, excludeLayers = everything); the controller tints the ring
+red, the guide stays on PlaceRobot and says what the arm touches, the panel warns; the Unity arm mirrors /joint_states
+while placing so the test sees the planner's start pose; and a plan that dies at `open hand` / `current state` leaves a
+notice telling the user to reposition. GuideProbe checks the blocked spot (`guide_place_blocked` shot).
+
+Later that night the headset log (logcat buffer enlarged to 16 MB) showed the real VR failure: robot confirmed at
+(0.01, 0.75, 0.84), i.e. 16 cm further from the doors than authored, square, six green markers, and three plans
+aborting after 40-50 s each (`grasp pose IK` solves, the place into the vise does not). `RUN2_DZ` sweep: 8 and 12 cm
+back plan (vise 0.60 / 0.64 m from the base axis), 16 cm back fails (0.68 m); 30 cm left is caught by the clearance
+check, 30 cm right by the markers (5/6), +-30 deg plans. The obstacle-carved `/reachability_map` after Confirm is not a
+usable gate (0/6 even where planning succeeds). Hence `RobotPlacementController.insideMachineMaxReach` = 0.65 m (vise
+drop anchor to base axis, horizontal): beyond it the ring is red, the guide keeps PlaceRobot ("come closer to the
+doors"), the panel warns.

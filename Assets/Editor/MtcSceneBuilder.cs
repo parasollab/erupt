@@ -533,6 +533,8 @@ public static class MtcSceneBuilder
     private const string PlacementRootName = "RobotPlacement";
     private const string PlacementHandleName = "RobotPlacementHandle";
     private const string ReachMarkersName = "ReachTargetMarkers";
+    private const float ReachMarkerRadius = 0.03f;
+    private const string OverlayShaderName = "Factory/OverlayUnlit"; // Assets/Shaders/Factory/OverlayUnlit.shader: ZTest Always
     private const string PlacementMenuName = "RobotPlacementMenu";
     private const string DesktopRigName = "Desktop Mouse Rig";
     private const string PlacementPanelUxmlPath = "Assets/UI Toolkit/RobotPlacementPanel.uxml";
@@ -550,6 +552,9 @@ public static class MtcSceneBuilder
     // conveyor, and the pose must lie inside the bounds (the validator checks both).
     private static readonly Vector2 PlacementStartOffset = new Vector2(0.8f, -0.8f);
     private const float PlacementStartYaw = 35f;
+    // Horizontal distance base axis -> vise drop anchor beyond which the load plan fails although the free-space
+    // reach markers are green (2026-10-26 plan-only sweep: 0.52 authored and 0.64 plan, 0.68 fails after 45 s).
+    private const float PlacementInsideMachineMaxReach = 0.65f;
 
     // Demo guide (Factory.DemoGuide and friends): the step director root, its head-following
     // instruction card (a stripped planning-menu panel, GuideCard.uxml), the target highlight and
@@ -557,14 +562,20 @@ public static class MtcSceneBuilder
     private const string GuideRootName = "DemoGuide";
     private const string GuideCardName = "GuideCard";
     private const string GuideCardUxmlPath = "Assets/UI Toolkit/GuideCard.uxml";
-    private const float GuideCardHeight = 270f; // document units (300 wide): 0.6 x 0.54 m at the prefab's 0.2 scale, room for title + 4 lines + hint + notice
+    private const float GuideCardHeight = 320f; // document units (300 wide): 0.6 x 0.64 m at the prefab's 0.2 scale; the longest instruction + hint + help line (or notice) fit with margin (text ran to the edge at 270)
     // Card centre in the camera's local frame: lower right of the view, so it covers neither the
     // stock stand and vise in the middle nor the buttons the guide points at (Open Doors top-left of
     // the left panel, Execute bottom-left of the right panel).
-    private static readonly Vector3 GuideCardOffset = new Vector3(0.5f, -0.36f, 1.5f);
+    private static readonly Vector3 GuideCardOffset = new Vector3(0.5f, -0.38f, 1.5f);
     private const float GuideHintAfterSeconds = 30f, GuideHelpAfterSeconds = 75f;
-    // The machine "runs the job" this long with the doors closed before the guide moves on to the unload.
-    private const float GuideMachiningSeconds = 8f;
+    // The guide pauses this long with the doors closed where the real machine would run the job (nothing is
+    // simulated; the card says so) before it moves on to the unload.
+    private const float GuideMachiningSeconds = 5f;
+    // Where the user stands: the spot the cell is authored around (panels face it, the machine is ahead on +z).
+    // SpawnHuman snaps the headset here once tracking is live, so the user does not start wherever they
+    // happen to stand in the room; "Restart demo" snaps again for the next user.
+    private const string UserSpawnName = "UserSpawn";
+    private static readonly Vector3 UserSpawnPosition = Vector3.zero;
     private const float ConveyorZoneRadius = 0.25f; // around the conveyor's DropAnchor: where the unload release counts
     private static readonly Color GuideHighlightColor = new Color(1f, 0.8f, 0.2f);
     // A billet outside this box (or under the floor) goes back to the stand: the cell plus the
@@ -610,7 +621,7 @@ public static class MtcSceneBuilder
 
     private static void LayoutVf2Cell(Scene scene, Composition c)
     {
-        foreach (string name in new[] { "Machines", FactoryStationRoot, DoorMenuName, PlacementRootName, PlacementHandleName, ReachMarkersName, PlacementMenuName, GuideRootName, GuideCardName })
+        foreach (string name in new[] { "Machines", FactoryStationRoot, DoorMenuName, PlacementRootName, PlacementHandleName, ReachMarkersName, PlacementMenuName, GuideRootName, GuideCardName, UserSpawnName })
         {
             GameObject old = scene.GetRootGameObjects().FirstOrDefault(r => r.name == name);
             if (old == null) continue;
@@ -650,11 +661,27 @@ public static class MtcSceneBuilder
         if (doorBounds.center.z > bodyBounds.center.z)
             throw new InvalidOperationException("VF-2 doors are not on the user side; check the prefab's front axis");
         machine.transform.position = new Vector3(MachineXOffset - doorBounds.center.x, 0f, DoorPlaneZ - doorBounds.min.z);
+        int queryColliders = 0;
         foreach (CollisionObjectPublisher pub in machine.GetComponentsInChildren<CollisionObjectPublisher>(true))
         {
             pub.worldOrigin = c.baseTransform;
             EditorUtility.SetDirty(pub);
+            // Relayout keeps the built machine: make sure every collision mesh is also a query-only Unity
+            // collider (the robot clearance check and rays must see what MoveIt sees).
+            var mfCol = pub.GetComponent<MeshFilter>();
+            if (pub.isMesh && mfCol != null && mfCol.sharedMesh != null)
+            {
+                var mc = pub.GetComponent<MeshCollider>();
+                if (mc == null) mc = pub.gameObject.AddComponent<MeshCollider>(); // Unity fake-null: no ?? here
+                mc.sharedMesh = mfCol.sharedMesh;
+                mc.convex = false;
+                mc.isTrigger = false;
+                mc.excludeLayers = ~0;
+                EditorUtility.SetDirty(mc);
+                queryColliders++;
+            }
         }
+        Line($"{queryColliders} machine collision mesh(es) carry a query-only MeshCollider");
         Bounds placed = RendererBounds(machine.transform);
         Line($"{MachineName} at {machine.transform.position}, bounds {placed.min} .. {placed.max}, door front z = {DoorPlaneZ}");
         Bounds platterBounds = RendererBounds(FindChild(machine, "Platter"));
@@ -795,6 +822,7 @@ public static class MtcSceneBuilder
         (Factory.RobotPlacementController placementController, Factory.RobotPlacementPanel placementPanel, GameObject placementHandle) =
             BuildPlacementStage(scene, c, pedestal, visualizer, doorMenu, reachTargets);
         BuildMachineDesktopInput(scene, station, vise, doors, gravity, doorMenu);
+        ConfigureHandStickTranslation(scene);
         BuildDemoGuide(scene, c, placementController, placementPanel, placementHandle, doorMenu.GetComponentInChildren<Factory.MachineDoorPanel>(true),
                        doors, vise, gravity, billets, conveyor.Find("DropAnchor"));
 
@@ -994,7 +1022,7 @@ public static class MtcSceneBuilder
         var grab = handle.AddComponent<XRGrabInteractable>();
         grab.movementType = XRBaseInteractable.MovementType.Instantaneous;
         grab.trackPosition = true;
-        grab.trackRotation = false; // turning is done with the panel's buttons
+        grab.trackRotation = true; // turns with the wrist like any grabbed object (the floor-yaw transformer keeps it upright); the panel's turn buttons remain
         grab.trackScale = false;
         grab.throwOnDetach = false;
         grab.useDynamicAttach = true;
@@ -1031,15 +1059,33 @@ public static class MtcSceneBuilder
         SceneManager.MoveGameObjectToScene(markersGo, scene);
         var markerSet = markersGo.AddComponent<Factory.ReachTargetMarkerSet>();
         SetRef(markerSet, "reachability", visualizer);
-        SetRef(markerSet, "markerMaterial", MakeMaterial("ReachMarker", Color.white, 0.3f, 0f));
+        // Drawn over everything: the stock-slot markers sit inside the stacked billets and the vise marker behind the closed doors.
+        SetRef(markerSet, "markerMaterial", MakeOverlayMaterial("ReachMarkerOverlay", new Color(1f, 1f, 1f, 0.9f)));
+        SetFloat(markerSet, "markerRadius", ReachMarkerRadius);
         SetArray(markerSet, "targets", targets.Cast<UnityEngine.Object>().ToArray());
         Line($"{ReachMarkersName}: {targets.Count} targets ({string.Join(", ", targets.Select(t => Path(t)))})");
+        // A seventh condition: the robot's resting arm must not intersect the cell where it stands (markers can all
+        // be green 20 cm left of the ideal spot, turned 20 deg, and the first motion still starts in collision).
+        var clearance = markersGo.AddComponent<Factory.RobotClearanceCheck>();
+        SetRef(clearance, "robotRoot", c.fr3);
+        var obstacleRoots = new List<UnityEngine.Object>();
+        foreach (string n in new[] { FactoryStationRoot, "Machines" })
+        {
+            GameObject rootGo = scene.GetRootGameObjects().FirstOrDefault(r => r.name == n);
+            if (rootGo != null) obstacleRoots.Add(rootGo.transform);
+        }
+        SetArray(clearance, "obstacleRoots", obstacleRoots.ToArray());
+        SetArray(clearance, "excludeRoots", pedestal != null ? new UnityEngine.Object[] { pedestal.transform } : new UnityEngine.Object[0]);
+        Line($"{ReachMarkersName}: RobotClearanceCheck against {obstacleRoots.Count} root(s), pedestal excluded");
 
         // --- the controller -------------------------------------------------------------------
         var placementRoot = new GameObject(PlacementRootName);
         SceneManager.MoveGameObjectToScene(placementRoot, scene);
         var controller = placementRoot.AddComponent<Factory.RobotPlacementController>();
         SetRef(controller, "robotRoot", c.fr3);
+        SetRef(controller, "clearance", markersGo.GetComponent<Factory.RobotClearanceCheck>());
+        SetRef(controller, "insideMachineTarget", targets[0]); // the fixture's DropAnchor: the one target behind the door opening
+        SetFloat(controller, "insideMachineMaxReach", PlacementInsideMachineMaxReach);
         SetRef(controller, "pedestal", pedestal.transform);
         SetRef(controller, "baseAnchor", c.baseTransform.transform);
         SetRef(controller, "handle", handle.transform);
@@ -1160,6 +1206,7 @@ public static class MtcSceneBuilder
         SetRef(reset, "guide", guide);
         SetRef(reset, "selection", c.selection);
         SetRef(placementPanel, "reset", reset);
+        BuildUserSpawn(scene, reset);
 
         var highlight = root.AddComponent<Factory.GuideTargetHighlight>();
         SetRef(highlight, "guide", guide);
@@ -1184,11 +1231,103 @@ public static class MtcSceneBuilder
         doc.transform.localPosition = new Vector3(-1.5f, GuideCardHeight / 200f, 0f);
         var follow = card.AddComponent<Factory.GuideHeadFollow>();
         follow.offset = GuideCardOffset;
+        // The machine's mesh colliders are not convex (a ray from inside hits nothing), so the card also treats these
+        // roots' renderer bounds as obstacles.
+        var occluders = new List<UnityEngine.Object>();
+        foreach (string n in new[] { FactoryStationRoot, "Machines", HallRootName })
+        {
+            GameObject rootGo = scene.GetRootGameObjects().FirstOrDefault(r => r.name == n);
+            if (rootGo != null) occluders.Add(rootGo.transform);
+        }
+        SetArray(follow, "occluderRoots", occluders.ToArray());
         var cardUi = doc.gameObject.AddComponent<Factory.GuideInstructionCard>();
         SetRef(cardUi, "uiDocument", doc);
         SetRef(cardUi, "guide", guide);
         Line($"{GuideCardName}: {GuideCardUxmlPath} {300}x{GuideCardHeight} following the head at camera offset {GuideCardOffset}; " +
              $"{card.GetComponentsInChildren<Component>(true).Count(x => x is Collider || x is XRBaseInteractable)} interactive component(s) left");
+    }
+
+    // Thumbstick on a grabbed object (2026-10-26 VR test): while a hand holds something at the end of its ray,
+    // its stick pushes/pulls the object along the ray; it never rotates it (the vendored near-far variant
+    // rotates on the stick's x axis by default). Both hands' far interactors under the Meta rig get the
+    // hand's "Translate Manipulation" action; rotate / directional readers are unbound. StickLocomotion
+    // already ignores a hand's stick while that hand's Select is held.
+    private const string XriInputActionsPath = "Assets/Samples/XR Interaction Toolkit/3.2.1/Starter Assets/XRI Default Input Actions.inputactions";
+    private const float StickTranslateSpeed = 0.8f; // m/s at full deflection
+    private const int InputSourceUnused = 0, InputSourceActionReference = 2; // XRInputValueReader.InputSourceMode
+
+    private static void ConfigureHandStickTranslation(Scene scene)
+    {
+        GameObject rig = scene.GetRootGameObjects().FirstOrDefault(r => r.name == MetaCameraRigName);
+        if (rig == null) { Line($"No '{MetaCameraRigName}' root; stick translation skipped"); return; }
+        // XRViz.Editor does not reference Unity.InputSystem: the InputActionReference sub-assets are matched by type name.
+        var refs = AssetDatabase.LoadAllAssetsAtPath(XriInputActionsPath).Where(o => o != null && o.GetType().Name == "InputActionReference").ToList();
+        foreach ((string anchorName, string hand) in new[] { ("LeftHandAnchor", "Left"), ("RightHandAnchor", "Right") })
+        {
+            Transform anchor = rig.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name == anchorName);
+            if (anchor == null) { Line($"'{MetaCameraRigName}' has no '{anchorName}'; stick translation skipped"); continue; }
+            string actionName = $"XRI {hand} Interaction/Translate Manipulation";
+            var translate = refs.FirstOrDefault(r => r.name == actionName)
+                            ?? throw new InvalidOperationException($"'{actionName}' not found in {XriInputActionsPath}");
+            int attaches = 0, rays = 0;
+            // The near-far's own manipulation input only works in far mode (and the vendored variant rotates on
+            // stick x); HeldObjectStickTranslate on the anchor pushes/pulls in near and far mode instead.
+            foreach (var attach in anchor.GetComponentsInChildren<UnityEngine.XR.Interaction.Toolkit.Attachment.InteractionAttachController>(true))
+            {
+                var so = new SerializedObject(attach);
+                so.FindProperty("m_UseManipulationInput").boolValue = false;
+                so.FindProperty("m_ManipulationXAxisMode").intValue = (int)UnityEngine.XR.Interaction.Toolkit.Attachment.InteractionAttachController.ManipulationXAxisMode.None;
+                so.FindProperty("m_ManipulationYAxisMode").intValue = (int)UnityEngine.XR.Interaction.Toolkit.Attachment.InteractionAttachController.ManipulationYAxisMode.Translate;
+                so.ApplyModifiedPropertiesWithoutUndo();
+                attaches++;
+            }
+            var nearFar = anchor.GetComponentInChildren<NearFarInteractor>(true);
+            var stickTranslate = anchor.GetComponent<Factory.HeldObjectStickTranslate>();
+            if (nearFar != null)
+            {
+                if (stickTranslate == null) stickTranslate = anchor.gameObject.AddComponent<Factory.HeldObjectStickTranslate>();
+                var actions = AssetDatabase.LoadMainAssetAtPath(XriInputActionsPath) ?? throw new InvalidOperationException($"{XriInputActionsPath} missing");
+                SetRef(stickTranslate, "inputActions", actions);
+                SetRef(stickTranslate, "interactor", nearFar);
+                var sso = new SerializedObject(stickTranslate);
+                sso.FindProperty("actionMap").stringValue = $"XRI {hand} Interaction";
+                sso.FindProperty("actionName").stringValue = "Translate Manipulation";
+                sso.FindProperty("speed").floatValue = StickTranslateSpeed;
+                sso.ApplyModifiedPropertiesWithoutUndo();
+            }
+            else if (stickTranslate != null) UnityEngine.Object.DestroyImmediate(stickTranslate);
+            foreach (var ray in anchor.GetComponentsInChildren<XRRayInteractor>(true))
+            {
+                var so = new SerializedObject(ray);
+                so.FindProperty("m_ManipulateAttachTransform").boolValue = true;
+                so.FindProperty("m_TranslateSpeed").floatValue = StickTranslateSpeed;
+                so.FindProperty("m_TranslateManipulationInput.m_InputSourceMode").intValue = InputSourceActionReference;
+                so.FindProperty("m_TranslateManipulationInput.m_InputActionReference").objectReferenceValue = translate;
+                so.FindProperty("m_RotateManipulationInput.m_InputSourceMode").intValue = InputSourceUnused;
+                so.FindProperty("m_DirectionalManipulationInput.m_InputSourceMode").intValue = InputSourceUnused;
+                so.ApplyModifiedPropertiesWithoutUndo();
+                rays++;
+            }
+            Line($"{Path(anchor)}: stick translates the held object ({(nearFar != null ? "HeldObjectStickTranslate on the near-far" : "no near-far")}, {attaches} attach controller(s) with XRI manipulation off, {rays} ray interactor(s) bound to '{actionName}', rotation off)");
+        }
+    }
+
+    // The user's spawn point: a root at the user's spot facing the machine, with the project's SpawnHuman
+    // (it waits for real 6DOF tracking, then puts the head over the point at the user's own eye height,
+    // yaw matched to the point's forward; its XROrigin is the passive one the Meta rig gets at runtime).
+    private static void BuildUserSpawn(Scene scene, Factory.DemoReset reset)
+    {
+        var spawn = new GameObject(UserSpawnName);
+        SceneManager.MoveGameObjectToScene(spawn, scene);
+        spawn.transform.SetPositionAndRotation(UserSpawnPosition, Quaternion.LookRotation(Vector3.forward, Vector3.up));
+        var human = spawn.AddComponent<SpawnHuman>();
+        human.spawnPoint = spawn.transform;
+        human.xrOrigin = null; // resolved at runtime (PersistentXRInfrastructure)
+        SetRef(reset, "spawn", human);
+        // The first snap happens while the administrator still holds the headset: snap again when it is put on or recentred.
+        var refresh = spawn.AddComponent<Factory.UserSpawnRefresh>();
+        SetRef(refresh, "spawn", human);
+        Line($"{UserSpawnName}: SpawnHuman at {UserSpawnPosition} facing +z; re-snapped on headset mount / recenter and on Restart demo");
     }
 
     // Keyboard stand-in for the machine panel and the robot's release (editor only; inert with a
@@ -1680,7 +1819,15 @@ public static class MtcSceneBuilder
         pub.isMesh = true;
         pub.frameId = "world";
         pub.publishRateHz = rateHz;
-        Line($"'{objectId}': {mf.sharedMesh.triangles.Length / 3} triangles under {Path(parent)} (local pos {col.localPosition})");
+        // The same mesh as a Unity collider, so the robot clearance check (and rays, the card's occlusion
+        // test) see exactly what MoveIt sees. Excluded from every physics layer: it never pushes anything.
+        var meshCollider = col.GetComponent<MeshCollider>();
+        if (meshCollider == null) meshCollider = col.gameObject.AddComponent<MeshCollider>(); // Unity fake-null: no ?? here
+        meshCollider.sharedMesh = mf.sharedMesh;
+        meshCollider.convex = false;
+        meshCollider.isTrigger = false;
+        meshCollider.excludeLayers = ~0;
+        Line($"'{objectId}': {mf.sharedMesh.triangles.Length / 3} triangles under {Path(parent)} (local pos {col.localPosition}); mesh collider for queries only");
     }
 
     private static Transform FindChild(GameObject root, string name)
@@ -1737,6 +1884,24 @@ public static class MtcSceneBuilder
         mat.SetColor("_BaseColor", color);
         mat.SetFloat("_Smoothness", smoothness);
         mat.SetFloat("_Metallic", metallic);
+        EditorUtility.SetDirty(mat);
+        return mat;
+    }
+
+    // Colour drawn over everything (indicator spheres inside other geometry).
+    private static Material MakeOverlayMaterial(string name, Color color)
+    {
+        string path = $"{FactoryMaterialFolder}/{name}.mat";
+        var mat = AssetDatabase.LoadAssetAtPath<Material>(path);
+        Shader shader = Shader.Find(OverlayShaderName) ?? throw new InvalidOperationException($"{OverlayShaderName} shader not found");
+        if (mat == null)
+        {
+            mat = new Material(shader);
+            AssetDatabase.CreateAsset(mat, path);
+        }
+        mat.shader = shader;
+        mat.SetColor("_BaseColor", color);
+        mat.renderQueue = 4000; // Overlay
         EditorUtility.SetDirty(mat);
         return mat;
     }
@@ -1909,6 +2074,10 @@ public static class MtcSceneBuilder
             var mf = pub != null ? pub.GetComponent<MeshFilter>() : null;
             Check(pub != null && pub.isMesh && pub.worldOrigin == origin && mf != null && mf.sharedMesh != null && mf.sharedMesh.isReadable,
                   $"machine collision object '{id}' is a readable mesh publisher with the world origin");
+            var mc = pub != null ? pub.GetComponent<MeshCollider>() : null;
+            Check(mc != null && mc.sharedMesh == (mf != null ? mf.sharedMesh : null) && !mc.convex && !mc.isTrigger && mc.excludeLayers.value == ~0,
+                  $"'{id}' carries its collision mesh as a query-only MeshCollider (clearance check, rays), excluded from physics" +
+                  (mc == null ? " (no MeshCollider)" : $" (mesh match {mc.sharedMesh == (mf != null ? mf.sharedMesh : null)}, convex {mc.convex}, trigger {mc.isTrigger}, excludeLayers {mc.excludeLayers.value})"));
         }
         if (doors != null && doors.doors != null && doors.doors.Length == 2)
             Check(machinePubs.Any(p => p.objectId == Vf2DoorLeftId && p.transform.IsChildOf(doors.doors[0].transform) || p.objectId == Vf2DoorLeftId && p.transform.IsChildOf(doors.doors[1].transform))
@@ -2117,6 +2286,26 @@ public static class MtcSceneBuilder
         Check(placementRoot != null, $"root '{PlacementRootName}' present");
         Check(handleGo != null && handleGo.activeSelf, $"root '{PlacementHandleName}' present and active");
         Check(markersGo != null && markersGo.activeSelf, $"root '{ReachMarkersName}' present and active");
+        var markerSetV = markersGo != null ? markersGo.GetComponent<Factory.ReachTargetMarkerSet>() : null;
+        var markerMat = markerSetV != null ? new SerializedObject(markerSetV).FindProperty("markerMaterial").objectReferenceValue as Material : null;
+        var clearanceV = markersGo != null ? markersGo.GetComponent<Factory.RobotClearanceCheck>() : null;
+        Check(clearanceV != null && RefIs(clearanceV, "robotRoot", fr3) && ArrayRefs(clearanceV, "obstacleRoots").Count >= 2 && ArrayRefs(clearanceV, "excludeRoots").Count == 1
+              && placementRoot != null && placementRoot.GetComponent<Factory.RobotPlacementController>() != null
+              && RefIs(placementRoot.GetComponent<Factory.RobotPlacementController>(), "clearance", clearanceV), "robot clearance check wired (robot, station + machines, pedestal excluded) and read by the placement controller");
+        var placementForReach = placementRoot != null ? placementRoot.GetComponent<Factory.RobotPlacementController>() : null;
+        Transform fixtureDrop = R(FactoryStationRoot) != null ? R(FactoryStationRoot).transform.Find("MachineFixture/DropAnchor") : null;
+        Check(placementForReach != null && fixtureDrop != null && RefIs(placementForReach, "insideMachineTarget", fixtureDrop)
+              && placementForReach.InsideMachineDistance > 0.5f && placementForReach.MachineInReach
+              && Mathf.Abs(placementForReach.InsideMachineMaxReach - PlacementInsideMachineMaxReach) < 1e-4f,
+              $"placement reach rule: vise {(placementForReach != null ? placementForReach.InsideMachineDistance : 0f):F2} m from the base at the authored spot, within {(placementForReach != null ? placementForReach.InsideMachineMaxReach : 0f):F2}");
+        if (clearanceV != null)
+        {
+            clearanceV.Collect();
+            bool clearAtIdeal = clearanceV.Evaluate();
+            Check(clearAtIdeal, $"the robot's resting pose is clear of the cell at the authored spot ({(clearAtIdeal ? "clear" : clearanceV.BlockingLink + " / " + clearanceV.BlockingObstacle)})");
+        }
+        Check(markerMat != null && markerMat.shader != null && markerMat.shader.name == OverlayShaderName && markerMat.renderQueue >= 4000,
+              $"reach markers use the overlay shader (drawn through the billets and the doors): {(markerMat != null && markerMat.shader != null ? markerMat.shader.name : "none")}");
         Check(placementMenu != null && placementMenu.activeSelf, $"root '{PlacementMenuName}' present and active");
         var visualizer = reach != null ? reach.GetComponent<ReachabilityVolumeVisualizer>() : null;
         Check(visualizer != null && RefIs(visualizer, "robot", fr3), "ReachabilityVolumeVisualizer bound to the fr3");
@@ -2132,9 +2321,9 @@ public static class MtcSceneBuilder
             var grab = handleGo.GetComponent<XRGrabInteractable>();
             var general = handleGo.GetComponent<XRGeneralGrabTransformer>();
             var floorYaw = handleGo.GetComponent<XRGrabTransformerFloorYaw>();
-            Check(grab != null && grab.movementType == XRBaseInteractable.MovementType.Instantaneous && grab.trackPosition && !grab.trackRotation && !grab.trackScale
+            Check(grab != null && grab.movementType == XRBaseInteractable.MovementType.Instantaneous && grab.trackPosition && grab.trackRotation && !grab.trackScale
                   && !grab.throwOnDetach && grab.selectMode == InteractableSelectMode.Single && !grab.addDefaultGrabTransformers,
-                  "handle grab: instantaneous, position only, single select, no default transformers");
+                  "handle grab: instantaneous, position and rotation (yaw via the floor transformer), single select, no default transformers");
             Check(general != null && general.permittedDisplacementAxes == (XRGeneralGrabTransformer.ManipulationAxes.X | XRGeneralGrabTransformer.ManipulationAxes.Z)
                   && general.constrainedAxisDisplacementMode == XRGeneralGrabTransformer.ConstrainedAxisDisplacementMode.WorldAxisRelative
                   && !general.allowOneHandedScaling && !general.allowTwoHandedScaling, "general transformer slides on world x/z only");
@@ -2276,6 +2465,49 @@ public static class MtcSceneBuilder
               && RefIs(demoReset, "trajectoryPlayer", player) && RefIs(demoReset, "doors", doors) && RefIs(demoReset, "vise", vise)
               && RefIs(demoReset, "parts", recovery) && RefIs(demoReset, "guide", guide), "DemoReset wired to everything it puts back");
         Check(placementPanel != null && RefIs(placementPanel, "reset", demoReset), "placement panel's Restart demo button drives DemoReset");
+        GameObject spawnGo = R(UserSpawnName);
+        var spawnHuman = spawnGo != null ? spawnGo.GetComponent<SpawnHuman>() : null;
+        Check(spawnGo != null && spawnGo.activeSelf && spawnHuman != null && spawnHuman.spawnPoint == spawnGo.transform, $"root '{UserSpawnName}' carries SpawnHuman pointing at itself");
+        Check(spawnGo != null && Vector3.Distance(spawnGo.transform.position, UserSpawnPosition) < 1e-3f
+              && Vector3.Dot(spawnGo.transform.forward, new Vector3(Fr3BasePosition.x - UserSpawnPosition.x, 0f, Fr3BasePosition.z - UserSpawnPosition.z).normalized) > 0.9f,
+              "spawn point at the user's spot, facing the robot and the machine");
+        Check(spawnHuman != null && RefIs(demoReset, "spawn", spawnHuman), "Restart demo re-snaps the headset to the spawn point");
+        var spawnRefresh = spawnGo != null ? spawnGo.GetComponent<Factory.UserSpawnRefresh>() : null;
+        Check(spawnRefresh != null && RefIs(spawnRefresh, "spawn", spawnHuman), "headset mount / recenter re-snaps to the spawn point");
+
+        // Stick translation of a held object, no stick rotation, on every far interactor of both hands.
+        GameObject metaRig = R(MetaCameraRigName);
+        foreach ((string anchorName, string hand) in new[] { ("LeftHandAnchor", "Left"), ("RightHandAnchor", "Right") })
+        {
+            Transform anchor = metaRig != null ? metaRig.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name == anchorName) : null;
+            var attachControllers = anchor != null ? anchor.GetComponentsInChildren<UnityEngine.XR.Interaction.Toolkit.Attachment.InteractionAttachController>(true) : new UnityEngine.XR.Interaction.Toolkit.Attachment.InteractionAttachController[0];
+            var rayInteractors = anchor != null ? anchor.GetComponentsInChildren<XRRayInteractor>(true) : new XRRayInteractor[0];
+            // Only the right hand carries XRI far interactors in this scene; the left just needs none left unconfigured.
+            if (hand == "Right") Check(anchor != null && attachControllers.Length + rayInteractors.Length > 0, $"{anchorName} has far interactors to configure");
+            Check(attachControllers.All(a => !new SerializedObject(a).FindProperty("m_UseManipulationInput").boolValue
+                                              && new SerializedObject(a).FindProperty("m_ManipulationXAxisMode").intValue == (int)UnityEngine.XR.Interaction.Toolkit.Attachment.InteractionAttachController.ManipulationXAxisMode.None),
+                  $"{anchorName}: XRI's own attach manipulation is off (far-only, rotated on stick x)");
+            var nearFarV = anchor != null ? anchor.GetComponentInChildren<NearFarInteractor>(true) : null;
+            var stickV = anchor != null ? anchor.GetComponent<Factory.HeldObjectStickTranslate>() : null;
+            if (nearFarV != null)
+            {
+                var sso = stickV != null ? new SerializedObject(stickV) : null;
+                Check(stickV != null && sso.FindProperty("inputActions").objectReferenceValue != null && RefIs(stickV, "interactor", nearFarV)
+                      && sso.FindProperty("actionMap").stringValue == $"XRI {hand} Interaction" && sso.FindProperty("actionName").stringValue == "Translate Manipulation"
+                      && sso.FindProperty("speed").floatValue > 0f,
+                      $"{anchorName}: HeldObjectStickTranslate pushes/pulls what the near-far holds (near and far) on '{hand}' Translate Manipulation");
+            }
+            Check(rayInteractors.All(r =>
+                  {
+                      var so = new SerializedObject(r);
+                      var reference = so.FindProperty("m_TranslateManipulationInput.m_InputActionReference").objectReferenceValue;
+                      return so.FindProperty("m_ManipulateAttachTransform").boolValue
+                             && so.FindProperty("m_TranslateManipulationInput.m_InputSourceMode").intValue == InputSourceActionReference
+                             && reference != null && reference.name == $"XRI {hand} Interaction/Translate Manipulation"
+                             && so.FindProperty("m_RotateManipulationInput.m_InputSourceMode").intValue == InputSourceUnused
+                             && so.FindProperty("m_DirectionalManipulationInput.m_InputSourceMode").intValue == InputSourceUnused;
+                  }), $"{anchorName}: ray interactors translate on the stick, rotate and directional readers unbound");
+        }
         var highlight = guideRoot != null ? guideRoot.GetComponent<Factory.GuideTargetHighlight>() : null;
         var offscreen = guideRoot != null ? guideRoot.GetComponent<Factory.GuideOffscreenIndicator>() : null;
         Check(highlight != null && RefIs(highlight, "guide", guide) && RefSet(highlight, "material"), "target highlight bound to the guide with a serialized material");
@@ -2293,6 +2525,8 @@ public static class MtcSceneBuilder
                   "card has nothing to grab, poke or bump into");
             var followComp = card.GetComponent<Factory.GuideHeadFollow>();
             Check(followComp != null && followComp.offset.z > 0.8f && followComp.offset.y < -0.2f && followComp.offset.x > 0.3f, "card follows the head, lower right of the view");
+            Check(followComp != null && followComp.avoidOcclusion && followComp.occluderRoots != null && followComp.occluderRoots.Count(t => t != null) >= 2,
+                  $"card avoids occlusion with {(followComp != null && followComp.occluderRoots != null ? followComp.occluderRoots.Count(t => t != null) : 0)} occluder root(s) (station, machines, hall)");
             var cardUi = card.GetComponentInChildren<Factory.GuideInstructionCard>(true);
             Check(cardUi != null && RefIs(cardUi, "guide", guide) && RefIs(cardUi, "uiDocument", cardDoc), "GuideInstructionCard bound to the guide");
             Check(cardDoc != null && Vector3.Distance(PanelCentre(cardDoc), card.transform.position) < 1e-3f || (cardDoc != null && cardDoc.GetComponent<BoxCollider>() == null

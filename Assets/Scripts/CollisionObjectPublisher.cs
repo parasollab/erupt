@@ -124,6 +124,11 @@ public class CollisionObjectPublisher : MonoBehaviour
     private Vector3 lastScale;
     public bool hasBeenPublished = false;
     private Mesh readableMeshCopy = null; // Cache for the readable mesh copy
+    // The ROS mesh of the last ADD, reused while the mesh and the world scale are unchanged: a
+    // re-ADD (robot placement confirm, TF republish) then costs only the serialization.
+    private MeshMsg cachedRosMesh;
+    private Mesh cachedRosMeshSource;
+    private Vector3 cachedRosMeshScale;
 
     // Extended latency metrics (extendedLatencyMetrics only): per-message size and mesh
     // density awaiting their pong, keyed by the stamp echoed back in the pong.
@@ -380,7 +385,7 @@ public class CollisionObjectPublisher : MonoBehaviour
                 if (mesh != null)
                 {
                     isMesh = true;
-                    msg.meshes = new[] { UnityMeshToRosMesh(mesh, transform) };
+                    msg.meshes = new[] { RosMeshFor(mesh) };
                 }
                 else
                 {
@@ -412,7 +417,7 @@ public class CollisionObjectPublisher : MonoBehaviour
                     if (mesh != null)
                     {
                         isMesh = true;
-                        msg.meshes = new[] { UnityMeshToRosMesh(mesh, transform) };
+                        msg.meshes = new[] { RosMeshFor(mesh) };
                     }
                     else
                     {
@@ -468,6 +473,55 @@ public class CollisionObjectPublisher : MonoBehaviour
         s_AddedFrameById.Clear();
         Debug.Log("[CollisionObjectPublisher] Cleared all world collision objects from the planning scene.");
     }
+
+    /// <summary>
+    /// Detaches every body from the robot in MoveIt's planning scene (one robot_state diff on
+    /// /apply_planning_scene: empty id + empty link = all attached bodies, as
+    /// planning_scene_watcher.py does between study scenes). After an execution cancelled between
+    /// its attach and its detach, MoveIt kept the billet in the hand and every later grasp failed
+    /// its IK, across Unity sessions, until the stack was restarted. The bodies land in the world
+    /// at the gripper's pose; their Unity publishers' next ADD moves them (the FactoryDemo confirm
+    /// re-sends everything). Deliberately not a remove-all: the watcher echoes every world REMOVE
+    /// and CollisionObjectsListenerSimple destroys the Unity object behind a REMOVE of an id it
+    /// owns (RViz-delete parity). The callback gets the service's success flag; false also covers
+    /// "ROS not connected".
+    /// </summary>
+    public static void DetachAllFromRobot(System.Action<bool> done = null)
+    {
+        IRosBus bus = RosBus.Instance;
+        if (bus == null || bus.HasConnectionError)
+        {
+            Debug.LogWarning("[CollisionObjectPublisher] Cannot detach from the robot: ROS not connected.");
+            done?.Invoke(false);
+            return;
+        }
+        var detachAll = new RosMessageTypes.Moveit.AttachedCollisionObjectMsg
+        {
+            link_name = "",
+            @object = new CollisionObjectMsg { id = "", operation = CollisionObjectMsg.REMOVE, header = new HeaderMsg { frame_id = "world", stamp = GetRosTimestamp() } },
+        };
+        var scene = new RosMessageTypes.Moveit.PlanningSceneMsg { is_diff = true };
+        scene.robot_state.is_diff = true;
+        scene.robot_state.attached_collision_objects = new[] { detachAll };
+        try
+        {
+            bus.RegisterRosService<RosMessageTypes.Moveit.ApplyPlanningSceneRequest, RosMessageTypes.Moveit.ApplyPlanningSceneResponse>(ApplyPlanningSceneService);
+            bus.SendServiceMessage<RosMessageTypes.Moveit.ApplyPlanningSceneResponse>(ApplyPlanningSceneService,
+                new RosMessageTypes.Moveit.ApplyPlanningSceneRequest(scene), response =>
+                {
+                    bool ok = response != null && response.success;
+                    Debug.Log($"[CollisionObjectPublisher] Detached every body from the robot in the planning scene: success={ok}");
+                    done?.Invoke(ok);
+                });
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[CollisionObjectPublisher] Detaching from the robot failed: {e.Message}");
+            done?.Invoke(false);
+        }
+    }
+
+    private const string ApplyPlanningSceneService = "/apply_planning_scene";
 
     /// <summary>
     /// Removes one object this app does not own from the planning scene (e.g. a part left
@@ -730,6 +784,17 @@ public class CollisionObjectPublisher : MonoBehaviour
         }
     }
 
+    MeshMsg RosMeshFor(Mesh mesh)
+    {
+        Vector3 scale = transform.lossyScale;
+        if (cachedRosMesh != null && cachedRosMeshSource == mesh && cachedRosMeshScale == scale)
+            return cachedRosMesh;
+        cachedRosMesh = UnityMeshToRosMesh(mesh, transform);
+        cachedRosMeshSource = mesh;
+        cachedRosMeshScale = scale;
+        return cachedRosMesh;
+    }
+
     static MeshMsg UnityMeshToRosMesh(Mesh unityMesh, Transform transform = null)
     {
         // Validate mesh
@@ -746,17 +811,21 @@ public class CollisionObjectPublisher : MonoBehaviour
             return new MeshMsg();
         }
 
-        // Convert vertices (Unity Y → ROS Z) with scale applied
-        var rosVertices = new PointMsg[unityMesh.vertexCount];
-        for (int i = 0; i < unityMesh.vertexCount; i++)
+        // Convert vertices (Unity Y → ROS Z) with scale applied. Mesh.vertices allocates a copy of
+        // the whole array on every access, so it is read once here (indexing it inside the loop made
+        // the conversion quadratic: seconds of freeze for the VF-2 meshes on every re-ADD).
+        Vector3[] vertices = unityMesh.vertices;
+        Vector3 scale = transform != null ? transform.lossyScale : Vector3.one;
+        var rosVertices = new PointMsg[vertices.Length];
+        for (int i = 0; i < vertices.Length; i++)
         {
-            Vector3 vertex = unityMesh.vertices[i];
+            Vector3 vertex = vertices[i];
 
             // Apply scale if transform is provided; lossyScale so parents' scale (e.g. scaled
             // model prefab roots in the Task4 scenes) is included, not just this object's own.
             if (transform != null)
             {
-                vertex = Vector3.Scale(vertex, transform.lossyScale);
+                vertex = Vector3.Scale(vertex, scale);
             }
 
             rosVertices[i] = new PointMsg(vertex.x, vertex.z, vertex.y);

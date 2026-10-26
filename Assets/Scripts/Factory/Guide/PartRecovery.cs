@@ -73,11 +73,17 @@ namespace Factory
         // In a hand, on the robot, falling, or being watched by a recording that will put it back itself.
         private bool IsBusy(GameObject part)
         {
-            var grab = part.GetComponent<XRGrabInteractable>();
-            if (grab != null && grab.isSelected) return true;
+            if (InHand(part)) return true;
             var pub = part.GetComponent<CollisionObjectPublisher>();
             if (pub != null && pub.attachedToRobot) return true;
             if (gravity != null && gravity.IsSettling(part)) return true;
+            return false;
+        }
+
+        private bool InHand(GameObject part)
+        {
+            var grab = part.GetComponent<XRGrabInteractable>();
+            if (grab != null && grab.isSelected) return true;
             if (mouse != null && mouse.isActiveAndEnabled && mouse.Dragged != null && mouse.Dragged.IsChildOf(part.transform)) return true;
             return false;
         }
@@ -96,14 +102,19 @@ namespace Factory
             if (pub != null) pub.ForceRepublish();
         }
 
-        /// <summary>Every billet back on its slot (demo restart). Parts in a hand or on the robot are skipped.</summary>
-        public int ReturnAll()
+        /// <summary>
+        /// Every billet back on its slot (demo restart). Parts in a hand are always skipped; with
+        /// <paramref name="force"/> a part still falling or still flagged as on the robot goes back too
+        /// (a restart seconds after the robot let go of it otherwise left it in the vise, where the
+        /// next plan's place pose IK found it: 0 of 160).
+        /// </summary>
+        public int ReturnAll(bool force = false)
         {
             if (_homes.Count == 0) CaptureHomes();
             int returned = 0;
             foreach ((GameObject part, Vector3 home, Quaternion rot) in _homes)
             {
-                if (part == null || IsBusy(part)) continue;
+                if (part == null || (force ? InHand(part) : IsBusy(part))) continue;
                 if (Vector3.Distance(part.transform.position, home) < 1e-3f && Quaternion.Angle(part.transform.rotation, rot) < 0.1f) continue;
                 ReturnHome(part, home, rot);
                 returned++;

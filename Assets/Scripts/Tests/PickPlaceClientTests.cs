@@ -327,6 +327,33 @@ namespace Erupt.Ros.Tests
 
         // --- helpers ---------------------------------------------------------------------
 
+        [UnityTest]
+        public IEnumerator ForgetTask_DropsTheSolutionsWhenIdle_AndIsRefusedWhileAGoalRuns()
+        {
+            yield return PlanWithSolutions(7, 4);
+            int resets = 0;
+            pickPlace.OnTaskReset += () => resets++;
+
+            Assert.IsTrue(pickPlace.ForgetTask());
+            Assert.AreEqual(1, resets);
+            Assert.IsEmpty(pickPlace.SolutionIds);
+            Assert.IsNull(pickPlace.TaskId);
+            Assert.IsNull(pickPlace.Description);
+            Assert.AreEqual(PickPlacePhase.Idle, pickPlace.Phase);
+
+            Task goal = pickPlace.PlanAsync("object", Pose(0.6, -0.15, 0.0));
+            Assert.AreEqual(2, resets, "the new plan resets the task itself");
+            Assert.IsFalse(pickPlace.ForgetTask(), "a running goal is not forgotten");
+            Assert.AreEqual(2, resets);
+            var accepted = plan.Accept();
+            yield return null;
+            plan.Feedback(new PickPlaceFeedback(k_Task, "planning", 1, 1f));
+            bus.Inbound(k_Statistics, Statistics(k_TopicTask, 9));
+            accepted.Complete(RosActionGoalStatus.Succeeded, PlanResult(true, ""));
+            yield return WaitFor(goal);
+            CollectionAssert.AreEqual(new uint[] { 9 }, pickPlace.SolutionIds);
+        }
+
         IEnumerator PlanWithSolutions(params uint[] ids)
         {
             Task goal = pickPlace.PlanAsync("object", Pose(0.6, -0.15, 0.0));

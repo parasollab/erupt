@@ -54,6 +54,16 @@ namespace Factory
         [Header("Feedback")]
         [SerializeField] private ReachabilityVolumeVisualizer reachability;
         [SerializeField] private ReachTargetMarkerSet markers;
+        [SerializeField, Tooltip("Is the robot's resting pose clear of the cell where it stands? A spot where the arm touches the machine plans nothing.")]
+        private RobotClearanceCheck clearance;
+        [SerializeField, Tooltip("Ring colour while the robot touches something where it stands.")]
+        private Color blockedRingColor = new Color(1f, 0.25f, 0.2f);
+        [SerializeField, Tooltip("The target inside the machine (the vise drop anchor). The free-space reach markers call it reachable from " +
+                                 "further away than the planner can actually place through the door opening.")]
+        private Transform insideMachineTarget;
+        [SerializeField, Tooltip("Metres (horizontal, base axis to the inside-machine target) beyond which the load plan fails: " +
+                                 "0.52 at the authored spot and 0.64 plan, 0.68 fails after 45 s (2026-10-26 sweep).")]
+        private float insideMachineMaxReach = 0.65f;
 
         [Header("Pick-and-place stack")]
         [SerializeField] private PickPlaceClient pickPlaceClient;
@@ -74,17 +84,29 @@ namespace Factory
         private float rosMapRequestDelay = 1.5f;
         [SerializeField, Tooltip("Start the scene in the placement phase.")]
         private bool startInPlacement = true;
+        [SerializeField, Tooltip("Follow /joint_states while placing, so the arm stands as the real robot does and the clearance " +
+                                 "check tests the pose the planner will start from (outside executions the Unity arm is otherwise " +
+                                 "wherever the scene or the IK handle left it).")]
+        private bool mirrorJointStatesWhilePlacing = true;
         [SerializeField, Tooltip("Hide the reachability shell and slice once the placement is confirmed; they come back " +
                                  "with the placement phase (the wrist menu can still show them meanwhile).")]
         private bool hideReachabilityWhenConfirmed = true;
+        [SerializeField, Tooltip("Once the planner is reachable, detach whatever MoveIt still holds in the gripper from an earlier " +
+                                 "session (a billet left there by a cancelled execution fails every later plan). " +
+                                 "Everything this scene publishes is re-sent on Confirm anyway.")]
+        private bool clearPlanningSceneOnStart = true;
 
         private Pose _defaultHandlePose, _startHandlePose;
         private Vector3 _robotLocalPos, _pedestalLocalPos;
         private Quaternion _robotLocalRot, _pedestalLocalRot;
         private Pose _lastAppliedHandlePose;
+        private Renderer _ring;
+        private MaterialPropertyBlock _ringBlock;
+        private Color _ringColor = Color.white;
+        private bool _ringTinted;
         private readonly List<CollisionObjectPublisher> _pausedPublishers = new List<CollisionObjectPublisher>();
         private bool _shellWasVisible = true, _sliceWasVisible, _wasConfirmedOnce;
-        private Coroutine _rosMapResume;
+        private Coroutine _rosMapResume, _startupClear;
 
         public PlacementPhase Phase { get; private set; } = PlacementPhase.Confirmed;
         public event Action<PlacementPhase> PhaseChanged;
@@ -98,6 +120,25 @@ namespace Factory
                                      && !(trajectoryPlayer != null && trajectoryPlayer.IsMirroring);
         public PickPlaceClient PickPlaceClient => pickPlaceClient;
         public ReachTargetMarkerSet Markers => markers;
+        public RobotClearanceCheck Clearance => clearance;
+        /// <summary>The robot, as it stands, touches nothing in the cell (true without a check).</summary>
+        public bool RobotClear => clearance == null || clearance.Clear;
+        /// <summary>What the robot touches, for the card and the panel ("fr3_link6 / vf2_body").</summary>
+        public string RobotBlockedBy => clearance != null && !clearance.Clear ? $"{clearance.BlockingLink} / {clearance.BlockingObstacle}" : null;
+        /// <summary>Horizontal distance from the base axis to the target inside the machine (0 without one).</summary>
+        public float InsideMachineDistance
+        {
+            get
+            {
+                if (insideMachineTarget == null) return 0f;
+                Transform b = baseAnchor != null ? baseAnchor : robotRoot.transform;
+                Vector3 d = insideMachineTarget.position - b.position; d.y = 0f;
+                return d.magnitude;
+            }
+        }
+        /// <summary>The robot stands close enough to the machine for the planner to place inside it.</summary>
+        public bool MachineInReach => insideMachineTarget == null || InsideMachineDistance <= insideMachineMaxReach;
+        public float InsideMachineMaxReach => insideMachineMaxReach;
         public ReachabilityVolumeVisualizer Reachability => reachability;
         public Transform Handle => handle;
         /// <summary>Authored (ideal) handle pose; the cell layout the validator checks.</summary>
@@ -122,6 +163,9 @@ namespace Factory
                 _pedestalLocalRot = Quaternion.Inverse(handle.rotation) * pedestal.rotation;
             }
             _lastAppliedHandlePose = _defaultHandlePose;
+            _ring = handle.GetComponentInChildren<Renderer>(true);
+            if (_ring != null && _ring.sharedMaterial != null && _ring.sharedMaterial.HasProperty("_BaseColor")) _ringColor = _ring.sharedMaterial.GetColor("_BaseColor");
+            _ringBlock = new MaterialPropertyBlock();
             _startHandlePose = new Pose(_defaultHandlePose.position + new Vector3(startOffset.x, 0f, startOffset.y),
                                         Quaternion.Euler(0f, _defaultHandlePose.rotation.eulerAngles.y + startYawDegrees, 0f));
         }
@@ -135,14 +179,35 @@ namespace Factory
                 handle.SetPositionAndRotation(_startHandlePose.position, _startHandlePose.rotation);
                 ApplyHandlePose(SanitisedHandlePose());
                 if (markers != null) markers.Refresh();
+                if (clearPlanningSceneOnStart) _startupClear = StartCoroutine(ClearPlanningSceneWhenReady());
             }
             else
                 ApplyPhaseObjects();
         }
 
+        // Waits for the planner (its action server comes up with move_group), then empties the gripper in
+        // the planning scene once, before the first Confirm re-ADDs this scene's objects. Dropped if the user confirms first.
+        private IEnumerator ClearPlanningSceneWhenReady()
+        {
+            float deadline = Time.time + 60f;
+            while (Phase == PlacementPhase.Placing && Time.time < deadline && !(pickPlaceClient != null && pickPlaceClient.Available))
+                yield return null;
+            _startupClear = null;
+            if (Phase != PlacementPhase.Placing) yield break;
+            if (pickPlaceClient != null && !pickPlaceClient.Available)
+            {
+                Debug.LogWarning($"{LogTag} planner not reachable within 60 s; the gripper was not emptied in the planning scene at start");
+                yield break;
+            }
+            var attachedListener = FindFirstObjectByType<AttachedCollisionObjectListener>();
+            int released = attachedListener != null ? attachedListener.ReleaseAll() : 0;
+            CollisionObjectPublisher.DetachAllFromRobot(ok => Debug.Log($"{LogTag} gripper emptied in the planning scene at start: {ok}; {released} stale attached object(s) released locally"));
+        }
+
         private void Update()
         {
             if (Phase != PlacementPhase.Placing) return;
+            UpdateRingTint();
             Pose current = SanitisedHandlePose();
             if (Vector3.Distance(current.position, _lastAppliedHandlePose.position) < applyPositionEpsilon
                 && Quaternion.Angle(current.rotation, _lastAppliedHandlePose.rotation) < applyAngleEpsilon)
@@ -157,9 +222,12 @@ namespace Factory
         {
             if (!CanConfirm) return;
             ApplyHandlePose(SanitisedHandlePose());
+            if (_startupClear != null) { StopCoroutine(_startupClear); _startupClear = null; }
+            if (mirrorJointStatesWhilePlacing && trajectoryPlayer != null && trajectoryPlayer.IsMirroring) trajectoryPlayer.StopLiveMirror();
             Phase = PlacementPhase.Confirmed;
             _wasConfirmedOnce = true;
             ApplyPhaseObjects();
+            _ringTinted = true; UpdateRingTint(); // reset to the plain ring for the next placement
             RepublishScene();
             if (hideReachabilityWhenConfirmed && reachability != null)
             {
@@ -178,6 +246,19 @@ namespace Factory
         public void BeginReposition()
         {
             if (!CanReposition) return;
+            EnterPlacing();
+        }
+
+        /// <summary>
+        /// Back to the placement phase regardless of what is still going on (demo restart, which has
+        /// already cancelled the goal and the recording); says why it would otherwise have refused.
+        /// </summary>
+        public void ForceReposition()
+        {
+            if (Phase == PlacementPhase.Placing) return;
+            if (!CanReposition)
+                Debug.LogWarning($"{LogTag} repositioning anyway: client busy={pickPlaceClient != null && pickPlaceClient.Busy}, " +
+                                 $"recording={recorder != null && recorder.IsRecording}, mirroring={trajectoryPlayer != null && trajectoryPlayer.IsMirroring}");
             EnterPlacing();
         }
 
@@ -224,7 +305,25 @@ namespace Factory
                 if (!markers.IsReachable(i)) missing.Add(markers.TargetLabel(i));
             if (missing.Count > 0)
                 list.Add($"Not reachable top-down: {string.Join(", ", missing)}");
+            if (!RobotClear)
+                list.Add($"The robot touches {RobotBlockedBy} where it stands: move it away");
+            if (!MachineInReach)
+                list.Add($"Too far from the machine to place inside it ({InsideMachineDistance:F2} m to the vise, max {insideMachineMaxReach:F2}): move closer to the doors");
             return list;
+        }
+
+        // The ring goes red while the robot's resting pose intersects the cell (the clearance check runs
+        // only while placing, so the tint is refreshed here and reset when the phase ends).
+        private void UpdateRingTint()
+        {
+            if (_ring == null) return;
+            bool blocked = !RobotClear || !MachineInReach;
+            if (blocked == _ringTinted) return;
+            _ringTinted = blocked;
+            _ring.GetPropertyBlock(_ringBlock);
+            if (blocked) { _ringBlock.SetColor("_BaseColor", blockedRingColor); _ringBlock.SetColor("_Color", blockedRingColor); }
+            else _ringBlock.Clear();
+            _ring.SetPropertyBlock(_ringBlock);
         }
 
         public string BaseDescription()
@@ -246,6 +345,9 @@ namespace Factory
                 if (trajectoryPlayer.IsMirroring) trajectoryPlayer.StopLiveMirror();
             }
             if (ghosts != null) ghosts.ClearGhosts();
+            if (mirrorJointStatesWhilePlacing && trajectoryPlayer != null) trajectoryPlayer.StartLiveMirror();
+            // Solutions were planned against the old base pose; they are meaningless once it moves.
+            if (pickPlaceClient != null) pickPlaceClient.ForgetTask();
             if (pausePublishersWhilePlacing) PausePublishers();
             if (reachability != null)
             {
