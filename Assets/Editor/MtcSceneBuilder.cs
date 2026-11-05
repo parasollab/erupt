@@ -23,7 +23,8 @@ using UnityEngine.XR.Interaction.Toolkit.Transformers;
 //     block on the machine table, conveyor to the far parts table) with GrabbablePartSet
 //     billets (Build FactoryDemo MTC station from the ur5e scene, Relayout FactoryDemo on a
 //     scene that already has the MTC stack). Batch entry points: BuildFactoryBatch,
-//     RelayoutFactoryBatch, ValidateFactoryBatch, RenderFactoryShotsBatch (FACTORY_SHOT_DIR).
+//     RelayoutFactoryBatch, ValidateFactoryBatch, RenderFactoryShotsBatch (FACTORY_SHOT_DIR),
+//     RenderControllerGuideImagesBatch (the controls screen's controller renderings; needs graphics).
 //
 // What the AR build does, in order:
 //   1. Opens Demo Scenes/AR.unity and saves it as Demo Scenes/ARMTC.unity (AR.unity is
@@ -562,11 +563,20 @@ public static class MtcSceneBuilder
     private const string GuideRootName = "DemoGuide";
     private const string GuideCardName = "GuideCard";
     private const string GuideCardUxmlPath = "Assets/UI Toolkit/GuideCard.uxml";
-    private const float GuideCardHeight = 320f; // document units (300 wide): 0.6 x 0.64 m at the prefab's 0.2 scale; the longest instruction + hint + help line (or notice) fit with margin (text ran to the edge at 270)
-    // Card centre in the camera's local frame: lower right of the view, so it covers neither the
-    // stock stand and vise in the middle nor the buttons the guide points at (Open Doors top-left of
-    // the left panel, Execute bottom-left of the right panel).
-    private static readonly Vector3 GuideCardOffset = new Vector3(0.5f, -0.38f, 1.5f);
+    // The document is baked GuideCardMaxHeight tall; GuideInstructionCard draws as much of it as the step's rows need
+    // (at least GuideCardHeight, 2026-11-05: no text is cut off; the welcome step with the two controller renderings and
+    // the legend is the tallest) and keeps the drawn part centred on the root (a world-space document resized at
+    // runtime left its renderer clipping stale regions, 2026-11-04).
+    private const float GuideCardMaxHeight = 520f;
+    private const float GuideCardHeight = 320f;
+    // Half size of the (welcome) card in metres: 300 x GuideCardMaxHeight units at the prefab's 0.2 scale (1 unit = 2 mm); the
+    // head-follow's occlusion check casts to the corners too so the tall card's lower edge stays out of the pedestal.
+    private static readonly Vector2 GuideCardHalfExtents = new Vector2(300f * 0.002f * 0.5f, GuideCardMaxHeight * 0.002f * 0.5f); // document units (300 wide): 0.6 x 0.64 m at the prefab's 0.2 scale; the longest instruction + hint + help line (or notice) fit with margin (text ran to the edge at 270)
+    // Card centre in the camera's local frame: lower left of the view (2026-11-05; lower right until then, where it
+    // sat over the machine's opening once the doors were open), so it covers neither the stock stand and vise in
+    // the middle nor the machine. GuideProbe checks from the eye that it stays off the buttons the guide points at
+    // (Open Doors on the left panel, the Execute area of the right panel) once the user looks at them.
+    private static readonly Vector3 GuideCardOffset = new Vector3(-0.5f, -0.38f, 1.5f);
     private const float GuideHintAfterSeconds = 30f, GuideHelpAfterSeconds = 75f;
     // The guide pauses this long with the doors closed where the real machine would run the job (nothing is
     // simulated; the card says so) before it moves on to the unload.
@@ -822,7 +832,9 @@ public static class MtcSceneBuilder
         (Factory.RobotPlacementController placementController, Factory.RobotPlacementPanel placementPanel, GameObject placementHandle) =
             BuildPlacementStage(scene, c, pedestal, visualizer, doorMenu, reachTargets);
         BuildMachineDesktopInput(scene, station, vise, doors, gravity, doorMenu);
+        MirrorInteractorsToLeftHand(scene, c);
         ConfigureHandStickTranslation(scene);
+        ConfigureControllerHands(scene);
         BuildDemoGuide(scene, c, placementController, placementPanel, placementHandle, doorMenu.GetComponentInChildren<Factory.MachineDoorPanel>(true),
                        doors, vise, gravity, billets, conveyor.Find("DropAnchor"));
 
@@ -1221,16 +1233,18 @@ public static class MtcSceneBuilder
         Line($"{GuideRootName}: director, auto-recording, billet recovery (area {PartWorkingArea.min}..{PartWorkingArea.max}), restart, highlight, chevron");
 
         // --- the card -------------------------------------------------------------------------
-        (GameObject card, UIDocument doc) = BuildPanelMenu(scene, GuideCardName, GuideCardUxmlPath, GuideCardHeight, new Vector3(0f, 1.2f, 1.3f));
+        (GameObject card, UIDocument doc) = BuildPanelMenu(scene, GuideCardName, GuideCardUxmlPath, GuideCardMaxHeight, new Vector3(0f, 1.2f, 1.3f));
         PrefabUtility.UnpackPrefabInstance(card, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
         foreach (Type t in new[] { typeof(XRSimpleInteractable), typeof(UnityEngine.XR.Interaction.Toolkit.Filtering.XRPokeFilter), typeof(MoveItPlanningRequestMenuUI), typeof(BoxCollider) })
             foreach (Component comp in doc.GetComponents(t)) UnityEngine.Object.DestroyImmediate(comp);
         foreach (Type t in new[] { typeof(XRGrabInteractable), typeof(XRGeneralGrabTransformer), typeof(UnityEngine.XR.Interaction.Toolkit.UI.LazyFollow), typeof(Rigidbody), typeof(BoxCollider), typeof(SkinnedMeshRenderer) })
             foreach (Component comp in card.GetComponents(t)) UnityEngine.Object.DestroyImmediate(comp);
-        // Panel centre on the root's origin so the follow places the centre of the card.
+        // The drawn (normal) part of the panel centred on the root's origin so the follow places the centre of the card;
+        // the document's extra welcome rows hang below it, empty and invisible outside the welcome step.
         doc.transform.localPosition = new Vector3(-1.5f, GuideCardHeight / 200f, 0f);
         var follow = card.AddComponent<Factory.GuideHeadFollow>();
         follow.offset = GuideCardOffset;
+        follow.halfExtents = GuideCardHalfExtents;
         // The machine's mesh colliders are not convex (a ray from inside hits nothing), so the card also treats these
         // roots' renderer bounds as obstacles.
         var occluders = new List<UnityEngine.Object>();
@@ -1243,7 +1257,11 @@ public static class MtcSceneBuilder
         var cardUi = doc.gameObject.AddComponent<Factory.GuideInstructionCard>();
         SetRef(cardUi, "uiDocument", doc);
         SetRef(cardUi, "guide", guide);
-        Line($"{GuideCardName}: {GuideCardUxmlPath} {300}x{GuideCardHeight} following the head at camera offset {GuideCardOffset}; " +
+        // The welcome card shows both controllers (trigger, grip, stick ringed) under its text and draws the whole document for them.
+        WireControllerImages(cardUi);
+        SetFloat(cardUi, "minHeightUnits", GuideCardHeight);
+        SetFloat(cardUi, "maxHeightUnits", GuideCardMaxHeight);
+        Line($"{GuideCardName}: {GuideCardUxmlPath} {300}x{GuideCardHeight}..{GuideCardMaxHeight} (fitted to the step's rows) following the head at camera offset {GuideCardOffset}; " +
              $"{card.GetComponentsInChildren<Component>(true).Count(x => x is Collider || x is XRBaseInteractable)} interactive component(s) left");
     }
 
@@ -1312,6 +1330,418 @@ public static class MtcSceneBuilder
         }
     }
 
+    // ------------------------------------------------------------------ left hand interactors
+
+    // The VR demo rig (ReachabilityVR lineage) carried XRI's Poke, Near-Far and Ray interactors on the right hand
+    // anchor only, so a left-handed user could neither press a panel button nor pick up a billet with the left
+    // controller (2026-11-05). The left anchor now gets clones of the right hand's three interactor objects with
+    // every "XRI Right ..." input reference swapped for its "XRI Left ..." twin (the right near-far prefab is the
+    // left one's variant with exactly those overrides), handedness Left and the XRI rig's left haptic player.
+    // ConfigureHandStickTranslation then treats both hands alike (stick push/pull, no stick rotation). Billet
+    // selection (SelectionManager) gets the left trigger too: "XRI Left Interaction/SelectObject" mirrors the
+    // right-hand action in the input asset, and PersistentXRInfrastructure binds both robot rays at load so each
+    // trigger selects what its own hand points at. Locomotion keeps its fixed roles (left stick walks, right turns).
+    private static readonly string[] HandInteractorNames = { "Poke Interactor", "Near-Far Interactor", "Ray Interactor" };
+    private const string RightHandPrefix = "XRI Right", LeftHandPrefix = "XRI Left";
+    private const string RightSelectObjectActionName = "XRI Right Interaction/SelectObject", LeftSelectObjectActionName = "XRI Left Interaction/SelectObject";
+
+    // XRViz.Editor does not reference Unity.InputSystem: the InputActionReference sub-assets are matched by type name.
+    private static List<UnityEngine.Object> InputActionReferences() =>
+        AssetDatabase.LoadAllAssetsAtPath(XriInputActionsPath).Where(o => o != null && o.GetType().Name == "InputActionReference").ToList();
+
+    private static void MirrorInteractorsToLeftHand(Scene scene, Composition c)
+    {
+        GameObject rig = scene.GetRootGameObjects().FirstOrDefault(r => r.name == MetaCameraRigName);
+        if (rig == null) { Line($"No '{MetaCameraRigName}' root; left hand interactors skipped"); return; }
+        Transform left = rig.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name == "LeftHandAnchor");
+        Transform right = rig.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name == "RightHandAnchor");
+        if (left == null || right == null) { Line($"'{MetaCameraRigName}' lacks a hand anchor; left hand interactors skipped"); return; }
+        List<UnityEngine.Object> refs = InputActionReferences();
+        // The right hand's interactors buzz the XRI rig's right controller; the left ones get its left counterpart.
+        var leftHaptic = scene.GetRootGameObjects()
+            .SelectMany(r => r.GetComponentsInChildren<UnityEngine.XR.Interaction.Toolkit.Inputs.Haptics.HapticImpulsePlayer>(true))
+            .FirstOrDefault(h => Path(h.transform).Contains("Left Controller"));
+        foreach (string name in HandInteractorNames)
+        {
+            Transform source = right.Find(name);
+            if (source == null) { Line($"{Path(right)} has no '{name}'; the left hand gets none"); continue; }
+            Transform old = left.Find(name);
+            if (old != null) { UnityEngine.Object.DestroyImmediate(old.gameObject); Line($"Removed previous {Path(left)}/{name}"); }
+            GameObject clone = UnityEngine.Object.Instantiate(source.gameObject, left);
+            clone.name = name;
+            clone.transform.SetSiblingIndex(Mathf.Min(source.GetSiblingIndex(), left.childCount - 1));
+            clone.transform.SetLocalPositionAndRotation(source.localPosition, source.localRotation);
+            clone.transform.localScale = source.localScale;
+            clone.SetActive(source.gameObject.activeSelf);
+            int rebound = 0, handed = 0, haptics = 0;
+            foreach (Component comp in clone.GetComponentsInChildren<Component>(true))
+            {
+                if (comp == null) continue;
+                var so = new SerializedObject(comp);
+                SerializedProperty p = so.GetIterator();
+                bool changed = false;
+                while (p.Next(true))
+                {
+                    if (comp is XRBaseInteractor && p.propertyType == SerializedPropertyType.Enum && p.propertyPath == "m_Handedness")
+                    {
+                        if (p.intValue != (int)InteractorHandedness.Left) { p.intValue = (int)InteractorHandedness.Left; handed++; changed = true; }
+                        continue;
+                    }
+                    if (p.propertyType != SerializedPropertyType.ObjectReference || p.objectReferenceValue == null) continue;
+                    UnityEngine.Object value = p.objectReferenceValue;
+                    if (value.GetType().Name == "InputActionReference" && value.name.StartsWith(RightHandPrefix))
+                    {
+                        string twinName = LeftHandPrefix + value.name.Substring(RightHandPrefix.Length);
+                        p.objectReferenceValue = refs.FirstOrDefault(r => r.name == twinName)
+                            ?? throw new InvalidOperationException($"'{twinName}' not found in {XriInputActionsPath} (for {Path(comp.transform)}.{p.propertyPath})");
+                        rebound++; changed = true;
+                    }
+                    else if (value is UnityEngine.XR.Interaction.Toolkit.Inputs.Haptics.HapticImpulsePlayer && value != leftHaptic)
+                    {
+                        p.objectReferenceValue = leftHaptic; haptics++; changed = true;
+                    }
+                }
+                if (changed) so.ApplyModifiedPropertiesWithoutUndo();
+            }
+            Line($"{Path(clone.transform)}: cloned from the right hand; {rebound} input reference(s) -> '{LeftHandPrefix} ...', {handed} interactor(s) set left-handed, " +
+                 $"{haptics} haptic player(s) -> {(leftHaptic != null ? Path(leftHaptic.transform) : "none")}");
+        }
+        // Billet selection with either trigger.
+        UnityEngine.Object leftSelect = refs.FirstOrDefault(r => r.name == LeftSelectObjectActionName)
+            ?? throw new InvalidOperationException($"'{LeftSelectObjectActionName}' not found in {XriInputActionsPath}; the XRI Left Interaction map needs a SelectObject action bound to the left trigger");
+        SetRef(c.selection, "leftSelectAction", leftSelect);
+        Line($"SelectionManager: '{RefName(c.selection, "selectAction")}' and '{leftSelect.name}' select what the respective hand's ray points at");
+    }
+
+    // ------------------------------------------------------------------ controller hands
+
+    // Hands drawn over the controllers (2026-11-04): the Meta runtime synthesises a hand pose around each
+    // held controller ("controller-driven hand poses" conforming to the controller: the look of the Quest
+    // home menus) and the SDK's hand prefab renders it. The two hands hang under the rig's TrackingSpace and
+    // place themselves from the runtime's hand root pose (OVRSkeleton updateRootPose), so the hand anchors,
+    // which carry the XRI rays and keep following the controllers, are not touched. Translucent outline
+    // material: Factory/GhostHand. Visible only on the headset (the editor has no hand data).
+    private const string ControllerHandsLeftName = "ControllerHands Left", ControllerHandsRightName = "ControllerHands Right";
+    private const string OvrHandPrefabPath = "Packages/com.meta.xr.sdk.core/Prefabs/OVRHandPrefab.prefab";
+    private const string GhostHandShaderName = "Factory/GhostHand"; // Assets/Shaders/Factory/GhostHand.shader
+    private const string GhostHandMaterialName = "ControllerHandGhost";
+    private static readonly Color GhostHandRimColor = new Color(0.4f, 0.73f, 1f), GhostHandInsideColor = new Color(0.05f, 0.06f, 0.08f);
+
+    private static void ConfigureControllerHands(Scene scene)
+    {
+        GameObject rig = scene.GetRootGameObjects().FirstOrDefault(r => r.name == MetaCameraRigName);
+        if (rig == null) { Line($"No '{MetaCameraRigName}' root; controller hands skipped"); return; }
+        var manager = rig.GetComponentInChildren<OVRManager>(true);
+        if (manager == null) { Line($"'{MetaCameraRigName}' has no OVRManager; controller hands skipped"); return; }
+        Transform trackingSpace = rig.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name == "TrackingSpace")
+                                  ?? throw new InvalidOperationException($"'{MetaCameraRigName}' has no TrackingSpace");
+        var mso = new SerializedObject(manager);
+        Prop(mso, "controllerDrivenHandPosesType").intValue = (int)OVRManager.ControllerDrivenHandPosesType.ConformingToController;
+        mso.ApplyModifiedPropertiesWithoutUndo();
+        Line($"{Path(manager.transform)}.OVRManager.controllerDrivenHandPosesType = ConformingToController");
+
+        GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(OvrHandPrefabPath) ?? throw new InvalidOperationException($"{OvrHandPrefabPath} missing");
+        Material ghost = MakeGhostHandMaterial();
+        OVRHandSkeletonVersion skeletonVersion = OVRRuntimeSettings.Instance.HandSkeletonVersion;
+        foreach ((string name, OVRHand.Hand hand) in new[] { (ControllerHandsLeftName, OVRHand.Hand.HandLeft), (ControllerHandsRightName, OVRHand.Hand.HandRight) })
+        {
+            foreach (Transform old in trackingSpace.Cast<Transform>().Where(t => t.name == name).ToArray())
+                UnityEngine.Object.DestroyImmediate(old.gameObject);
+            var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab, scene);
+            go.name = name;
+            go.transform.SetParent(trackingSpace, false);
+            go.transform.localPosition = Vector3.zero;
+            go.transform.localRotation = Quaternion.identity;
+            go.SetActive(true);
+            // HandType is internal to the SDK and the skeleton / mesh setters are not public: serialized fields.
+            var hso = new SerializedObject(Require<OVRHand>(go));
+            Prop(hso, "HandType").intValue = (int)hand;
+            hso.ApplyModifiedPropertiesWithoutUndo();
+            OVRSkeleton.SkeletonType skeletonType = hand.AsSkeletonType(skeletonVersion);
+            OVRMesh.MeshType meshType = hand.AsMeshType(skeletonVersion);
+            var sso = new SerializedObject(Require<OVRSkeleton>(go));
+            Prop(sso, "_skeletonType").intValue = (int)skeletonType;
+            Prop(sso, "_updateRootPose").boolValue = true;  // the hand sits where the runtime says, not on an anchor
+            Prop(sso, "_updateRootScale").boolValue = true;
+            sso.ApplyModifiedPropertiesWithoutUndo();
+            var meshSo = new SerializedObject(Require<OVRMesh>(go));
+            Prop(meshSo, "_meshType").intValue = (int)meshType;
+            meshSo.ApplyModifiedPropertiesWithoutUndo();
+            var smr = Require<SkinnedMeshRenderer>(go);
+            smr.sharedMaterial = ghost;
+            smr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            smr.receiveShadows = false;
+            Line($"{Path(go.transform)}: OVRHand {hand}, skeleton {skeletonType}, mesh {meshType}, root pose from the runtime, material '{ghost.name}'");
+        }
+    }
+
+    private static Material MakeGhostHandMaterial()
+    {
+        string path = $"{FactoryMaterialFolder}/{GhostHandMaterialName}.mat";
+        Shader shader = Shader.Find(GhostHandShaderName) ?? throw new InvalidOperationException($"{GhostHandShaderName} shader not found");
+        var mat = AssetDatabase.LoadAssetAtPath<Material>(path);
+        if (mat == null)
+        {
+            mat = new Material(shader);
+            AssetDatabase.CreateAsset(mat, path);
+        }
+        mat.shader = shader;
+        mat.SetColor("_RimColor", GhostHandRimColor);
+        mat.SetColor("_BaseColor", GhostHandInsideColor);
+        mat.SetFloat("_RimPower", 2.5f);
+        mat.SetFloat("_Alpha", 0.85f);
+        mat.SetFloat("_InnerAlpha", 0.25f);
+        mat.renderQueue = 3000; // Transparent
+        EditorUtility.SetDirty(mat);
+        return mat;
+    }
+
+    // ------------------------------------------------------------------ controller guide images
+
+    // The guide's welcome card (step 1) shows renderings of both Touch Plus controllers under its text, the
+    // trigger, grip and thumbstick ringed in the legend's colours and the pointing ray drawn from the front.
+    // Rendered here from the Meta SDK's controller models into PNGs under Assets/UI Toolkit/Images
+    // (GuideInstructionCard.leftControllerImage / rightControllerImage); the legend swatches in GuideCard.uxml
+    // carry the same three colours. Needs a graphics device (not -nographics): a
+    // relayout renders them when they are missing, the menu entry / batch method re-renders them.
+    private const string ControllerImageFolder = "Assets/UI Toolkit/Images";
+    private const string ControllerImageLeftPath = ControllerImageFolder + "/ControllerLeft.png", ControllerImageRightPath = ControllerImageFolder + "/ControllerRight.png";
+    private const string TouchPlusLeftModelPath = "Packages/com.meta.xr.sdk.core/Meshes/MetaQuestTouchPlus/MetaQuestTouchPlus_Left.fbx";
+    private const string TouchPlusRightModelPath = "Packages/com.meta.xr.sdk.core/Meshes/MetaQuestTouchPlus/MetaQuestTouchPlus_Right.fbx";
+    private const int ControllerImageWidth = 544, ControllerImageHeight = 544; // ~5x the card's 104x104 elements
+    private const int ControllerImageLayer = 30; // temporary: only the render set is on it while rendering
+    private const float ControllerImageFov = 30f;
+    private static readonly Color ControllerTriggerColor = new Color32(255, 140, 0, 255), ControllerGripColor = new Color32(77, 217, 115, 255), ControllerStickColor = new Color32(89, 153, 242, 255);
+    private static readonly Color ControllerRayColor = new Color(0.6f, 0.8f, 1f, 0.85f);
+    private const float ControllerRingInnerRadius = 0.011f, ControllerRingOuterRadius = 0.015f, ControllerRayLength = 0.065f, ControllerRayRadius = 0.0028f;
+    // Camera on the inner-front side of each controller, a little above: the trigger (front), the grip (inner side),
+    // the stick (top) and the handle all show. The frame is then fitted to the projected extents (ray included).
+    private static readonly Vector3 ControllerViewDirRight = new Vector3(-1f, 0.6f, 0.35f), ControllerViewDirLeft = new Vector3(1f, 0.6f, 0.35f);
+    private const float ControllerImageFill = 0.86f; // fraction of the frame the projected extents span
+    private const float ControllerImagePitch = -45f; // nose up: the model is authored pointing along +z, the handle hangs down as in a relaxed hand
+
+    [MenuItem("ERUPT/Scenes/Render controller guide images")]
+    public static void RenderControllerGuideImages()
+    {
+        Log.Clear();
+        try { RenderControllerGuideImages(force: true); Debug.Log("MtcSceneBuilder: done.\n" + Log); }
+        catch (Exception e) { Debug.LogError("MtcSceneBuilder: FAILED.\n" + Log + "\n" + e); throw; }
+    }
+
+    public static void RenderControllerGuideImagesBatch() => Batch(() => RenderControllerGuideImages(force: true));
+
+    private static void WireControllerImages(Component target)
+    {
+        RenderControllerGuideImages(force: false);
+        var left = AssetDatabase.LoadAssetAtPath<Texture2D>(ControllerImageLeftPath);
+        var right = AssetDatabase.LoadAssetAtPath<Texture2D>(ControllerImageRightPath);
+        if (left == null || right == null) Line("WARNING: controller guide images not available; the welcome card shows no renderings");
+        SetRef(target, "leftControllerImage", left);
+        SetRef(target, "rightControllerImage", right);
+    }
+
+    private static void RenderControllerGuideImages(bool force)
+    {
+        bool have = System.IO.File.Exists(ControllerImageLeftPath) && System.IO.File.Exists(ControllerImageRightPath);
+        if (have && !force) return;
+        if (SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null)
+        {
+            Line(have ? "controller guide images kept (no graphics device to re-render them)"
+                      : "WARNING: controller guide images missing and no graphics device; run 'ERUPT/Scenes/Render controller guide images' (or RenderControllerGuideImagesBatch without -nographics)");
+            return;
+        }
+        if (!AssetDatabase.IsValidFolder(ControllerImageFolder))
+        {
+            System.IO.Directory.CreateDirectory(ControllerImageFolder);
+            AssetDatabase.Refresh();
+        }
+        RenderControllerImage(TouchPlusLeftModelPath, ControllerViewDirLeft, ControllerImageLeftPath);
+        RenderControllerImage(TouchPlusRightModelPath, ControllerViewDirRight, ControllerImageRightPath);
+    }
+
+    private static void RenderControllerImage(string modelPath, Vector3 viewDir, string pngPath)
+    {
+        GameObject model = AssetDatabase.LoadAssetAtPath<GameObject>(modelPath) ?? throw new InvalidOperationException($"{modelPath} missing");
+        Shader overlay = Shader.Find(OverlayShaderName) ?? throw new InvalidOperationException($"{OverlayShaderName} shader not found");
+        var set = new GameObject("ControllerImageSet");
+        var temp = new List<UnityEngine.Object> { set };
+        RenderTexture rt = null;
+        try
+        {
+            set.transform.position = new Vector3(0f, -40f, 0f); // under the hall; the camera also culls to the temporary layer
+            var instance = (GameObject)PrefabUtility.InstantiatePrefab(model);
+            instance.transform.SetParent(set.transform, false);
+            instance.transform.localRotation = Quaternion.Euler(ControllerImagePitch, 0f, 0f);
+            Vector3 forward = instance.transform.forward;
+            Renderer[] renderers = instance.GetComponentsInChildren<Renderer>();
+            if (renderers.Length == 0) throw new InvalidOperationException($"{modelPath} has no renderers");
+            // Skinned renderers report generous bounds; frame the mesh vertices instead (bind pose = the imported pose).
+            Bounds bounds = new Bounds(renderers[0].bounds.center, Vector3.zero);
+            float frontZ = float.MinValue; // the model's front, in its own frame
+            var points = new List<Vector3>(); // what the frame is fitted to: the mesh vertices and the ray
+            bool first = true;
+            foreach (Renderer r in renderers)
+            {
+                Mesh m = r is SkinnedMeshRenderer s ? s.sharedMesh : r.GetComponent<MeshFilter>()?.sharedMesh;
+                if (m == null) { if (first) { bounds = r.bounds; first = false; } else bounds.Encapsulate(r.bounds); continue; }
+                foreach (Vector3 v in m.vertices)
+                {
+                    Vector3 w = r.transform.TransformPoint(v);
+                    points.Add(w);
+                    frontZ = Mathf.Max(frontZ, instance.transform.InverseTransformPoint(w).z);
+                    if (first) { bounds = new Bounds(w, Vector3.zero); first = false; } else bounds.Encapsulate(w);
+                }
+            }
+            Line($"{System.IO.Path.GetFileName(modelPath)}: mesh bounds {bounds.size} (renderer bounds {renderers.Aggregate(renderers[0].bounds, (b, r) => { b.Encapsulate(r.bounds); return b; }).size})");
+
+            Vector3 camDir = viewDir.normalized;
+            Material Overlay(Color c) { var m = new Material(overlay); m.SetColor("_BaseColor", c); m.renderQueue = 4000; temp.Add(m); return m; }
+            Mesh ringMesh = BuildAnnulus(ControllerRingInnerRadius, ControllerRingOuterRadius, 0.0005f, 48);
+            temp.Add(ringMesh);
+            var parts = new (string key, string label, Color color)[]
+            {
+                ("trigger_front", "trigger", ControllerTriggerColor), ("trigger_grip", "grip", ControllerGripColor), ("thumbstick", "thumbstick", ControllerStickColor),
+            };
+            Vector3? trigger = null;
+            foreach (var (key, label, color) in parts)
+            {
+                Vector3? centre = ControllerPartCentre(instance, key);
+                if (centre == null) { Line($"WARNING: {System.IO.Path.GetFileName(modelPath)} has no part '{key}'; no {label} ring"); continue; }
+                if (key == "trigger_front") trigger = centre;
+                var ring = new GameObject(label + " ring");
+                ring.transform.SetParent(set.transform, true);
+                ring.transform.SetPositionAndRotation(centre.Value, Quaternion.FromToRotation(Vector3.up, camDir)); // faces the camera
+                ring.AddComponent<MeshFilter>().sharedMesh = ringMesh;
+                ring.AddComponent<MeshRenderer>().sharedMaterial = Overlay(color);
+                Line($"{System.IO.Path.GetFileName(modelPath)}: {label} at {centre.Value - set.transform.position}");
+            }
+            // The pointing ray out of the front (+z of the model, just above the trigger).
+            Vector3 triggerLocal = instance.transform.InverseTransformPoint(trigger ?? bounds.center);
+            Vector3 front = instance.transform.TransformPoint(new Vector3(triggerLocal.x, triggerLocal.y + 0.01f, frontZ + 0.002f));
+            var ray = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            ray.name = "ray";
+            UnityEngine.Object.DestroyImmediate(ray.GetComponent<Collider>());
+            ray.transform.SetParent(set.transform, true);
+            ray.transform.SetPositionAndRotation(front + forward * (ControllerRayLength * 0.5f), Quaternion.FromToRotation(Vector3.up, forward));
+            ray.transform.localScale = new Vector3(ControllerRayRadius * 2f, ControllerRayLength * 0.5f, ControllerRayRadius * 2f);
+            ray.GetComponent<MeshRenderer>().sharedMaterial = Overlay(ControllerRayColor);
+            bounds.Encapsulate(front + forward * ControllerRayLength);
+            points.Add(front);
+            points.Add(front + forward * ControllerRayLength);
+
+            foreach (Transform t in set.GetComponentsInChildren<Transform>(true)) t.gameObject.layer = ControllerImageLayer;
+
+            var lightGo = new GameObject("ControllerImageLight");
+            lightGo.transform.SetParent(set.transform, false);
+            var light = lightGo.AddComponent<Light>();
+            light.type = LightType.Directional;
+            light.intensity = 1.4f;
+            light.cullingMask = 1 << ControllerImageLayer;
+            light.shadows = LightShadows.None;
+            lightGo.transform.rotation = Quaternion.LookRotation((-camDir + Vector3.down * 0.6f + Vector3.left * 0.3f).normalized);
+
+            var camGo = new GameObject("ControllerImageCam");
+            camGo.transform.SetParent(set.transform, false);
+            var cam = camGo.AddComponent<Camera>();
+            cam.clearFlags = CameraClearFlags.SolidColor;
+            cam.backgroundColor = new Color(0f, 0f, 0f, 0f); // transparent: the panel's own background shows through
+            cam.cullingMask = 1 << ControllerImageLayer;
+            cam.fieldOfView = ControllerImageFov;
+            cam.nearClipPlane = 0.01f;
+            cam.farClipPlane = 10f;
+            cam.allowHDR = false;
+            cam.aspect = (float)ControllerImageWidth / ControllerImageHeight;
+            float distance = bounds.extents.magnitude / Mathf.Sin(ControllerImageFov * 0.5f * Mathf.Deg2Rad);
+            cam.transform.position = bounds.center + camDir * distance;
+            cam.transform.LookAt(bounds.center, Vector3.up);
+            // Fit: scale the distance to the projected extents of the vertices and the ray, then centre them in the frame.
+            for (int it = 0; it < 4; it++)
+            {
+                float minX = 1f, maxX = 0f, minY = 1f, maxY = 0f;
+                foreach (Vector3 pt in points)
+                {
+                    Vector3 vp = cam.WorldToViewportPoint(pt);
+                    minX = Mathf.Min(minX, vp.x); maxX = Mathf.Max(maxX, vp.x); minY = Mathf.Min(minY, vp.y); maxY = Mathf.Max(maxY, vp.y);
+                }
+                float span = Mathf.Max(maxX - minX, maxY - minY);
+                float halfH = distance * Mathf.Tan(ControllerImageFov * 0.5f * Mathf.Deg2Rad);
+                Vector3 shift = cam.transform.right * (((minX + maxX) * 0.5f - 0.5f) * 2f * halfH * cam.aspect) + cam.transform.up * (((minY + maxY) * 0.5f - 0.5f) * 2f * halfH);
+                float scale = span / ControllerImageFill;
+                distance *= scale;
+                cam.transform.position += shift + camDir * (distance - distance / scale);
+            }
+
+            rt = new RenderTexture(ControllerImageWidth, ControllerImageHeight, 24, RenderTextureFormat.ARGB32) { antiAliasing = 4 };
+            cam.targetTexture = rt;
+            cam.Render();
+            RenderTexture.active = rt;
+            var tex = new Texture2D(rt.width, rt.height, TextureFormat.RGBA32, false);
+            temp.Add(tex);
+            tex.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
+            tex.Apply();
+            RenderTexture.active = null;
+            cam.targetTexture = null;
+            Color32[] px = tex.GetPixels32();
+            int opaque = px.Count(c => c.a > 8);
+            System.IO.File.WriteAllBytes(pngPath, tex.EncodeToPNG());
+            AssetDatabase.ImportAsset(pngPath, ImportAssetOptions.ForceUpdate);
+            if (AssetImporter.GetAtPath(pngPath) is TextureImporter importer)
+            {
+                importer.textureType = TextureImporterType.Default;
+                importer.alphaIsTransparency = true;
+                importer.mipmapEnabled = false;
+                importer.npotScale = TextureImporterNPOTScale.None;
+                importer.maxTextureSize = 1024;
+                importer.textureCompression = TextureImporterCompression.Uncompressed;
+                importer.wrapMode = TextureWrapMode.Clamp;
+                importer.sRGBTexture = true;
+                importer.SaveAndReimport();
+            }
+            Line($"Rendered {pngPath} ({rt.width}x{rt.height}, {100f * opaque / px.Length:F0}% covered) from {System.IO.Path.GetFileName(modelPath)}, camera {camDir} at {distance:F2} m");
+        }
+        finally
+        {
+            if (rt != null) { RenderTexture.active = null; UnityEngine.Object.DestroyImmediate(rt); }
+            foreach (UnityEngine.Object o in temp) if (o != null) UnityEngine.Object.DestroyImmediate(o);
+        }
+    }
+
+    // Centre of the controller part whose bone (skinned model) or node (rigid model) name contains the key:
+    // the mean of the vertices weighted mostly to that bone, in the imported (bind) pose.
+    private static Vector3? ControllerPartCentre(GameObject model, string key)
+    {
+        foreach (var smr in model.GetComponentsInChildren<SkinnedMeshRenderer>())
+        {
+            Mesh mesh = smr.sharedMesh;
+            if (mesh == null || smr.bones == null) continue;
+            int bone = Array.FindIndex(smr.bones, b => b != null && b.name.ToLowerInvariant().Contains(key));
+            if (bone < 0) continue;
+            Vector3[] verts = mesh.vertices;
+            BoneWeight[] weights = mesh.boneWeights;
+            Vector3 sum = Vector3.zero;
+            int n = 0;
+            for (int i = 0; i < verts.Length && i < weights.Length; i++)
+            {
+                BoneWeight w = weights[i];
+                int best = w.boneIndex0; float bw = w.weight0;
+                if (w.weight1 > bw) { best = w.boneIndex1; bw = w.weight1; }
+                if (w.weight2 > bw) { best = w.boneIndex2; bw = w.weight2; }
+                if (w.weight3 > bw) best = w.boneIndex3;
+                if (best != bone) continue;
+                sum += verts[i];
+                n++;
+            }
+            return n > 0 ? smr.transform.TransformPoint(sum / n) : smr.bones[bone].position;
+        }
+        foreach (Transform t in model.GetComponentsInChildren<Transform>(true))
+        {
+            if (!t.name.ToLowerInvariant().Contains(key)) continue;
+            var r = t.GetComponentInChildren<Renderer>();
+            return r != null ? r.bounds.center : t.position;
+        }
+        return null;
+    }
+
     // The user's spawn point: a root at the user's spot facing the machine, with the project's SpawnHuman
     // (it waits for real 6DOF tracking, then puts the head over the point at the user's own eye height,
     // yaw matched to the point's forward; its XROrigin is the passive one the Meta rig gets at runtime).
@@ -1368,8 +1798,20 @@ public static class MtcSceneBuilder
     {
         var existing = AssetDatabase.LoadAssetAtPath<Mesh>(PlacementRingMeshPath);
         if (existing != null) return existing;
-        const int segments = 64;
-        float ri = HandleRingInnerRadius, ro = HandleRingOuterRadius, h = HandleRingThickness * 0.5f;
+        Mesh mesh = BuildAnnulus(HandleRingInnerRadius, HandleRingOuterRadius, HandleRingThickness * 0.5f, 64);
+        mesh.name = "PlacementRing";
+        string folder = System.IO.Path.GetDirectoryName(PlacementRingMeshPath);
+        if (!AssetDatabase.IsValidFolder(folder))
+            System.IO.Directory.CreateDirectory(folder);
+        AssetDatabase.CreateAsset(mesh, PlacementRingMeshPath);
+        Line($"Created {PlacementRingMeshPath}");
+        return mesh;
+    }
+
+    // Annulus of radius ri..ro lying in the local x/z plane, h half its thickness: top face plus outer and
+    // inner walls (separate vertices so the normals stay hard). In memory; callers save it if they need to.
+    private static Mesh BuildAnnulus(float ri, float ro, float h, int segments)
+    {
         var verts = new List<Vector3>();
         var tris = new List<int>();
         void Quad(int a, int b, int c, int d) { tris.AddRange(new[] { a, b, c, a, c, d }); }
@@ -1378,7 +1820,7 @@ public static class MtcSceneBuilder
             float a0 = i * Mathf.PI * 2f / segments, a1 = (i + 1) * Mathf.PI * 2f / segments;
             Vector3 d0 = new Vector3(Mathf.Cos(a0), 0f, Mathf.Sin(a0)), d1 = new Vector3(Mathf.Cos(a1), 0f, Mathf.Sin(a1));
             int b = verts.Count;
-            // 0..3 top face, 4..7 outer wall, 8..11 inner wall (separate vertices so the normals stay hard)
+            // 0..3 top face, 4..7 outer wall, 8..11 inner wall
             verts.AddRange(new[] { d0 * ri + Vector3.up * h, d0 * ro + Vector3.up * h, d1 * ro + Vector3.up * h, d1 * ri + Vector3.up * h });
             verts.AddRange(new[] { d0 * ro + Vector3.up * h, d0 * ro - Vector3.up * h, d1 * ro - Vector3.up * h, d1 * ro + Vector3.up * h });
             verts.AddRange(new[] { d0 * ri - Vector3.up * h, d0 * ri + Vector3.up * h, d1 * ri + Vector3.up * h, d1 * ri - Vector3.up * h });
@@ -1386,16 +1828,11 @@ public static class MtcSceneBuilder
             Quad(b + 4, b + 7, b + 6, b + 5);
             Quad(b + 8, b + 11, b + 10, b + 9);
         }
-        var mesh = new Mesh { name = "PlacementRing" };
+        var mesh = new Mesh { name = "Annulus" };
         mesh.SetVertices(verts);
         mesh.SetTriangles(tris, 0);
         mesh.RecalculateNormals();
         mesh.RecalculateBounds();
-        string folder = System.IO.Path.GetDirectoryName(PlacementRingMeshPath);
-        if (!AssetDatabase.IsValidFolder(folder))
-            System.IO.Directory.CreateDirectory(folder);
-        AssetDatabase.CreateAsset(mesh, PlacementRingMeshPath);
-        Line($"Created {PlacementRingMeshPath}");
         return mesh;
     }
 
@@ -2475,15 +2912,58 @@ public static class MtcSceneBuilder
         var spawnRefresh = spawnGo != null ? spawnGo.GetComponent<Factory.UserSpawnRefresh>() : null;
         Check(spawnRefresh != null && RefIs(spawnRefresh, "spawn", spawnHuman), "headset mount / recenter re-snaps to the spawn point");
 
-        // Stick translation of a held object, no stick rotation, on every far interactor of both hands.
+        // Ghost hands over the controllers: the runtime synthesises hand poses from the held controllers and
+        // the SDK hands under the tracking space draw them with the outline material.
         GameObject metaRig = R(MetaCameraRigName);
+        var ovrManager = metaRig != null ? metaRig.GetComponentInChildren<OVRManager>(true) : null;
+        Check(ovrManager != null && ovrManager.controllerDrivenHandPosesType == OVRManager.ControllerDrivenHandPosesType.ConformingToController,
+              "OVRManager synthesises hand poses conforming to the held controllers");
+        Transform trackingSpaceV = metaRig != null ? metaRig.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name == "TrackingSpace") : null;
+        foreach ((string handName, OVRHand.Hand handSide) in new[] { (ControllerHandsLeftName, OVRHand.Hand.HandLeft), (ControllerHandsRightName, OVRHand.Hand.HandRight) })
+        {
+            Transform handT = trackingSpaceV != null ? trackingSpaceV.Find(handName) : null;
+            var ovrHand = handT != null ? handT.GetComponent<OVRHand>() : null;
+            var skel = handT != null ? handT.GetComponent<OVRSkeleton>() : null;
+            var handSmr = handT != null ? handT.GetComponent<SkinnedMeshRenderer>() : null;
+            Check(ovrHand != null && handT.gameObject.activeSelf && new SerializedObject(ovrHand).FindProperty("HandType").intValue == (int)handSide,
+                  $"'{handName}' under TrackingSpace is an active OVRHand ({handSide})");
+            Check(skel != null && new SerializedObject(skel).FindProperty("_updateRootPose").boolValue
+                  && skel.GetSkeletonType() == handSide.AsSkeletonType(OVRRuntimeSettings.Instance.HandSkeletonVersion),
+                  $"'{handName}' places itself from the runtime's root pose with the project's skeleton version");
+            Check(handSmr != null && handSmr.sharedMaterial != null && handSmr.sharedMaterial.shader != null && handSmr.sharedMaterial.shader.name == GhostHandShaderName
+                  && handSmr.shadowCastingMode == UnityEngine.Rendering.ShadowCastingMode.Off,
+                  $"'{handName}' is drawn with the ghost outline material, no shadows");
+        }
+
+        // Stick translation of a held object, no stick rotation, on every far interactor of both hands.
         foreach ((string anchorName, string hand) in new[] { ("LeftHandAnchor", "Left"), ("RightHandAnchor", "Right") })
         {
             Transform anchor = metaRig != null ? metaRig.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name == anchorName) : null;
             var attachControllers = anchor != null ? anchor.GetComponentsInChildren<UnityEngine.XR.Interaction.Toolkit.Attachment.InteractionAttachController>(true) : new UnityEngine.XR.Interaction.Toolkit.Attachment.InteractionAttachController[0];
             var rayInteractors = anchor != null ? anchor.GetComponentsInChildren<XRRayInteractor>(true) : new XRRayInteractor[0];
-            // Only the right hand carries XRI far interactors in this scene; the left just needs none left unconfigured.
-            if (hand == "Right") Check(anchor != null && attachControllers.Length + rayInteractors.Length > 0, $"{anchorName} has far interactors to configure");
+            // Both hands carry XRI's poke, near-far and ray interactors (left-handed users, 2026-11-05), each reading its own hand's actions.
+            Check(anchor != null && attachControllers.Length + rayInteractors.Length > 0, $"{anchorName} has far interactors to configure");
+            Transform[] handInteractors = anchor != null ? HandInteractorNames.Select(n => anchor.Find(n)).Where(t => t != null).ToArray() : new Transform[0];
+            Check(handInteractors.Length == HandInteractorNames.Length && handInteractors.All(t => t.gameObject.activeSelf)
+                  && anchor.GetComponentInChildren<XRPokeInteractor>(true) != null && anchor.GetComponentInChildren<NearFarInteractor>(true) != null && rayInteractors.Length > 0,
+                  $"{anchorName} carries active Poke, Near-Far and Ray interactors");
+            InteractorHandedness wantHand = hand == "Left" ? InteractorHandedness.Left : InteractorHandedness.Right;
+            string ownPrefix = hand == "Left" ? LeftHandPrefix : RightHandPrefix, otherPrefix = hand == "Left" ? RightHandPrefix : LeftHandPrefix;
+            var strayRefs = new List<string>();
+            int handedWrong = 0;
+            foreach (Transform t in handInteractors)
+                foreach (Component comp in t.GetComponentsInChildren<Component>(true))
+                {
+                    if (comp == null) continue;
+                    if (comp is XRBaseInteractor && new SerializedObject(comp).FindProperty("m_Handedness").intValue != (int)wantHand) handedWrong++;
+                    SerializedProperty p = new SerializedObject(comp).GetIterator();
+                    while (p.Next(true))
+                        if (p.propertyType == SerializedPropertyType.ObjectReference && p.objectReferenceValue != null
+                            && p.objectReferenceValue.GetType().Name == "InputActionReference" && p.objectReferenceValue.name.StartsWith(otherPrefix))
+                            strayRefs.Add($"{Path(comp.transform)}.{p.propertyPath} = {p.objectReferenceValue.name}");
+                }
+            Check(handedWrong == 0 && strayRefs.Count == 0,
+                  $"{anchorName}: interactors are {wantHand}-handed and read only '{ownPrefix} ...' actions" + (strayRefs.Count > 0 ? " (stray: " + string.Join("; ", strayRefs) + ")" : ""));
             Check(attachControllers.All(a => !new SerializedObject(a).FindProperty("m_UseManipulationInput").boolValue
                                               && new SerializedObject(a).FindProperty("m_ManipulationXAxisMode").intValue == (int)UnityEngine.XR.Interaction.Toolkit.Attachment.InteractionAttachController.ManipulationXAxisMode.None),
                   $"{anchorName}: XRI's own attach manipulation is off (far-only, rotated on stick x)");
@@ -2508,6 +2988,10 @@ public static class MtcSceneBuilder
                              && so.FindProperty("m_DirectionalManipulationInput.m_InputSourceMode").intValue == InputSourceUnused;
                   }), $"{anchorName}: ray interactors translate on the stick, rotate and directional readers unbound");
         }
+        var selectionV = R("SelectionManager") != null ? R("SelectionManager").GetComponent<SelectionManager>() : null;
+        string rightSelectName = selectionV != null ? RefName(selectionV, "selectAction") : null, leftSelectName = selectionV != null ? RefName(selectionV, "leftSelectAction") : null;
+        Check(selectionV != null && rightSelectName == RightSelectObjectActionName && leftSelectName == LeftSelectObjectActionName,
+              $"SelectionManager selects with either trigger ('{rightSelectName}' / '{leftSelectName}')");
         var highlight = guideRoot != null ? guideRoot.GetComponent<Factory.GuideTargetHighlight>() : null;
         var offscreen = guideRoot != null ? guideRoot.GetComponent<Factory.GuideOffscreenIndicator>() : null;
         Check(highlight != null && RefIs(highlight, "guide", guide) && RefSet(highlight, "material"), "target highlight bound to the guide with a serialized material");
@@ -2524,11 +3008,20 @@ public static class MtcSceneBuilder
                   && card.GetComponentsInChildren<Rigidbody>(true).Length == 0 && card.GetComponentsInChildren<Renderer>(true).Length == 0,
                   "card has nothing to grab, poke or bump into");
             var followComp = card.GetComponent<Factory.GuideHeadFollow>();
-            Check(followComp != null && followComp.offset.z > 0.8f && followComp.offset.y < -0.2f && followComp.offset.x > 0.3f, "card follows the head, lower right of the view");
+            Check(followComp != null && followComp.offset.z > 0.8f && followComp.offset.y < -0.2f && followComp.offset.x < -0.3f, "card follows the head, lower left of the view (off the machine's opening)");
             Check(followComp != null && followComp.avoidOcclusion && followComp.occluderRoots != null && followComp.occluderRoots.Count(t => t != null) >= 2,
                   $"card avoids occlusion with {(followComp != null && followComp.occluderRoots != null ? followComp.occluderRoots.Count(t => t != null) : 0)} occluder root(s) (station, machines, hall)");
+            Check(followComp != null && Vector2.Distance(followComp.halfExtents, GuideCardHalfExtents) < 1e-4f, $"occlusion check covers the card's corners ({GuideCardHalfExtents} m half extents)");
             var cardUi = card.GetComponentInChildren<Factory.GuideInstructionCard>(true);
             Check(cardUi != null && RefIs(cardUi, "guide", guide) && RefIs(cardUi, "uiDocument", cardDoc), "GuideInstructionCard bound to the guide");
+            Check(cardUi != null && new SerializedObject(cardUi).FindProperty("leftControllerImage").objectReferenceValue != null
+                  && new SerializedObject(cardUi).FindProperty("rightControllerImage").objectReferenceValue != null
+                  && Mathf.Abs(new SerializedObject(cardUi).FindProperty("maxHeightUnits").floatValue - GuideCardMaxHeight) < 1e-3f
+                  && Mathf.Abs(new SerializedObject(cardUi).FindProperty("minHeightUnits").floatValue - GuideCardHeight) < 1e-3f
+                  && Mathf.Abs(new SerializedObject(cardDoc).FindProperty("m_WorldSpaceHeight").floatValue - GuideCardMaxHeight) < 1e-3f,
+                  $"welcome card holds both controller renderings; document {GuideCardMaxHeight} units tall, {GuideCardHeight}..{GuideCardMaxHeight} drawn to fit the rows");
+            Check(cardDoc != null && cardDoc.visualTreeAsset != null && cardDoc.visualTreeAsset.Instantiate().Q<VisualElement>("guideControllersBlock") != null
+                  && cardDoc.visualTreeAsset.Instantiate().Q<VisualElement>("guideControllerLeftImage") != null, "GuideCard.uxml has the controllers block");
             Check(cardDoc != null && Vector3.Distance(PanelCentre(cardDoc), card.transform.position) < 1e-3f || (cardDoc != null && cardDoc.GetComponent<BoxCollider>() == null
                   && Vector3.Distance(cardDoc.transform.localPosition, new Vector3(-1.5f, GuideCardHeight / 200f, 0f)) < 1e-3f), "card panel is centred on its root");
             Check(placement != null && !ArrayRefs(placement, "gatedObjects").Contains(card) && !ArrayRefs(placement, "placementObjects").Contains(card), "card is shown in both phases");

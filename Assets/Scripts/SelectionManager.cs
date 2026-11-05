@@ -8,10 +8,17 @@ public class SelectionManager : MonoBehaviour
 {
     public static SelectionManager Instance { get; private set; }
 
+    [Tooltip("Trigger that selects what the right hand's ray points at (XRI Right Interaction/SelectObject).")]
     public InputActionReference selectAction;
+    [Tooltip("Trigger that selects what the left hand's ray points at (XRI Left Interaction/SelectObject). Empty = the right hand only, " +
+             "as before the FactoryDemo got a left-handed mode (2026-11-05).")]
+    public InputActionReference leftSelectAction;
 
     [Header("Ray Interactor")]
+    [Tooltip("The right hand's robot ray; bound at load by PersistentXRInfrastructure.")]
     public Quest3ControllerRayInteractor rayInteractor;
+    [Tooltip("The left hand's robot ray, read when leftSelectAction fires; bound at load by PersistentXRInfrastructure.")]
+    public Quest3ControllerRayInteractor leftRayInteractor;
 
     [Header("Interaction Router (opt-in)")]
     [Tooltip("When assigned, selection is driven by the router instead of a bound input " +
@@ -93,6 +100,13 @@ public class SelectionManager : MonoBehaviour
         rayInteractor = interactor;
     }
 
+    /// <summary>One robot ray per hand; either trigger then selects what its own hand points at.</summary>
+    public void BindRayInteractors(Quest3ControllerRayInteractor left, Quest3ControllerRayInteractor right)
+    {
+        leftRayInteractor = left;
+        rayInteractor = right;
+    }
+
     // The router only drives selection when it can actually run. A router assigned in the
     // Inspector but sitting under an inactive rig (KitchenFR3 keeps its XR Origin disabled,
     // and PersistentXRInfrastructure disables duplicate rigs on load) never raises Select,
@@ -110,6 +124,11 @@ public class SelectionManager : MonoBehaviour
             return;
 
         selectAction.action.performed += OnSelectPerformed;
+        if (leftSelectAction != null && leftSelectAction.action != null && leftSelectAction.action != selectAction.action)
+        {
+            leftSelectAction.action.performed += OnLeftSelectPerformed;
+            leftSelectAction.action.Enable();
+        }
         selectActionSubscribed = true;
     }
 
@@ -119,6 +138,8 @@ public class SelectionManager : MonoBehaviour
             return;
 
         selectAction.action.performed -= OnSelectPerformed;
+        if (leftSelectAction != null && leftSelectAction.action != null)
+            leftSelectAction.action.performed -= OnLeftSelectPerformed;
         selectActionSubscribed = false;
     }
 
@@ -134,7 +155,10 @@ public class SelectionManager : MonoBehaviour
             Instance = null;
     }
 
-    private void OnSelectPerformed(InputAction.CallbackContext _) => TrySelect();
+    private void OnSelectPerformed(InputAction.CallbackContext _) => TrySelect(rayInteractor ?? leftRayInteractor);
+
+    // The left trigger reads the left hand's ray (falling back to the right one in scenes that bind only that).
+    private void OnLeftSelectPerformed(InputAction.CallbackContext _) => TrySelect(leftRayInteractor ?? rayInteractor);
 
     // Bridges the legacy tag-based selection onto the typed SelectionService. Objects
     // without a SelectableMarker are reported as Obstacle, which is what everything
@@ -181,12 +205,14 @@ public class SelectionManager : MonoBehaviour
         SetSelectedObject(hitObj);
     }
 
-    void TrySelect()
+    void TrySelect() => TrySelect(rayInteractor ?? leftRayInteractor);
+
+    void TrySelect(Quest3ControllerRayInteractor ray)
     {
         if (IsInteractingWithUI())
             return;
 
-        if (rayInteractor == null || !rayInteractor.TryGetCurrentHit(out RaycastHit hit))
+        if (ray == null || !ray.TryGetCurrentHit(out RaycastHit hit))
         {
             // Ray hitting nothing — could be UI interaction with misaligned physics ray; don't clear
             return;

@@ -5,7 +5,7 @@ namespace Factory
     /// <summary>The one thing the user should do next in the factory demo.</summary>
     public enum GuideStep
     {
-        Welcome,          // "Begin" on the placement panel: teaches pointing at a panel and pulling the trigger
+        Welcome,          // "Begin" on the placement panel: the card shows both controllers (trigger, grip, stick) and teaches pointing at a panel and pulling the trigger
         PlaceRobot,       // drag the floor ring until every reach marker is green
         ConfirmPlacement, // "Confirm placement" on the placement panel
         OpenDoors,        // "Open Doors" on the machine panel
@@ -145,7 +145,7 @@ namespace Factory
             _ => GuideTarget.None,
         };
 
-        /// <summary>1-based position on the card's "step N of 10" line; 0 for Done.</summary>
+        /// <summary>1-based position on the card's "step N of 16" line; 0 for Done.</summary>
         public static int NumberOf(GuideStep step) => step switch
         {
             GuideStep.Welcome => 1,
@@ -195,111 +195,111 @@ namespace Factory
             return obstacle;
         }
 
-        const string Trigger = "TRIGGER = the front button under your index finger.";
-        const string Grip = "GRIP = the side button under your middle finger.";
+        const string Trigger = "TRIGGER = front button under your index finger.";
+        const string Grip = "GRIP = side button under your middle finger.";
         const string PointAndTrigger = "Point the ray at the button and pull the TRIGGER.";
+        const string StickMoves = "THUMBSTICK forward or back pushes it away or pulls it closer.";
+        const string Reading = "Good. Hold still: the robot is reading where you put it...";
+        const string Loading = "The robot found a way. Loading the motion...";
+        const string Offline = "Waiting for the robot connection... (ask the demonstration administrator)";
 
-        /// <summary>Card text for a step; <paramref name="s"/> picks the variant (grabbed, moving, ...).</summary>
+        /// <summary>Card text for a step; <paramref name="s"/> picks the variant (grabbed, moving, ...). Kept short: the card is narrow.</summary>
         public static GuideText Describe(GuideStep step, in GuideSignals s, bool robotOnline)
         {
             switch (step)
             {
                 case GuideStep.Welcome:
+                    // The card shows both controllers under this text (GuideInstructionCard): trigger, grip and thumbstick ringed, the ray from the front.
                     return new GuideText("Welcome",
-                        "You will teach this robot to load a part into the milling machine. Point the ray at the panel on your left and press 'Begin'.",
+                        "You will teach this robot to load a block into the milling machine. These are your two controllers; both work the same, so use whichever hand you prefer. Point the ray at the panel on your left and press 'Begin'.",
                         PointAndTrigger + " " + Trigger,
-                        "Hold the controller like a pistol; the ray comes out of its front. Turn left to find the panel, point at the green button and pull the trigger.");
+                        "Hold a controller like a flashlight: trigger under your index finger, grip under your middle finger, the ray out of the front. Turn left to find the panel.");
                 case GuideStep.PlaceRobot:
                     if (s.handleGrabbed)
                         return new GuideText("Place the robot",
-                            $"Keep dragging. {s.reachable} of {s.targetCount} markers are green, so the robot can reach those spots." +
-                            (s.robotBlocked ? " The ring is red: the robot would touch " + Obstacle(s.robotBlockedBy) + " here." : s.robotTooFar ? " The ring is red: too far from the machine to reach the vise, come closer to the doors." : "") +
-                            " Let go of the GRIP when all six are green and the ring is blue.",
-                            "Hold GRIP to keep dragging; turn your wrist to turn the robot; release to let go.",
-                            "The spot right in front of the machine doors, centred, reaches everything.");
+                            $"Keep dragging: {s.reachable} of {s.targetCount} markers are green." +
+                            (s.robotBlocked ? " Red ring: the robot would touch " + Obstacle(s.robotBlockedBy) + " here." : s.robotTooFar ? " Red ring: too far to reach the vise, come closer to the doors." : "") +
+                            " Release the GRIP when all six are green and the ring is blue.",
+                            "Hold GRIP to drag; turn your wrist to turn the robot.",
+                            "Right in front of the machine doors, centred, reaches everything.");
                     if (s.reachable >= s.targetCount && !s.robotBlocked && s.robotTooFar)
                         return new GuideText("Place the robot",
-                            "All six markers are green, but the ring is red: from here the robot cannot reach into the machine to the vise. Drag the ring closer to the machine doors until the ring turns blue.",
+                            "All six markers are green but the ring is red: the robot cannot reach the vise from here. Drag the ring closer to the machine doors until it turns blue.",
                             Grip + " Point at the ring first.",
-                            "Right in front of the doors, centred, about a step away from them.");
+                            "Right in front of the doors, about a step away.");
                     if (s.reachable >= s.targetCount && s.robotBlocked)
                         return new GuideText("Place the robot",
-                            $"All six markers are green, but the ring is red: standing here the robot's arm touches {Obstacle(s.robotBlockedBy)}, so it could not move. Drag the ring a little away from it until the ring turns blue.",
-                            Grip + " Point at the ring first. Turn your wrist to turn the robot.",
-                            "Centre the robot in front of the machine doors, a step back from them, square to the machine.");
+                            $"All six markers are green but the ring is red: here the robot's arm touches {Obstacle(s.robotBlockedBy)}. Drag the ring a little away from it until it turns blue.",
+                            Grip + " Point at the ring first; turn your wrist to turn the robot.",
+                            "Centred in front of the doors, a step back, square to the machine.");
                     return new GuideText("Place the robot",
-                        "The six floating balls mark the places the robot must reach: the billets on the stand, the vise inside the machine and the conveyor. Red means out of reach. Point the ray at the blue ring on the floor, hold the GRIP and drag the robot until all six turn green.",
-                        Grip + " Point at the ring first. Turn your wrist to turn the robot.",
-                        "A marker turns green when the robot can reach it from where it stands. Try the spot right in front of the machine doors.");
+                        "The six floating balls are the spots the robot must reach: the blocks on the stand, the vise and the conveyor. Red means out of reach. The ring around the robot is red while it cannot do the job from here and turns blue when it can. Point at the ring, hold the GRIP and drag the robot until all six balls are green and the ring is blue.",
+                        Grip + " Point at the red ring on the floor first. Turn your wrist to turn the robot.",
+                        "Try the spot right in front of the machine doors.");
                 case GuideStep.ConfirmPlacement:
                     return new GuideText("Confirm the placement",
-                        "All six markers are green: the robot can reach the stand, the vise and the conveyor from here. Press 'Confirm placement' on the panel to your left.",
+                        "All six markers are green. Press 'Confirm placement' on the panel to your left.",
                         PointAndTrigger,
-                        "The panel is on your left. The ray comes out of the front of the controller.");
+                        "The panel is on your left; the ray comes out of the front of the controller.");
                 case GuideStep.OpenDoors:
                     if (s.doorsMoving)
                         return new GuideText("Open the machine", "The doors are moving...", "", "");
                     return new GuideText("Open the machine",
                         "Press 'Open Doors' on the machine panel to your left.",
                         PointAndTrigger,
-                        "The machine panel is the panel on your left, top green button.");
+                        "Top green button on the left panel.");
                 case GuideStep.SelectBillet:
-                    return new GuideText("Pick a billet",
-                        "Point the ray at the top billet on the stand and pull the TRIGGER once to select it.",
-                        Trigger + " The billet lights up when it is selected.",
-                        "The billets are the grey blocks stacked on the stand in front of the robot. The ray must touch the block when you pull the trigger.");
+                    return new GuideText("Pick a block",
+                        "Point the ray at the top block on the stand and pull the TRIGGER once to select it.",
+                        Trigger + " The block lights up when selected.",
+                        "The blocks are the grey stack on the stand in front of the robot. The ray must touch the block when you pull the trigger.");
                 case GuideStep.GrabBillet:
-                    return new GuideText("Pick up the billet",
-                        "Point at the selected billet and squeeze the GRIP to pick it up.",
-                        Grip + " Keep it squeezed while you carry.",
-                        "Squeeze the side button while the ray points at the highlighted billet. You can pull it closer by walking.");
+                    return new GuideText("Pick up the block",
+                        "Point at the selected block and squeeze the GRIP to pick it up.",
+                        Grip + " Keep it squeezed while you carry. " + StickMoves,
+                        "Squeeze the side button while the ray points at the lit block. Walk closer if the ray will not reach.");
                 case GuideStep.CarryToVise:
                     if (!s.billetGrabbed && s.recording)
                         return new GuideText("Show the robot where it goes",
-                            "Not there yet. Pick the billet up again and set it down between the two jaws of the vise inside the machine.",
-                            Grip + " Let go of the GRIP to put it down.",
-                            "The vise is on the round table behind the open doors. The billet has to sit between the two dark jaws, on the plate.");
+                            "Not there yet. Pick the block up again and set it between the two jaws of the vise inside the machine.",
+                            Grip + " Release the GRIP to put it down.",
+                            "The vise is on the round table behind the open doors; the block goes between the two dark jaws, on the plate.");
                     return new GuideText("Show the robot where it goes",
-                        "Carry the billet into the machine and let go of the GRIP with it sitting between the two open jaws of the vise.",
-                        "Release the GRIP to put it down. Walk or lean closer if you need to.",
-                        "The vise is on the round table behind the open doors. Lower the billet between the two dark jaws, then let go.");
+                        "Carry the block into the machine and release the GRIP with it between the two open jaws of the vise.",
+                        StickMoves + " Release the GRIP to put it down.",
+                        "The vise is on the round table behind the open doors. Lower the block between the two dark jaws, then let go. Walk or lean closer if needed.");
                 case GuideStep.ReleaseInVise:
-                    return new GuideText("Show the robot where it goes",
-                        "Good. Hold still a moment: the robot is reading where you put it...",
-                        "", "");
+                    return new GuideText("Show the robot where it goes", Reading, "", "");
                 case GuideStep.Planning:
-                    if (s.solutionLoading)
-                        return new GuideText("The robot is thinking", "The robot found a way. Loading the motion...", "", "");
+                    if (s.solutionLoading) return new GuideText("The robot is thinking", Loading, "", "");
                     return new GuideText("The robot is thinking",
-                        robotOnline ? "The robot is planning how to do the same move. This takes a few seconds."
-                                    : "Waiting for the robot connection... (ask the demonstration administrator)",
-                        "", "");
+                        robotOnline ? "The robot is planning the same move. This takes a few seconds." : Offline, "", "");
                 case GuideStep.Execute:
                     return new GuideText("Let the robot do it",
-                        "The robot found a way. Press 'Execute' on the panel to your right to let it load the billet.",
+                        "The robot found a way. Press 'Execute' on the panel to your right.",
                         PointAndTrigger,
-                        "The panel on your right: the green 'Execute' button near the bottom.");
+                        "Green 'Execute' button near the bottom of the right panel.");
                 case GuideStep.Executing:
                     return new GuideText("Watch the robot",
-                        "The robot is loading the billet. Stand back and watch.",
-                        "", "The robot moves on its own now; nothing to do until it is done.");
+                        "The robot is loading the block. Stand back and watch.",
+                        "", "Nothing to do until it is done.");
                 case GuideStep.Clamp:
                     if (s.robotInJaws)
-                        return new GuideText("Clamp the billet", "Wait for the robot to move clear of the vise...", "", "");
-                    return new GuideText("Clamp the billet",
-                        "The billet is in the vise. Press 'Clamp' on the machine panel to your left to hold it.",
+                        return new GuideText("Clamp the block", "Wait for the robot to move clear of the vise...", "", "");
+                    return new GuideText("Clamp the block",
+                        "The block is in the vise. Press 'Clamp' on the machine panel to your left.",
                         PointAndTrigger,
-                        "The machine panel on your left, the green 'Clamp' button in the vise section.");
+                        "Green 'Clamp' button in the vise section of the left panel.");
                 case GuideStep.CloseDoors:
                     if (s.doorsMoving)
                         return new GuideText("Close the machine", "The doors are moving...", "", "");
                     return new GuideText("Close the machine",
                         "Press 'Close Doors' on the machine panel so the machine can run the job.",
                         PointAndTrigger,
-                        "The machine panel on your left, the red 'Close Doors' button.");
+                        "Red 'Close Doors' button on the left panel.");
                 case GuideStep.Machining:
                     return new GuideText("Machining (not simulated)",
-                        "This is where the real machine would mill the part. The demo does not simulate the cut; it moves on to unloading in a moment.",
+                        "This is where the real machine would mill the block. The demo does not simulate the cut and moves on to unloading in a moment.",
                         "", "");
                 case GuideStep.OpenDoorsToUnload:
                     if (s.doorsMoving)
@@ -307,55 +307,50 @@ namespace Factory
                     return new GuideText("Unload the machine",
                         "The job is done. Press 'Open Doors' on the machine panel to get the part out.",
                         PointAndTrigger,
-                        "The machine panel on your left, the green 'Open Doors' button at the top.");
+                        "Green 'Open Doors' button at the top of the left panel.");
                 case GuideStep.ReleaseVise:
                     return new GuideText("Release the vise",
                         "Press 'Release' on the machine panel so the robot can take the part.",
                         PointAndTrigger,
-                        "The machine panel on your left, the red 'Release' button in the vise section.");
+                        "Red 'Release' button in the vise section of the left panel.");
                 case GuideStep.SelectMachinedBillet:
                     return new GuideText("Pick the finished part",
                         "Point the ray at the part in the vise and pull the TRIGGER once to select it.",
-                        Trigger + " The part lights up when it is selected.",
-                        "The part sits between the vise jaws inside the machine. The ray must touch it when you pull the trigger.");
+                        Trigger + " The part lights up when selected.",
+                        "It sits between the vise jaws inside the machine; the ray must touch it when you pull the trigger.");
                 case GuideStep.GrabMachinedBillet:
                     return new GuideText("Pick up the finished part",
                         "Point at the selected part and squeeze the GRIP to pick it up.",
-                        Grip + " Keep it squeezed while you carry.",
-                        "Squeeze the side button while the ray points at the highlighted part. Lean closer if the ray will not reach.");
+                        Grip + " Keep it squeezed while you carry. " + StickMoves,
+                        "Squeeze the side button while the ray points at the lit part. Lean closer if the ray will not reach.");
                 case GuideStep.CarryToConveyor:
                     if (!s.billetGrabbed && s.recording)
                         return new GuideText("Show the robot where it goes",
-                            "Not there yet. Pick the part up again and set it down on the conveyor belt to the left of the robot.",
-                            Grip + " Let go of the GRIP to put it down.",
-                            "The conveyor is the belt running from beside the robot to the table on the far left. Set the part on the belt near the robot.");
+                            "Not there yet. Pick the part up again and set it on the conveyor belt to the left of the robot.",
+                            Grip + " Release the GRIP to put it down.",
+                            "The belt runs from beside the robot to the table on the far left. Set the part on it near the robot.");
                     return new GuideText("Show the robot where it goes",
-                        "Carry the part out of the machine and let go of the GRIP with it resting on the conveyor belt.",
-                        "Release the GRIP to put it down. Walk or lean closer if you need to.",
+                        "Carry the part out of the machine and release the GRIP with it resting on the conveyor belt.",
+                        StickMoves + " Release the GRIP to put it down.",
                         "The conveyor is the belt to the left of the robot. Lower the part onto it, then let go.");
                 case GuideStep.ReleaseOnConveyor:
-                    return new GuideText("Show the robot where it goes",
-                        "Good. Hold still a moment: the robot is reading where you put it...",
-                        "", "");
+                    return new GuideText("Show the robot where it goes", Reading, "", "");
                 case GuideStep.PlanningUnload:
-                    if (s.solutionLoading)
-                        return new GuideText("The robot is thinking", "The robot found a way. Loading the motion...", "", "");
+                    if (s.solutionLoading) return new GuideText("The robot is thinking", Loading, "", "");
                     return new GuideText("The robot is thinking",
-                        robotOnline ? "The robot is planning how to unload the part. This takes a few seconds."
-                                    : "Waiting for the robot connection... (ask the demonstration administrator)",
-                        "", "");
+                        robotOnline ? "The robot is planning the unload. This takes a few seconds." : Offline, "", "");
                 case GuideStep.ExecuteUnload:
                     return new GuideText("Let the robot do it",
-                        "The robot found a way. Press 'Execute' on the panel to your right to let it unload the part.",
+                        "The robot found a way. Press 'Execute' on the panel to your right.",
                         PointAndTrigger,
-                        "The panel on your right: the green 'Execute' button near the bottom.");
+                        "Green 'Execute' button near the bottom of the right panel.");
                 case GuideStep.ExecutingUnload:
                     return new GuideText("Watch the robot",
                         "The robot is unloading the part onto the conveyor. Stand back and watch.",
-                        "", "The robot moves on its own now; nothing to do until it is done.");
+                        "", "Nothing to do until it is done.");
                 case GuideStep.Done:
                     return new GuideText("Demo finished",
-                        "The demo is finished. You taught the robot to load the machine and to unload the finished part.",
+                        "The demo is finished: you taught the robot to load the machine and to unload the finished part.",
                         "", "");
             }
             return new GuideText(step.ToString(), "", "", "");

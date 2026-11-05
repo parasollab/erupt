@@ -529,21 +529,21 @@ public static class DemoVideoProbe
             Vector3 hover = window.position + new Vector3(0.01f, 0.03f + 0.005f + 0.015f, 0.012f);
             Quaternion hoverRot = Quaternion.AngleAxis(10f, Vector3.up); // 5 cm side across the jaws, skewed 10 deg
             uint? sid = await DemonstrateAndPlan(part, hover, hoverRot, viseClose, window.position,
-                "5. Select the top billet: point at it and pull the trigger",
-                "6. Grab it: picking the billet up starts the pick-and-place recording on its own",
-                "   Let go between the open jaws: the recording stops and the plan goes out; the billet returns to the stack",
+                "5. Select the top block: point at it and pull the trigger",
+                "6. Grab it: picking the block up starts the pick-and-place recording on its own",
+                "   Let go between the open jaws: the recording stops and the plan goes out; the block returns to the stack",
                 "7. MoveIt Task Constructor plans the load; the dashboard shows the planning status",
                 "   The best solution is selected and shown on its own: nothing to browse");
             if (sid == null) { Exit(5); return; }
 
             // --- 8. execute ---
             Log($"guide step before execute: {guide.Step}");
-            await ExecuteSelected(part, viseClose, window.position, "8. Execute: the robot loads the billet; the part falls onto the parallels when the gripper opens", fromSolutionsTab: true);
+            await ExecuteSelected(part, viseClose, window.position, "8. Execute: the robot loads the block; the part falls onto the parallels when the gripper opens", fromSolutionsTab: true);
             Log($"guide step after execute: {guide.Step}");
 
             // --- 9. clamp ---
             vise.ScanPresence();
-            await Press(machineDoc, "viseClampButton", "9. Clamp: the self-centring jaws square the billet and centre it");
+            await Press(machineDoc, "viseClampButton", "9. Clamp: the self-centring jaws square the block and centre it");
             SetView(viseClose, window.position, 0.8f);
             await Hold(0.5f);
             while (vise.IsMoving) await Task.Delay(100);

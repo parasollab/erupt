@@ -78,8 +78,8 @@ namespace Factory
         public event System.Action<GameObject> Stopped;
 
         private readonly Dictionary<XRGrabInteractable, GameObject> _hooked = new Dictionary<XRGrabInteractable, GameObject>();
-        private Coroutine _pendingStop, _hookParts;
-        private bool _recorderHooked;
+        private Coroutine _pendingStop, _hookParts, _reselect;
+        private bool _recorderHooked, _selectionHooked;
 
         private void Awake()
         {
@@ -95,7 +95,35 @@ namespace Factory
                 mouse.DragEnded += OnMouseDragEnded;
             }
             HookRecorder();
+            HookSelection();
             _hookParts = StartCoroutine(HookPartsWhenReady());
+        }
+
+        // A stray trigger pull at the machine or a panel clears the selection, and SelectableGrabController then
+        // refuses the grab until the billet is selected again. While the guide's recording is about that billet,
+        // put the selection straight back so the user can simply grip it again (2026-11-05).
+        private void HookSelection()
+        {
+            if (selection == null || _selectionHooked) return;
+            selection.OnSelectionCleared += OnSelectionCleared;
+            _selectionHooked = true;
+        }
+
+        private void OnSelectionCleared()
+        {
+            if (!StartedByGuide || WatchedPart == null || recorder == null || !recorder.IsRecording) return;
+            if (_reselect != null) StopCoroutine(_reselect);
+            _reselect = StartCoroutine(ReselectWatchedPart());
+        }
+
+        private IEnumerator ReselectWatchedPart()
+        {
+            yield return null; // after ClearSelection has finished
+            _reselect = null;
+            if (!StartedByGuide || WatchedPart == null || recorder == null || !recorder.IsRecording) yield break;
+            if (selection == null || selection.SelectedObject != null) yield break;
+            Debug.Log($"{LogTag} selection cleared while carrying '{WatchedPart.name}'; selecting it again");
+            selection.SetSelectedObject(WatchedPart);
         }
 
         // Idempotent: OnEnable may run before the recorder is assigned (components built at runtime).
@@ -120,6 +148,9 @@ namespace Factory
                 recorder.OnRecordingDiscarded -= OnRecorderDiscarded;
             }
             _recorderHooked = false;
+            if (selection != null && _selectionHooked) selection.OnSelectionCleared -= OnSelectionCleared;
+            _selectionHooked = false;
+            if (_reselect != null) { StopCoroutine(_reselect); _reselect = null; }
             if (_hookParts != null) { StopCoroutine(_hookParts); _hookParts = null; }
             CancelPendingStop();
             foreach (var kv in _hooked)
@@ -197,6 +228,7 @@ namespace Factory
             if (placement != null && placement.Phase != RobotPlacementController.PlacementPhase.Confirmed) return;
             if (selection != null && selection.SelectedObject != part) return; // the recorder watches the selection
             HookRecorder();
+            HookSelection();
             recorder.StartRecording();
             if (!recorder.IsRecording) return;
             StartedByGuide = true;

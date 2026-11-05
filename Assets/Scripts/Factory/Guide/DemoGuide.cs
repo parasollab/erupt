@@ -226,7 +226,7 @@ namespace Factory
                     Notify($"The robot cannot move from where it stands ('{stage}' failed): its arm is touching the machine or the stand. " +
                            "Press 'Move the robot again' on the panel to your left and place it a little further from the machine.");
                 else
-                    Notify("The robot could not find a way to do that. Try again: set the billet lower and centred between the jaws.");
+                    Notify("The robot could not find a way to do that. Try again: set the block lower and centred between the jaws.");
             }
         }
 
@@ -259,7 +259,7 @@ namespace Factory
             if (vise != null) vise.ScanPresence();
             if (vise != null && vise.PresentPart == report.part && !vise.PresentPartHeldByRobot) return;
             LoadedByRobot = false;
-            Notify("The billet landed beside the vise. Select it and show the robot the spot again.");
+            Notify("The block landed beside the vise. Select it and show the robot the spot again.");
         }
 
         // ---- evaluation ------------------------------------------------------------------

@@ -128,19 +128,19 @@ grep '\[PROBE' /tmp/probe.log
 ```
 
 It plays `FactoryDemo` and walks the self-guided flow the way a first-time user would, checking `Factory.DemoGuide`
-at every step: Welcome (card lower right of the eye, the placement panel shows only a Begin button, framed, chevron pointing at it), Begin -> PlaceRobot (the unload steps after Clamp are exercised by the video probe, not here) (ring framed,
+at every step: Welcome (card lower left of the eye (left since 2026-11-05, off the machine's opening) and taller, showing both controller renderings with the trigger / grip / thumbstick legend; the drawn card fits its rows between 320 and the baked 520 units, `GuideInstructionCard.ContentFits` is checked on the welcome, after Begin, with the hint + help lines and with the offline notice; the placement panel shows only a Begin button, framed, chevron pointing at it), Begin -> PlaceRobot (the renderings leave the card, the first text says the ring starts red; the unload steps after Clamp are exercised by the video probe, not here) (ring framed,
 off-screen chevron shown when the head turns away and hidden when looking at the ring, the card glides after the
 head), nudge to the ideal spot -> ConfirmPlacement (frame + pulsing class on the Confirm button, button-sized at
 the lower part of the panel), Confirm -> OpenDoors (frame on the now-shown machine panel), doors -> SelectBillet
-(top billet framed), select -> GrabBillet, `GuidedRecording.NotifyGrabbed` -> recording started -> CarryToVise
+(top billet framed; before that the eye is turned to the Open Doors button and to the right panel's Execute area and the card must not lie on the sightline, `guide_card_vs_door_panel` / `guide_card_vs_mtc_panel`), select -> GrabBillet, `GuidedRecording.NotifyGrabbed` -> recording started -> CarryToVise
 (jaw opening framed), billet set between the jaws -> ReleaseInVise, `NotifyReleased` -> the recording stops after
 the settle and the plan goes out (with ROS up: Planning -> Execute with the best solution selected and the Execute
 button framed; offline: refused, the guide offers the billet again and the card shows ROBOT OFFLINE after the grace
 period), the stuck timers shortened by reflection on the SelectBillet step -> hint and "ask for help" lines, a billet
 under the floor / outside the working area -> back on the stand (`PartRecovery`), `DemoReset.Restart` -> placement
 phase at the start pose, doors closing, vise open, guide on Welcome. Screenshots in `PROBE_OUT`: `guide_welcome`,
-`guide_place_ring`, `guide_offscreen_chevron`, `guide_confirm_button`, `guide_confirm_closeup`, `guide_open_doors`,
-`guide_select_billet`, `guide_carry_to_vise`, `guide_vise_closeup`, `guide_card_hint`, `guide_card_offline`,
+`guide_welcome_card`, `guide_place_ring`, `guide_offscreen_chevron`, `guide_confirm_button`, `guide_confirm_closeup`, `guide_open_doors`,
+`guide_card_vs_door_panel`, `guide_card_vs_mtc_panel`, `guide_select_billet`, `guide_carry_to_vise`, `guide_vise_closeup`, `guide_card_hint`, `guide_card_offline`,
 `guide_restarted`. Verified 2026-10-23: 55 checks, 0 failures (ROS up). Play-mode tests for the step order and the
 auto-recording: `-runTests -testPlatform PlayMode -testFilter "DemoGuideStepsTests|GuidedRecordingTests"`.
 
@@ -240,6 +240,30 @@ new poses, inside the platter. `ReleasedPartGravity` had switched the billet's r
 left it there; an interpolating kinematic body reports a blended transform for one frame after every teleport. The drop
 routine now restores the previous interpolation mode when the part freezes.
 
+## A fumbled demonstration (`RegrabProbe.cs`)
+
+Same copy-to-`Assets/Editor/` recipe, ROS stack up, run **without** `-nographics`. Reproduces "the plan sometimes fails
+when it takes a couple of tries to place the billet": a clean demonstration (control) and its plan, `DemoReset.Restart`,
+then a fumbled one: grab, release hovering over the stand, a stray trigger pull that clears the selection (as
+`SelectionManager.TrySelect` does on any non-selectable hit), re-select, re-grab, set between the jaws, release. Logs the
+recorder's pick-pose snapshot after the re-selection, where the billet is reset to when the recording stops, every
+`/collision_object` MOVE published for it, and the plan outcome; `VERDICT` lines summarise. `REPS=N` repeats the fumble
+(restart between), `CONTROL=0` skips the control. Exit 0 always.
+
+```
+REPS=2 "/Applications/Unity/Hub/Editor/6000.2.1f1/Unity.app/Contents/MacOS/Unity" -batchmode \
+  -projectPath "$PWD" -executeMethod RegrabProbe.Run -logFile /tmp/regrab.log
+grep 'VERDICT' /tmp/regrab.log
+```
+
+2026-11-05, before the fix: both fumbles re-snapshotted the pick pose at the hover spot (the recorder re-watched the
+billet on the re-selection), reset the billet there when the recording stopped and published that mid-air pose in the
+same frame as the plan request; the plans still succeeded (the hover spot was reachable, so MTC planned the pick from
+mid-air). Where the fumble spot is unreachable or in collision the plan fails. Fix: `PickPlaceTaskRecorder` keeps every
+object's pick pose for the whole recording (a re-selection restores it), and `GuidedRecording` selects the carried billet
+again when the selection is cleared mid-recording so the grab is never refused. After the fix the probe reports no
+re-snapshot, the billet back on the stand and no MOVE.
+
 ## Second run after "Restart demo" (`SecondRunProbe.cs`)
 
 Same copy-to-`Assets/Editor/` recipe, ROS stack up, run **without** `-nographics`. Reproduces "planning always fails on
@@ -291,3 +315,23 @@ check, 30 cm right by the markers (5/6), +-30 deg plans. The obstacle-carved `/r
 usable gate (0/6 even where planning succeeds). Hence `RobotPlacementController.insideMachineMaxReach` = 0.65 m (vise
 drop anchor to base axis, horizontal): beyond it the ring is red, the guide keeps PlaceRobot ("come closer to the
 doors"), the panel warns.
+
+## Poster stills (`PosterShotsProbe.cs`)
+
+Same copy-to-`Assets/Editor/` recipe, ROS stack up, run **without** `-nographics`. A trimmed `DemoVideoProbe`
+that walks the self-guided flow once and writes 3840x2160 JPEGs instead of a video: named stills at each step
+(`01_placement_start_*`, `04_placement_ideal_*` with the reach shell and ring, `06_cell_*`, `07_load_carry_hover`
+with the guide card, `07_load_dashboard`, `09_vise_clamped_*`, `12_unload_placed_*`, `13_final_*`) plus a 0.5 fps
+(2 fps during execution) `frames/` sequence with `captions.txt`. The guide card and highlight frames are hidden
+except in the `*_guide` shots and the demonstration shots (`ShowGuide`).
+
+```
+PROBE_OUT=/tmp/poster_shots "/Applications/Unity/Hub/Editor/6000.2.1f1/Unity.app/Contents/MacOS/Unity" -batchmode \
+  -projectPath "$PWD" -executeMethod PosterShotsProbe.Run -logFile /tmp/poster.log
+grep '\[PROBE' /tmp/poster.log
+```
+
+Used 2026-11-01 for the IMEC poster (`~/Downloads/IMEC Poster.pptx`, generated by a pptxgenjs script kept in
+`~/Downloads/IMEC Poster source.zip`): 41 stills + 86 frames in about 3 minutes, both plans 3 solutions, both
+executions succeeded. Visual QA of the .pptx was done by exporting through PowerPoint itself (AppleScript
+`save ... as save as PDF`), so the fonts in the render are exact.

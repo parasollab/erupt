@@ -107,6 +107,66 @@ namespace Erupt.Ros.Tests
             Assert.Less(Vector3.Distance(part.transform.position, slotGo.transform.position), 1e-3f, "the billet is back at its pick pose");
         }
 
+        static Vector3 RecorderPickPose(PickPlaceTaskRecorder r) =>
+            (Vector3)typeof(PickPlaceTaskRecorder).GetField("pickWorldPos", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(r);
+
+        [UnityTest]
+        public IEnumerator FumbledAttempt_StrayDeselectAndReselect_KeepsThePickPose()
+        {
+            // A novice lets go outside the vise (the billet hovers), pulls the trigger at the machine (selection
+            // cleared, grab refused), selects the billet again and places it: the pick pose must stay the stand's,
+            // the billet must go back to the stand and no mid-air pose may reach the planning scene.
+            AddVise(new Vector3(2f, 1f, 2f));
+            Vector3 stand = slotGo.transform.position;
+            selection.SetSelectedObject(part);
+            recording.NotifyGrabbed(part);
+            Assert.IsTrue(recorder.IsRecording);
+            part.transform.position = stand + new Vector3(0.05f, 0.18f, 0.12f);
+            recording.NotifyReleased(part);
+            yield return new WaitForSeconds(Settle + 0.3f);
+            Assert.IsTrue(recorder.IsRecording, "released outside the vise: still recording");
+
+            selection.ClearSelection();
+            Assert.IsNull(selection.SelectedObject);
+            yield return null;
+            yield return null;
+            Assert.AreEqual(part, selection.SelectedObject, "the guide selects the carried billet again so it can be gripped");
+            Assert.Less(Vector3.Distance(RecorderPickPose(recorder), stand), 1e-3f, "re-selection keeps the pick pose on the stand");
+
+            recording.NotifyGrabbed(part);
+            part.transform.position = new Vector3(2f, 1.03f, 2f);
+            recording.NotifyReleased(part);
+            yield return new WaitForSeconds(Settle + 0.3f);
+            Assert.IsFalse(recorder.IsRecording, "placed between the jaws: stopped");
+            Assert.IsTrue(bus.Publishes.Any(p => p.Topic == "/pick_place_task"), "the task went out");
+            Assert.Less(Vector3.Distance(part.transform.position, stand), 1e-3f, "the billet is back on the stand, not at the fumble spot");
+            int taskIndex = bus.Publishes.FindLastIndex(p => p.Topic == "/pick_place_task");
+            yield return null;
+            yield return null; // the publisher's next ticks
+            Assert.IsFalse(bus.Publishes.Skip(taskIndex + 1).Any(p => p.Topic == "/collision_object" && p.Message is RosMessageTypes.Moveit.CollisionObjectMsg co && co.id == "blank_1"),
+                           "no pose of the billet reached the planning scene after the task (it is back where MoveIt already has it)");
+        }
+
+        [UnityTest]
+        public IEnumerator SelectingAnotherObjectAndBack_RestoresTheFirstPickPose()
+        {
+            var other = GrabbableCollisionObjectFactory.CreatePrimitive(PrimitiveType.Cube, "blank_2", new Vector3(0.08f, 0.06f, 0.05f), "blank_2", origin);
+            other.transform.position = new Vector3(0.2f, 1f, 0.4f);
+            try
+            {
+                Vector3 stand = slotGo.transform.position;
+                selection.SetSelectedObject(part);
+                recorder.StartRecording();
+                part.transform.position = stand + Vector3.up * 0.2f;
+                selection.SetSelectedObject(other);
+                selection.SetSelectedObject(part);
+                Assert.Less(Vector3.Distance(RecorderPickPose(recorder), stand), 1e-3f, "the first object's pick pose is the one it started from");
+                recorder.CancelRecording();
+                yield return null;
+            }
+            finally { Object.DestroyImmediate(other); }
+        }
+
         [UnityTest]
         public IEnumerator ReGrabDuringTheSettle_CancelsTheStop()
         {

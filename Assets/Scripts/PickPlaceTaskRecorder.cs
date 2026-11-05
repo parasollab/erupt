@@ -1,5 +1,6 @@
 using Erupt.Ros;
 using Erupt.Interaction;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
@@ -49,6 +50,12 @@ public class PickPlaceTaskRecorder : MonoBehaviour
     // Pick pose — snapshotted when the object is first watched; restored on stop.
     private Vector3 pickWorldPos;
     private Quaternion pickWorldRot;
+    // Pick poses of every object watched during this recording. Re-selecting an object the user
+    // already carried (a stray trigger pull cleared the selection, so they select it again to be
+    // able to grip it) must not re-snapshot its pick pose where it hovers: the plan would then be
+    // requested with the object still on the stand in MoveIt while Unity resets it to mid-air and
+    // publishes that pose, and the pick is planned from wherever the fumble happened (2026-11-05).
+    private readonly Dictionary<GameObject, (Vector3 pos, Quaternion rot)> pickPoses = new Dictionary<GameObject, (Vector3, Quaternion)>();
 
     // Set when the object has been released at least once during recording.
     private bool objectWasPlaced;
@@ -73,6 +80,7 @@ public class PickPlaceTaskRecorder : MonoBehaviour
         IsRecording = true;
         objectWasPlaced = false;
         watchProblem = null;
+        pickPoses.Clear();
         selectionManager.OnObjectSelected += OnObjectSelected;
 
         // Watch whatever is already selected
@@ -102,6 +110,7 @@ public class PickPlaceTaskRecorder : MonoBehaviour
             SendPickPlaceTask(objectId, relPos, relRot);
             ResetWatchedObjectToPickPose();
             ClearWatchedObject();
+            pickPoses.Clear();
             OnRecordingComplete?.Invoke(objectId);
         }
         else
@@ -110,6 +119,7 @@ public class PickPlaceTaskRecorder : MonoBehaviour
                 ? $"'{watchedPublisher.objectId}' was grabbed but never released"
                 : watchProblem ?? "no object was selected; point at the object, then grab and release it";
             ClearWatchedObject();
+            pickPoses.Clear();
             Debug.LogWarning($"PickPlaceTaskRecorder: nothing sent — {reason}");
             OnRecordingDiscarded?.Invoke(reason);
         }
@@ -129,12 +139,15 @@ public class PickPlaceTaskRecorder : MonoBehaviour
         selectionManager.OnObjectSelected -= OnObjectSelected;
         ResetWatchedObjectToPickPose();
         ClearWatchedObject();
+        pickPoses.Clear();
         Debug.Log("PickPlaceTaskRecorder: recording cancelled");
         OnRecordingDiscarded?.Invoke("recording cancelled");
     }
 
     private void OnObjectSelected(GameObject obj)
     {
+        if (obj == null) return;
+        if (watchedPublisher != null && obj == watchedPublisher.gameObject) return; // re-selected: keep watching from the same pick pose
         ClearWatchedObject();
         WatchObject(obj);
     }
@@ -155,8 +168,18 @@ public class PickPlaceTaskRecorder : MonoBehaviour
 
         watchedInteractable = gi;
         watchedPublisher = pub;
-        pickWorldPos = pub.transform.position;
-        pickWorldRot = pub.transform.rotation;
+        if (pickPoses.TryGetValue(obj, out var known))
+        {
+            // Seen earlier in this recording: it was carried since, so its pick pose is the one it started from.
+            pickWorldPos = known.pos;
+            pickWorldRot = known.rot;
+        }
+        else
+        {
+            pickWorldPos = pub.transform.position;
+            pickWorldRot = pub.transform.rotation;
+            pickPoses[obj] = (pickWorldPos, pickWorldRot);
+        }
         Debug.Log($"PickPlaceTaskRecorder: watching '{pub.objectId}' from its pick pose {pickWorldPos} (parent '{pub.transform.parent?.name}')");
         watchedPublisher.pausePublishing = true;
         gi.selectExited.AddListener(OnGrabReleased);

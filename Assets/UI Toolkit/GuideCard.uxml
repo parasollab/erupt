@@ -2,11 +2,36 @@
     <Style src="MTCDashboard.uss" />
     <ui:VisualElement name="guideRoot" class="mtc-root" style="flex-grow: 1; padding-top: 8px; padding-bottom: 10px; padding-left: 14px; padding-right: 14px; border-radius: 12px; border-width: 2px; border-color: rgb(90, 150, 230);">
         <ui:VisualElement style="flex-direction: row; justify-content: space-between; flex-shrink: 0;">
-            <ui:Label text="STEP 1 OF 10" name="guideStepLabel" class="mtc-section" style="margin: 0; color: rgb(140, 180, 255);" />
+            <ui:Label text="STEP 1 OF 16" name="guideStepLabel" class="mtc-section" style="margin: 0; color: rgb(140, 180, 255);" />
             <ui:Label text="" name="guideStatusLabel" class="mtc-section" style="margin: 0; color: rgb(255, 120, 100); display: none;" />
         </ui:VisualElement>
         <ui:Label text="Welcome" name="guideTitleLabel" style="font-size: 19px; -unity-font-style: bold; color: rgb(255, 255, 255); white-space: normal; margin-top: 2px; flex-shrink: 0;" />
         <ui:Label text="" name="guideInstructionLabel" style="font-size: 14px; color: rgb(238, 238, 242); white-space: normal; margin-top: 6px; flex-shrink: 0;" />
+        <ui:VisualElement name="guideControllersBlock" style="flex-shrink: 0; margin-top: 6px; display: none;">
+            <ui:VisualElement style="flex-direction: row; flex-shrink: 0; justify-content: space-around;">
+                <ui:VisualElement style="align-items: center;">
+                    <ui:VisualElement name="guideControllerLeftImage" style="width: 96px; height: 96px; flex-shrink: 0; background-size: contain; background-repeat: no-repeat; background-position: center;" />
+                    <ui:Label text="Left hand" style="font-size: 10px; color: rgb(150, 150, 162); margin-top: 0;" />
+                </ui:VisualElement>
+                <ui:VisualElement style="align-items: center;">
+                    <ui:VisualElement name="guideControllerRightImage" style="width: 96px; height: 96px; flex-shrink: 0; background-size: contain; background-repeat: no-repeat; background-position: center;" />
+                    <ui:Label text="Right hand" style="font-size: 10px; color: rgb(150, 150, 162); margin-top: 0;" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+            <ui:VisualElement style="flex-direction: row; flex-shrink: 0; margin-top: 5px; align-items: center;">
+                <ui:VisualElement style="width: 9px; height: 9px; border-radius: 5px; background-color: rgb(255, 140, 0); margin-right: 6px; flex-shrink: 0;" />
+                <ui:Label text="TRIGGER, index finger: press and select" style="font-size: 10px; color: rgb(238, 238, 242); white-space: normal; flex-shrink: 1;" />
+            </ui:VisualElement>
+            <ui:VisualElement style="flex-direction: row; flex-shrink: 0; margin-top: 3px; align-items: center;">
+                <ui:VisualElement style="width: 9px; height: 9px; border-radius: 5px; background-color: rgb(77, 217, 115); margin-right: 6px; flex-shrink: 0;" />
+                <ui:Label text="GRIP, middle finger: pick up and drag" style="font-size: 10px; color: rgb(238, 238, 242); white-space: normal; flex-shrink: 1;" />
+            </ui:VisualElement>
+            <ui:VisualElement style="flex-direction: row; flex-shrink: 0; margin-top: 3px; align-items: center;">
+                <ui:VisualElement style="width: 9px; height: 9px; border-radius: 5px; background-color: rgb(89, 153, 242); margin-right: 6px; flex-shrink: 0;" />
+                <ui:Label text="THUMBSTICK, while holding a block: forward pushes it away, back pulls it closer" style="font-size: 10px; color: rgb(238, 238, 242); white-space: normal; flex-shrink: 1;" />
+            </ui:VisualElement>
+            <ui:Label text="The ray shines out of the front of each controller." style="font-size: 10px; color: rgb(150, 150, 162); white-space: normal; margin-top: 4px; flex-shrink: 0;" />
+        </ui:VisualElement>
         <ui:Label text="" name="guideControllerLabel" style="font-size: 11px; color: rgb(140, 180, 255); white-space: normal; margin-top: 8px; flex-shrink: 0; display: none;" />
         <ui:Label text="" name="guideHintLabel" style="font-size: 11px; color: rgb(255, 205, 60); white-space: normal; margin-top: 6px; flex-shrink: 0; display: none;" />
         <ui:Label text="" name="guideNoticeLabel" style="font-size: 11px; color: rgb(255, 150, 130); white-space: normal; margin-top: 6px; flex-shrink: 0; display: none;" />

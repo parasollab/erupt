@@ -44,8 +44,19 @@ namespace Erupt.Ros.Tests
         {
             var s = new GuideSignals { placing = true, targetCount = 6 };
             Assert.AreEqual(GuideStep.Welcome, DemoGuideSteps.Resolve(s));
+            // The welcome card carries the controller renderings; its text introduces them and never mentions weapons.
+            GuideText welcome = DemoGuideSteps.Describe(GuideStep.Welcome, s, true);
+            StringAssert.Contains("controllers", welcome.instruction);
+            // Both hands point, select and grab (left-handed users): the welcome says so.
+            StringAssert.Contains("whichever hand", welcome.instruction);
+            StringAssert.DoesNotContain("pistol", welcome.hint.ToLowerInvariant());
             s.welcomeDone = true;
             Assert.AreEqual(GuideStep.PlaceRobot, DemoGuideSteps.Resolve(s));
+            // The ring starts red (the start pose is out of reach of the vise): the first placement text says so.
+            s.robotTooFar = true;
+            GuideText first = DemoGuideSteps.Describe(GuideStep.PlaceRobot, s, true);
+            StringAssert.Contains("red", first.instruction);
+            StringAssert.DoesNotContain("blue ring", first.instruction);
         }
 
         [Test]

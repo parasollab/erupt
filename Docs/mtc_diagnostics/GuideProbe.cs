@@ -74,6 +74,10 @@ public static class GuideProbe
             // --- welcome ------------------------------------------------------------------
             Check(guide.Step == GuideStep.Welcome, $"starts on Welcome (is {guide.Step})");
             Check(card.TitleText == "Welcome" && !string.IsNullOrEmpty(card.InstructionText), $"card shows the welcome text: '{card.TitleText}' / '{card.InstructionText}'");
+            float cardHeight0 = card.MinHeightUnits;
+            Check(card.ControllersVisible && card.ControllerImagesAssigned, "welcome card shows both controller renderings with the legend");
+            Check(card.RootHeightUnits > cardHeight0 + 20f && card.RootHeightUnits <= card.MaxHeightUnits + 0.5f, $"welcome card draws taller for the renderings ({card.RootHeightUnits} vs {cardHeight0}..{card.MaxHeightUnits} units)");
+            Check(card.ContentFits, $"welcome rows all inside the drawn card (content {card.ContentHeightUnits:F0} of {card.RootHeightUnits:F0} units)");
             Check(guide.TargetElementName == "placementBeginButton" && guide.TargetDocument != null, "welcome step targets the Begin button");
             var placementPanel0 = UnityEngine.Object.FindFirstObjectByType<RobotPlacementPanel>();
             var beginBtn = placementPanel0.GetComponent<UIDocument>().rootVisualElement.Q<Button>("placementBeginButton");
@@ -85,12 +89,16 @@ public static class GuideProbe
             Transform menuT0 = placementPanel0.transform.root;
             Shot(outDir, "guide_begin_panel", highlight.LastBounds.center - menuT0.forward * 0.8f, highlight.LastBounds.center, 50f);
             float cardDist = Vector3.Distance(follow.transform.position, cam.transform.position);
-            Check(cardDist > 1.3f && cardDist < 1.9f, $"card floats {cardDist:F2} m from the eye");
+            // The card sits lower left of the view (2026-11-05, off the machine's opening); the corner-aware occlusion
+            // check may still pull it in (and shrink it) a little from its 1.5 m spot when something stands behind a corner.
+            Check(cardDist > 1.0f && cardDist < 1.9f, $"card floats {cardDist:F2} m from the eye (scale {follow.ScaleFactor:F2})");
             Vector3 cardLocal = cam.transform.InverseTransformPoint(follow.transform.position);
-            Check(cardLocal.y < -0.2f && cardLocal.x > 0.3f && cardLocal.z > 1f, $"card lower right of the view ({cardLocal})");
+            Check(cardLocal.y < -0.2f && cardLocal.x < -0.3f && cardLocal.z > 1f, $"card lower left of the view ({cardLocal})");
             Check(Vector3.Dot(-follow.transform.forward, (cam.transform.position - follow.transform.position).normalized) > 0.98f, "card faces the eye");
             Check(dashboard != null && dashboard.GuidedMode, "dashboard in guided mode");
             Shot(outDir, "guide_welcome", cam);
+            Vector3 toEye = (cam.transform.position - follow.transform.position).normalized;
+            Shot(outDir, "guide_welcome_card", follow.transform.position + toEye * 0.85f, follow.transform.position, 45f); // the card alone: renderings, legend
 
             // --- placement ----------------------------------------------------------------
             // Press Begin the way the ray would.
@@ -102,6 +110,9 @@ public static class GuideProbe
             VisualElement placementRoot0 = placementPanel0.GetComponent<UIDocument>().rootVisualElement;
             Check(placementRoot0.Q<VisualElement>("placementBeginPanel").style.display == DisplayStyle.None && placementRoot0.Q<VisualElement>("placementEditPanel").style.display == DisplayStyle.Flex,
                   "Begin button gone, placement controls shown");
+            Check(!card.ControllersVisible && card.RootHeightUnits < card.MaxHeightUnits - 20f && card.ContentFits, $"controller renderings leave the card after Begin, card shrinks to its rows ({card.RootHeightUnits:F0} units, content {card.ContentHeightUnits:F0})");
+            Check(card.InstructionText != null && card.InstructionText.Contains("red") && !card.InstructionText.Contains("blue ring"),
+                  $"first placement text says the ring starts red ('{card.InstructionText}')");
             Check(guide.TargetTransform == ctl.Handle, "target is the placement ring");
             Check(highlight.Visible && highlight.LastBounds.Contains(ctl.Handle.GetComponentInChildren<Renderer>().bounds.center), "ring framed by the highlight");
             Log($"chevron angle to ring {chevron.LastAngle:F0} deg, visible {chevron.Visible}");
@@ -120,16 +131,20 @@ public static class GuideProbe
             mouse.JumpTo(new Vector3(0f, 1.6f, -0.8f), new Vector3(0f, 0.8f, 1f));
             await Task.Delay(300);
 
+            // At the user's spot the corner-aware check may already hold the card a little in (whatever stands behind a
+            // corner of the lower-left card); walking up to the machine must pull it in much more.
+            float homeScale = follow.ScaleFactor;
+            Log($"card scale at the user's spot: {homeScale:F2}");
             // Walk up to the machine: the card's spot lies inside it; the card must come forward and shrink.
             mouse.JumpTo(new Vector3(0.1f, 1.55f, 0.75f), new Vector3(0.1f, 1.1f, 2.5f));
             await Task.Delay(1500);
             float occludedDist = Vector3.Distance(follow.transform.position, cam.transform.position);
-            Check(follow.Occluded && follow.ScaleFactor < 0.9f && occludedDist < follow.offset.magnitude * 0.9f,
+            Check(follow.Occluded && follow.ScaleFactor < Mathf.Min(0.9f, homeScale - 0.1f) && occludedDist < follow.offset.magnitude * 0.9f,
                   $"card pulled in front of the machine (scale {follow.ScaleFactor:F2}, {occludedDist:F2} m from the eye)");
             Shot(outDir, "guide_card_occlusion", cam);
             mouse.JumpTo(new Vector3(0f, 1.6f, -0.8f), new Vector3(0f, 0.8f, 1f));
             await Task.Delay(1500);
-            Check(!follow.Occluded && Mathf.Abs(follow.ScaleFactor - 1f) < 0.02f, $"card back at full size away from the machine (scale {follow.ScaleFactor:F2})");
+            Check(Mathf.Abs(follow.ScaleFactor - homeScale) < 0.08f && follow.ScaleFactor > 0.75f, $"card back at its size at the user's spot away from the machine (scale {follow.ScaleFactor:F2}, was {homeScale:F2})");
 
             Vector3 toIdeal = ctl.DefaultHandlePose.position - ctl.Handle.position;
             ctl.Nudge(toIdeal.x, toIdeal.z);
@@ -173,6 +188,25 @@ public static class GuideProbe
             await Task.Delay(300);
             Check(highlight.Visible && highlight.PulsedElement != null, "Open Doors framed");
             Shot(outDir, "guide_open_doors", cam);
+            // The card (lower left of the view since 2026-11-05) must not sit over the button the guide points at once the
+            // user looks at it: the Open Doors button on the left panel, and the Execute area of the right panel.
+            Vector3 eyeHome = new Vector3(0f, 1.6f, -0.8f);
+            Vector3 openBtn = highlight.LastBounds.center;
+            mouse.JumpTo(eyeHome, openBtn);
+            await Task.Delay(1800);
+            Check(!CardCovers(follow, cam, openBtn, card), $"card clear of the Open Doors button when looking at it (card at {cam.transform.InverseTransformPoint(follow.transform.position)})");
+            Shot(outDir, "guide_card_vs_door_panel", cam);
+            var dashDoc = dashboard.GetComponent<UIDocument>();
+            VisualElement dashRoot = dashDoc.rootVisualElement.Q<VisualElement>("mtcRoot") ?? dashDoc.rootVisualElement;
+            Rect dashWb = dashRoot.worldBound;
+            // Execute sits near the bottom of the panel, left of centre; the button itself is hidden until a plan arrives.
+            Vector3 executeArea = dashDoc.transform.TransformPoint(new Vector3(Mathf.Lerp(dashWb.xMin, dashWb.xMax, 0.25f), Mathf.Lerp(dashWb.yMin, dashWb.yMax, 0.85f), -0.01f));
+            mouse.JumpTo(eyeHome, executeArea);
+            await Task.Delay(1800);
+            Check(!CardCovers(follow, cam, executeArea, card), $"card clear of the right panel's Execute area when looking at it (card at {cam.transform.InverseTransformPoint(follow.transform.position)})");
+            Shot(outDir, "guide_card_vs_mtc_panel", cam);
+            mouse.JumpTo(eyeHome, new Vector3(0f, 0.8f, 1f));
+            await Task.Delay(300);
 
             // --- doors, billet ------------------------------------------------------------
             doors.Open();
@@ -194,6 +228,7 @@ public static class GuideProbe
             Check(guide.Escalation >= 1 && card.HintVisible, $"after the hint delay the hint line shows (escalation {guide.Escalation})");
             await Task.Delay(800);
             Check(guide.Escalation == 2, "then the 'ask for help' line");
+            Check(card.ContentFits, $"hint and help lines inside the drawn card (content {card.ContentHeightUnits:F0} of {card.RootHeightUnits:F0} units)");
             Shot(outDir, "guide_card_hint", cam);
             Set(guide, "hintAfterSeconds", 30f);
             Set(guide, "helpAfterSeconds", 75f);
@@ -250,6 +285,7 @@ public static class GuideProbe
                       $"offline: the plan is refused and the guide offers the billet again (is {guide.Step})");
                 await Task.Delay(9000);
                 Check(!guide.RobotOnline, "offline after the grace period: card shows ROBOT OFFLINE");
+                Check(card.ContentFits, $"notice inside the drawn card (content {card.ContentHeightUnits:F0} of {card.RootHeightUnits:F0} units)");
                 Shot(outDir, "guide_card_offline", cam);
             }
 
@@ -268,7 +304,7 @@ public static class GuideProbe
             await Task.Delay(500);
             Check(ctl.Phase == RobotPlacementController.PlacementPhase.Placing, "restart -> placement phase");
             Check(Vector3.Distance(ctl.Handle.position, ctl.StartHandlePose.position) < 1e-3f, "robot back at its start pose");
-            Check(guide.Step == GuideStep.Welcome && !guide.WelcomeDone, $"guide back on Welcome (is {guide.Step})");
+            Check(guide.Step == GuideStep.Welcome && !guide.WelcomeDone && card.ControllersVisible, $"guide back on Welcome with the controllers on the card (is {guide.Step})");
             Check(doors.State == MachineDoors.DoorState.Closing || doors.State == MachineDoors.DoorState.Closed, $"doors closing ({doors.State})");
             Check(vise.State == MachineVise.ViseState.Open, "vise open");
             Check(SelectionManager.Instance.SelectedObject == null, "selection cleared");
@@ -285,6 +321,22 @@ public static class GuideProbe
     }
 
     // From the user's eye: the card and whatever is highlighted, as the headset shows it.
+    // Does the eye -> point sightline pass through the drawn card (its rectangle, at the size the follow scaled it to)?
+    static bool CardCovers(GuideHeadFollow follow, Camera cam, Vector3 point, GuideInstructionCard card)
+    {
+        Vector3 eye = cam.transform.position;
+        var plane = new Plane(follow.transform.forward, follow.transform.position);
+        var ray = new Ray(eye, (point - eye).normalized);
+        if (!plane.Raycast(ray, out float enter) || enter > Vector3.Distance(eye, point)) return false;
+        // World-space offsets along the card's axes against its drawn half extents (300 units wide, 2 mm per unit) at the size the follow scaled it to.
+        Vector3 hit = ray.GetPoint(enter) - follow.transform.position;
+        float x = Vector3.Dot(hit, follow.transform.right), y = Vector3.Dot(hit, follow.transform.up);
+        float halfW = 300f * 0.002f * 0.5f * follow.ScaleFactor, halfH = card.RootHeightUnits * 0.002f * 0.5f * follow.ScaleFactor;
+        bool covers = Mathf.Abs(x) <= halfW && Mathf.Abs(y) <= halfH;
+        Log($"sightline to {point} meets the card plane {x:F2} m across, {y:F2} m up from the card centre vs half extents ({halfW:F2}, {halfH:F2}) m: {(covers ? "COVERED" : "clear")}");
+        return covers;
+    }
+
     static void Shot(string dir, string name, Camera eye) =>
         Shot(dir, name, eye.transform.position, eye.transform.position + eye.transform.forward * 2f, 75f);
 

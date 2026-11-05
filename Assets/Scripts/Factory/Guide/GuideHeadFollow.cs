@@ -32,6 +32,9 @@ namespace Factory
         public float minDistance = 0.45f;
         [Tooltip("Gap kept in front of the blocking surface (metres).")]
         public float occlusionMargin = 0.08f;
+        [Tooltip("Half width / height of the card (metres at nominal scale): the occlusion check also casts to the four corners, " +
+                 "so a tall card's lower edge cannot sink into a pedestal the centre ray misses. Zero = centre only.")]
+        public Vector2 halfExtents = Vector2.zero;
         [Tooltip("Colliders the occlusion check looks at. Triggers are ignored.")]
         public LayerMask occlusionLayers = ~0;
         [Tooltip("Roots whose renderers' bounds also count as obstacles (the machine's mesh colliders are not convex, so a ray " +
@@ -114,18 +117,43 @@ namespace Factory
             float dist = toCard.magnitude;
             if (dist < 1e-4f) return wanted;
             Vector3 dir = toCard / dist;
-            // A little beyond the card, so a wall right behind it also counts.
-            float block = float.PositiveInfinity;
-            if (Physics.Raycast(eye.position, dir, out RaycastHit hit, dist + occlusionMargin, occlusionLayers, QueryTriggerInteraction.Ignore))
-                block = hit.distance;
-            block = Mathf.Min(block, BoundsBlockDistance(eye.position, dir, dist + occlusionMargin));
-            if (block < dist + occlusionMargin)
+            // The centre and, when the extents are known, the four corners of the card as it faces the eye. Pulling the
+            // card in and scaling it by the same factor moves every corner along its own ray from the eye, so the
+            // smallest allowed fraction over the rays is exact.
+            float fraction = BlockedFraction(eye.position, wanted);
+            if (halfExtents.x > 0f || halfExtents.y > 0f)
             {
-                float allowed = Mathf.Clamp(block - occlusionMargin, minDistance, dist);
+                Vector3 right = Vector3.Cross(Vector3.up, dir);
+                if (right.sqrMagnitude < 1e-6f) right = eye.right;
+                right.Normalize();
+                Vector3 up = Vector3.Cross(dir, right).normalized;
+                foreach (float sx in new[] { -1f, 1f })
+                    foreach (float sy in new[] { -1f, 1f })
+                        fraction = Mathf.Min(fraction, BlockedFraction(eye.position, wanted + right * (sx * halfExtents.x) + up * (sy * halfExtents.y)));
+            }
+            if (fraction < 1f)
+            {
+                float allowed = Mathf.Clamp(fraction * dist, minDistance, dist);
                 scale = allowed / dist;
                 return eye.position + dir * allowed;
             }
             return wanted;
+        }
+
+        // Fraction (0..1) of the eye -> point distance that stays clear of obstacles (margin included); 1 = nothing in the way.
+        private float BlockedFraction(Vector3 eye, Vector3 point)
+        {
+            Vector3 to = point - eye;
+            float dist = to.magnitude;
+            if (dist < 1e-4f) return 1f;
+            Vector3 dir = to / dist;
+            // A little beyond the point, so a wall right behind it also counts.
+            float block = float.PositiveInfinity;
+            if (Physics.Raycast(eye, dir, out RaycastHit hit, dist + occlusionMargin, occlusionLayers, QueryTriggerInteraction.Ignore))
+                block = hit.distance;
+            block = Mathf.Min(block, BoundsBlockDistance(eye, dir, dist + occlusionMargin));
+            if (block >= dist + occlusionMargin) return 1f;
+            return Mathf.Clamp01((block - occlusionMargin) / dist);
         }
 
         private Camera Cam() => targetCamera != null ? targetCamera : Camera.main;

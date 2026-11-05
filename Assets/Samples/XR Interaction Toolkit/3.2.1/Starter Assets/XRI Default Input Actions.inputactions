@@ -1021,6 +1021,15 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
+                },
+                {
+                    "name": "SelectObject",
+                    "type": "Button",
+                    "id": "a2a93679-026f-4933-85eb-4d08f568fe9b",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -1461,6 +1470,28 @@
                     "processors": "",
                     "groups": "",
                     "action": "ResetToSpawn",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "d14390b4-3b4c-470f-8b39-66618338c385",
+                    "path": "<OculusTouchController>{LeftHand}/triggerPressed",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "SelectObject",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "e5a80ce3-b853-44f6-8915-a48a25f3e931",
+                    "path": "<QuestTouchPlusController>{LeftHand}/triggerPressed",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "SelectObject",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

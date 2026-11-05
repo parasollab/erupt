@@ -353,8 +353,10 @@ public sealed class PersistentXRInfrastructure : MonoBehaviour
             ? collisionObjectsListener.worldOrigin
             : FindGameObjectInScene(scene, "BaseTransform");
 
+        // Both hands' rays: the manager selects from whichever hand's trigger fired (the left only
+        // when the scene gave it a left select action; FactoryDemo does for left-handed users).
         if (selectionManager != null)
-            selectionManager.BindRayInteractor(_rightRobotRay);
+            selectionManager.BindRayInteractors(_leftRobotRay, _rightRobotRay);
 
         BindRobotRay(_leftRobotRay, robotInteraction);
         BindRobotRay(_rightRobotRay, robotInteraction);
