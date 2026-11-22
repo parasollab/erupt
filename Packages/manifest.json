@@ -1,32 +1,33 @@
 {
   "dependencies": {
-    "com.github-glitchenzo.nugetforunity": "https://github.com/GlitchEnzo/NuGetForUnity.git?path=/src/NuGetForUnity",
-    "com.meta.xr.mrutilitykit": "201.0.0",
-    "com.meta.xr.sdk.all": "207.0.0",
-    "com.meta.xr.sdk.core": "85.0.0",
-    "com.unity.2d.enhancers": "1.0.0",
+    "com.meta.xr.mrutilitykit": "207.0.0",
+    "com.meta.xr.sdk.audio": "85.0.0",
+    "com.meta.xr.sdk.core": "207.0.0",
+    "com.meta.xr.sdk.haptics": "207.0.0",
+    "com.meta.xr.sdk.interaction": "207.0.0",
+    "com.meta.xr.sdk.interaction.ovr": "207.0.0",
+    "com.meta.xr.sdk.platform": "207.0.0",
+    "com.meta.xr.sdk.voice": "85.0.1",
     "com.unity.2d.sprite": "1.0.0",
     "com.unity.ai.inference": "2.6.1",
     "com.unity.ai.navigation": "2.0.12",
-    "com.unity.collab-proxy": "2.12.4",
     "com.unity.ide.rider": "3.0.39",
     "com.unity.ide.visualstudio": "2.0.26",
     "com.unity.inputsystem": "1.19.0",
-    "com.unity.multiplayer.center": "1.0.1",
     "com.unity.postprocessing": "3.5.4",
     "com.unity.render-pipelines.universal": "17.3.0",
-    "com.unity.robotics.ros-tcp-connector": "file:./ROS-TCP-Connector/com.unity.robotics.ros-tcp-connector",
-    "com.unity.robotics.urdf-importer": "file:./URDF-Importer/com.unity.robotics.urdf-importer",
-    "com.unity.robotics.visualizations": "file:./ROS-TCP-Connector/com.unity.robotics.visualizations",
+    "com.unity.robotics.ros-tcp-connector": "https://github.com/parasollab/ROS-TCP-Connector.git?path=/com.unity.robotics.ros-tcp-connector#3705ada03b179a38b8faffe42a555702e3b06576",
+    "com.unity.robotics.urdf-importer": "https://github.com/parasollab/URDF-Importer.git?path=/com.unity.robotics.urdf-importer#c05f7a04e357b818df9c1d934b65bae7c6d32aad",
+    "com.unity.robotics.visualizations": "https://github.com/parasollab/ROS-TCP-Connector.git?path=/com.unity.robotics.visualizations#3705ada03b179a38b8faffe42a555702e3b06576",
     "com.unity.shadergraph": "17.3.0",
     "com.unity.test-framework": "1.6.0",
     "com.unity.timeline": "1.8.12",
     "com.unity.ugui": "2.0.0",
-    "com.unity.visualscripting": "1.9.11",
     "com.unity.xr.hands": "1.7.3",
     "com.unity.xr.interaction.toolkit": "3.3.1",
     "com.unity.xr.meta-openxr": "2.3.1",
     "com.unity.xr.openxr": "1.16.1",
+    "jp.keijiro.apriltag": "https://github.com/courtneymcbeth/jp.keijiro.apriltag.git?path=/Packages/jp.keijiro.apriltag#1def475558924699f970fb57ff2b007250703526",
     "com.unity.modules.accessibility": "1.0.0",
     "com.unity.modules.adaptiveperformance": "1.0.0",
     "com.unity.modules.ai": "1.0.0",
@@ -61,5 +62,14 @@
     "com.unity.modules.vr": "1.0.0",
     "com.unity.modules.wind": "1.0.0",
     "com.unity.modules.xr": "1.0.0"
-  }
+  },
+  "scopedRegistries": [
+    {
+      "name": "Meta XR",
+      "url": "https://npm.developer.oculus.com",
+      "scopes": [
+        "com.meta.xr"
+      ]
+    }
+  ]
 }

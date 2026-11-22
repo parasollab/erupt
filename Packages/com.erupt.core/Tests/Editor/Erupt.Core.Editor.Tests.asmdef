@@ -3,6 +3,7 @@
     "rootNamespace": "Erupt.Editor.Tests",
     "references": [
         "Erupt.Core.Editor",
+        "Erupt.Robot",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],

@@ -1,0 +1,40 @@
+{
+  "robot": "ur10e",
+  "planning_frame": "world",
+  "arm_group": "ur_manipulator",
+  "arm_joints": [
+    "shoulder_pan_joint",
+    "shoulder_lift_joint",
+    "elbow_joint",
+    "wrist_1_joint",
+    "wrist_2_joint",
+    "wrist_3_joint"
+  ],
+  "joint_states_topic": "joint_states",
+  "trajectory_command_topic": "joint_trajectory_controller/joint_trajectory",
+  "named_poses": {
+    "gripper": [
+      "open",
+      "close"
+    ],
+    "ur_manipulator": [
+      "home",
+      "up",
+      "test_configuration",
+      "ready"
+    ]
+  },
+  "base_link": "base_link",
+  "gripper_controller": {
+    "name": "robotiq_gripper_controller",
+    "type": "position_controllers/GripperActionController",
+    "joints": [
+      "robotiq_85_left_knuckle_joint"
+    ]
+  },
+  "gripper_group": "gripper",
+  "end_effector_link": "tool0",
+  "initial_pose": "ready",
+  "gripper_open_pose": "open",
+  "gripper_closed_pose": "close"
+}

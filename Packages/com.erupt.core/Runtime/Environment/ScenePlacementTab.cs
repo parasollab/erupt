@@ -7,14 +7,16 @@ using Erupt.Ui;
 namespace Erupt.UiBindings
 {
     /// <summary>
-    /// Tier 3 "Scene" tab: creates a Cube, Sphere or Cylinder obstacle in Build mode.
+    /// Tier 3 "Scene" tab: creates a Cube, Sphere or Cylinder obstacle. The three buttons
+    /// are always available.
     /// </summary>
     /// <remarks>
-    /// Guideline deviation, recorded in refactor/plugin/03-report.md: creation is meant to be
-    /// a Build-mode in-world placement tool (Part 4 step 2), not a panel. Until that tool
-    /// exists this tab is the interim replacement for the wrist menu's "Add Shape" submenu.
-    /// It keeps the wrist menu's placement (2 m in front of the user) and material, and
-    /// every creation goes through the undo stack.
+    /// Deviation from the design guidelines: creation is meant to be an in-world placement
+    /// tool (Part 4 step 2), not a panel. Until that tool exists this tab is the interim
+    /// replacement for the wrist menu's "Add Shape" submenu.
+    /// A new shape goes where the user is looking: onto the first surface the gaze meets
+    /// within the placement distance, or that far ahead in the air when it meets none. It
+    /// keeps the wrist menu's material, and every creation goes through the undo stack.
     /// </remarks>
     public class ScenePlacementTab : MonoBehaviour
     {
@@ -22,16 +24,18 @@ namespace Erupt.UiBindings
 
         [SerializeField] private TierUiRig rig;
         [SerializeField] private EnvironmentRegistry registry;
-        [SerializeField] private ModeManager modes;
         [SerializeField] private SelectionService selection;
         [Tooltip("Material for new shapes (the wrist menu's litMaterial).")]
         [SerializeField] private Material shapeMaterial;
+        [Tooltip("How far along the gaze a new shape may go, in metres. A surface nearer than this takes it.")]
         [SerializeField] private float placementDistance = 2f;
         [Tooltip("Edge length, diameter or height of a new shape, in metres. Unity's primitives are 1 m (cylinders 2 m tall), which is huge on a table.")]
         [SerializeField] private float defaultSize = 0.3f;
 
-        private UnityEngine.UI.Button cube, sphere, cylinder;
         private PanelTab tab;
+
+        /// <summary>The texts on the tab's buttons.</summary>
+        public const string AddCubeLabel = "Add Cube", AddSphereLabel = "Add Sphere", AddCylinderLabel = "Add Cylinder";
 
         public PanelTab Tab => tab;
         public int InteractiveElementCount => tab != null ? UiBuilder.CountInteractive(tab.Content) : 0;
@@ -40,13 +44,11 @@ namespace Erupt.UiBindings
         {
             if (rig == null) rig = FindFirstObjectByType<TierUiRig>();
             if (registry == null) registry = FindFirstObjectByType<EnvironmentRegistry>();
-            if (modes == null) modes = FindFirstObjectByType<ModeManager>();
             if (selection == null) selection = FindFirstObjectByType<SelectionService>();
             if (rig == null) { Debug.LogError("ScenePlacementTab: no TierUiRig.", this); return; }
 
             tab = rig.AddTab(TabId, "Scene", Build);
-            if (modes != null) modes.ModeChanged += _ => Refresh();
-            Refresh();
+            tab.Order = 0; // core's own tab stands first
         }
 
         private void Build(RectTransform content)
@@ -55,31 +57,51 @@ namespace Erupt.UiBindings
             UiBuilder.Stretch(column.GetComponent<RectTransform>());
             Transform t = column.transform;
             var size = new Vector2(300f, 60f);
-            cube = UiBuilder.CreateButton("Cube", t, "Add Cube", size, () => Add(PrimitiveType.Cube));
-            sphere = UiBuilder.CreateButton("Sphere", t, "Add Sphere", size, () => Add(PrimitiveType.Sphere));
-            cylinder = UiBuilder.CreateButton("Cylinder", t, "Add Cylinder", size, () => Add(PrimitiveType.Cylinder));
-            UiBuilder.CreateLabel("Hint", t, "Build mode only", 20f);
-        }
-
-        private void Refresh()
-        {
-            bool build = modes == null || modes.Is(AppMode.Build);
-            foreach (var b in new[] { cube, sphere, cylinder })
-                if (b != null) UiBuilder.SetInteractable(b, build);
+            UiBuilder.CreateButton("Cube", t, AddCubeLabel, size, () => Add(PrimitiveType.Cube));
+            UiBuilder.CreateButton("Sphere", t, AddSphereLabel, size, () => Add(PrimitiveType.Sphere));
+            UiBuilder.CreateButton("Cylinder", t, AddCylinderLabel, size, () => Add(PrimitiveType.Cylinder));
         }
 
         // Every shape used to land on the same point, so the second one sat inside the first
-        // and the ray always hit the first. Step sideways until the spot is clear.
+        // and the ray always hit the first. Step sideways, to either side, until the spot is clear.
+        // The check is a box just inside the shape's own size: a shape that rests on a surface
+        // touches it, and that is not "occupied".
         private static Vector3 FreeSpot(Vector3 wanted, Vector3 right, float size)
         {
-            float clearance = size * 0.9f;   // just over a cube's half-diagonal
-            float step = size * 1.5f;
-            for (int i = 0; i < 6; i++)
+            Vector3 halfExtents = Vector3.one * (size * 0.49f);
+            float step = size * 1.2f;
+            // Right, left, further right, further left: the nearest free spot to where the user looks.
+            for (int i = 0; i < 9; i++)
             {
-                Vector3 candidate = wanted + right * (step * i);
-                if (!Physics.CheckSphere(candidate, clearance, ~0, QueryTriggerInteraction.Ignore)) return candidate;
+                float side = ((i + 1) / 2) * (i % 2 == 1 ? 1f : -1f);
+                Vector3 candidate = wanted + right * (step * side);
+                if (!Physics.CheckBox(candidate, halfExtents, Quaternion.identity, ~0, QueryTriggerInteraction.Ignore)) return candidate;
             }
             return wanted;
+        }
+
+        private static readonly RaycastHit[] gazeHits = new RaycastHit[32];
+
+        /// <summary>
+        /// Where a new shape of the given size goes for a gaze from <paramref name="origin"/>
+        /// along <paramref name="direction"/>: resting against the first solid surface the gaze
+        /// meets within <paramref name="reach"/>, or <paramref name="reach"/> ahead when it
+        /// meets none. A robot is not a surface (the gaze passes through its links), and
+        /// neither is a menu.
+        /// </summary>
+        public static Vector3 PlacementAlong(Vector3 origin, Vector3 direction, float reach, float size)
+        {
+            int count = Physics.RaycastNonAlloc(origin, direction, gazeHits, reach, ~0, QueryTriggerInteraction.Ignore);
+            int nearest = -1;
+            for (int i = 0; i < count; i++)
+            {
+                Collider collider = gazeHits[i].collider;
+                if (collider == null || collider.GetComponentInParent<ArticulationBody>() != null) continue;
+                if (nearest < 0 || gazeHits[i].distance < gazeHits[nearest].distance) nearest = i;
+            }
+            if (nearest < 0) return origin + direction * reach;
+            RaycastHit hit = gazeHits[nearest];
+            return hit.point + hit.normal * (size * 0.5f + 0.002f);
         }
 
         /// <summary>
@@ -96,10 +118,8 @@ namespace Erupt.UiBindings
         /// <summary>Create a shape in front of the user, reversibly.</summary>
         public GameObject Add(PrimitiveType type)
         {
-            if (modes != null && !modes.Is(AppMode.Build)) return null;
-
             Camera cam = Camera.main;
-            Vector3 position = cam != null ? cam.transform.position + cam.transform.forward * placementDistance
+            Vector3 position = cam != null ? PlacementAlong(cam.transform.position, cam.transform.forward, placementDistance, defaultSize)
                                            : Vector3.forward * placementDistance;
             position = FreeSpot(position, cam != null ? cam.transform.right : Vector3.right, defaultSize);
             var command = new CreateObstacleCommand(new ObstacleSnapshot

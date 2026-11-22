@@ -1,0 +1,39 @@
+{
+  "robot": "fr3",
+  "planning_frame": "world",
+  "arm_group": "fr3_arm",
+  "arm_joints": [
+    "fr3_joint1",
+    "fr3_joint2",
+    "fr3_joint3",
+    "fr3_joint4",
+    "fr3_joint5",
+    "fr3_joint6",
+    "fr3_joint7"
+  ],
+  "joint_states_topic": "joint_states",
+  "trajectory_command_topic": "fr3_arm_controller/joint_trajectory",
+  "named_poses": {
+    "fr3_arm": [
+      "ready",
+      "extended"
+    ],
+    "fr3_hand": [
+      "open",
+      "close"
+    ]
+  },
+  "base_link": "base",
+  "gripper_controller": {
+    "name": "fr3_hand_controller",
+    "type": "parallel_gripper_action_controller/GripperActionController",
+    "joints": [
+      "fr3_finger_joint1"
+    ]
+  },
+  "gripper_group": "fr3_hand",
+  "end_effector_link": "fr3_link8",
+  "initial_pose": "ready",
+  "gripper_open_pose": "open",
+  "gripper_closed_pose": "close"
+}

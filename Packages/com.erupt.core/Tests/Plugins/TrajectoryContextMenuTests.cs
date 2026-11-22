@@ -27,11 +27,10 @@ namespace Erupt.Plugins.Tests
             eruptGo = new GameObject("ERUPT");
             eruptGo.SetActive(false);
             selection = eruptGo.AddComponent<SelectionService>();
-            var modes = eruptGo.AddComponent<ModeManager>();
             rig = eruptGo.AddComponent<TierUiRig>();
             host = eruptGo.AddComponent<PluginHost>();
             host.DiscoverInScene = false;
-            host.Initialise(new EruptContext { Selection = selection, Modes = modes, Ui = rig, Undo = host.Undo });
+            host.Initialise(new EruptContext { Selection = selection, Ui = rig, Undo = host.Undo });
             eruptGo.SetActive(true);
             yield return null;
 
@@ -87,11 +86,11 @@ namespace Erupt.Plugins.Tests
             public int PreviewCalls, ExecuteCalls;
             public override string Id => "placing";
             public override string DisplayName => "Placing";
-            public override InteractionRefusal SetGoal(ISelectable endEffector) => InteractionRefusal.None;
-            public override void RequestPlan(PlanPreferences preferences, System.Action<PlanResult> done) =>
+            public override InteractionRefusal SetGoal(Erupt.Robot.RobotInstance robot, ISelectable endEffector) => InteractionRefusal.None;
+            public override void RequestPlan(Erupt.Robot.RobotInstance robot, PlanPreferences preferences, System.Action<PlanResult> done) =>
                 done?.Invoke(PublishResult(new PlanResult()));
             public override void Preview(PlanResult plan) => PreviewCalls++;
-            public override void StopPreview() { }
+            public override void StopPreview(Erupt.Robot.RobotInstance robot) { }
             public override void Execute(PlanResult plan, System.Action<ExecutionStatus> status) => ExecuteCalls++;
             public TrajectorySelectable Place(PlanResult result, Vector3 at) => PlaceHandle(result, at);
         }

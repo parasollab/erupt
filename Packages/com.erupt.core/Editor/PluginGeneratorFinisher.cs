@@ -12,7 +12,7 @@ namespace Erupt.Editor
     /// <summary>
     /// Second half of plugin generation. The generated behaviour does not exist until the
     /// new assembly compiles, so the prefab step is parked in <see cref="SessionState"/> and
-    /// finished after the reload (the same two-step pattern the OpenCV define installer used).
+    /// finished after the reload.
     /// </summary>
     [InitializeOnLoad]
     public static class PluginGeneratorFinisher

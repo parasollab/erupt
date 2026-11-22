@@ -1,9 +1,8 @@
-// using UnityEngine;
-// using UnityEngine.XR.Interaction.Toolkit;
-// using UnityEngine.XR.Interaction.Toolkit.Interactables;
-// using UnityEngine.XR.Interaction.Toolkit.Transformers;
+using UnityEngine;
+using UnityEngine.XR.Interaction.Toolkit;
+using UnityEngine.XR.Interaction.Toolkit.Transformers;
 
-namespace UnityEngine.XR.Interaction.Toolkit.Transformers
+namespace Erupt.Environment
 {
     public class XRUIScaleTransformer : XRBaseGrabTransformer
     {

@@ -11,6 +11,10 @@ namespace Erupt.Ui
     /// Adding a feature should mean adding an entry here, not adding a menu — that is the
     /// whole point of the tier 2 table.
     ///
+    /// A verb marked pending is in the guidelines and not implemented yet. The tier 2 menus
+    /// leave pending and unbound verbs out unless the rig is told to show them
+    /// (<c>TierUiRig.ShowUnimplementedVerbs</c>); the entries stay here either way.
+    ///
     /// Three verbs are marked <see cref="VerbOrigin.EruptAddition"/>: snap to surface,
     /// duplicate, and preview. They are existing ERUPT functionality with no row in
     /// Part 2's table. They are kept rather than dropped, and marked rather than
@@ -54,7 +58,7 @@ namespace Erupt.Ui
             [SelectionKind.Trajectory] = new[]
             {
                 Pending  ("scrub",   "Scrub"),
-                Pending  ("correct", "Correct"),
+                Available("correct", "Correct"),
                 Pending  ("compare", "Compare"),
                 Available("execute", "Execute"),
                 Extra    ("preview", "Preview")

@@ -6,12 +6,12 @@
 | Source ROS package | Files | Generated from |
 |---|---|---|
 | `moveit_task_constructor_msgs` (msg + srv + action) | 16 | erupt_ws commit `f356be6` (`src/moveit_task_constructor/msgs`) |
-| `study_interfaces` (action/PickPlace, action/ExecuteSolution, srv/GetSolution) | 8 | the interface definitions in `Documentation~/ros-interface.md` §0 (2026-09-18) |
+| `erupt_interfaces` (action/PickPlace, action/ExecuteSolution, srv/GetSolution) | 8 | the interface definitions in `Documentation~/ros-interface.md` §0 (2026-09-18) |
 
 Regenerating: set the browser's output path to `Packages/com.erupt.plugin.mtc/Runtime/Messages`
 before generating. Never generate `moveit_msgs` here; it lives in the MoveIt plugin.
 
-`study_interfaces` notes (2026-09-18 regeneration, run with the connector's `ActionAutoGen` /
+`erupt_interfaces` notes (2026-09-18 regeneration, run with the connector's `ActionAutoGen` /
 `ServiceAutoGen`):
 
 - The generator does not parse ROS 2 field defaults, so they are stripped before generating and
@@ -19,5 +19,5 @@ before generating. Never generate `moveit_msgs` here; it lives in the MoveIt plu
 - It names the MTC namespace `MoveitTaskConstructor`; this package uses
   `RosMessageTypes.MoveitTaskConstructorMsgs`, so `GetSolutionResponse.solution` is patched to match.
 - Only Goal / Result / Feedback are kept; the ROS 1 style `*Action*` wrappers are not used.
-- `StudyInterfaces.GetSolutionRequest/Response` share their class names with the legacy
+- `EruptInterfaces.GetSolutionRequest/Response` share their class names with the
   `MoveitTaskConstructorMsgs` ones: alias them with `using` where both namespaces are imported.

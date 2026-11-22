@@ -1,11 +1,14 @@
 using UnityEngine;
 
-public class Billboard : MonoBehaviour
+namespace Erupt.Ui
 {
-    public Transform cameraTransform;
-
-    void LateUpdate()
+    public class Billboard : MonoBehaviour
     {
-        transform.LookAt(transform.position + cameraTransform.forward);
+        public Transform cameraTransform;
+
+        void LateUpdate()
+        {
+            transform.LookAt(transform.position + cameraTransform.forward);
+        }
     }
 }

@@ -7,10 +7,8 @@ namespace Erupt.Interaction
     /// The one selection concept. Tier 2 menus key off <see cref="Current"/>'s kind.
     /// </summary>
     /// <remarks>
-    /// Hover is tracked separately from selection because Guidelines Part 6 wants tier 2
-    /// to appear near a gazed object on visionOS without a deliberate ray-select. Quest
-    /// controllers only ever drive selection, but the distinction has to exist now or the
-    /// port has to restructure it later.
+    /// Hover is tracked separately from selection: pointing at an object is not selecting
+    /// it. Quest controllers and hands only ever drive selection.
     /// </remarks>
     public class SelectionService : MonoBehaviour
     {
@@ -44,6 +42,19 @@ namespace Erupt.Interaction
         /// <summary>Resolve a hit GameObject to a selectable, searching parents.</summary>
         public static ISelectable Resolve(GameObject go) =>
             go == null ? null : go.GetComponentInParent<ISelectable>();
+
+        // A selected or hovered object that is destroyed (a plan's handle when its plan is
+        // dropped, an obstacle removed from the ROS side) stops being the selection: everything
+        // that follows the selection would otherwise keep reading a dead object, every frame.
+        private void LateUpdate()
+        {
+            if (IsDestroyed(Current)) ClearSelection();
+            if (IsDestroyed(Hovered)) SetHover(null);
+        }
+
+        /// <summary>True for a selectable whose Unity object has been destroyed (it is not a C# null).</summary>
+        public static bool IsDestroyed(ISelectable selectable) =>
+            selectable is UnityEngine.Object unityObject && unityObject == null;
 
         private void OnDestroy()
         {

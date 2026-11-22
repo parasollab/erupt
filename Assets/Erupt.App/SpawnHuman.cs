@@ -2,31 +2,34 @@ using UnityEngine;
 using Unity.XR.CoreUtils;
 using System.Collections;
 
-public class SpawnHuman : MonoBehaviour
+namespace Erupt.App
 {
-    public Transform spawnPoint;
-    public XROrigin xrOrigin;
-
-    IEnumerator Start()
+    public class SpawnHuman : MonoBehaviour
     {
-        yield return null;
+        public Transform spawnPoint;
+        public XROrigin xrOrigin;
 
-        // On Quest, tracking initializes in two stages:
-        //   1. Camera Floor Offset only — CameraInOriginSpacePos = (0, 1.36, 0), no real XZ
-        //   2. ~1s later, after a Guardian/boundary pause-resume cycle, real 6DOF kicks in
-        // We detect stage 2 by waiting for the camera to deviate from its initial local
-        // position (the y=0 reset during the pause is the tell), then recover above 0.5m.
-        Vector3 initialLocal = xrOrigin.CameraInOriginSpacePos;
-        float deadline = Time.unscaledTime + 1.5f;
+        IEnumerator Start()
+        {
+            yield return null;
 
-        yield return new WaitUntil(() =>
-            Vector3.Distance(xrOrigin.CameraInOriginSpacePos, initialLocal) > 0.1f ||
-            Time.unscaledTime >= deadline);
+            // On Quest, tracking initializes in two stages:
+            //   1. Camera Floor Offset only — CameraInOriginSpacePos = (0, 1.36, 0), no real XZ
+            //   2. ~1s later, after a Guardian/boundary pause-resume cycle, real 6DOF kicks in
+            // We detect stage 2 by waiting for the camera to deviate from its initial local
+            // position (the y=0 reset during the pause is the tell), then recover above 0.5m.
+            Vector3 initialLocal = xrOrigin.CameraInOriginSpacePos;
+            float deadline = Time.unscaledTime + 1.5f;
 
-        yield return new WaitUntil(() => xrOrigin.CameraInOriginSpacePos.y > 0.5f);
+            yield return new WaitUntil(() =>
+                Vector3.Distance(xrOrigin.CameraInOriginSpacePos, initialLocal) > 0.1f ||
+                Time.unscaledTime >= deadline);
 
-        xrOrigin.MatchOriginUpCameraForward(spawnPoint.up, spawnPoint.forward);
-        Vector3 eyeLevelTarget = spawnPoint.position + Vector3.up * xrOrigin.CameraInOriginSpacePos.y;
-        xrOrigin.MoveCameraToWorldLocation(eyeLevelTarget);
+            yield return new WaitUntil(() => xrOrigin.CameraInOriginSpacePos.y > 0.5f);
+
+            xrOrigin.MatchOriginUpCameraForward(spawnPoint.up, spawnPoint.forward);
+            Vector3 eyeLevelTarget = spawnPoint.position + Vector3.up * xrOrigin.CameraInOriginSpacePos.y;
+            xrOrigin.MoveCameraToWorldLocation(eyeLevelTarget);
+        }
     }
 }

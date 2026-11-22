@@ -12,6 +12,8 @@ namespace Erupt.Plugins
     {
         public PlanResult Result { get; private set; }
         public PlanningPlugin Owner { get; private set; }
+        /// <summary>Id of the robot the plan is for; null for a plan made without a robot.</summary>
+        public string RobotId => Result?.RobotId;
 
         public SelectionKind Kind => SelectionKind.Trajectory;
         public GameObject GameObject => gameObject;

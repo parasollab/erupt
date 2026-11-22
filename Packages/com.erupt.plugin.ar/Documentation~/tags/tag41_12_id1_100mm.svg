@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges" width="20.0000cm" height="27.0000cm" viewBox="0 0 20.0000 27.0000">
+  <rect x="0" y="0" width="20.0000" height="27.0000" fill="#fff"/>
+  <rect x="5.0000" y="3.3000" width="2.0000" height="2.0000" fill="#000"/>
+  <rect x="15.0000" y="3.3000" width="2.0000" height="2.0000" fill="#000"/>
+  <rect x="1.0000" y="5.3000" width="2.0000" height="2.0000" fill="#000"/>
+  <rect x="3.0000" y="5.3000" width="2.0000" height="2.0000" fill="#000"/>
+  <rect x="5.0000" y="5.3000" width="2.0000" height="2.0000" fill="#000"/>
+  <rect x="7.0000" y="5.3000" width="2.0000" height="2.0000" fill="#000"/>
+  <rect x="9.0000" y="5.3000" width="2.0000" height="2.0000" fill="#000"/>
+  <rect x="11.0000" y="5.3000" width="2.0000" height="2.0000" fill="#000"/>
+  <rect x="13.0000" y="5.3000" width="2.0000" height="2.0000" fill="#000"/>
+  <rect x="15.0000" y="5.3000" width="2.0000" height="2.0000" fill="#000"/>
+  <rect x="17.0000" y="5.3000" width="2.0000" height="2.0000" fill="#000"/>
+  <rect x="3.0000" y="7.3000" width="2.0000" height="2.0000" fill="#000"/>
+  <rect x="15.0000" y="7.3000" width="2.0000" height="2.0000" fill="#000"/>
+  <rect x="17.0000" y="7.3000" width="2.0000" height="2.0000" fill="#000"/>
+  <rect x="1.0000" y="9.3000" width="2.0000" height="2.0000" fill="#000"/>
+  <rect x="3.0000" y="9.3000" width="2.0000" height="2.0000" fill="#000"/>
+  <rect x="15.0000" y="9.3000" width="2.0000" height="2.0000" fill="#000"/>
+  <rect x="17.0000" y="9.3000" width="2.0000" height="2.0000" fill="#000"/>
+  <rect x="3.0000" y="11.3000" width="2.0000" height="2.0000" fill="#000"/>
+  <rect x="7.0000" y="11.3000" width="2.0000" height="2.0000" fill="#000"/>
+  <rect x="15.0000" y="11.3000" width="2.0000" height="2.0000" fill="#000"/>
+  <rect x="3.0000" y="13.3000" width="2.0000" height="2.0000" fill="#000"/>
+  <rect x="9.0000" y="13.3000" width="2.0000" height="2.0000" fill="#000"/>
+  <rect x="15.0000" y="13.3000" width="2.0000" height="2.0000" fill="#000"/>
+  <rect x="17.0000" y="13.3000" width="2.0000" height="2.0000" fill="#000"/>
+  <rect x="1.0000" y="15.3000" width="2.0000" height="2.0000" fill="#000"/>
+  <rect x="3.0000" y="15.3000" width="2.0000" height="2.0000" fill="#000"/>
+  <rect x="15.0000" y="15.3000" width="2.0000" height="2.0000" fill="#000"/>
+  <rect x="17.0000" y="15.3000" width="2.0000" height="2.0000" fill="#000"/>
+  <rect x="3.0000" y="17.3000" width="2.0000" height="2.0000" fill="#000"/>
+  <rect x="5.0000" y="17.3000" width="2.0000" height="2.0000" fill="#000"/>
+  <rect x="7.0000" y="17.3000" width="2.0000" height="2.0000" fill="#000"/>
+  <rect x="9.0000" y="17.3000" width="2.0000" height="2.0000" fill="#000"/>
+  <rect x="11.0000" y="17.3000" width="2.0000" height="2.0000" fill="#000"/>
+  <rect x="13.0000" y="17.3000" width="2.0000" height="2.0000" fill="#000"/>
+  <rect x="15.0000" y="17.3000" width="2.0000" height="2.0000" fill="#000"/>
+  <rect x="1.0000" y="19.3000" width="2.0000" height="2.0000" fill="#000"/>
+  <rect x="5.0000" y="19.3000" width="2.0000" height="2.0000" fill="#000"/>
+  <rect x="13.0000" y="19.3000" width="2.0000" height="2.0000" fill="#000"/>
+  <rect x="15.0000" y="19.3000" width="2.0000" height="2.0000" fill="#000"/>
+  <text x="10.0000" y="22.9000" font-family="sans-serif" font-size="0.34" text-anchor="middle">tagStandard41h12 id 1 - Tag Size = 0.100 m - the arrow marks the top edge of the tag</text>
+  <text x="10.0000" y="23.4500" font-family="sans-serif" font-size="0.34" text-anchor="middle">Print at 100 % (no "fit to page"). The tag size is the inner square of 5 cells (10.0 cm), not the printed pattern (18.0 cm).</text>
+  <text x="10.0000" y="24.0000" font-family="sans-serif" font-size="0.34" text-anchor="middle">Measure the inner square with a ruler and enter what you measure. Keep the white margin around the pattern.</text>
+  <path d="M 9.6000 2.3000 L 10.0000 1.6000 L 10.4000 2.3000 Z" fill="#888"/>
+</svg>

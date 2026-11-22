@@ -1,28 +1,31 @@
 using UnityEngine;
 
-[ExecuteAlways]
-// a
-public class LightFlicker : MonoBehaviour
+namespace Erupt.App
 {
-    public float minIntensity = 0.5f;
-    public float maxIntensity = 1.5f;
-    public float flickerSpeed = 0.1f;
-
-    private Light lightSource;
-    private float baseIntensity;
-
-    void Start()
+    [ExecuteAlways]
+    // a
+    public class LightFlicker : MonoBehaviour
     {
-        lightSource = GetComponent<Light>();
-        if (lightSource != null)
+        public float minIntensity = 0.5f;
+        public float maxIntensity = 1.5f;
+        public float flickerSpeed = 0.1f;
+
+        private Light lightSource;
+        private float baseIntensity;
+
+        void Start()
         {
-            baseIntensity = lightSource.intensity; 
-            InvokeRepeating("Flicker", 0.0f, flickerSpeed); 
+            lightSource = GetComponent<Light>();
+            if (lightSource != null)
+            {
+                baseIntensity = lightSource.intensity; 
+                InvokeRepeating("Flicker", 0.0f, flickerSpeed); 
+            }
         }
-    }
 
-    void Flicker()
-    {
-        lightSource.intensity = baseIntensity * Random.Range(minIntensity, maxIntensity);
+        void Flicker()
+        {
+            lightSource.intensity = baseIntensity * Random.Range(minIntensity, maxIntensity);
+        }
     }
 }

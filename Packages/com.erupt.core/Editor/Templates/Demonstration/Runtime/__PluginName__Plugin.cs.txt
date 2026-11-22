@@ -1,50 +1,99 @@
+using System;
 using UnityEngine;
 using Erupt.Interaction;
 using Erupt.Plugins;
+using Erupt.Robot;
 
 namespace {{Namespace}}
 {
     /// <summary>
     /// {{DisplayName}}: an ERUPT demonstration (learning-from-demonstration) plugin. The base
-    /// class gates recording on Teach mode, feeds interaction samples to OnSample while
-    /// recording, binds the trajectory "correct" verb and adds a tier 3 tab "demos-{{PluginId}}".
-    /// Guidelines Part 5 (Learning from demonstration), Part 4 (Teach mode).
+    /// class feeds interaction samples to OnSample while a demonstration is being recorded,
+    /// binds the trajectory "correct" verb and adds a tier 3 tab "demos-{{PluginId}}".
+    /// Recording starts and stops on a button press; there is no mode to enter first.
+    /// Guidelines Part 5 (Learning from demonstration).
     /// </summary>
+    /// <remarks>
+    /// A scene may hold any number of robots, each in its own ROS namespace. There is one
+    /// plugin instance; what it keeps per robot lives in a <see cref="Session"/>, created when
+    /// a robot joins the registry and disposed when it leaves. A demonstration is recorded on
+    /// the robot the template methods name.
+    /// </remarks>
     public class {{PluginName}}Plugin : DemonstrationPlugin
     {
+        /// <summary>What this plugin keeps for one robot.</summary>
+        public sealed class Session : IDisposable
+        {
+            public RobotInstance Robot { get; }
+
+            public Session(RobotInstance robot)
+            {
+                Robot = robot;
+                // TODO: register the publisher this robot's demonstrations go out on, through
+                // robot.Ros with a RELATIVE name ("demonstration" resolves to /<namespace>/demonstration).
+            }
+
+            public void Dispose()
+            {
+                // TODO: unsubscribe from robot.Ros.
+            }
+        }
+
+        private RobotSessions<Session> sessions;
+
+        /// <summary>Every robot's session, in registration order; null before registration.</summary>
+        public RobotSessions<Session> Sessions => sessions;
+        private Session recording;
+
         public override string Id => "{{PluginId}}";
         public override string DisplayName => "{{DisplayName}}";
 
         protected override void OnRegister(IEruptContext context)
         {
-            // TODO: register the publisher your demonstrations go out on (context.Ros).
+            // One session per robot, now and for every robot that joins later.
+            sessions = new RobotSessions<Session>(context.Robots,
+                robot => robot.Ros != null ? new Session(robot) : null);
             base.OnRegister(context);
         }
 
-        /// <summary>One interaction sample (modality, confidence, pose). Only while Teach mode and recording are both on.</summary>
-        protected override void OnSample(InteractionSample sample)
+        protected override void OnUnregister(IEruptContext context)
         {
-            // TODO: append to the current demonstration.
+            base.OnUnregister(context);
+            sessions?.Dispose();
+            sessions = null;
         }
 
-        public override void StartDemonstration()
+        /// <summary>One interaction sample (modality, confidence, pose). Only while a demonstration is being recorded.</summary>
+        protected override void OnSample(InteractionSample sample)
         {
-            // TODO: clear the buffer, then:
+            // TODO: append to the demonstration being recorded (recording.Robot).
+        }
+
+        public override void StartDemonstration(RobotInstance robot)
+        {
+            recording = sessions?.For(robot);
+            if (recording == null) return;
+            // TODO: clear that robot's buffer, then:
             SetRecording(true);
         }
 
-        public override void StopDemonstration()
+        /// <summary>Stop the demonstration on one robot; null means whichever is being recorded.</summary>
+        public override void StopDemonstration(RobotInstance robot)
         {
             SetRecording(false);
-            // TODO: finalise the demonstration.
+            // TODO: finalise the demonstration of recording.Robot.
+            recording = null;
         }
 
-        public override void Publish()
+        public override void Publish(RobotInstance robot)
         {
-            // TODO: send the demonstration through Context.Ros.
+            // TODO: send that robot's demonstration through robot.Ros.
         }
 
-        /// <summary>Fill the demos tab (record / stop / list; ≤ 7 interactive elements). Use UiBuilder.</summary>
+        /// <summary>
+        /// Fill the demos tab for the ACTIVE robot (sessions.Active); it is built again whenever
+        /// the active robot changes. Record / stop / list; ≤ 7 interactive elements. Use UiBuilder.
+        /// </summary>
         protected override void BuildDemosTab(RectTransform content)
         {
             if (content == null) return;   // headless UI host (tests)

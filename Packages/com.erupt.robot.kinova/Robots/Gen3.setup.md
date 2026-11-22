@@ -1,0 +1,46 @@
+# Robot Setup: Kinova Gen3
+
+Written by `ERUPT > Robots > Robot Setup…`. Running it again on the same output folder rewrites this file.
+
+0 problems, 1 warning.
+
+## Warnings
+
+The robot is usable; check that these are what you want.
+
+- 1 collision mesh is too detailed for one convex collider (Unity's limit is 256 polygons): spherical_wrist_2_link. Unity uses part of the hull and logs "Couldn't create a Convex Mesh" when the robot is first created. The colliders only serve to select and grab the links, so the robot works; simpler collision meshes in the description make the message go away.
+
+## Found
+
+- Copied the description into 'Packages/com.erupt.robot.kinova/Robots': the URDF, the SRDF, the ROS-names file and the 26 mesh files the URDF names (0 files new or changed).
+- URDF 'kinova_gen3': 19 links, 18 joints, 13 of them movable; root link 'world'.
+- Planning frame: 'world' (ROS-names file).
+- The planning frame 'world' is a link of the URDF; the planning-frame anchor sits on it.
+- Arm group: 'manipulator' (ROS-names file).
+- Gripper group: 'gripper' (ROS-names file).
+- Arm joints (ROS-names file): joint_1, joint_2, joint_3, joint_4, joint_5, joint_6, joint_7.
+- Gripper joints (SRDF group 'gripper'): robotiq_85_left_knuckle_joint, robotiq_85_right_knuckle_joint, robotiq_85_left_inner_knuckle_joint, robotiq_85_right_inner_knuckle_joint, robotiq_85_left_finger_tip_joint, robotiq_85_right_finger_tip_joint.
+- Base link: 'base_link' (ROS-names file).
+- End-effector link: 'end_effector_link' (ROS-names file).
+- Named poses (SRDF): Home, Retract, Vertical, ready, Open, Close, open, close.
+- Initial pose: 'ready' (ROS-names file).
+- Gripper driver joint: 'robotiq_85_left_knuckle_joint' (ROS-names file, gripper controller).
+- Gripper position 0 of 'robotiq_85_left_knuckle_joint' from the pose 'open' (ROS-names file).
+- Gripper position 0.79 of 'robotiq_85_left_knuckle_joint' from the pose 'close' (ROS-names file).
+- Gripper open width 0.0837 m, measured in the URDF: the change in the distance between 'robotiq_85_left_finger_tip_link' and 'robotiq_85_right_finger_tip_link' from closed to open.
+- Joint states topic: 'joint_states' (ROS-names file).
+- Trajectory command topic: 'joint_trajectory_controller/joint_trajectory' (ROS-names file).
+- The profile existed: limit overrides and margins, the velocity switch, the ROS name rule and the gripper speed were kept.
+- Imported 'Packages/com.erupt.robot.kinova/Robots/kinova_gen3.urdf' with the URDF Importer: 19 links, 19 articulation bodies.
+- Joint limits in the import agree with the URDF.
+- Link frames in the import agree with the URDF.
+- Visual and collision geometry overlap on all 17 links that have both.
+- Removed 6 of the importer's own control components (keyboard controller, mimic drivers): ERUPT's controller drives the joints.
+- Updated in place: the prefabs and the profile keep their GUIDs.
+
+## Written
+
+- `Packages/com.erupt.robot.kinova/Robots/Gen3.prefab`
+- `Packages/com.erupt.robot.kinova/Robots/Gen3Ghost.prefab`
+- `Packages/com.erupt.robot.kinova/Robots/Gen3.asset`
+- `Packages/com.erupt.robot.kinova/Robots/Gen3.setup.md`

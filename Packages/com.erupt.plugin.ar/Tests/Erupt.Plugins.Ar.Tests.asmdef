@@ -1,0 +1,69 @@
+{
+    "name": "Erupt.Plugins.Ar.Tests",
+    "rootNamespace": "Erupt.Plugins.Ar.Tests",
+    "references": [
+        "Erupt.Plugins.Ar",
+        "Erupt.Plugins",
+        "Erupt.Plugins.Tests",
+        "Erupt.Plugins.MoveIt",
+        "Erupt.Plugins.MoveIt.Messages",
+        "Erupt.Environment",
+        "Erupt.Interaction.Core",
+        "Erupt.Ros",
+        "Erupt.Robot",
+        "Erupt.Ui",
+        "Erupt.TestSupport",
+        "Unity.Robotics.ROSTCPConnector",
+        "Unity.Robotics.ROSTCPConnector.MessageGeneration",
+        "Unity.Robotics.ROSTCPConnector.Messages",
+        "UnityEngine.TestRunner",
+        "UnityEngine.UI",
+        "Unity.TextMeshPro"
+    ],
+    "includePlatforms": [
+        "Android",
+        "Editor",
+        "EmbeddedLinux",
+        "LinuxStandalone64",
+        "macOSStandalone",
+        "WindowsStandalone32",
+        "WindowsStandalone64"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS",
+        "ERUPT_ROS_TCP_CONNECTOR",
+        "ROS2",
+        "ERUPT_APRILTAG",
+        "ERUPT_MRUK"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.unity.robotics.ros-tcp-connector",
+            "expression": "",
+            "define": "ERUPT_ROS_TCP_CONNECTOR"
+        },
+        {
+            "name": "jp.keijiro.apriltag",
+            "expression": "",
+            "define": "ERUPT_APRILTAG"
+        },
+        {
+            "name": "com.meta.xr.mrutilitykit",
+            "expression": "",
+            "define": "ERUPT_MRUK"
+        },
+        {
+            "name": "com.erupt.plugin.moveit",
+            "expression": "",
+            "define": "ERUPT_PLUGIN_MOVEIT"
+        }
+    ],
+    "noEngineReferences": false
+}

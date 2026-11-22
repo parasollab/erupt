@@ -1,6 +1,4 @@
 using UnityEngine;
-using UnityEngine.XR.Interaction.Toolkit.Interactables;
-using UnityEngine.XR.Interaction.Toolkit.Transformers;
 using Erupt.Interaction;
 using Erupt.Environment;
 
@@ -13,9 +11,9 @@ namespace Erupt.Obstacles
     /// </summary>
     /// <remarks>
     /// Lifted from WristMenuController.AddPrimitiveShape so that creation has one
-    /// implementation shared by the Build-mode placement tool, the duplicate verb, and
-    /// undo of a deletion. The component order and settings are reproduced exactly —
-    /// the grab transformer stack in particular is order-sensitive.
+    /// implementation shared by the Scene tab's Add buttons, the duplicate verb, and
+    /// undo of a deletion. The grab stack itself is <see cref="GrabbableObjectSetup"/>,
+    /// shared with the objects planner plugins mirror.
     ///
     /// WristMenuController still keeps its own copy until Phase 3 retires it; it adopts
     /// its shapes into the registry so both paths produce the same mirror entry.
@@ -30,42 +28,15 @@ namespace Erupt.Obstacles
 
             shape.transform.SetPositionAndRotation(snapshot.Position, snapshot.Rotation);
             shape.transform.localScale = snapshot.Scale;
-            shape.tag = "Selectable";
 
-            Rigidbody rb = shape.AddComponent<Rigidbody>();
-            rb.useGravity = false;
-            rb.isKinematic = true;
-
-            // Single, so only one hand holds it and the attach controller's push/pull
-            // keeps working.
-            var grab = shape.AddComponent<XRGrabInteractable>();
-            grab.selectMode = InteractableSelectMode.Single;
-
-            shape.AddComponent<SelectableGrabController>();
-            shape.AddComponent<XRGrabTransformerScaleAxisLock>();
-            shape.AddComponent<XRGrabTransformerLockPose>();
-
-            var general = shape.AddComponent<XRGeneralGrabTransformer>();
-            general.allowTwoHandedScaling = false;
-            general.clampScaling = false;
-
-            shape.AddComponent<XRTwoHandedScaleTransformer>();
-            shape.AddComponent<XRUIScaleTransformer>();
-
-            grab.AddMultipleGrabTransformer(general);
-            grab.AddMultipleGrabTransformer(shape.GetComponent<XRTwoHandedScaleTransformer>());
-            grab.AddMultipleGrabTransformer(shape.GetComponent<XRGrabTransformerScaleAxisLock>());
-            grab.AddMultipleGrabTransformer(shape.GetComponent<XRGrabTransformerLockPose>());
-            grab.AddMultipleGrabTransformer(shape.GetComponent<XRUIScaleTransformer>());
+            // Rigidbody, collider, grab interactable and its transformers, selection gating.
+            GrabbableObjectSetup.Configure(shape);
 
             // Typed selection, so tier 2 knows which verbs to offer.
             shape.AddComponent<SelectableMarker>().SetKind(SelectionKind.Obstacle);
 
             var renderer = shape.GetComponent<MeshRenderer>();
             if (renderer != null && snapshot.Material != null) renderer.sharedMaterial = snapshot.Material;
-
-            Collider collider = shape.GetComponent<Collider>();
-            if (collider != null) collider.enabled = true;
 
             // Identity first, then membership: a sync that reacts to Added sees a fully
             // initialised object and adds its own components (e.g. a planner publisher).

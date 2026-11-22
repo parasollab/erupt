@@ -13,12 +13,14 @@ GameObject:
   - component: {fileID: 7612471598499163310}
   - component: {fileID: 4262661313832939178}
   - component: {fileID: 3337568076177267331}
-  - component: {fileID: 1258451728946425108}
   - component: {fileID: 3117733394962076456}
   - component: {fileID: 3575828963327804693}
   - component: {fileID: 7832859383080732455}
   - component: {fileID: 2350159173302138411}
   - component: {fileID: 8164029184253866424}
+  - component: {fileID: 4915077302411385601}
+  - component: {fileID: 4915077302411385602}
+  - component: {fileID: 4915077302411385603}
   m_Layer: 0
   m_Name: EruptCore
   m_TagString: Untagged
@@ -53,10 +55,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8721ac1314fe433faf33f854172dbe9b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Erupt.Plugins::Erupt.Plugins.PluginHost
-  robot: {fileID: 0}
   environment: {fileID: 3117733394962076456}
   selection: {fileID: 7612471598499163310}
-  modes: {fileID: 1258451728946425108}
   router: {fileID: 0}
   ui: {fileID: 3575828963327804693}
   discoverInScene: 1
@@ -101,19 +101,6 @@ MonoBehaviour:
   router: {fileID: 0}
   selectionService: {fileID: 7612471598499163310}
   legacyTag: Selectable
---- !u!114 &1258451728946425108
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2271841663759161846}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 01f6b273c32644696b296b381236e06e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Erupt.Interaction.Core::Erupt.Interaction.ModeManager
-  initialMode: 0
 --- !u!114 &3117733394962076456
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -142,6 +129,11 @@ MonoBehaviour:
   useTierUi: 1
   tierOneAnchor: {fileID: 0}
   tierThreeAnchor: {fileID: 0}
+  router: {fileID: 0}
+  placeInFrontOfUser: 1
+  summonDistance: 1.1
+  summonHeightOffset: -0.1
+  showUnimplementedVerbs: 0
 --- !u!114 &7832859383080732455
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -172,7 +164,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Erupt.Environment::Erupt.UiBindings.ScenePlacementTab
   rig: {fileID: 3575828963327804693}
   registry: {fileID: 3117733394962076456}
-  modes: {fileID: 1258451728946425108}
   selection: {fileID: 7612471598499163310}
   shapeMaterial: {fileID: 0}
   placementDistance: 2
@@ -188,3 +179,78 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a4f8364c82b54fe0a903f6c0efc08326, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Erupt.Interaction.Backends.OpenXR::Erupt.Interaction.Backends.XrUiRaycastInstaller
+--- !u!114 &4915077302411385601
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2271841663759161846}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e346e432bc29846788b9208401c169a4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Erupt.Interaction.Backends.Desktop::Erupt.Interaction.Backends.DesktopMouseBackend
+  sourceCamera: {fileID: 0}
+  sourceId: mouse
+  scrollScale: 3
+  dragDepthPerNotch: 0.05
+  panelKey: 3
+--- !u!114 &4915077302411385602
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2271841663759161846}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ff8433cb08424827bac481106c67e177, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Erupt.Interaction.Backends.Desktop::Erupt.Interaction.Backends.DesktopControls
+  desktopControls: 1
+  showHint: 1
+  mouseBackend: {fileID: 4915077302411385601}
+  ui: {fileID: 3575828963327804693}
+  router: {fileID: 0}
+  frameRobotsAtStart: 1
+  viewDistance: 1.4
+  viewElevation: 18
+  lookAboveTips: 0.15
+  moveSpeed: 1.2
+  fastMultiplier: 3
+  lookDegreesPerSecond: 70
+  mouseLookDegreesPerPixel: 0.15
+  forwardKey: 37
+  backKey: 33
+  leftKey: 15
+  rightKey: 18
+  upKey: 19
+  downKey: 31
+  fastKey: 51
+  lookLeftKey: 61
+  lookRightKey: 62
+  lookUpKey: 63
+  lookDownKey: 64
+  frameKey: 20
+  hintKey: 22
+  tierOneViewport: {x: 0.5, y: 0.93}
+  tierOneHeight: 0.07
+  tierOneDistance: 0.3
+  panelViewFraction: 0.75
+  menuReadableDistance: 1.3
+--- !u!114 &4915077302411385603
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2271841663759161846}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3356f31fdbfd4227824a709e771f4f23, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Erupt.Environment::Erupt.Environment.ObstacleDragBinding
+  router: {fileID: 0}
+  selection: {fileID: 7612471598499163310}
+  rig: {fileID: 3575828963327804693}

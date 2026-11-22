@@ -1,9 +1,9 @@
 > **Provenance.** Written as `mtc_connector.md` at the repo root while the MTC UI was being built on the
 > legacy wrist menu; moved here in Phase 6 of the plugin refactor (2026-09-14). **Section 0 (2026-09-18) is
 > the current protocol**, served by `mtc_pick_place_server` and spoken by `PickPlaceClient`. Sections 1–7
-> describe the earlier `pick_place_dynamic_demo` protocol (`MtcClient`, `/execute_task_solution`,
-> `/get_solution_<task_id>`), kept as the reference for the MTC message fields, the attach/detach
-> topics and the legacy client. Where they disagree with Section 0, Section 0 wins.
+> describe the earlier `pick_place_dynamic_demo` protocol (`/execute_task_solution`,
+> `/get_solution_<task_id>`), kept as the reference for the MTC message fields and the attach/detach
+> topics. Where they disagree with Section 0, Section 0 wins.
 
 # MTC Unity VR Interface — Component & Message Reference
 
@@ -15,15 +15,20 @@ This document defines every ROS topic, service, action, and message field requir
 
 Tested end-to-end on the ROS side through ROS-TCP-Endpoint (`action-support` branch of
 parasollab/ROS-TCP-Endpoint). On the wire the endpoint names types `package/Type`, e.g.
-`study_interfaces/PickPlace`.
+`erupt_interfaces/PickPlace`.
 
 | Interface | Type | Unity |
 | --- | --- | --- |
-| ACT `/pick_place` | `study_interfaces/PickPlace` | `PickPlaceClient.PlanAsync` / `PlanAndExecuteAsync` |
-| ACT `/execute_solution` | `study_interfaces/ExecuteSolution` | `PickPlaceClient.ExecuteAsync(solutionId)` |
-| SRV `/get_solution` | `study_interfaces/GetSolution` | `PickPlaceClient.FetchSolution` |
+| ACT `/pick_place` | `erupt_interfaces/PickPlace` | `PickPlaceClient.PlanAsync` / `PlanAndExecuteAsync` |
+| ACT `/execute_solution` | `erupt_interfaces/ExecuteSolution` | `PickPlaceClient.ExecuteAsync(solutionId)` |
+| SRV `/get_solution` | `erupt_interfaces/GetSolution` | `PickPlaceClient.FetchSolution` |
 | SUB `/pick_place/description` | `moveit_task_constructor_msgs/TaskDescription` | `PickPlaceClient.Description` |
 | SUB `/pick_place/statistics` | `moveit_task_constructor_msgs/TaskStatistics` | `PickPlaceClient.SolutionIds` |
+
+The names above are those of a robot in the root namespace. `PickPlaceClient` uses relative
+names (`pick_place`, `execute_solution`, `get_solution`, `pick_place/description`,
+`pick_place/statistics`) on the robot's namespaced bus, so a robot in namespace `left` talks to
+`/left/pick_place` and so on.
 
 ```
 # action/PickPlace.action — server: /pick_place
@@ -144,7 +149,7 @@ directly. The bridge topics below still exist for older endpoints.
 
 | Action | Type | Unity component |
 | --- | --- | --- |
-| `/pick_place` | `study_interfaces/action/PickPlace` | `PickPlaceActionClient` |
+| `/pick_place` | `erupt_interfaces/action/PickPlace` | `PickPlaceActionClient` |
 | `/execute_task_solution` | `moveit_task_constructor_msgs/action/ExecuteTaskSolution` | `MTCDataManager` |
 
 #### `/pick_place`
@@ -152,7 +157,7 @@ directly. The bridge topics below still exist for older endpoints.
 Same request the CLI makes:
 
 ```bash
-ros2 action send_goal /pick_place study_interfaces/action/PickPlace \
+ros2 action send_goal /pick_place erupt_interfaces/action/PickPlace \
   '{object_id: "object",
     place_pose: {header: {frame_id: "world"},
                  pose: {position: {x: 0.6, y: -0.15, z: 0.0},

@@ -1,15 +1,19 @@
 # ERUPT CI (optional).
 #
-# `boundary` needs no Unity licence and runs on every push / PR: the three grep gates from
-# `refactor_plan.md` § Verification.
+# `boundary` needs no Unity licence and runs on every push / PR: grep gates for the rules
+# the architecture relies on (core never names a plugin, one joint write point, no absolute
+# per-robot ROS name), plus the lab-only package rule.
 #
-# `unity-tests` runs the EditMode + PlayMode suites in batchmode through game-ci. It needs
-# secrets this repository does not ship, so it only runs on manual dispatch:
-#   UNITY_LICENSE   the .ulf activation file contents (https://game.ci/docs/github/activation)
-#   UNITY_EMAIL / UNITY_PASSWORD   the account the licence belongs to
-#   SUBMODULE_SSH_KEY   a deploy key with read access to parasollab/ROS-TCP-Connector and
-#                       parasollab/URDF-Importer (the submodules use SSH URLs)
-# Once the secrets exist, add `push` / `pull_request` to the `if:` below or drop the guard.
+# `unity-tests` runs the EditMode + PlayMode suites in batchmode through game-ci, on every
+# push and pull request, as soon as the repository has these secrets (Settings > Secrets and
+# variables > Actions); until then the job is skipped and the workflow still passes:
+#   UNITY_LICENSE   the contents of the .ulf licence file (https://game.ci/docs/github/activation)
+#   UNITY_EMAIL / UNITY_PASSWORD   the Unity account the licence belongs to
+# A pull request from a fork cannot read secrets, so there the job is skipped as well.
+# Every package comes from a public source (the Unity registry, Meta's registry and pinned
+# HTTPS git URLs in Packages/manifest.json), so no submodule, SSH key or store entitlement is
+# involved. The tests use a stand-in for ROS; the live tests against a real ROS 2 stack are
+# ignored here.
 name: tests
 
 on:
@@ -24,8 +28,98 @@ jobs:
       - uses: actions/checkout@v4
       - name: Core must not reference plugin message types
         run: |
-          if grep -rlE "RosMessageTypes\.(Moveit|MoveitTaskConstructorMsgs|StudyInterfaces)" Packages/com.erupt.core; then
+          if grep -rlE "RosMessageTypes\.(Moveit|MoveitTaskConstructorMsgs|EruptInterfaces)" Packages/com.erupt.core; then
             echo "::error::core references plugin message types"; exit 1; fi
+      - name: Nothing outside the lab-only package references it
+        run: |
+          # com.erupt.plugin.lab is not published: a checkout without it must still compile
+          # and load its scenes. Names first, then (when the package is present) asset GUIDs.
+          if grep -rlE "Erupt\.Plugins\.Lab|com\.erupt\.plugin\.lab" Assets Packages \
+               --include='*.cs' --include='*.asmdef' --include='package.json' --include='manifest.json' \
+               --exclude-dir=com.erupt.plugin.lab; then
+            echo "::error::code or a manifest outside the lab package names it"; exit 1; fi
+          if [ -d Packages/com.erupt.plugin.lab ]; then
+            grep -rh '^guid: ' Packages/com.erupt.plugin.lab --include='*.meta' | awk '{print $2}' > /tmp/lab-guids
+            if grep -rlFf /tmp/lab-guids Assets Packages \
+                 --include='*.unity' --include='*.prefab' --include='*.asset' --include='*.asmdef' \
+                 --exclude-dir=com.erupt.plugin.lab; then
+              echo "::error::a scene, prefab or asmdef outside the lab package uses a lab asset"; exit 1; fi
+          fi
+      - name: Nothing outside the AR module references it, AprilTag or the MR Utility Kit
+        run: |
+          # com.erupt.plugin.ar is optional: a project without it (the package folder and the two
+          # manifest lines it asks for deleted) must still compile and load its scenes, with no
+          # AprilTag code and no use of the passthrough camera. Names first (the module, and the
+          # assemblies and namespaces only the module may use, by name or by asmdef GUID), then
+          # (when the package is present) asset GUIDs.
+          if grep -rlE "Erupt\.Plugins\.Ar\b|com\.erupt\.plugin\.ar\b|using[[:space:]]+AprilTag\b|AprilTag\.Runtime|jp\.keijiro\.apriltag|Meta\.XR\.MRUtilityKit|meta\.xr\.mrutilitykit|PassthroughCameraAccess\b|GUID:f5eda1afa2a1241a59c4db6830e1c890|GUID:c85f558502c2ed74fb418fe9c223ef02" \
+               Assets/Erupt.App Packages/com.erupt.* \
+               --include='*.cs' --include='*.asmdef' --include='*.txt' --include='package.json' \
+               --exclude-dir=com.erupt.plugin.ar; then
+            echo "::error::code or a manifest outside the AR module names it, AprilTag, the MR Utility Kit or the passthrough camera"; exit 1; fi
+          if [ -d Packages/com.erupt.plugin.ar ]; then
+            grep -rh '^guid: ' Packages/com.erupt.plugin.ar --include='*.meta' | awk '{print $2}' > /tmp/ar-guids
+            if grep -rlFf /tmp/ar-guids Assets Packages \
+                 --include='*.unity' --include='*.prefab' --include='*.asset' --include='*.asmdef' \
+                 --exclude-dir=com.erupt.plugin.ar; then
+              echo "::error::a scene, prefab or asmdef outside the AR module uses one of its assets"; exit 1; fi
+          fi
+      - name: What the ERUPT packages ask the project to install is what the project has
+        run: |
+          # A git package cannot declare git dependencies, so a package lists what it needs under
+          # "erupt.requires" (core: the two forks; the AR module: AprilTag and the MR Utility Kit)
+          # and ERUPT offers to add it. The template project carries the same commits and versions.
+          python3 - <<'PY'
+          import glob, json, sys
+          project = json.load(open('Packages/manifest.json'))['dependencies']
+          bad = []
+          for path in sorted(glob.glob('Packages/com.erupt.*/package.json')):
+              for need in json.load(open(path)).get('erupt', {}).get('requires', []):
+                  if project.get(need['name']) != need['source']:
+                      bad.append(f"{path}: {need['name']} = {need['source']}, the project has {project.get(need['name'])}")
+          if bad:
+              print('\n'.join(bad)); print('::error::erupt.requires and Packages/manifest.json disagree'); sys.exit(1)
+          PY
+      - name: The static ROS bus is read only where allowlisted
+        run: |
+          # Components get their bus from the plugin context (IEruptContext.Ros; a robot's own
+          # traffic from RobotInstance.Ros). Only the host reads the static provider, to build
+          # that context.
+          allowed='^(Packages/com\.erupt\.core/Runtime/Plugins/PluginHost\.cs)$'
+          hits=$(grep -rlE 'RosBus[[:space:]]*\.[[:space:]]*Instance' Assets Packages --include='*.cs' --include='*.cs.txt' | grep -vE "$allowed" || true)
+          if [ -n "$hits" ]; then echo "$hits"; echo "::error::RosBus.Instance is used outside the allowlist"; exit 1; fi
+      - name: Plugins take robots from the registry
+        run: |
+          # A plugin works on the robots the context gives it (IEruptContext.Robots); a scene
+          # lookup would always find the first robot, whichever one the plugin is serving.
+          hits=$(grep -rlE 'Find(First|Any)?Objects?(By|Of)Type[[:space:]]*<[[:space:]]*(DirectArticulationIKController|RobotInstance|JointTrajectoryPlayer|RobotGhosts|RobotInteractionController)[[:space:]]*>' \
+                   Packages/com.erupt.plugin.*/Runtime --include='*.cs' || true)
+          if [ -n "$hits" ]; then echo "$hits"; echo "::error::plugin code looks robots up in the scene"; exit 1; fi
+      - name: Joint positions are written in one file
+        run: |
+          # Joints are teleported and PhysX does not apply joint limits to a teleport, so the
+          # limits hold only because every write goes through JointWriter (which clamps to the
+          # robot's limit model). Another runtime file assigning jointPosition bypasses them.
+          writer='Packages/com.erupt.core/Runtime/Robot/JointWriter.cs'
+          hits=$(grep -rlE '\.jointPosition[[:space:]]*=[^=]|\.SetJointPositions[[:space:]]*\(' \
+                   Packages/com.erupt.*/Runtime Assets/Erupt.App --include='*.cs' | sort || true)
+          if [ "$hits" != "$writer" ]; then
+            echo "$hits"; echo "::error::joint positions must be written only in $writer"; exit 1; fi
+      - name: Robot packages hold assets only, and nothing in core or the plugins knows them
+        run: |
+          # A robot package is a description, prefabs and a profile. Core and the plugins work
+          # with whatever robot is in the scene, so they never name a robot package.
+          code=$(find Packages/com.erupt.robot.* \( -name '*.cs' -o -name '*.asmdef' -o -name '*.asmref' -o -name '*.dll' \) 2>/dev/null || true)
+          if [ -n "$code" ]; then echo "$code"; echo "::error::a robot package contains code"; exit 1; fi
+          if grep -rlE 'com\.erupt\.robot\.' Packages/com.erupt.* --include='*.cs' --include='*.asmdef' --include='*.json' --include='*.txt' \
+               --exclude-dir='com.erupt.robot.*'; then
+            echo "::error::core or a plugin names a robot package"; exit 1; fi
+          if ls -d Packages/com.erupt.robot.* >/dev/null 2>&1; then
+            grep -rh '^guid: ' Packages/com.erupt.robot.* --include='*.meta' | awk '{print $2}' > /tmp/robot-guids
+            if grep -rlFf /tmp/robot-guids Packages/com.erupt.* --include='*.unity' --include='*.prefab' --include='*.asset' --include='*.mat' \
+                 --exclude-dir='com.erupt.robot.*'; then
+              echo "::error::an asset of core or of a plugin uses an asset of a robot package"; exit 1; fi
+          fi
       - name: No asmdef may target Assembly-CSharp
         run: |
           if grep -rl "Assembly-CSharp" Assets --include='*.asmdef'; then
@@ -34,13 +128,12 @@ jobs:
         run: |
           stray=$(find Assets -name "*.cs" \
             -not -path "Assets/Erupt.App/*" -not -path "Assets/Samples/*" \
-            -not -path "Assets/OpenCVForUnity/*" -not -path "Assets/_Heathen*" \
             -not -path "Assets/LudicWorlds/*" -not -path "Assets/TextMesh Pro/*")
           if [ -n "$stray" ]; then echo "$stray"; echo "::error::scripts outside Erupt.App would fall into Assembly-CSharp"; exit 1; fi
       - name: Package versions agree
         run: |
           v=$(python3 -c "import json;print(json.load(open('Packages/com.erupt.core/package.json'))['version'])")
-          for p in Packages/com.erupt.plugin.*/package.json; do
+          for p in Packages/com.erupt.plugin.*/package.json Packages/com.erupt.robot.*/package.json; do
             python3 - "$p" "$v" <<'PY'
           import json,sys
           m=json.load(open(sys.argv[1])); want=sys.argv[2]
@@ -49,15 +142,32 @@ jobs:
           PY
           done
 
-  unity-tests:
-    if: github.event_name == 'workflow_dispatch'
+  # Whether the Unity licence secret exists (a job-level `if` cannot read secrets itself).
+  unity-licence:
     runs-on: ubuntu-latest
+    outputs:
+      present: ${{ steps.check.outputs.present }}
     steps:
-      - uses: actions/checkout@v4
+      - id: check
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+        run: |
+          if [ -n "$UNITY_LICENSE" ]; then echo "present=true" >> "$GITHUB_OUTPUT"
+          else echo "present=false" >> "$GITHUB_OUTPUT"; echo "::notice::No UNITY_LICENSE secret: the Unity tests are skipped."; fi
+
+  unity-tests:
+    needs: unity-licence
+    if: needs.unity-licence.outputs.present == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      # The editor image with Android support and the imported project need more room than
+      # a hosted runner has free.
+      - uses: jlumbroso/free-disk-space@v1.3.1
         with:
-          submodules: recursive
-          ssh-key: ${{ secrets.SUBMODULE_SSH_KEY }}
-          lfs: true
+          tool-cache: false
+          large-packages: false
+      - uses: actions/checkout@v4
       - uses: actions/cache@v4
         with:
           path: Library
@@ -69,6 +179,10 @@ jobs:
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
           testMode: all            # EditMode (boundary, generator) + PlayMode (every Erupt.*.Tests)
+          # The suites are developed against the Android build target, the one the headset uses.
+          # Keep the image's version in step with ProjectSettings/ProjectVersion.txt.
+          customImage: unityci/editor:ubuntu-6000.3.15f1-android-4
+          customParameters: -buildTarget Android
           artifactsPath: test-results
           githubToken: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/upload-artifact@v4

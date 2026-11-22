@@ -44,19 +44,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9190cb62a3ba4789bb9736f5c1bd44ee, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Erupt.Plugins.MoveIt::MoveItPlugin
+  handleDiameter: 0.06
+  handleColor: {r: 0.55, g: 0.35, b: 1, a: 0.9}
   settings:
-    jointStateTopic: /joint_states
-    executeTrajectoryTopic: /joint_trajectory_controller/joint_trajectory
-    motionPlanServiceName: /plan_kinematic_path
-    plannerQueryServiceName: /query_planner_interface
+    motionPlanServiceName: plan_kinematic_path
+    plannerQueryServiceName: query_planner_interface
     displayTrajectoryTopic: 
-    planningGroupName: ur_manipulator
     planningPipelineId: ompl
-    defaultPlannerId: ur_manipulator
+    defaultPlannerId: 
     defaultNumPlanningAttempts: 10
     defaultAllowedPlanningTime: 5
     goalTolerance: 0.01
-    rosJointNamePrefix: panda_
-    unityJointNamePrefix: fr3_
-  player: {fileID: 0}
   autoQueryPlanners: 1

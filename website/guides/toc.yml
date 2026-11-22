@@ -1,0 +1,28 @@
+- name: Get started
+  items:
+    - name: Quick start
+      href: quick-start.md
+    - name: Add ERUPT to your own project
+      href: install-package.md
+    - name: The ROS 2 side
+      href: ros-setup.md
+- name: Use
+  items:
+    - name: Using the app
+      href: using-the-app.md
+    - name: Robots
+      href: robots.md
+    - name: Several robot arms
+      href: multi-arm.md
+    - name: Collecting demonstrations
+      href: demonstrations.md
+    - name: AR placement (optional)
+      href: ar.md
+- name: Extend
+  items:
+    - name: Adding a robot
+      href: add-a-robot.md
+    - name: Writing a plugin
+      href: write-a-plugin.md
+- name: Troubleshooting
+  href: troubleshooting.md

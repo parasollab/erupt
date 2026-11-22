@@ -1,24 +1,27 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-public class ResetKitchenScene : MonoBehaviour
+namespace Erupt.App
 {
-    [SerializeField]
-    private InputActionReference _resetAction;
-
-    private void Start()
+    public class ResetKitchenScene : MonoBehaviour
     {
-        _resetAction.action.performed += OnResetPressed;
-    }
+        [SerializeField]
+        private InputActionReference _resetAction;
 
-    private void OnResetPressed(InputAction.CallbackContext context)
-    {
-        // Load the current scene again to reset it
-        UnityEngine.SceneManagement.SceneManager.LoadScene(UnityEngine.SceneManagement.SceneManager.GetActiveScene().name);
-    }
+        private void Start()
+        {
+            _resetAction.action.performed += OnResetPressed;
+        }
 
-    private void OnDestroy()
-    {
-        _resetAction.action.performed -= OnResetPressed;
+        private void OnResetPressed(InputAction.CallbackContext context)
+        {
+            // Load the current scene again to reset it
+            UnityEngine.SceneManagement.SceneManager.LoadScene(UnityEngine.SceneManagement.SceneManager.GetActiveScene().name);
+        }
+
+        private void OnDestroy()
+        {
+            _resetAction.action.performed -= OnResetPressed;
+        }
     }
 }

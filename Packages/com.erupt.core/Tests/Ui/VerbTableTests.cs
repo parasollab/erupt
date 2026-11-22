@@ -46,14 +46,21 @@ namespace Erupt.Ui.Tests
         [TestCase(SelectionKind.EndEffector, "set-goal")]
         [TestCase(SelectionKind.Trajectory, "execute")]
         [TestCase(SelectionKind.Trajectory, "preview")]
+        [TestCase(SelectionKind.Trajectory, "correct")]   // the demonstration family implements it
         public void ExistingFunctionalityIsMarkedAvailable(SelectionKind kind, string verbId)
         {
             var verb = VerbTable.For(kind).Single(v => v.Id == verbId);
             Assert.IsTrue(verb.IsAvailable, $"{verbId} exists today and must not be disabled.");
         }
 
-        // Not-yet-built verbs stay visible but disabled, so the menu shows the intended
-        // vocabulary rather than shrinking to whatever happens to be implemented.
+        // Not-yet-built verbs stay in the table, marked as such, so the intended vocabulary is
+        // on record. The menus leave them out unless the rig is told to show them.
+        [TestCase(SelectionKind.Obstacle, "reshape")]
+        [TestCase(SelectionKind.Obstacle, "lock")]
+        [TestCase(SelectionKind.EndEffector, "preview-grasp")]
+        [TestCase(SelectionKind.Trajectory, "scrub")]
+        [TestCase(SelectionKind.Trajectory, "compare")]
+        [TestCase(SelectionKind.RobotLink, "lock-joint")]
         [TestCase(SelectionKind.Obstacle, "paint-cost")]
         [TestCase(SelectionKind.Manipulable, "grasp-here")]
         [TestCase(SelectionKind.Waypoint, "pin-timing")]

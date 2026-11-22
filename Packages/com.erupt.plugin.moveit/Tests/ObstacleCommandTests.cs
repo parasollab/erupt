@@ -7,6 +7,7 @@ using Erupt.Environment;
 using Erupt.Interaction;
 using Erupt.Obstacles;
 using Erupt.Ros;
+using Erupt.Plugins.MoveIt;
 
 namespace Erupt.Ros.Tests
 {
@@ -24,6 +25,7 @@ namespace Erupt.Ros.Tests
         private GameObject syncHost;
         private EnvironmentRegistry registry;
         private GameObject spawned;
+        private PlanningSceneFanout fanout;
 
         [SetUp]
         public void SetUp()
@@ -37,6 +39,8 @@ namespace Erupt.Ros.Tests
 
             syncHost = new GameObject("collision-listener");
             var listener = syncHost.AddComponent<CollisionObjectsListenerSimple>();
+            fanout = new PlanningSceneFanout(listener);
+            fanout.AddEndpoint(bus.Root);
             listener.requestInitialPlanningScene = false;
             syncHost.AddComponent<MoveItPlanningSceneSync>();
         }
@@ -44,6 +48,7 @@ namespace Erupt.Ros.Tests
         [TearDown]
         public void TearDown()
         {
+            fanout.Dispose();
             RosBus.Reset();
             if (spawned != null) Object.DestroyImmediate(spawned);
             Object.DestroyImmediate(syncHost);

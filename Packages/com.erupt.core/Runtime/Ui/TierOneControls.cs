@@ -4,43 +4,33 @@ using Erupt.Interaction;
 
 namespace Erupt.Ui
 {
-    /// <summary>Shows the current mode and cycles it. Guidelines Part 4.</summary>
+    /// <summary>Opens and closes the tier 3 panel. Guidelines Part 2 tier 1.</summary>
     /// <remarks>
-    /// Part 4 requires the mode to be visible and one action from changing. This control
-    /// is both halves, which is why it is a single tier 1 slot rather than two.
+    /// The same thing the controller's Menu button, the hand menu gesture and the desktop
+    /// panel key do through the router's <c>Activate</c> intent; this is the one the user can
+    /// see, so nothing has to be known beforehand to find the panel.
     /// </remarks>
-    public class ModeIndicatorControl : MonoBehaviour, ITierOneControl
+    public class MenuControl : MonoBehaviour, ITierOneControl
     {
         public UiTier Tier => UiTier.Persistent;
-        public string Id => "mode";
+        public string Id => "menu";
 
-        private ModeManager modes;
         private Button button;
 
-        public void Initialise(ModeManager modeManager, Button target)
+        /// <summary>The button was pressed. The rig that owns the panel toggles it.</summary>
+        public event System.Action Pressed;
+
+        public void Initialise(Button target)
         {
-            modes = modeManager;
             button = target;
-
             button.onClick.AddListener(OnClick);
-            if (modes != null) modes.ModeChanged += OnModeChanged;
-
-            Refresh();
         }
 
-        private void OnClick() => modes?.Cycle();
-
-        private void OnModeChanged(AppMode _) => Refresh();
-
-        private void Refresh()
-        {
-            if (button == null) return;
-            UiBuilder.SetButtonText(button, modes != null ? modes.Current.ToString() : "—");
-        }
+        private void OnClick() => Pressed?.Invoke();
 
         private void OnDestroy()
         {
-            if (modes != null) modes.ModeChanged -= OnModeChanged;
+            Pressed = null;
             if (button != null) button.onClick.RemoveListener(OnClick);
         }
     }

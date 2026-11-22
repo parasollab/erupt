@@ -21,6 +21,9 @@ namespace Erupt.Interaction
         public void SetKind(SelectionKind newKind) => kind = newKind;
         public void SetDisplayName(string name) => displayName = name;
 
+        /// <summary>The name as set, without the object-name fallback of <see cref="DisplayName"/>.</summary>
+        public string ConfiguredDisplayName => displayName;
+
         /// <summary>The object's marker, added with the given kind if it has none.</summary>
         public static SelectableMarker Ensure(GameObject go, SelectionKind kind, string displayName = null)
         {

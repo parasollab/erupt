@@ -7,7 +7,7 @@ namespace Erupt.Editor.Tests
 {
     /// <summary>
     /// The generator produces the file set a real plugin has, with every token resolved, and
-    /// the shipped MoveIt / MTC / RADER packages match their template's shape.
+    /// the shipped MoveIt / MTC / demonstration packages match their template's shape.
     /// </summary>
     public class PluginGeneratorTests
     {
@@ -58,6 +58,30 @@ namespace Erupt.Editor.Tests
             StringAssert.Contains("=> \"demo\"", File.ReadAllText(Path.Combine(root, "Runtime/DemoPlugin.cs")));
         }
 
+        // A generated Planning or Demonstration plugin starts from the per-robot session pattern:
+        // one plugin instance, a RobotSessions of its own Session type, the robot named in every
+        // template method, and a smoke test with three fake robots.
+        [TestCase(PluginFamily.Planning, "RequestPlan(RobotInstance robot")]
+        [TestCase(PluginFamily.Demonstration, "StartDemonstration(RobotInstance robot")]
+        public void Generate_FamilyPlugins_StartFromThePerRobotSessionPattern(PluginFamily family, string perRobotMethod)
+        {
+            var spec = PluginSpec.Default("Demo", family);
+            string root = Path.Combine(temp, spec.PackageId);
+            PluginGenerator.Generate(spec, PluginTemplate.For(family), root);
+
+            string plugin = File.ReadAllText(Path.Combine(root, "Runtime/DemoPlugin.cs"));
+            StringAssert.Contains("RobotSessions<Session>", plugin);
+            StringAssert.Contains("new RobotSessions<Session>(context.Robots", plugin);
+            StringAssert.Contains("sessions?.Dispose()", plugin);
+            StringAssert.Contains(perRobotMethod, plugin);
+            StringAssert.Contains("robot.Ros", plugin, "A robot's traffic goes through its own namespaced bus.");
+            StringAssert.DoesNotContain("Robots.Active.Model", plugin, "Nothing is done on 'the' robot.");
+
+            string test = File.ReadAllText(Path.Combine(root, "Tests/DemoSmokeTests.cs"));
+            StringAssert.Contains("FakeRobots.Three(", test);
+            StringAssert.Contains("plugin.Sessions.Count", test);
+        }
+
         [Test]
         public void Generate_RefusesANonEmptyTarget_AndBadNames()
         {
@@ -102,7 +126,7 @@ namespace Erupt.Editor.Tests
         // components they grew).
         [TestCase("Packages/com.erupt.plugin.moveit", "MoveIt", "Erupt.Plugins.MoveIt", ": PlanningPlugin")]
         [TestCase("Packages/com.erupt.plugin.mtc", "Mtc", "Erupt.Plugins.Mtc", ": PlanningPlugin")]
-        [TestCase("Packages/com.erupt.plugin.rader", "Rader", "Erupt.Plugins.Rader", ": DemonstrationPlugin")]
+        [TestCase("Packages/com.erupt.plugin.demonstration", "DemonstrationCollection", "Erupt.Plugins.Demonstration", ": DemonstrationPlugin")]
         public void ShippedPlugins_HaveTheTemplateShape(string package, string name, string assembly, string baseClass)
         {
             Assert.IsTrue(File.Exists(Path.Combine(package, "package.json")));

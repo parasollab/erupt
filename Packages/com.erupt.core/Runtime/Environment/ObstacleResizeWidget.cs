@@ -8,6 +8,7 @@ using UnityEngine.XR.Interaction.Toolkit.Transformers;
 using Erupt.Interaction;
 using Erupt.Obstacles;
 using Erupt.Ui;
+using Erupt.Environment;
 
 namespace Erupt.UiBindings
 {

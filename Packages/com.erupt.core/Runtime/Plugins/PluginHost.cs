@@ -17,9 +17,9 @@ namespace Erupt.Plugins
     }
 
     /// <summary>
-    /// Finds the plugins in the scene, orders them by <see cref="IEruptPlugin.DependsOn"/>,
-    /// hands each the <see cref="IEruptContext"/>, and fans out mode changes. Lives on the
-    /// ERUPT root next to the core services it collects into the context.
+    /// Finds the plugins in the scene, orders them by <see cref="IEruptPlugin.DependsOn"/>
+    /// and hands each the <see cref="IEruptContext"/>. Lives on the ERUPT root next to the
+    /// core services it collects into the context.
     /// </summary>
     /// <remarks>
     /// Follows <c>InteractionRouter.Awake</c>: scene services are found with
@@ -30,10 +30,8 @@ namespace Erupt.Plugins
     public class PluginHost : MonoBehaviour
     {
         [Header("Core services (found in the scene if empty)")]
-        [SerializeField] private DirectArticulationIKController robot;
         [SerializeField] private EnvironmentRegistry environment;
         [SerializeField] private SelectionService selection;
-        [SerializeField] private ModeManager modes;
         [SerializeField] private InteractionRouter router;
         [SerializeField] private TierUiRig ui;
 
@@ -79,13 +77,13 @@ namespace Erupt.Plugins
             started = true;
             context ??= BuildContext();
 
-            if (modes != null) modes.ModeChanged += OnModeChanged;
-            else if (context.Modes != null) context.Modes.ModeChanged += OnModeChanged;
-
-            // The gripper belongs to the core robot, not to a plugin. A robot without
-            // finger joints leaves the verb unbound, which renders it disabled.
-            if (robot != null && robot.HasGripper && ui != null && ui.TierTwo != null)
-                ui.BindVerb("gripper", _ => robot.ToggleGripper());
+            // The gripper belongs to the core robot, not to a plugin. Bound once: it acts on
+            // the robot the selected object belongs to, and a robot without a gripper answers
+            // with a refusal.
+            IUiHost uiHost = context.Ui;
+            bool tierTwoReady = !(uiHost is TierUiRig rig) || rig.TierTwo != null;
+            if (context.Robots != null && uiHost != null && tierTwoReady)
+                uiHost.BindVerb("gripper", ToggleGripper);
 
             if (!discoverInScene) return;
 
@@ -101,10 +99,32 @@ namespace Erupt.Plugins
             }
         }
 
+        /// <summary>
+        /// The gripper verb: opens or closes the gripper of the robot <paramref name="target"/>
+        /// belongs to (the active robot when it belongs to none). A robot without a gripper is
+        /// a refusal on the router, not an error.
+        /// </summary>
+        public void ToggleGripper(ISelectable target)
+        {
+            IRobotRegistry robots = context?.Robots;
+            if (robots == null) return;
+            GameObject selected = target?.GameObject;
+            RobotInstance robot = selected != null ? robots.OwnerOf(selected) : null;
+            if (robot == null) robot = robots.Active;
+
+            IRobotGripper gripper = robot != null ? robot.Gripper : null;
+            if (gripper != null)
+            {
+                gripper.ToggleGripper();
+                return;
+            }
+            Vector3 at = selected != null ? selected.transform.position : Vector3.zero;
+            string reason = robot != null ? "This robot has no gripper." : "There is no robot to open or close a gripper on.";
+            context.Router?.ReportRefusal(InteractionRefusal.Refuse(RefusalCode.NotControllable, reason, at));
+        }
+
         private void OnDestroy()
         {
-            var m = modes != null ? modes : context?.Modes;
-            if (m != null) m.ModeChanged -= OnModeChanged;
             UnregisterAll();
         }
 
@@ -129,8 +149,12 @@ namespace Erupt.Plugins
         public void Unregister(IEruptPlugin plugin)
         {
             if (plugin == null || !registered.Remove(plugin)) return;
+            if (plugin is EruptPluginBehaviour behaviour) behaviour.Host = null;
             plugin.OnUnregister(context);
             context?.Ui?.Verbs.RemoveAllFrom(plugin.Id);
+            // An open menu drops what the plugin offered: its own verbs, and the guideline
+            // verbs it had bound and shows only while it is registered.
+            context?.Ui?.Verbs?.Refresh();
         }
 
         public bool TryGet(string id, out IEruptPlugin plugin)
@@ -151,7 +175,12 @@ namespace Erupt.Plugins
                 throw new PluginDependencyException($"Plugin id '{plugin.Id}' is already registered.");
             plugin.OnRegister(context);
             registered.Add(plugin);
+            if (plugin is EruptPluginBehaviour behaviour) behaviour.Host = this;
         }
+
+        // One of the plugins is being destroyed while registered (its scene is going away):
+        // all of them are unregistered now, dependants first, while they can still clean up.
+        internal void PluginIsBeingDestroyed() => UnregisterAll();
 
         private void UnregisterAll()
         {
@@ -159,16 +188,8 @@ namespace Erupt.Plugins
             {
                 var plugin = registered[i];
                 registered.RemoveAt(i);
+                if (plugin is EruptPluginBehaviour behaviour) behaviour.Host = null;
                 try { plugin.OnUnregister(context); }
-                catch (Exception e) { Debug.LogException(e, this); }
-            }
-        }
-
-        private void OnModeChanged(AppMode mode)
-        {
-            foreach (var plugin in registered)
-            {
-                try { plugin.OnModeChanged(mode); }
                 catch (Exception e) { Debug.LogException(e, this); }
             }
         }
@@ -215,27 +236,31 @@ namespace Erupt.Plugins
 
         private IEruptContext BuildContext()
         {
-            if (robot == null) robot = FindFirstObjectByType<DirectArticulationIKController>();
             if (environment == null) environment = FindFirstObjectByType<EnvironmentRegistry>();
             if (selection == null) selection = FindFirstObjectByType<SelectionService>();
-            if (modes == null) modes = FindFirstObjectByType<ModeManager>();
             if (router == null) router = FindFirstObjectByType<InteractionRouter>();
             if (ui == null) ui = FindFirstObjectByType<TierUiRig>(FindObjectsInactive.Include);
 
-            if (robot == null) Debug.LogError("[PluginHost] No DirectArticulationIKController in the scene.", this);
             if (environment == null) Debug.LogError("[PluginHost] No EnvironmentRegistry in the scene.", this);
             if (selection == null) Debug.LogError("[PluginHost] No SelectionService in the scene.", this);
-            if (modes == null) Debug.LogError("[PluginHost] No ModeManager in the scene.", this);
             if (router == null) Debug.LogWarning("[PluginHost] No InteractionRouter in the scene.", this);
             if (ui == null) Debug.LogWarning("[PluginHost] No TierUiRig in the scene; plugins get no UI host.", this);
 
+            // Robots register themselves when enabled, which is before any Start. The registry
+            // gets the bus here; each robot scopes it to its own ROS namespace.
+            RobotRegistry robots = RobotRegistry.Default;
+            IRosBus bus = RosBus.Instance;
+            robots.SetBus(bus);
+            if (robots.DefaultPlanningFrame == null && environment != null)
+                robots.DefaultPlanningFrame = environment.WorldOrigin;
+            if (robots.All.Count == 0) Debug.LogError("[PluginHost] No RobotInstance in the scene.", this);
+
             return new EruptContext
             {
-                Ros = RosBus.Instance,
-                Robot = robot,
+                Ros = bus,
+                Robots = robots,
                 Environment = environment,
                 Selection = selection,
-                Modes = modes,
                 Undo = ui != null && ui.UndoStack != null ? ui.UndoStack : Undo,
                 Router = router,
                 Ui = ui

@@ -18,7 +18,6 @@ namespace Erupt.Ui.Tests
         public void SetUp()
         {
             host = new GameObject("tier1");
-            host.AddComponent<ModeManager>();
             bar = host.AddComponent<TierOneBar>();
         }
 
@@ -32,7 +31,7 @@ namespace Erupt.Ui.Tests
 
             Assert.AreEqual(4, bar.Registry.TierOneControls.Count);
             CollectionAssert.AreEquivalent(
-                new[] { "mode", "undo", "redo", "voice" },
+                new[] { "menu", "undo", "redo", "voice" },
                 bar.Registry.TierOneControls.Select(c => c.Id).ToArray());
         }
 
@@ -52,7 +51,7 @@ namespace Erupt.Ui.Tests
         {
             yield return null;
 
-            // Screen-space canvases do not work under PolySpatial (backlog B18).
+            // Screen-space canvases do not render in a headset.
             Assert.AreEqual(RenderMode.WorldSpace, bar.Canvas.renderMode);
         }
 
@@ -75,16 +74,59 @@ namespace Erupt.Ui.Tests
             Assert.IsFalse(FindButton("Redo").interactable, "Nothing has been undone yet.");
         }
 
+        // Menu, Undo, Redo, in that order, and nothing that names a mode.
         [UnityTest]
-        public IEnumerator ModeButtonShowsAndCyclesTheMode()
+        public IEnumerator HoldsMenuUndoRedo_InThatOrder()
         {
             yield return null;
-            Button modeButton = FindButton("Mode");
 
-            Assert.AreEqual("Build", TextOf(modeButton));
+            Button[] buttons = bar.Canvas.GetComponentsInChildren<Button>(true);
+            CollectionAssert.AreEqual(new[] { "Menu", "Undo", "Redo" }, buttons.Select(TextOf).ToArray());
+            CollectionAssert.AreEqual(new[] { TierOneBar.MenuLabel, TierOneBar.UndoLabel, TierOneBar.RedoLabel }, buttons.Select(TextOf).ToArray());
+            Assert.That(buttons.Select(b => b.transform.position.x).ToArray(), Is.Ordered, "Left to right.");
+        }
 
-            modeButton.onClick.Invoke();
-            Assert.AreEqual("Plan", TextOf(modeButton), "Mode must be one action from changing.");
+        [UnityTest]
+        public IEnumerator MenuButton_RaisesPressed_AndIsAlwaysPressable()
+        {
+            yield return null;
+            int presses = 0;
+            bar.Menu.Pressed += () => presses++;
+            Button menu = FindButton("Menu");
+
+            Assert.IsTrue(menu.interactable);
+            menu.onClick.Invoke();
+            menu.onClick.Invoke();
+            Assert.AreEqual(2, presses);
+        }
+
+        // The bar is as wide as its three buttons, the gaps between them and its margin.
+        [UnityTest]
+        public IEnumerator TheBarIsSizedToItsContent()
+        {
+            yield return null;
+            Canvas.ForceUpdateCanvases();
+            RectTransform canvas = bar.Canvas.GetComponent<RectTransform>();
+            Button[] buttons = bar.Canvas.GetComponentsInChildren<Button>(true);
+            Vector2 button = buttons[0].GetComponent<RectTransform>().rect.size;
+
+            Assert.AreEqual(TierOneBar.SizeFor(3, button, 8f, 12f), canvas.sizeDelta);
+            Assert.Less(canvas.sizeDelta.x, 560f, "Narrower than the bar that held the mode.");
+
+            // Every button lies inside the canvas, with the margin round the row.
+            var corners = new Vector3[4];
+            foreach (Button b in buttons)
+            {
+                b.GetComponent<RectTransform>().GetWorldCorners(corners);
+                foreach (Vector3 corner in corners)
+                {
+                    Vector3 local = canvas.InverseTransformPoint(corner);
+                    Assert.That(Mathf.Abs(local.x), Is.LessThanOrEqualTo(canvas.sizeDelta.x * 0.5f - 11.9f), $"{b.name} is inside the bar.");
+                    Assert.That(Mathf.Abs(local.y), Is.LessThanOrEqualTo(canvas.sizeDelta.y * 0.5f - 11.9f), $"{b.name} is inside the bar.");
+                }
+            }
+            var collider = bar.Canvas.GetComponent<BoxCollider>();
+            Assert.AreEqual(new Vector3(canvas.sizeDelta.x, canvas.sizeDelta.y, 1f), collider.size, "The press-consuming collider is the bar's size.");
         }
 
         private Button FindButton(string name) =>

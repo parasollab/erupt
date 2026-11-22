@@ -155,6 +155,54 @@ namespace Erupt.Ui.Tests
             Object.DestroyImmediate(go);
         }
 
+        // The rig's default: a menu holds what can be pressed. The verbs nothing implements
+        // (pending in the table, or bound by nobody) are left out; the table still has them.
+        [Test]
+        public void WhenUnavailableVerbsAreNotListed_TheMenuHoldsOnlyWhatCanBePressed()
+        {
+            menu.Bind("delete", _ => { });
+            menu.Bind("paint-cost", _ => { });   // bound, but pending in the table: still not pressable
+            menu.SetTarget(Make(SelectionKind.Obstacle, out var go));
+            Assert.AreEqual(7, menu.Verbs.Count, "Everything is listed by default.");
+
+            menu.ListsUnavailableVerbs = false;
+
+            CollectionAssert.AreEqual(new[] { "delete" }, Ids());
+            Assert.IsTrue(menu.IsVisible);
+            Assert.AreEqual(7, menu.Registry.For(SelectionKind.Obstacle).Count, "The registry keeps its entries.");
+
+            menu.ListsUnavailableVerbs = true;
+            Assert.AreEqual(7, menu.Verbs.Count);
+            Object.DestroyImmediate(go);
+        }
+
+        [Test]
+        public void WhenUnavailableVerbsAreNotListed_ASelectionWithNothingToDoHasNoMenu()
+        {
+            menu.ListsUnavailableVerbs = false;
+            menu.SetTarget(Make(SelectionKind.RobotLink, out var go));
+
+            Assert.IsEmpty(menu.Verbs, "Set Joint Angle is bound by nobody and Lock Joint is pending.");
+            Assert.IsFalse(menu.IsVisible, "A menu of buttons that cannot be pressed reads as broken.");
+            Object.DestroyImmediate(go);
+        }
+
+        [Test]
+        public void WhenUnavailableVerbsAreNotListed_BindingAVerbPutsItOnTheOpenMenu()
+        {
+            menu.ListsUnavailableVerbs = false;
+            menu.SetTarget(Make(SelectionKind.Obstacle, out var go));
+            Assert.IsEmpty(menu.Verbs);
+            int changes = 0;
+            menu.Changed += () => changes++;
+
+            menu.Bind("snap", _ => { });
+
+            CollectionAssert.AreEqual(new[] { "snap" }, Ids());
+            Assert.AreEqual(1, changes, "An open menu is told.");
+            Object.DestroyImmediate(go);
+        }
+
         private string[] Ids() =>
             System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(menu.Verbs, v => v.Id));
 

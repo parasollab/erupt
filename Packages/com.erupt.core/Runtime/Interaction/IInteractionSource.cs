@@ -3,7 +3,7 @@ using System;
 namespace Erupt.Interaction
 {
     /// <summary>
-    /// A backend. The only layer that knows about triggers, pinches, thumbsticks or gaze.
+    /// A backend. The only layer that knows about triggers, pinches, thumbsticks or mouse buttons.
     /// Produces raw source state; applies no policy. Guidelines Part 3.
     /// </summary>
     public interface IInteractionSource

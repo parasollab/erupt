@@ -1,0 +1,53 @@
+{
+  "robots": [
+    {
+      "urdfPath": "Tools/robot-descriptions/out/fr3/fr3.urdf",
+      "srdfPath": "Tools/robot-descriptions/out/fr3/fr3.srdf",
+      "rosNamesPath": "Tools/robot-descriptions/out/fr3/fr3.ros.json",
+      "displayName": "Franka Research 3",
+      "assetName": "FR3",
+      "outputFolder": "Packages/com.erupt.robot.franka/Robots",
+      "endEffectorLink": "fr3_hand_tcp"
+    },
+    {
+      "urdfPath": "Tools/robot-descriptions/out/ur5e/ur5e.urdf",
+      "srdfPath": "Tools/robot-descriptions/out/ur5e/ur5e.srdf",
+      "rosNamesPath": "Tools/robot-descriptions/out/ur5e/ur5e.ros.json",
+      "displayName": "Universal Robots UR5e",
+      "assetName": "UR5e",
+      "outputFolder": "Packages/com.erupt.robot.universal-robots/Robots"
+    },
+    {
+      "urdfPath": "Tools/robot-descriptions/out/ur10e/ur10e.urdf",
+      "srdfPath": "Tools/robot-descriptions/out/ur10e/ur10e.srdf",
+      "rosNamesPath": "Tools/robot-descriptions/out/ur10e/ur10e.ros.json",
+      "displayName": "Universal Robots UR10e",
+      "assetName": "UR10e",
+      "outputFolder": "Packages/com.erupt.robot.universal-robots/Robots"
+    },
+    {
+      "urdfPath": "Tools/robot-descriptions/out/kinova_gen3/kinova_gen3.urdf",
+      "srdfPath": "Tools/robot-descriptions/out/kinova_gen3/kinova_gen3.srdf",
+      "rosNamesPath": "Tools/robot-descriptions/out/kinova_gen3/kinova_gen3.ros.json",
+      "displayName": "Kinova Gen3",
+      "assetName": "Gen3",
+      "outputFolder": "Packages/com.erupt.robot.kinova/Robots"
+    },
+    {
+      "urdfPath": "Tools/robot-descriptions/out/xarm7/xarm7.urdf",
+      "srdfPath": "Tools/robot-descriptions/out/xarm7/xarm7.srdf",
+      "rosNamesPath": "Tools/robot-descriptions/out/xarm7/xarm7.ros.json",
+      "displayName": "UFactory xArm7",
+      "assetName": "xArm7",
+      "outputFolder": "Packages/com.erupt.robot.ufactory/Robots"
+    },
+    {
+      "urdfPath": "Tools/robot-descriptions/out/iiwa14/iiwa14.urdf",
+      "srdfPath": "Tools/robot-descriptions/out/iiwa14/iiwa14.srdf",
+      "rosNamesPath": "Tools/robot-descriptions/out/iiwa14/iiwa14.ros.json",
+      "displayName": "KUKA LBR iiwa 14 R820",
+      "assetName": "iiwa14",
+      "outputFolder": "Packages/com.erupt.robot.kuka/Robots"
+    }
+  ]
+}

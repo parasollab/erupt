@@ -26,11 +26,18 @@ namespace Erupt.Interaction
         [Header("Filtering (Guidelines Part 3)")]
         [SerializeField] private ModalityFilterProfile[] profiles = ModalityFilterProfile.Defaults();
 
+        [Header("Refusals")]
+        [Tooltip("A refusal with the same code and subject as one raised within this many seconds is dropped. " +
+                 "A drag against a joint limit reports one every frame.")]
+        [SerializeField, Min(0f)] private float refusalCoalesceSeconds = 0.5f;
+
         [Header("Diagnostics")]
         [SerializeField] private bool logRefusals = true;
 
         private readonly List<InteractionSourceBehaviour> sources = new();
         private readonly Dictionary<string, OneEuroFilter> filters = new();
+        // When each kind of refusal (code + subject) was last raised, in unscaled seconds.
+        private readonly Dictionary<(RefusalCode code, int subject, string reason), float> refusalRaisedAt = new();
 
         public event Action<InteractionIntent> Select;
         public event Action<InteractionIntent> Deselect;
@@ -43,6 +50,18 @@ namespace Erupt.Interaction
 
         /// <summary>Sources currently registered, for capability queries by feature code.</summary>
         public IReadOnlyList<InteractionSourceBehaviour> Sources => sources;
+
+        private readonly List<IProximitySource> proximitySources = new();
+
+        /// <summary>What proximity feedback measures from (the robots' tips), registered by feature code.</summary>
+        public IReadOnlyList<IProximitySource> ProximitySources => proximitySources;
+
+        public void AddProximitySource(IProximitySource source)
+        {
+            if (source != null && !proximitySources.Contains(source)) proximitySources.Add(source);
+        }
+
+        public void RemoveProximitySource(IProximitySource source) => proximitySources.Remove(source);
 
         /// <summary>True if any active source offers the capability. Replaces platform checks.</summary>
         public bool AnySourceHas(Capability c)
@@ -205,17 +224,46 @@ namespace Erupt.Interaction
             }
         }
 
-        /// <summary>
-        /// Report an interaction that could not proceed. Guidelines Part 3 — refusals
-        /// carry a user-facing reason. Phase 1 logs and broadcasts; spatial presentation
-        /// arrives in Phase 3.
-        /// </summary>
-        public void ReportRefusal(InteractionRefusal refusal)
+        /// <summary>Seconds within which a repeat of the same refusal (code + subject) is dropped.</summary>
+        public float RefusalCoalesceSeconds
         {
-            if (!refusal.IsRefused) return;
+            get => refusalCoalesceSeconds;
+            set => refusalCoalesceSeconds = Mathf.Max(0f, value);
+        }
+
+        /// <summary>
+        /// Report an interaction that could not proceed. Guidelines Part 3: refusals carry a
+        /// user-facing reason. Raises <see cref="Refused"/>, which the toast, the joint-limit
+        /// tint and the controller pulse listen to. A repeat of a refusal with the same code and
+        /// subject within <see cref="RefusalCoalesceSeconds"/> of the one last raised is
+        /// dropped, so a caller may report on every frame of a drag.
+        /// </summary>
+        /// <returns>True when the refusal was raised, false when it was empty or coalesced.</returns>
+        public bool ReportRefusal(InteractionRefusal refusal)
+        {
+            if (!refusal.IsRefused) return false;
+            if (IsRepeat(refusal)) return false;
             InteractionSampleBus.Publish(refusal);
             Refused?.Invoke(refusal);
-            if (logRefusals) Debug.Log($"[InteractionRouter] Refused: {refusal.Reason}");
+            if (logRefusals) Debug.Log($"[InteractionRouter] Refused ({refusal.Code}): {refusal.Reason}");
+            return true;
+        }
+
+        private bool IsRepeat(InteractionRefusal refusal)
+        {
+            if (refusalCoalesceSeconds <= 0f) return false;
+
+            // Refusals without a code are told apart by their text.
+            var key = (refusal.Code,
+                       refusal.Subject != null ? refusal.Subject.GetInstanceID() : 0,
+                       refusal.Code == RefusalCode.Unspecified ? refusal.Reason : null);
+            float now = Time.unscaledTime;
+            if (refusalRaisedAt.TryGetValue(key, out float raisedAt) && now - raisedAt < refusalCoalesceSeconds)
+                return true;
+
+            if (refusalRaisedAt.Count > 64) refusalRaisedAt.Clear();
+            refusalRaisedAt[key] = now;
+            return false;
         }
 
         // A fresh grab must not inherit smoothed history from the previous one.

@@ -26,12 +26,8 @@ namespace {{Namespace}}
 
         protected override void OnUnregister(IEruptContext context)
         {
-            // TODO: undo what OnRegister did (verbs are removed for you; ROS subscriptions are not).
-        }
-
-        protected override void OnModeChanged(AppMode mode)
-        {
-            // TODO: gate behaviour on Build / Plan / Teach (Guidelines Part 4).
+            // TODO: undo what OnRegister did (verbs are removed for you; ROS subscriptions and
+            // tabs are not: context.Ui?.RemoveTab("my-tab")).
         }
     }
 }

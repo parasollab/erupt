@@ -24,7 +24,7 @@ namespace Erupt.Ui
         [SerializeField] private Transform tierThreeAnchor;
 
         [Header("Summoning")]
-        [Tooltip("Tier 3 toggles on the router's Activate intent (the controller Menu button, as the wrist menu did). Found in the scene if empty.")]
+        [Tooltip("Tier 3 toggles on the router's Activate intent (the controller Menu button, the hand menu gesture, the desktop panel key) and on tier 1's Menu button. Found in the scene if empty.")]
         [SerializeField] private InteractionRouter router;
 
         [Tooltip("Place tier 3 in front of the user's head each time it opens. Off leaves it wherever its anchor is.")]
@@ -36,14 +36,45 @@ namespace Erupt.Ui
         [Tooltip("Vertical offset of the panel centre from eye level, in metres. Slightly below is most comfortable.")]
         [SerializeField] private float summonHeightOffset = -0.1f;
 
+        [Header("Tier 2")]
+        [Tooltip("List the verbs nothing implements yet as disabled buttons. Off (the default) leaves them out of the menus; they stay in the verb table.")]
+        [SerializeField] private bool showUnimplementedVerbs;
+
         public TierOneBar TierOne { get; private set; }
         public ContextualMenuView TierTwo { get; private set; }
         public TabbedPanelView TierThree { get; private set; }
+
+        /// <summary>
+        /// The readout that shows why an interaction was refused, at the place it happened.
+        /// Not a tier: it has no controls and is on screen only for a moment.
+        /// </summary>
+        public RefusalToast Refusals { get; private set; }
+
+        /// <summary>
+        /// The tier 3 Settings tab, which components contribute their sections to. Null before
+        /// the rig has woken; the tab itself exists only while it has a section.
+        /// </summary>
+        public SettingsTab Settings { get; private set; }
 
         public UiTierRegistry Registry => TierOne != null ? TierOne.Registry : null;
         public UndoStack UndoStack => TierOne != null ? TierOne.UndoStack : pendingUndo;
 
         public bool UseTierUi => useTierUi;
+
+        /// <summary>
+        /// Whether the tier 2 menus list the verbs that cannot be pressed (the ones the
+        /// guidelines name and nothing implements yet, or that nothing has bound) as disabled
+        /// buttons. Off by default: a menu shows what can be done.
+        /// </summary>
+        public bool ShowUnimplementedVerbs
+        {
+            get => showUnimplementedVerbs;
+            set
+            {
+                showUnimplementedVerbs = value;
+                if (TierTwo != null) TierTwo.Model.ListsUnavailableVerbs = value;
+            }
+        }
 
         /// <summary>The live vocabulary: Guidelines rows plus plugin verbs.</summary>
         public VerbRegistry Verbs { get; } = VerbRegistry.FromTable();
@@ -68,11 +99,18 @@ namespace Erupt.Ui
             TierOne = CreateChild<TierOneBar>("Tier 1", tierOneAnchor, bar => bar.UseUndoStack(pendingUndo));
             TierTwo = CreateChild<ContextualMenuView>("Tier 2", null);
             TierTwo.Model.SetRegistry(Verbs);
+            TierTwo.Model.ListsUnavailableVerbs = showUnimplementedVerbs;
             TierThree = CreateChild<TabbedPanelView>("Tier 3", tierThreeAnchor);
+            Settings = new SettingsTab(TierThree);
+
+            // Tier 1's Menu button does what the controller's Menu button does.
+            if (TierOne.Menu != null) TierOne.Menu.Pressed += ToggleTierThree;
 
             // Tier 3 registers so the one-open-at-a-time invariant runs through the same
             // registry that enforces the tier 1 cap.
             Registry?.RegisterPanel(TierThree);
+
+            Refusals = CreateChild<RefusalToast>("Refusal Toast", null);
 
             Apply();
         }
@@ -81,6 +119,7 @@ namespace Erupt.Ui
         {
             if (router == null) router = FindFirstObjectByType<InteractionRouter>();
             if (router != null) router.Activate += OnActivate;
+            if (Refusals != null && router != null) Refusals.SetRouter(router);
         }
 
         private void OnDisable()
@@ -162,12 +201,29 @@ namespace Erupt.Ui
         {
             if (!placeInFrontOfUser || TierThree == null) return;
 
+            Pose? elsewhere = summonPlacement?.Invoke();
+            if (elsewhere.HasValue)
+            {
+                TierThree.transform.SetPositionAndRotation(elsewhere.Value.position, elsewhere.Value.rotation);
+                return;
+            }
+
             Camera cam = Camera.main;
             if (cam == null) return;   // no head to place in front of; the anchor stands
 
             Pose pose = PlacementFor(cam.transform.position, cam.transform.forward, summonDistance, summonHeightOffset);
             TierThree.transform.SetPositionAndRotation(pose.position, pose.rotation);
         }
+
+        private Func<Pose?> summonPlacement;
+
+        /// <summary>
+        /// Let a backend say where tier 3 opens (the desktop view puts it square in front of
+        /// its camera, whatever the camera's pitch). The function is asked each time the panel
+        /// opens; when it returns nothing, or after it is set back to null, the panel opens in
+        /// front of the head, level with the horizon.
+        /// </summary>
+        public void UseSummonPlacement(Func<Pose?> placement) => summonPlacement = placement;
 
         /// <summary>
         /// Where a summoned panel goes for a head at <paramref name="headPosition"/> looking
@@ -217,6 +273,8 @@ namespace Erupt.Ui
             build?.Invoke(tab.Content);
             return tab;
         }
+
+        public bool RemoveTab(string id) => TierThree != null && TierThree.RemoveTab(id);
 
         public void RegisterWidget(IWorldWidget widget)
         {

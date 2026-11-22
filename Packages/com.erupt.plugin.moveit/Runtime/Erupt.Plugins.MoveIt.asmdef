@@ -32,7 +32,16 @@
     "overrideReferences": false,
     "precompiledReferences": [],
     "autoReferenced": true,
-    "defineConstraints": [],
-    "versionDefines": [],
+    "defineConstraints": [
+        "ERUPT_ROS_TCP_CONNECTOR",
+        "ROS2"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.unity.robotics.ros-tcp-connector",
+            "expression": "",
+            "define": "ERUPT_ROS_TCP_CONNECTOR"
+        }
+    ],
     "noEngineReferences": false
 }

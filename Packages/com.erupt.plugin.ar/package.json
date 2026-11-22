@@ -1,0 +1,45 @@
+{
+  "name": "com.erupt.plugin.ar",
+  "version": "1.0.0-preview.1",
+  "displayName": "ERUPT AR Module",
+  "description": "Optional augmented-reality module for ERUPT on Meta Quest: AprilTag tracking through the passthrough camera, placing robots at printed markers (shown first, confirmed by the user), and the room's scene anchors as obstacles. Needs jp.keijiro.apriltag (a fork, from git) and Meta's MR Utility Kit; ERUPT offers to add them to the project (ERUPT > Project Setup; see the README). A project without this package has no AprilTag code, no AprilTag native library and no use of the passthrough camera.",
+  "unity": "6000.3",
+  "license": "BSD-3-Clause",
+  "dependencies": {
+    "com.erupt.core": "1.0.0-preview.1"
+  },
+  "keywords": [
+    "robotics",
+    "xr",
+    "erupt",
+    "plugin",
+    "augmented-reality",
+    "apriltag"
+  ],
+  "author": {
+    "name": "Parasol Lab, UIUC",
+    "email": "parasol-opensource@cs.illinois.edu",
+    "url": "https://parasollab.web.illinois.edu"
+  },
+  "erupt": {
+    "requires": [
+      {
+        "name": "jp.keijiro.apriltag",
+        "source": "https://github.com/courtneymcbeth/jp.keijiro.apriltag.git?path=/Packages/jp.keijiro.apriltag#1def475558924699f970fb57ff2b007250703526",
+        "reason": "AprilTag detection, with the full-intrinsics overload the passthrough camera needs"
+      },
+      {
+        "name": "com.meta.xr.mrutilitykit",
+        "source": "207.0.0",
+        "reason": "the passthrough camera and the room's scene anchors"
+      }
+    ]
+  },
+  "samples": [
+    {
+      "displayName": "AR Scene",
+      "description": "A passthrough scene with the ERUPT root, an XR rig, the MoveIt, MTC and demonstration plugins, the AR plugin with the AprilTag tracker, the room-anchor bridge and a robot slot with a marker anchor: drag a robot prefab onto the slot, print the tag and build for the headset.",
+      "path": "Samples~/ArScene"
+    }
+  ]
+}

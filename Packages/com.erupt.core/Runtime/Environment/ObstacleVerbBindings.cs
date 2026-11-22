@@ -103,7 +103,12 @@ namespace Erupt.UiBindings
                 Quaternion rotation = target.transform.rotation;
                 Vector3 scale = target.transform.localScale;
 
-                if (!ObstacleSnapping.TrySnapToSurface(target)) return;
+                if (!ObstacleSnapping.TrySnapToSurface(target))
+                {
+                    // Nothing tagged as a surface lies below: say so instead of doing nothing.
+                    Refuse(RefusalCode.Unspecified, "There is no surface below this object to snap to.", target.transform.position);
+                    return;
+                }
 
                 undo.Record(new TransformObstacleCommand(target, "Snap to Surface", position, rotation, scale));
             });
@@ -118,6 +123,14 @@ namespace Erupt.UiBindings
                 PrimitiveType? primitive = TryPrimitive(target, out var p) ? p : null;
                 ResizeWidget.Toggle(target, primitive);
             });
+        }
+
+        private InteractionRouter router;
+
+        private void Refuse(RefusalCode code, string reason, Vector3 at)
+        {
+            if (router == null) router = FindFirstObjectByType<InteractionRouter>();
+            if (router != null) router.ReportRefusal(InteractionRefusal.Refuse(code, reason, at));
         }
 
         // Objects built through ObstacleFactory record their primitive; legacy shapes are

@@ -7,7 +7,8 @@
         "Erupt.Ui",
         "Erupt.Ros",
         "Erupt.Robot",
-        "Erupt.Environment"
+        "Erupt.Environment",
+        "Unity.Robotics.UrdfImporter"
     ],
     "includePlatforms": [
         "Editor"
@@ -17,7 +18,21 @@
     "overrideReferences": false,
     "precompiledReferences": [],
     "autoReferenced": false,
-    "defineConstraints": [],
-    "versionDefines": [],
+    "defineConstraints": [
+        "ERUPT_ROS_TCP_CONNECTOR",
+        "ROS2"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.unity.robotics.urdf-importer",
+            "expression": "",
+            "define": "ERUPT_URDF_IMPORTER"
+        },
+        {
+            "name": "com.unity.robotics.ros-tcp-connector",
+            "expression": "",
+            "define": "ERUPT_ROS_TCP_CONNECTOR"
+        }
+    ],
     "noEngineReferences": false
 }

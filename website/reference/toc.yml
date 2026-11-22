@@ -1,0 +1,12 @@
+- name: Architecture
+  href: ../../Packages/com.erupt.core/Documentation~/architecture.md
+- name: Robots and Robot Setup
+  href: ../../Packages/com.erupt.core/Documentation~/robots.md
+- name: Installing as packages
+  href: ../../Packages/com.erupt.core/Documentation~/installation.md
+- name: Plugin authoring
+  href: ../../Packages/com.erupt.core/Documentation~/plugin-authoring.md
+- name: Design guidelines
+  href: ../../Packages/com.erupt.core/Documentation~/design-guidelines.md
+- name: MTC plugin ROS interface
+  href: ../../Packages/com.erupt.plugin.mtc/Documentation~/ros-interface.md

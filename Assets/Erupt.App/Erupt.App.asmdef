@@ -1,6 +1,6 @@
 {
     "name": "Erupt.App",
-    "rootNamespace": "",
+    "rootNamespace": "Erupt.App",
     "references": [
         "Erupt.Interaction.Core",
         "Erupt.Interaction.Backends.OpenXR",
@@ -21,7 +21,6 @@
         "UnityEngine.UI",
         "Unity.TextMeshPro",
         "GUID:f64c9ebcd7899c3448a08dc9f9ddbe30",
-        "GUID:f5eda1afa2a1241a59c4db6830e1c890",
         "Erupt.Plugins"
     ],
     "includePlatforms": [

@@ -6,7 +6,10 @@
         "Erupt.Interaction.Core",
         "Erupt.TestSupport",
         "UnityEngine.TestRunner",
-        "Unity.XR.Interaction.Toolkit"
+        "Unity.XR.Interaction.Toolkit",
+        "Erupt.Ui",
+        "UnityEngine.UI",
+        "Unity.TextMeshPro"
     ],
     "includePlatforms": [
         "Android",

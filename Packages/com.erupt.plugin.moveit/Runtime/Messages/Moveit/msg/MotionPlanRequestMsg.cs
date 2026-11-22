@@ -59,9 +59,6 @@ namespace RosMessageTypes.Moveit
         public string cartesian_speed_limited_link;
         public double max_cartesian_speed;
         //  m/s
-        //  for level of smoothness for the FREE command
-        //  it should be between 0.01 and 1.0
-        public double smoothness_level;
 
         public MotionPlanRequestMsg()
         {
@@ -80,10 +77,9 @@ namespace RosMessageTypes.Moveit
             this.max_acceleration_scaling_factor = 0.0;
             this.cartesian_speed_limited_link = "";
             this.max_cartesian_speed = 0.0;
-            this.smoothness_level = 0.0;
         }
 
-        public MotionPlanRequestMsg(WorkspaceParametersMsg workspace_parameters, RobotStateMsg start_state, ConstraintsMsg[] goal_constraints, ConstraintsMsg path_constraints, TrajectoryConstraintsMsg trajectory_constraints, GenericTrajectoryMsg[] reference_trajectories, string pipeline_id, string planner_id, string group_name, int num_planning_attempts, double allowed_planning_time, double max_velocity_scaling_factor, double max_acceleration_scaling_factor, string cartesian_speed_limited_link, double max_cartesian_speed, double smoothness_level)
+        public MotionPlanRequestMsg(WorkspaceParametersMsg workspace_parameters, RobotStateMsg start_state, ConstraintsMsg[] goal_constraints, ConstraintsMsg path_constraints, TrajectoryConstraintsMsg trajectory_constraints, GenericTrajectoryMsg[] reference_trajectories, string pipeline_id, string planner_id, string group_name, int num_planning_attempts, double allowed_planning_time, double max_velocity_scaling_factor, double max_acceleration_scaling_factor, string cartesian_speed_limited_link, double max_cartesian_speed)
         {
             this.workspace_parameters = workspace_parameters;
             this.start_state = start_state;
@@ -100,7 +96,6 @@ namespace RosMessageTypes.Moveit
             this.max_acceleration_scaling_factor = max_acceleration_scaling_factor;
             this.cartesian_speed_limited_link = cartesian_speed_limited_link;
             this.max_cartesian_speed = max_cartesian_speed;
-            this.smoothness_level = smoothness_level;
         }
 
         public static MotionPlanRequestMsg Deserialize(MessageDeserializer deserializer) => new MotionPlanRequestMsg(deserializer);
@@ -122,7 +117,6 @@ namespace RosMessageTypes.Moveit
             deserializer.Read(out this.max_acceleration_scaling_factor);
             deserializer.Read(out this.cartesian_speed_limited_link);
             deserializer.Read(out this.max_cartesian_speed);
-            deserializer.Read(out this.smoothness_level);
         }
 
         public override void SerializeTo(MessageSerializer serializer)
@@ -144,7 +138,6 @@ namespace RosMessageTypes.Moveit
             serializer.Write(this.max_acceleration_scaling_factor);
             serializer.Write(this.cartesian_speed_limited_link);
             serializer.Write(this.max_cartesian_speed);
-            serializer.Write(this.smoothness_level);
         }
 
         public override string ToString()
@@ -164,8 +157,7 @@ namespace RosMessageTypes.Moveit
             "\nmax_velocity_scaling_factor: " + max_velocity_scaling_factor.ToString() +
             "\nmax_acceleration_scaling_factor: " + max_acceleration_scaling_factor.ToString() +
             "\ncartesian_speed_limited_link: " + cartesian_speed_limited_link.ToString() +
-            "\nmax_cartesian_speed: " + max_cartesian_speed.ToString() +
-            "\nsmoothness_level: " + smoothness_level.ToString();
+            "\nmax_cartesian_speed: " + max_cartesian_speed.ToString();
         }
 
 #if UNITY_EDITOR

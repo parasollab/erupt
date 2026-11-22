@@ -1,18 +1,21 @@
 using UnityEngine;
 
-public class FPSSetter : MonoBehaviour
+namespace Erupt.App
 {
-    [SerializeField] private float targetFPS = 90.0f;
-
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
-    void Start()
+    public class FPSSetter : MonoBehaviour
     {
-        OVRPlugin.systemDisplayFrequency = targetFPS;
-    }
+        [SerializeField] private float targetFPS = 90.0f;
 
-    // Update is called once per frame
-    void Update()
-    {
-        
+        // Start is called once before the first execution of Update after the MonoBehaviour is created
+        void Start()
+        {
+            OVRPlugin.systemDisplayFrequency = targetFPS;
+        }
+
+        // Update is called once per frame
+        void Update()
+        {
+
+        }
     }
 }

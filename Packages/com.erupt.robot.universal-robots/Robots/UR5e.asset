@@ -1,0 +1,274 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3c165ade31059455180e33d62d15d1fa, type: 3}
+  m_Name: UR5e
+  m_EditorClassIdentifier: Erupt.Robot::Erupt.Robot.RobotProfile
+  displayName: Universal Robots UR5e
+  baseLink: base_link
+  endEffectorLink: tool0
+  planningFrame: world
+  armGroup: ur_manipulator
+  gripperGroup: gripper
+  endEffectorName: gripper
+  joints:
+  - name: shoulder_pan_joint
+    childLink: shoulder_link
+    kind: 0
+    role: 0
+    urdfLower: -6.2831855
+    urdfUpper: 6.2831855
+    overrideLimits: 0
+    lower: 0
+    upper: 0
+    maxVelocity: 3.1415927
+    mimic:
+      leader: 
+      multiplier: 1
+      offset: 0
+  - name: shoulder_lift_joint
+    childLink: upper_arm_link
+    kind: 0
+    role: 0
+    urdfLower: -6.2831855
+    urdfUpper: 6.2831855
+    overrideLimits: 0
+    lower: 0
+    upper: 0
+    maxVelocity: 3.1415927
+    mimic:
+      leader: 
+      multiplier: 1
+      offset: 0
+  - name: elbow_joint
+    childLink: forearm_link
+    kind: 0
+    role: 0
+    urdfLower: -3.1415927
+    urdfUpper: 3.1415927
+    overrideLimits: 0
+    lower: 0
+    upper: 0
+    maxVelocity: 3.1415927
+    mimic:
+      leader: 
+      multiplier: 1
+      offset: 0
+  - name: wrist_1_joint
+    childLink: wrist_1_link
+    kind: 0
+    role: 0
+    urdfLower: -6.2831855
+    urdfUpper: 6.2831855
+    overrideLimits: 0
+    lower: 0
+    upper: 0
+    maxVelocity: 3.1415927
+    mimic:
+      leader: 
+      multiplier: 1
+      offset: 0
+  - name: wrist_2_joint
+    childLink: wrist_2_link
+    kind: 0
+    role: 0
+    urdfLower: -6.2831855
+    urdfUpper: 6.2831855
+    overrideLimits: 0
+    lower: 0
+    upper: 0
+    maxVelocity: 3.1415927
+    mimic:
+      leader: 
+      multiplier: 1
+      offset: 0
+  - name: wrist_3_joint
+    childLink: wrist_3_link
+    kind: 0
+    role: 0
+    urdfLower: -6.2831855
+    urdfUpper: 6.2831855
+    overrideLimits: 0
+    lower: 0
+    upper: 0
+    maxVelocity: 3.1415927
+    mimic:
+      leader: 
+      multiplier: 1
+      offset: 0
+  - name: robotiq_85_left_knuckle_joint
+    childLink: robotiq_85_left_knuckle_link
+    kind: 0
+    role: 1
+    urdfLower: 0
+    urdfUpper: 0.8
+    overrideLimits: 0
+    lower: 0
+    upper: 0
+    maxVelocity: 0.5
+    mimic:
+      leader: 
+      multiplier: 1
+      offset: 0
+  - name: robotiq_85_right_knuckle_joint
+    childLink: robotiq_85_right_knuckle_link
+    kind: 0
+    role: 1
+    urdfLower: -0.8
+    urdfUpper: 0
+    overrideLimits: 0
+    lower: 0
+    upper: 0
+    maxVelocity: 0.5
+    mimic:
+      leader: robotiq_85_left_knuckle_joint
+      multiplier: -1
+      offset: 0
+  - name: robotiq_85_left_inner_knuckle_joint
+    childLink: robotiq_85_left_inner_knuckle_link
+    kind: 0
+    role: 1
+    urdfLower: 0
+    urdfUpper: 0.8
+    overrideLimits: 0
+    lower: 0
+    upper: 0
+    maxVelocity: 0.5
+    mimic:
+      leader: robotiq_85_left_knuckle_joint
+      multiplier: 1
+      offset: 0
+  - name: robotiq_85_right_inner_knuckle_joint
+    childLink: robotiq_85_right_inner_knuckle_link
+    kind: 0
+    role: 1
+    urdfLower: -0.8
+    urdfUpper: 0
+    overrideLimits: 0
+    lower: 0
+    upper: 0
+    maxVelocity: 0.5
+    mimic:
+      leader: robotiq_85_left_knuckle_joint
+      multiplier: -1
+      offset: 0
+  - name: robotiq_85_left_finger_tip_joint
+    childLink: robotiq_85_left_finger_tip_link
+    kind: 0
+    role: 1
+    urdfLower: -0.8
+    urdfUpper: 0
+    overrideLimits: 0
+    lower: 0
+    upper: 0
+    maxVelocity: 0.5
+    mimic:
+      leader: robotiq_85_left_knuckle_joint
+      multiplier: -1
+      offset: 0
+  - name: robotiq_85_right_finger_tip_joint
+    childLink: robotiq_85_right_finger_tip_link
+    kind: 0
+    role: 1
+    urdfLower: 0
+    urdfUpper: 0.8
+    overrideLimits: 0
+    lower: 0
+    upper: 0
+    maxVelocity: 0.5
+    mimic:
+      leader: robotiq_85_left_knuckle_joint
+      multiplier: 1
+      offset: 0
+  limitMarginRadians: 0
+  limitMarginMetres: 0
+  limitUserVelocity: 0
+  poses:
+  - name: home
+    joints:
+    - joint: elbow_joint
+      value: 0
+    - joint: shoulder_lift_joint
+      value: -1.5707
+    - joint: shoulder_pan_joint
+      value: 0
+    - joint: wrist_1_joint
+      value: 0
+    - joint: wrist_2_joint
+      value: 0
+    - joint: wrist_3_joint
+      value: 0
+  - name: up
+    joints:
+    - joint: elbow_joint
+      value: 0
+    - joint: shoulder_lift_joint
+      value: -1.5707
+    - joint: shoulder_pan_joint
+      value: 0
+    - joint: wrist_1_joint
+      value: -1.5707
+    - joint: wrist_2_joint
+      value: 0
+    - joint: wrist_3_joint
+      value: 0
+  - name: test_configuration
+    joints:
+    - joint: elbow_joint
+      value: 1.4
+    - joint: shoulder_lift_joint
+      value: -1.62
+    - joint: shoulder_pan_joint
+      value: 1.54
+    - joint: wrist_1_joint
+      value: -1.2
+    - joint: wrist_2_joint
+      value: -1.6
+    - joint: wrist_3_joint
+      value: -0.11
+  - name: ready
+    joints:
+    - joint: shoulder_pan_joint
+      value: 0
+    - joint: shoulder_lift_joint
+      value: -1.5708
+    - joint: elbow_joint
+      value: 1.5708
+    - joint: wrist_1_joint
+      value: -1.5708
+    - joint: wrist_2_joint
+      value: -1.5708
+    - joint: wrist_3_joint
+      value: 0
+  - name: open
+    joints:
+    - joint: robotiq_85_left_knuckle_joint
+      value: 0
+  - name: close
+    joints:
+    - joint: robotiq_85_left_knuckle_joint
+      value: 0.79
+  initialPose: ready
+  gripper:
+    kind: 2
+    driverJoint: robotiq_85_left_knuckle_joint
+    open: 0
+    closed: 0.79
+    openWidthMetres: 0.08369815
+    speed: 0.1
+  rosRobotName: ur5e
+  jointStatesTopic: joint_states
+  trajectoryCommandTopic: joint_trajectory_controller/joint_trajectory
+  names:
+    localPrefix: 
+    rosPrefix: 
+    pairs: []
+  ghostPrefab: {fileID: 7536971940016671646, guid: 4112a51ff17d54ceab6668202b7980c7, type: 3}

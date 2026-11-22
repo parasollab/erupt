@@ -1,0 +1,7 @@
+# API reference covers the ERUPT namespaces only (generated ROS message bindings are excluded
+# in docfx.json).
+apiRules:
+  - include:
+      uidRegex: ^Erupt
+  - exclude:
+      uidRegex: .*

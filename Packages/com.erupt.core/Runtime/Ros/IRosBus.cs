@@ -6,7 +6,7 @@ namespace Erupt.Ros
 {
     /// <summary>
     /// The ROS transport, behind a seam. Exists so scenes can run headless in tests
-    /// without a live TCP endpoint — see refactor/backlog.md B16.
+    /// without a live TCP endpoint.
     /// </summary>
     /// <remarks>
     /// Mirrors the subset of ROSConnection that ERUPT actually uses. RegisterPublisher
@@ -17,11 +17,23 @@ namespace Erupt.Ros
     {
         bool HasConnectionThread { get; }
 
+        /// <summary>
+        /// True while the connector is in its error/backoff state (no endpoint reachable).
+        /// </summary>
+        bool HasConnectionError { get; }
+
         void Subscribe<T>(string topic, Action<T> callback) where T : Message;
 
         void Unsubscribe<T>(string topic, Action<T> callback) where T : Message;
 
         void RegisterPublisher<T>(string topic) where T : Message;
+
+        /// <summary>
+        /// Registers with an explicit outgoing queue size. The connector keeps the first
+        /// registration's size for a topic, so every registrant of a shared topic must pass
+        /// the same value.
+        /// </summary>
+        void RegisterPublisher<T>(string topic, int queueSize) where T : Message;
 
         void RegisterRosService<TRequest, TResponse>(string serviceName)
             where TRequest : Message where TResponse : Message;

@@ -1,3 +1,4 @@
+using System;
 using Erupt.Environment;
 using Erupt.Interaction;
 using Erupt.Robot;
@@ -12,11 +13,17 @@ namespace Erupt.Plugins
     /// </summary>
     public interface IEruptContext
     {
+        /// <summary>The transport for names that belong to no robot; a robot's own traffic goes through <see cref="RobotInstance.Ros"/>.</summary>
         IRosBus Ros { get; }
-        IRobotModel Robot { get; }
+        /// <summary>
+        /// The robots in the scene, any number of them. A plugin serves all of them (see
+        /// <see cref="RobotSessions{T}"/>) and acts on the one a selection belongs to
+        /// (<see cref="IRobotRegistry.OwnerOf"/>); <see cref="IRobotRegistry.Active"/> is the
+        /// one the user last selected.
+        /// </summary>
+        IRobotRegistry Robots { get; }
         EnvironmentRegistry Environment { get; }
         SelectionService Selection { get; }
-        ModeManager Modes { get; }
         UndoStack Undo { get; }
         InteractionRouter Router { get; }
         /// <summary>Null when the scene has no tier UI; plugins must then skip UI contributions.</summary>
@@ -27,10 +34,9 @@ namespace Erupt.Plugins
     public sealed class EruptContext : IEruptContext
     {
         public IRosBus Ros { get; set; }
-        public IRobotModel Robot { get; set; }
+        public IRobotRegistry Robots { get; set; }
         public EnvironmentRegistry Environment { get; set; }
         public SelectionService Selection { get; set; }
-        public ModeManager Modes { get; set; }
         public UndoStack Undo { get; set; }
         public InteractionRouter Router { get; set; }
         public IUiHost Ui { get; set; }

@@ -1,0 +1,284 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3c165ade31059455180e33d62d15d1fa, type: 3}
+  m_Name: xArm7
+  m_EditorClassIdentifier: Erupt.Robot::Erupt.Robot.RobotProfile
+  displayName: UFactory xArm7
+  baseLink: link_base
+  endEffectorLink: link_tcp
+  planningFrame: world
+  armGroup: xarm7
+  gripperGroup: xarm_gripper
+  endEffectorName: xarm_gripper
+  joints:
+  - name: joint1
+    childLink: link1
+    kind: 0
+    role: 0
+    urdfLower: -6.2831855
+    urdfUpper: 6.2831855
+    overrideLimits: 0
+    lower: 0
+    upper: 0
+    maxVelocity: 3.14
+    mimic:
+      leader: 
+      multiplier: 1
+      offset: 0
+  - name: joint2
+    childLink: link2
+    kind: 0
+    role: 0
+    urdfLower: -2.059
+    urdfUpper: 2.0944
+    overrideLimits: 0
+    lower: 0
+    upper: 0
+    maxVelocity: 3.14
+    mimic:
+      leader: 
+      multiplier: 1
+      offset: 0
+  - name: joint3
+    childLink: link3
+    kind: 0
+    role: 0
+    urdfLower: -6.2831855
+    urdfUpper: 6.2831855
+    overrideLimits: 0
+    lower: 0
+    upper: 0
+    maxVelocity: 3.14
+    mimic:
+      leader: 
+      multiplier: 1
+      offset: 0
+  - name: joint4
+    childLink: link4
+    kind: 0
+    role: 0
+    urdfLower: -0.19198
+    urdfUpper: 3.927
+    overrideLimits: 0
+    lower: 0
+    upper: 0
+    maxVelocity: 3.14
+    mimic:
+      leader: 
+      multiplier: 1
+      offset: 0
+  - name: joint5
+    childLink: link5
+    kind: 0
+    role: 0
+    urdfLower: -6.2831855
+    urdfUpper: 6.2831855
+    overrideLimits: 0
+    lower: 0
+    upper: 0
+    maxVelocity: 3.14
+    mimic:
+      leader: 
+      multiplier: 1
+      offset: 0
+  - name: joint6
+    childLink: link6
+    kind: 0
+    role: 0
+    urdfLower: -1.69297
+    urdfUpper: 3.1415927
+    overrideLimits: 0
+    lower: 0
+    upper: 0
+    maxVelocity: 3.14
+    mimic:
+      leader: 
+      multiplier: 1
+      offset: 0
+  - name: joint7
+    childLink: link7
+    kind: 0
+    role: 0
+    urdfLower: -6.2831855
+    urdfUpper: 6.2831855
+    overrideLimits: 0
+    lower: 0
+    upper: 0
+    maxVelocity: 3.14
+    mimic:
+      leader: 
+      multiplier: 1
+      offset: 0
+  - name: drive_joint
+    childLink: left_outer_knuckle
+    kind: 0
+    role: 1
+    urdfLower: 0
+    urdfUpper: 0.85
+    overrideLimits: 0
+    lower: 0
+    upper: 0
+    maxVelocity: 2
+    mimic:
+      leader: 
+      multiplier: 1
+      offset: 0
+  - name: left_finger_joint
+    childLink: left_finger
+    kind: 0
+    role: 1
+    urdfLower: 0
+    urdfUpper: 0.85
+    overrideLimits: 0
+    lower: 0
+    upper: 0
+    maxVelocity: 2
+    mimic:
+      leader: drive_joint
+      multiplier: 1
+      offset: 0
+  - name: left_inner_knuckle_joint
+    childLink: left_inner_knuckle
+    kind: 0
+    role: 1
+    urdfLower: 0
+    urdfUpper: 0.85
+    overrideLimits: 0
+    lower: 0
+    upper: 0
+    maxVelocity: 2
+    mimic:
+      leader: drive_joint
+      multiplier: 1
+      offset: 0
+  - name: right_outer_knuckle_joint
+    childLink: right_outer_knuckle
+    kind: 0
+    role: 1
+    urdfLower: 0
+    urdfUpper: 0.85
+    overrideLimits: 0
+    lower: 0
+    upper: 0
+    maxVelocity: 2
+    mimic:
+      leader: drive_joint
+      multiplier: 1
+      offset: 0
+  - name: right_finger_joint
+    childLink: right_finger
+    kind: 0
+    role: 1
+    urdfLower: 0
+    urdfUpper: 0.85
+    overrideLimits: 0
+    lower: 0
+    upper: 0
+    maxVelocity: 2
+    mimic:
+      leader: drive_joint
+      multiplier: 1
+      offset: 0
+  - name: right_inner_knuckle_joint
+    childLink: right_inner_knuckle
+    kind: 0
+    role: 1
+    urdfLower: 0
+    urdfUpper: 0.85
+    overrideLimits: 0
+    lower: 0
+    upper: 0
+    maxVelocity: 2
+    mimic:
+      leader: drive_joint
+      multiplier: 1
+      offset: 0
+  limitMarginRadians: 0
+  limitMarginMetres: 0
+  limitUserVelocity: 0
+  poses:
+  - name: home
+    joints:
+    - joint: joint1
+      value: 0
+    - joint: joint2
+      value: 0
+    - joint: joint3
+      value: 0
+    - joint: joint4
+      value: 0
+    - joint: joint5
+      value: 0
+    - joint: joint6
+      value: 0
+    - joint: joint7
+      value: 0
+  - name: hold-up
+    joints:
+    - joint: joint1
+      value: 0
+    - joint: joint2
+      value: 0
+    - joint: joint3
+      value: 0
+    - joint: joint4
+      value: 0
+    - joint: joint5
+      value: 0
+    - joint: joint6
+      value: -1.5708
+    - joint: joint7
+      value: 0
+  - name: ready
+    joints:
+    - joint: joint1
+      value: 0
+    - joint: joint2
+      value: -0.4
+    - joint: joint3
+      value: 0
+    - joint: joint4
+      value: 0.9
+    - joint: joint5
+      value: 0
+    - joint: joint6
+      value: 1.3
+    - joint: joint7
+      value: 0
+  - name: open
+    joints:
+    - joint: drive_joint
+      value: 0
+  - name: close
+    joints:
+    - joint: drive_joint
+      value: 0.85
+  - name: closed
+    joints:
+    - joint: drive_joint
+      value: 0.84
+  initialPose: ready
+  gripper:
+    kind: 2
+    driverJoint: drive_joint
+    open: 0
+    closed: 0.84
+    openWidthMetres: 0.08619496
+    speed: 0.1
+  rosRobotName: xarm7
+  jointStatesTopic: joint_states
+  trajectoryCommandTopic: xarm7_traj_controller/joint_trajectory
+  names:
+    localPrefix: 
+    rosPrefix: 
+    pairs: []
+  ghostPrefab: {fileID: 257611143658273252, guid: 24d6177a5e75745418a3c283a6c89038, type: 3}

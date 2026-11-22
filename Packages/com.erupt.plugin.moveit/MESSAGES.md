@@ -7,6 +7,15 @@
 |---|---|---|
 | `moveit_msgs` (msg + srv) | 100 | erupt_ws commit `f356be6` (ROS 2 host install of moveit_msgs) |
 
+The bindings must match the `moveit_msgs` the ROS host runs (ROS 2 Jazzy binaries, 2.6.0):
+the endpoint decodes what Unity sends with the host's definitions. `MotionPlanRequestMsg` was
+generated from a fork with a trailing `smoothness_level` field that upstream does not have; it
+was removed by hand. `Assets/Erupt.App/Tests/Live` checks the wire against a real stack.
+
+`Runtime/Messages/Moveit/action/ExecuteTrajectory{Goal,Result,Feedback}.cs` were written by
+hand in the generator's layout (`moveit_msgs/action/ExecuteTrajectory`, 2.6.0); the plugin sends
+gripper commands through that action.
+
 Regenerating: set the browser's output path to `Packages/com.erupt.plugin.moveit/Runtime/Messages`
 before generating, so the files land in this assembly. `Assets/msgbrowser_settings.asset` is a
 machine-local setting and is not the source of truth.

@@ -1,13 +1,12 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.XR.Interaction.Toolkit.Inputs.Haptics;
 using Erupt.Interaction;
 
 namespace Erupt.Interaction.Backends
 {
     /// <summary>
-    /// OpenXR controller backend. Ports the behavior that
-    /// Quest3ControllerRayInteractor read straight from the XR device layer:
-    /// trigger selects, grip drags, thumbstick Y jogs.
+    /// OpenXR controller backend: trigger selects, grip drags, thumbstick Y jogs.
     /// </summary>
     /// <remarks>
     /// This is the only class in the migrated path that touches input actions. It applies
@@ -15,7 +14,7 @@ namespace Erupt.Interaction.Backends
     /// the Controller profile carries the 0.18 deadzone the old script applied inline so
     /// the feel is unchanged.
     /// </remarks>
-    public class XriControllerBackend : InteractionSourceBehaviour
+    public class XriControllerBackend : InteractionSourceBehaviour, IHapticOutput
     {
         [Header("Identity")]
         [Tooltip("Stable id carried on every sample. Use \"left\" or \"right\".")]
@@ -31,6 +30,15 @@ namespace Erupt.Interaction.Backends
         [SerializeField] private InputActionProperty axisAction;
         [SerializeField] private InputActionProperty activateAction;
 
+        [Header("Haptics")]
+        [Tooltip("This controller's haptic output. Empty = the \"Haptic Device\" action of the map the select action's map " +
+                 "extends (\"XRI Right Interaction\" -> \"XRI Right\"), which is how the XRI default input actions are laid out.")]
+        [SerializeField] private InputActionProperty hapticAction;
+
+        private HapticControlActionManager hapticManager;
+        private InputAction resolvedHapticAction;
+        private bool hapticActionResolved;
+
         private bool wasSelectPressed;
         private bool wasGripPressed;
         private bool isDragging;
@@ -43,6 +51,46 @@ namespace Erupt.Interaction.Backends
         public override InteractionSample Current => BuildSample();
 
         private Transform Origin => rayOrigin != null ? rayOrigin : transform;
+
+        /// <summary>The id on every sample this controller emits ("left" or "right").</summary>
+        public string SourceId => sourceId;
+
+        private void Awake()
+        {
+            // A refusal caused by this controller is answered on this controller.
+            if (GetComponent<RefusalHaptics>() == null) gameObject.AddComponent<RefusalHaptics>();
+        }
+
+        /// <summary>Pulse this controller. Does nothing when it has no haptic action.</summary>
+        public void SendHapticImpulse(float amplitude, float seconds)
+        {
+            InputAction action = HapticAction();
+            if (action == null) return;
+            hapticManager ??= new HapticControlActionManager();
+            hapticManager.GetChannelGroup(action)?.GetChannel()?.SendHapticImpulse(amplitude, seconds);
+        }
+
+        private InputAction HapticAction()
+        {
+            if (hapticActionResolved) return resolvedHapticAction;
+            hapticActionResolved = true;
+
+            if (hapticAction.reference != null || (hapticAction.action != null && hapticAction.action.bindings.Count > 0))
+                return resolvedHapticAction = hapticAction.action;
+
+            // The XRI default actions keep a controller's haptic output in the map its
+            // interaction map is named after: "XRI Right Interaction" next to "XRI Right".
+            InputActionMap map = selectAction.action?.actionMap;
+            InputActionAsset asset = map?.asset;
+            if (asset == null) return null;
+            foreach (InputActionMap candidate in asset.actionMaps)
+            {
+                if (candidate == map || !map.name.StartsWith(candidate.name, System.StringComparison.Ordinal)) continue;
+                InputAction found = candidate.FindAction("Haptic Device") ?? candidate.FindAction("Haptic");
+                if (found != null) return resolvedHapticAction = found;
+            }
+            return null;
+        }
 
         private void OnEnable()
         {

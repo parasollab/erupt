@@ -22,6 +22,12 @@ namespace LudicWorlds
         private Queue<string> _queuedMessages;
 
         private const int MAX_LINES = 500;
+        // A UI Text builds four vertices per character and a mesh holds 65000: past about 16000
+        // characters the canvas rebuild throws, on every rebuild, and each exception is a new
+        // log line that asks for the next rebuild. Long lines (a chatty ROS session has many)
+        // reach that long before MAX_LINES does.
+        private const int MAX_CHARS = 12000;
+        private const int MAX_MESSAGE_CHARS = 400;
 
         private bool _billboardEnabled = true;
         private Transform _cameraTransform;
@@ -131,6 +137,8 @@ namespace LudicWorlds
 
         void OnMessageReceived(string message, string stackTrace, LogType type)
         {
+            if (message != null && message.Length > MAX_MESSAGE_CHARS)
+                message = message.Substring(0, MAX_MESSAGE_CHARS) + "...";
             _queuedMessages.Enqueue(message);
         }
 
@@ -217,6 +225,12 @@ namespace LudicWorlds
             string[] lines = _debugText.text.Split('\n');
             if (lines.Length > MAX_LINES)
                 _debugText.text = string.Join("\n", lines, lines.Length - MAX_LINES, MAX_LINES);
+
+            // Oldest lines go first until the text fits a mesh.
+            string text = _debugText.text;
+            if (text.Length <= MAX_CHARS) return;
+            int cut = text.IndexOf('\n', text.Length - MAX_CHARS);
+            _debugText.text = cut >= 0 ? text.Substring(cut + 1) : text.Substring(text.Length - MAX_CHARS);
         }
     }
 }

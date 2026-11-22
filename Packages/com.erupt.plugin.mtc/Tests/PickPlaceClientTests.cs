@@ -5,13 +5,14 @@ using NUnit.Framework;
 using RosMessageTypes.Geometry;
 using RosMessageTypes.Moveit;
 using RosMessageTypes.MoveitTaskConstructorMsgs;
-using RosMessageTypes.StudyInterfaces;
+using RosMessageTypes.EruptInterfaces;
 using Unity.Robotics.ROSTCPConnector;
 using UnityEngine;
 using UnityEngine.TestTools;
 using Erupt.Ros;
-using GetSolutionRequest = RosMessageTypes.StudyInterfaces.GetSolutionRequest;
-using GetSolutionResponse = RosMessageTypes.StudyInterfaces.GetSolutionResponse;
+using Erupt.Plugins.Mtc;
+using GetSolutionRequest = RosMessageTypes.EruptInterfaces.GetSolutionRequest;
+using GetSolutionResponse = RosMessageTypes.EruptInterfaces.GetSolutionResponse;
 
 namespace Erupt.Ros.Tests
 {
@@ -40,6 +41,7 @@ namespace Erupt.Ros.Tests
             RosBus.Override(bus);
             clientObject = new GameObject("PickPlaceClient test");
             pickPlace = clientObject.AddComponent<PickPlaceClient>();
+            pickPlace.Initialise(bus.Root);
             yield return null;
             plan = bus.ActionClient<PickPlaceGoal, PickPlaceResult, PickPlaceFeedback>("/pick_place");
             execute = bus.ActionClient<ExecuteSolutionGoal, ExecuteSolutionResult, ExecuteSolutionFeedback>("/execute_solution");
@@ -60,10 +62,40 @@ namespace Erupt.Ros.Tests
             CollectionAssert.Contains(bus.RegisteredServices, "/get_solution");
             Assert.IsNotNull(plan);
             Assert.IsNotNull(execute);
-            Assert.AreEqual("study_interfaces/PickPlace", PickPlaceGoal.k_RosMessageName);
-            Assert.AreEqual("study_interfaces/ExecuteSolution", ExecuteSolutionGoal.k_RosMessageName);
-            Assert.AreEqual("study_interfaces/GetSolution", GetSolutionRequest.k_RosMessageName);
+            Assert.AreEqual("erupt_interfaces/PickPlace", PickPlaceGoal.k_RosMessageName);
+            Assert.AreEqual("erupt_interfaces/ExecuteSolution", ExecuteSolutionGoal.k_RosMessageName);
+            Assert.AreEqual("erupt_interfaces/GetSolution", GetSolutionRequest.k_RosMessageName);
             Assert.IsTrue(new PickPlaceGoal().execute, "execute defaults to true, matching the .action default");
+        }
+
+        // The static provider is overridden with the same fake in SetUp, so a client that
+        // read it would show up here as a second set of subscriptions.
+        [UnityTest]
+        public IEnumerator WithoutABus_TheClientIsIdle_AndConnectsWhenItIsGivenOne()
+        {
+            var lateObject = new GameObject("PickPlaceClient without a bus");
+            try
+            {
+                var late = lateObject.AddComponent<PickPlaceClient>();
+                bus.Clear();
+                yield return null; // Start, with no bus.
+
+                CollectionAssert.IsEmpty(bus.Subscriptions);
+                CollectionAssert.IsEmpty(bus.RegisteredServices);
+                Assert.IsFalse(late.Available);
+                Assert.IsFalse(late.ExecutionAvailable);
+
+                late.Initialise(bus.Root);
+
+                CollectionAssert.AreEquivalent(new[] { k_Description, k_Statistics }, bus.Subscriptions);
+                CollectionAssert.Contains(bus.RegisteredServices, "/get_solution");
+                Assert.IsTrue(late.Available);
+                Assert.IsTrue(late.ExecutionAvailable);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(lateObject);
+            }
         }
 
         [UnityTest]
@@ -393,6 +425,56 @@ namespace Erupt.Ros.Tests
                 return respond(r.solution_id);
             });
             return requests;
+        }
+
+        // --- forgetting a task, place height ----------------------------------------------
+
+        [UnityTest]
+        public IEnumerator ForgetTask_DropsTheSolutionsWhenIdle_AndIsRefusedWhileAGoalRuns()
+        {
+            yield return PlanWithSolutions(7, 4);
+            int resets = 0;
+            pickPlace.OnTaskReset += () => resets++;
+
+            Assert.IsTrue(pickPlace.ForgetTask());
+            Assert.AreEqual(1, resets);
+            Assert.IsEmpty(pickPlace.SolutionIds);
+            Assert.IsNull(pickPlace.TaskId);
+            Assert.IsNull(pickPlace.Description);
+            Assert.AreEqual(PickPlacePhase.Idle, pickPlace.Phase);
+
+            Task goal = pickPlace.PlanAsync("object", Pose(0.6, -0.15, 0.0));
+            Assert.AreEqual(2, resets, "the new plan resets the task itself");
+            Assert.IsFalse(pickPlace.ForgetTask(), "a running goal is not forgotten");
+            Assert.AreEqual(2, resets);
+            var accepted = plan.Accept();
+            yield return null;
+            plan.Feedback(new PickPlaceFeedback(k_Task, "planning", 1, 1f));
+            bus.Inbound(k_Statistics, Statistics(k_TopicTask, 9));
+            accepted.Complete(RosActionGoalStatus.Succeeded, PlanResult(true, ""));
+            yield return WaitFor(goal);
+            CollectionAssert.AreEqual(new uint[] { 9 }, pickPlace.SolutionIds);
+        }
+
+        [Test]
+        public void PlacePose_AddsTheConfiguredHeightOffsetToRosZ()
+        {
+            var position = new PointMsg(0.6, -0.15, 0.3);
+            var orientation = new QuaternionMsg(0, 0, 0, 1);
+
+            PoseStampedMsg asGiven = pickPlace.PlacePose(position, orientation);
+            Assert.AreEqual(0.3, asGiven.pose.position.z, 1e-9, "no offset by default");
+
+            typeof(PickPlaceClient).GetField("placeHeightOffsetMeters",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).SetValue(pickPlace, -0.125f);
+            PoseStampedMsg lowered = pickPlace.PlacePose(position, orientation);
+
+            Assert.AreEqual(0.175, lowered.pose.position.z, 1e-9);
+            Assert.AreEqual(0.6, lowered.pose.position.x, 1e-9);
+            Assert.AreEqual(-0.15, lowered.pose.position.y, 1e-9);
+            Assert.AreSame(orientation, lowered.pose.orientation);
+            Assert.AreEqual("world", lowered.header.frame_id);
+            Assert.AreEqual(0.3, position.z, 1e-9, "the caller's point is not modified");
         }
 
         // --- helpers ---------------------------------------------------------------------

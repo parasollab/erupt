@@ -8,6 +8,7 @@
         "Erupt.Interaction.Core",
         "Erupt.Ui",
         "Erupt.Ros",
+        "Erupt.Robot",
         "Erupt.TestSupport",
         "Unity.Robotics.ROSTCPConnector",
         "Unity.Robotics.ROSTCPConnector.MessageGeneration",

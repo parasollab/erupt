@@ -36,11 +36,11 @@ namespace Erupt.Editor
         }
 
         public static readonly PluginTemplate Blank = new(PluginFamily.Blank,
-            "A plugin with the bare contract: register, unregister, react to modes.", "EruptPluginBehaviour");
+            "A plugin with the bare contract: register and unregister.", "EruptPluginBehaviour");
         public static readonly PluginTemplate Planning = new(PluginFamily.Planning,
             "A planner: set goal, plan, preview, execute; contributes the end-effector and trajectory verbs and a settings tab.", "PlanningPlugin");
         public static readonly PluginTemplate Demonstration = new(PluginFamily.Demonstration,
-            "Learning from demonstration: records interaction samples in Teach mode and publishes them.", "DemonstrationPlugin");
+            "Learning from demonstration: records interaction samples while a demonstration is recorded and publishes them.", "DemonstrationPlugin");
 
         public static IReadOnlyList<PluginTemplate> All { get; } = new[] { Blank, Planning, Demonstration };
 

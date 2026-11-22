@@ -164,6 +164,100 @@ namespace Erupt.Interaction.Tests
         }
 
         [Test]
+        public void Refusal_CarriesItsCodeSubjectAndSource()
+        {
+            InteractionRefusal seen = InteractionRefusal.None;
+            router.Refused += r => seen = r;
+            target = new GameObject("link");
+
+            bool raised = router.ReportRefusal(InteractionRefusal
+                .Refuse(RefusalCode.JointLimit, "j1 is at its upper limit.", Vector3.one, target.transform)
+                .From("left"));
+
+            Assert.IsTrue(raised);
+            Assert.AreEqual(RefusalCode.JointLimit, seen.Code);
+            Assert.AreSame(target.transform, seen.Subject);
+            Assert.AreEqual("left", seen.SourceId);
+
+            Assert.AreEqual(RefusalCode.Unspecified, InteractionRefusal.Refuse("plain", Vector3.zero).Code);
+            Assert.AreEqual(RefusalCode.None, InteractionRefusal.None.Code);
+            Assert.IsNull(InteractionRefusal.Refuse("plain", Vector3.zero).Subject);
+        }
+
+        // A drag against a joint limit reports the same refusal on every frame.
+        [Test]
+        public void Refusals_WithTheSameCodeAndSubject_AreCoalesced()
+        {
+            int count = 0, onBus = 0;
+            router.Refused += _ => count++;
+            InteractionSampleBus.Refusal += _ => onBus++;
+            target = new GameObject("link");
+
+            for (int frame = 0; frame < 30; frame++)
+                router.ReportRefusal(InteractionRefusal.Refuse(
+                    RefusalCode.OutOfReach, $"Target is out of reach by {frame} cm.", Vector3.zero, target.transform));
+
+            Assert.AreEqual(1, count, "Thirty frames of the same refusal are one refusal, whatever the wording.");
+            Assert.AreEqual(1, onBus);
+        }
+
+        [Test]
+        public void Refusals_WithAnotherCodeOrSubject_AreNotCoalesced()
+        {
+            var seen = new List<InteractionRefusal>();
+            router.Refused += seen.Add;
+            target = new GameObject("link");
+            var other = new GameObject("other link");
+            try
+            {
+                router.ReportRefusal(InteractionRefusal.Refuse(RefusalCode.JointLimit, "a", Vector3.zero, target.transform));
+                router.ReportRefusal(InteractionRefusal.Refuse(RefusalCode.JointLimit, "b", Vector3.zero, other.transform));
+                router.ReportRefusal(InteractionRefusal.Refuse(RefusalCode.OutOfReach, "c", Vector3.zero, target.transform));
+                router.ReportRefusal(InteractionRefusal.Refuse(RefusalCode.JointLimit, "d", Vector3.zero));
+                router.ReportRefusal(InteractionRefusal.Refuse(RefusalCode.JointLimit, "a again", Vector3.zero, target.transform));
+
+                CollectionAssert.AreEqual(new[] { "a", "b", "c", "d" }, seen.ConvertAll(r => r.Reason));
+            }
+            finally
+            {
+                Object.DestroyImmediate(other);
+            }
+        }
+
+        [Test]
+        public void Refusals_WithoutACode_AreToldApartByTheirText()
+        {
+            int count = 0;
+            router.Refused += _ => count++;
+
+            router.ReportRefusal(InteractionRefusal.Refuse("Nothing is selected.", Vector3.zero));
+            router.ReportRefusal(InteractionRefusal.Refuse("MoveIt is not connected.", Vector3.zero));
+            router.ReportRefusal(InteractionRefusal.Refuse("Nothing is selected.", Vector3.zero));
+
+            Assert.AreEqual(2, count);
+        }
+
+        [UnityEngine.TestTools.UnityTest]
+        public System.Collections.IEnumerator ARefusal_IsRaisedAgain_OnceTheWindowHasPassed()
+        {
+            int count = 0;
+            router.Refused += _ => count++;
+            router.RefusalCoalesceSeconds = 0.1f;
+            InteractionRefusal refusal = InteractionRefusal.Refuse(RefusalCode.JointLimit, "j1 is at its upper limit.", Vector3.zero);
+
+            Assert.IsTrue(router.ReportRefusal(refusal));
+            Assert.IsFalse(router.ReportRefusal(refusal), "Inside the window.");
+            yield return new WaitForSecondsRealtime(0.25f);
+            Assert.IsTrue(router.ReportRefusal(refusal), "The joint is still at its limit half a second later: say so again.");
+            Assert.AreEqual(2, count);
+
+            router.RefusalCoalesceSeconds = 0f;
+            router.ReportRefusal(refusal);
+            router.ReportRefusal(refusal);
+            Assert.AreEqual(4, count, "A window of zero turns coalescing off.");
+        }
+
+        [Test]
         public void AnySourceHas_ReportsCapabilityNotPlatform()
         {
             Assert.IsTrue(router.AnySourceHas(Capability.Ray));

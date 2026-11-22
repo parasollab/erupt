@@ -3,9 +3,8 @@ using UnityEngine;
 namespace Erupt.Interaction
 {
     /// <summary>
-    /// Draws a pointer ray for one source. Ported from the LineRenderer half of
-    /// Quest3ControllerRayInteractor so the visual survives while the input reads behind
-    /// it move into a backend. Hit-testing is asked of the router, not repeated here.
+    /// Draws a pointer ray for one source. Only the visual lives here: the input is read by a
+    /// backend, and hit-testing is asked of the router, not repeated.
     /// </summary>
     [RequireComponent(typeof(LineRenderer))]
     public class InteractionRayVisual : MonoBehaviour
@@ -13,7 +12,7 @@ namespace Erupt.Interaction
         [SerializeField] private InteractionRouter router;
         [SerializeField] private InteractionSourceBehaviour source;
 
-        [Tooltip("Hidden when the source lacks Capability.Ray — e.g. a gaze-pinch backend.")]
+        [Tooltip("Hidden when the source lacks Capability.Ray.")]
         [SerializeField] private bool requireRayCapability = true;
 
         [SerializeField] private Color idleRayColor = new Color(0.05f, 0.75f, 1f, 0.85f);
@@ -51,7 +50,7 @@ namespace Erupt.Interaction
                 return;
             }
 
-            // Capability, not platform — a gaze backend reports no ray and draws nothing.
+            // Capability, not device — a source that reports no ray draws nothing.
             bool visible = source.IsActive && (!requireRayCapability || source.Has(Capability.Ray));
             lineRenderer.enabled = visible;
             if (!visible) return;

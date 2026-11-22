@@ -1,0 +1,43 @@
+{
+  "robot": "kinova_gen3",
+  "planning_frame": "world",
+  "arm_group": "manipulator",
+  "arm_joints": [
+    "joint_1",
+    "joint_2",
+    "joint_3",
+    "joint_4",
+    "joint_5",
+    "joint_6",
+    "joint_7"
+  ],
+  "joint_states_topic": "joint_states",
+  "trajectory_command_topic": "joint_trajectory_controller/joint_trajectory",
+  "named_poses": {
+    "gripper": [
+      "Open",
+      "Close",
+      "open",
+      "close"
+    ],
+    "manipulator": [
+      "Home",
+      "Retract",
+      "Vertical",
+      "ready"
+    ]
+  },
+  "base_link": "base_link",
+  "gripper_controller": {
+    "name": "robotiq_gripper_controller",
+    "type": "position_controllers/GripperActionController",
+    "joints": [
+      "robotiq_85_left_knuckle_joint"
+    ]
+  },
+  "gripper_group": "gripper",
+  "end_effector_link": "end_effector_link",
+  "initial_pose": "ready",
+  "gripper_open_pose": "open",
+  "gripper_closed_pose": "close"
+}

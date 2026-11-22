@@ -29,6 +29,9 @@ namespace Erupt.Ui
         /// <summary>Add a tier 3 tab and build its content.</summary>
         PanelTab AddTab(string id, string label, Action<RectTransform> build);
 
+        /// <summary>Take a tier 3 tab away again (a plugin does when it is unregistered). False when there is no such tab.</summary>
+        bool RemoveTab(string id);
+
         void SummonTab(string id);
 
         void RegisterWidget(IWorldWidget widget);

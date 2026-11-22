@@ -4,6 +4,8 @@ using UnityEngine;
 using Erupt.Interaction;
 using Erupt.Plugins;
 using Erupt.Plugins.Tests;
+using Erupt.Robot;
+using Erupt.Robot.Tests;
 using Erupt.Ros.Tests;
 
 namespace {{Namespace}}.Tests
@@ -22,10 +24,44 @@ namespace {{Namespace}}.Tests
 
             Assert.IsTrue(plugin.IsRegistered);
             Assert.Contains("demos-{{PluginId}}", ui.Tabs.ToList());
-            Assert.IsFalse(plugin.IsRecording, "Recording waits for Teach mode.");
+            Assert.IsFalse(plugin.IsRecording, "Recording waits for the user to start it.");
 
             ((IEruptPlugin)plugin).OnUnregister(context);
             Object.DestroyImmediate(go);
+        }
+
+        // A scene may hold any number of robots. Three fake ones (left, right, third), each in
+        // its own namespace on one fake bus: one plugin, one tab, one session per robot.
+        [Test]
+        public void WithThreeRobots_ThereIsOneSessionPerRobot_AndOneTab()
+        {
+            var bus = new FakeRosBus();
+            RobotRegistry robots = FakeRobots.Three(bus);
+            var go = new GameObject("{{PluginName}}");
+            var plugin = go.AddComponent<{{PluginName}}Plugin>();
+            var ui = new FakeUiHost();
+            var context = new EruptContext { Ros = bus, Robots = robots, Ui = ui, Undo = new UndoStack() };
+            try
+            {
+                ((IEruptPlugin)plugin).OnRegister(context);
+
+                Assert.AreEqual(3, plugin.Sessions.Count);
+                CollectionAssert.AreEqual(FakeRobots.ThreeIds, plugin.Sessions.Select(s => s.Robot.Id));
+                Assert.AreEqual(1, ui.Tabs.Count(t => t == "demos-{{PluginId}}"));
+                Assert.AreEqual("{{DisplayName}} · left", ui.TabsById["demos-{{PluginId}}"].Label,
+                    "With several robots the tab names the active one.");
+
+                // TODO: assert that each robot's names go out under its own namespace, e.g.
+                //   CollectionAssert.Contains(bus.RegisteredServices, "/right/plan");
+                // and that a verb on a robot's end effector reaches that robot's session:
+                //   ui.Bound["set-goal"](FakeRobots.EndEffectorOf(robots.All[2]));
+            }
+            finally
+            {
+                ((IEruptPlugin)plugin).OnUnregister(context);
+                Object.DestroyImmediate(go);
+                FakeRobots.DestroyAll(robots);
+            }
         }
     }
 }

@@ -1,104 +1,49 @@
 using UnityEngine;
 using RosMessageTypes.Geometry;
 
-public static class RosUnityConversion
+namespace Erupt.Ros
 {
-    public static PointMsg UnityToRosPosition(Vector3 pos)
+    /// <summary>
+    /// The scene's ROS ↔ Unity convention: in a planning frame, ROS (x, y, z) is Unity (x, z, y)
+    /// (Unity's Y is up, ROS's z is up; x is shared).
+    /// </summary>
+    /// <remarks>
+    /// Swapping two axes mirrors space, so an orientation is not converted by swapping its
+    /// components alone: a rotation by θ about an axis becomes a rotation by −θ about the swapped
+    /// axis. For a quaternion (x, y, z, w) that is (−x, −z, −y, w), and the same formula goes
+    /// both ways. (This used to go through Euler angles and three rotation matrices, which gave
+    /// the same rotation but lost up to a few hundredths of a degree near a 90° pitch.)
+    /// Robot links are a different matter: the URDF importer lays them out in the connector's
+    /// FLU convention; see <c>AttachedObjectPlacement</c> in the MoveIt plugin for the bridge.
+    /// </remarks>
+    public static class RosUnityConversion
     {
-        return new PointMsg(pos.x, pos.z, pos.y); // Unity Y → ROS Z
-    }
+        public static PointMsg UnityToRosPosition(Vector3 pos)
+        {
+            return new PointMsg(pos.x, pos.z, pos.y); // Unity Y → ROS Z
+        }
 
-    public static QuaternionMsg UnityToRosQuaternion(Quaternion q)
-    {
-        // Get the Euler angles in degrees
-        Vector3 euler = q.eulerAngles;
-        var ax = euler.x;
-        var ay = euler.z;
-        var az = euler.y;
+        public static QuaternionMsg UnityToRosQuaternion(Quaternion q)
+        {
+            return new QuaternionMsg(-q.x, -q.z, -q.y, q.w);
+        }
 
-        // Make a rotation matrix from each axis
-        Matrix4x4 Rx = RotX(-ax);
-        Matrix4x4 Ry = RotY(-ay);
-        Matrix4x4 Rz = RotZ(-az);
+        // ROS → Unity Position
+        public static Vector3 RosToUnityPosition(PointMsg pos)
+        {
+            // Undo UnityToRosPosition: (x, z, y) → (x, y, z)
+            return new Vector3((float)pos.x, (float)pos.z, (float)pos.y);
+        }
 
-        // Combine the rotation matrices (note the order of multiplication)
-        Matrix4x4 R = Rz * Rx * Ry;
-
-        Quaternion converted = R.rotation;
-        return new QuaternionMsg(converted.x, converted.y, converted.z, converted.w);
-    }
-
-    // ROS → Unity Position
-    public static Vector3 RosToUnityPosition(PointMsg pos)
-    {
-      // Undo UnityToRosPosition: (x, z, y) → (x, y, z)
-      return new Vector3((float)pos.x, (float)pos.z, (float)pos.y);
-    }
-
-    // ROS → Unity Quaternion
-    public static Quaternion RosToUnityQuaternion(QuaternionMsg qMsg)
-    {
-        // First convert back to a Quaternion
-        Quaternion q = new Quaternion(
-            (float)qMsg.x,
-            (float)qMsg.y,
-            (float)qMsg.z,
-            (float)qMsg.w
-        );
-
-        // Get Euler angles from ROS quaternion
-        Vector3 euler = q.eulerAngles;
-
-        // Undo the axis swap done in UnityToRosQuaternion
-        var ax = euler.x;
-        var ay = euler.z;
-        var az = euler.y;
-
-        // Build rotation matrices
-        Matrix4x4 Rx = RotX(-ax);
-        Matrix4x4 Ry = RotY(-ay);
-        Matrix4x4 Rz = RotZ(-az);
-
-        Matrix4x4 R = Rz * Rx * Ry;
-
-        Quaternion converted = R.rotation;
-        return converted;
-    }
-
-    // Rotation helpers
-    private static Matrix4x4 RotX(float angleDeg)
-    {
-        float rad = angleDeg * Mathf.Deg2Rad;
-        float c = Mathf.Cos(rad), s = Mathf.Sin(rad);
-        return new Matrix4x4(
-            new Vector4(1, 0, 0, 0),
-            new Vector4(0, c, s, 0),
-            new Vector4(0, -s, c, 0),
-            new Vector4(0, 0, 0, 1)
-        );
-    }
-
-    private static Matrix4x4 RotY(float angleDeg)
-    {
-        float rad = angleDeg * Mathf.Deg2Rad;
-        float c = Mathf.Cos(rad), s = Mathf.Sin(rad);
-        return new Matrix4x4(
-            new Vector4(c, 0, -s, 0),
-            new Vector4(0, 1, 0, 0),
-            new Vector4(s, 0, c, 0),
-            new Vector4(0, 0, 0, 1)
-        );
-    }
-
-    private static Matrix4x4 RotZ(float angleDeg)
-    {
-        float rad = angleDeg * Mathf.Deg2Rad;
-        float c = Mathf.Cos(rad), s = Mathf.Sin(rad);
-        return new Matrix4x4(
-            new Vector4(c, s, 0, 0),
-            new Vector4(-s, c, 0, 0),
-            new Vector4(0, 0, 1, 0),
-            new Vector4(0, 0, 0, 1)
-        );
+        // ROS → Unity Quaternion
+        public static Quaternion RosToUnityQuaternion(QuaternionMsg qMsg)
+        {
+            // An all-zero quaternion is an unset orientation: identity.
+            if (qMsg == null || (qMsg.x == 0 && qMsg.y == 0 && qMsg.z == 0 && qMsg.w == 0)) return Quaternion.identity;
+            var q = new Quaternion(-(float)qMsg.x, -(float)qMsg.z, -(float)qMsg.y, (float)qMsg.w);
+            // ROS senders are not always exactly normalised; Unity wants unit quaternions.
+            float magnitude = Mathf.Sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w);
+            return magnitude > 1e-6f ? new Quaternion(q.x / magnitude, q.y / magnitude, q.z / magnitude, q.w / magnitude) : Quaternion.identity;
+        }
     }
 }

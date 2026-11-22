@@ -1,0 +1,46 @@
+{
+    "name": "Erupt.App.Desktop.Tests",
+    "rootNamespace": "Erupt.App.Desktop.Tests",
+    "references": [
+        "Erupt.Robot",
+        "Erupt.Interaction.Core",
+        "Erupt.Interaction.Backends.Desktop",
+        "Erupt.Interaction.Backends.OpenXR",
+        "Erupt.Environment",
+        "Erupt.Ui",
+        "Erupt.Plugins",
+        "Erupt.Plugins.MoveIt",
+        "Erupt.Plugins.MoveIt.Messages",
+        "Erupt.TestSupport",
+        "Erupt.Ros",
+        "Unity.InputSystem",
+        "Unity.InputSystem.TestFramework",
+        "Unity.Robotics.ROSTCPConnector",
+        "Unity.Robotics.ROSTCPConnector.MessageGeneration",
+        "Unity.Robotics.ROSTCPConnector.Messages",
+        "UnityEngine.UI",
+        "Unity.TextMeshPro",
+        "UnityEngine.TestRunner"
+    ],
+    "includePlatforms": [
+        "Android",
+        "Editor",
+        "EmbeddedLinux",
+        "LinuxStandalone64",
+        "macOSStandalone",
+        "WindowsStandalone32",
+        "WindowsStandalone64"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

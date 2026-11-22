@@ -4,7 +4,7 @@ namespace Erupt.Interaction
 {
     /// <summary>
     /// The single sink every manipulation sample flows through. LfD recording, planning
-    /// scene sync and study telemetry all subscribe here rather than tapping input
+    /// scene sync and interaction logging all subscribe here rather than tapping input
     /// directly. Guidelines Part 3.
     /// </summary>
     /// <remarks>

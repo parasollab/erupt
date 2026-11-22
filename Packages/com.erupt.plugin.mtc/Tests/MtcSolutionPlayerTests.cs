@@ -5,6 +5,7 @@ using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
 using Erupt.Environment;
+using Erupt.Robot;
 using Erupt.Robot.Tests;
 using Erupt.Ros;
 using Erupt.Ros.Tests;
@@ -15,6 +16,7 @@ using RosMessageTypes.MoveitTaskConstructorMsgs;
 using RosMessageTypes.Sensor;
 using RosMessageTypes.Shape;
 using RosMessageTypes.Trajectory;
+using Erupt.Plugins.MoveIt;
 
 namespace Erupt.Plugins.Mtc.Tests
 {
@@ -31,6 +33,8 @@ namespace Erupt.Plugins.Mtc.Tests
         private FakeRobotModel robot;
         private EnvironmentRegistry registry;
         private MtcSolutionPlayer player;
+        private RobotProfile profile;
+        private readonly List<RobotRegistry> registries = new();
         private readonly List<GameObject> spawned = new();
 
         [SetUp]
@@ -50,7 +54,9 @@ namespace Erupt.Plugins.Mtc.Tests
             player = host.AddComponent<MtcSolutionPlayer>();
             typeof(MtcSolutionPlayer).GetField("registry", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
                 .SetValue(player, registry);
-            player.SetRobot(robot);
+            // The ROS robot names its joints and links panda_*, the Unity robot fr3_*.
+            profile = FakeRobots.ProfileWithPrefixes("fr3_", "panda_");
+            player.SetRobot(RobotFor(robot));
         }
 
         [TearDown]
@@ -61,7 +67,48 @@ namespace Erupt.Plugins.Mtc.Tests
             spawned.Clear();
             Object.DestroyImmediate(host);
             Object.DestroyImmediate(robotGo);
+            foreach (var registry in registries) FakeRobots.DestroyAll(registry);
+            registries.Clear();
+            Object.DestroyImmediate(profile);
             RosBus.Reset();
+        }
+
+        // A registered robot around a fake model, on the test bus (or on none yet).
+        private RobotInstance RobotFor(IRobotModel model, bool withBus = true, string rosNamespace = "")
+        {
+            RobotRegistry robots = FakeRobots.Single(withBus ? bus : null, model, rosNamespace, profile);
+            registries.Add(robots);
+            return robots.Active;
+        }
+
+        // --- bus ---------------------------------------------------------------------------
+
+        // The static provider is overridden with the same fake in SetUp, so a player that
+        // read it would subscribe here.
+        [Test]
+        public void LiveMirror_NeedsTheBusItIsGiven()
+        {
+            var otherHost = new GameObject("mtc player without a bus");
+            try
+            {
+                var other = otherHost.AddComponent<MtcSolutionPlayer>();
+                RobotInstance busless = RobotFor(robot, withBus: false);
+                other.SetRobot(busless);
+
+                other.StartLiveMirror();
+                Assert.IsFalse(other.IsMirroring);
+                CollectionAssert.IsEmpty(bus.Subscriptions);
+
+                registries[^1].SetBus(bus);
+                other.StartLiveMirror();
+                Assert.IsTrue(other.IsMirroring);
+                CollectionAssert.AreEqual(new[] { "/joint_states" }, bus.Subscriptions);
+                other.StopLiveMirror();
+            }
+            finally
+            {
+                Object.DestroyImmediate(otherHost);
+            }
         }
 
         // --- start scene ------------------------------------------------------------------
@@ -195,6 +242,52 @@ namespace Erupt.Plugins.Mtc.Tests
             Assert.IsNull(player.LastProblem, "a gripper-only segment is skipped, not an error");
             Assert.IsTrue(robot.Applied.All(a => a.names.All(n => n.StartsWith("fr3_"))), "every applied name is a Unity name");
             Assert.That(robot.Applied.Select(a => a.positions[0]).ToList(), Has.Member(2.0));
+            player.Stop();
+        }
+
+        [UnityTest]
+        public IEnumerator GripperOnlySegments_ArePlayedOnARobotThatHasTheFinger_AndRestoredAfterwards()
+        {
+            var gripperRobot = new FakeRobotModel("fr3_joint1") { Root = robotGo.transform, EndEffector = hand }
+                .WithGripper("fr3_finger_joint1");
+            gripperRobot.Positions[1] = 0.01f;
+            player.SetRobot(RobotFor(gripperRobot));
+            var solution = new SolutionMsg
+            {
+                sub_trajectory = new[] { Step("panda_finger_joint1", 0.0, 0.04), Step("panda_joint1", 1, 2) }
+            };
+
+            player.PlaySolution(solution);
+            yield return new WaitForSeconds(0.1f);
+
+            Assert.IsNull(player.LastProblem);
+            var fingerStates = gripperRobot.Applied.Where(a => a.names.Length == 1 && a.names[0] == "fr3_finger_joint1").ToList();
+            Assert.IsNotEmpty(fingerStates, "The open/close segment moves the finger (panda_finger_joint1 → fr3_finger_joint1).");
+            Assert.AreEqual(0.04, fingerStates[^1].positions[0], 1e-9);
+
+            player.Stop();
+            Assert.AreEqual(0.01f, gripperRobot.Positions[1], 1e-6f, "The finger goes back to where it was before the preview.");
+        }
+
+        [UnityTest]
+        public IEnumerator StartScene_AppliesGripperJointsToo()
+        {
+            var gripperRobot = new FakeRobotModel("fr3_joint1") { Root = robotGo.transform, EndEffector = hand }
+                .WithGripper("fr3_finger_joint1");
+            player.SetRobot(RobotFor(gripperRobot));
+            var solution = new SolutionMsg { sub_trajectory = new[] { new SubTrajectoryMsg() } };
+            solution.start_scene.robot_state.joint_state = new JointStateMsg
+            {
+                name = new[] { "panda_joint1", "panda_joint2", "panda_finger_joint1" },
+                position = new[] { 0.5, -0.5, 0.04 }
+            };
+
+            player.PlaySolution(solution, useStartScene: true);
+            yield return null;
+
+            var applied = gripperRobot.Applied[0];
+            CollectionAssert.AreEqual(new[] { "fr3_joint1", "fr3_finger_joint1" }, applied.names, "the joints the robot has, finger included");
+            CollectionAssert.AreEqual(new[] { 0.5, 0.04 }, applied.positions);
             player.Stop();
         }
 

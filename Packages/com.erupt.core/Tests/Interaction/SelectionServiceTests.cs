@@ -30,6 +30,29 @@ namespace Erupt.Interaction.Tests
             Object.DestroyImmediate(go);
         }
 
+        [UnityEngine.TestTools.UnityTest]
+        public System.Collections.IEnumerator ASelectedObjectThatIsDestroyed_StopsBeingTheSelection()
+        {
+            var plan = MakeSelectable(SelectionKind.Trajectory, out var go);
+            var hovered = MakeSelectable(SelectionKind.Obstacle, out var hoveredGo);
+            service.Select(plan);
+            service.SetHover(hovered);
+            int changes = 0;
+            ISelectable last = plan;
+            service.SelectionChanged += s => { changes++; last = s; };
+
+            Object.Destroy(go);
+            Object.Destroy(hoveredGo);
+            yield return null;
+            yield return null;
+
+            Assert.IsNull(service.Current, "Whatever follows the selection (the tier 2 menu, every frame) would read a dead object.");
+            Assert.IsNull(service.Hovered);
+            Assert.AreEqual(1, changes);
+            Assert.IsNull(last);
+            Assert.IsFalse(SelectionService.IsDestroyed(null));
+        }
+
         [Test]
         public void NothingSelected_ReportsNone()
         {
@@ -65,7 +88,7 @@ namespace Erupt.Interaction.Tests
             Object.DestroyImmediate(goA);
         }
 
-        // Part 6: tier 2 must be able to appear on gaze-hover without a deliberate select.
+        // Pointing at an object is not selecting it: hover never changes the selection.
         [Test]
         public void Hover_IsIndependentOfSelection()
         {

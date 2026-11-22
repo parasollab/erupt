@@ -1,0 +1,280 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3c165ade31059455180e33d62d15d1fa, type: 3}
+  m_Name: iiwa14
+  m_EditorClassIdentifier: Erupt.Robot::Erupt.Robot.RobotProfile
+  displayName: KUKA LBR iiwa 14 R820
+  baseLink: lbr_link_0
+  endEffectorLink: lbr_link_ee
+  planningFrame: world
+  armGroup: arm
+  gripperGroup: gripper
+  endEffectorName: gripper
+  joints:
+  - name: lbr_A1
+    childLink: lbr_link_1
+    kind: 0
+    role: 0
+    urdfLower: -2.9670596
+    urdfUpper: 2.9670596
+    overrideLimits: 0
+    lower: 0
+    upper: 0
+    maxVelocity: 1.4835298
+    mimic:
+      leader: 
+      multiplier: 1
+      offset: 0
+  - name: lbr_A2
+    childLink: lbr_link_2
+    kind: 0
+    role: 0
+    urdfLower: -2.0943952
+    urdfUpper: 2.0943952
+    overrideLimits: 0
+    lower: 0
+    upper: 0
+    maxVelocity: 1.4835298
+    mimic:
+      leader: 
+      multiplier: 1
+      offset: 0
+  - name: lbr_A3
+    childLink: lbr_link_3
+    kind: 0
+    role: 0
+    urdfLower: -2.9670596
+    urdfUpper: 2.9670596
+    overrideLimits: 0
+    lower: 0
+    upper: 0
+    maxVelocity: 1.7453293
+    mimic:
+      leader: 
+      multiplier: 1
+      offset: 0
+  - name: lbr_A4
+    childLink: lbr_link_4
+    kind: 0
+    role: 0
+    urdfLower: -2.0943952
+    urdfUpper: 2.0943952
+    overrideLimits: 0
+    lower: 0
+    upper: 0
+    maxVelocity: 1.3089969
+    mimic:
+      leader: 
+      multiplier: 1
+      offset: 0
+  - name: lbr_A5
+    childLink: lbr_link_5
+    kind: 0
+    role: 0
+    urdfLower: -2.9670596
+    urdfUpper: 2.9670596
+    overrideLimits: 0
+    lower: 0
+    upper: 0
+    maxVelocity: 2.268928
+    mimic:
+      leader: 
+      multiplier: 1
+      offset: 0
+  - name: lbr_A6
+    childLink: lbr_link_6
+    kind: 0
+    role: 0
+    urdfLower: -2.0943952
+    urdfUpper: 2.0943952
+    overrideLimits: 0
+    lower: 0
+    upper: 0
+    maxVelocity: 2.3561945
+    mimic:
+      leader: 
+      multiplier: 1
+      offset: 0
+  - name: lbr_A7
+    childLink: lbr_link_7
+    kind: 0
+    role: 0
+    urdfLower: -3.0543263
+    urdfUpper: 3.0543263
+    overrideLimits: 0
+    lower: 0
+    upper: 0
+    maxVelocity: 2.3561945
+    mimic:
+      leader: 
+      multiplier: 1
+      offset: 0
+  - name: robotiq_85_left_knuckle_joint
+    childLink: robotiq_85_left_knuckle_link
+    kind: 0
+    role: 1
+    urdfLower: 0
+    urdfUpper: 0.8
+    overrideLimits: 0
+    lower: 0
+    upper: 0
+    maxVelocity: 0.5
+    mimic:
+      leader: 
+      multiplier: 1
+      offset: 0
+  - name: robotiq_85_right_knuckle_joint
+    childLink: robotiq_85_right_knuckle_link
+    kind: 0
+    role: 1
+    urdfLower: -0.8
+    urdfUpper: 0
+    overrideLimits: 0
+    lower: 0
+    upper: 0
+    maxVelocity: 0.5
+    mimic:
+      leader: robotiq_85_left_knuckle_joint
+      multiplier: -1
+      offset: 0
+  - name: robotiq_85_left_inner_knuckle_joint
+    childLink: robotiq_85_left_inner_knuckle_link
+    kind: 0
+    role: 1
+    urdfLower: 0
+    urdfUpper: 0.8
+    overrideLimits: 0
+    lower: 0
+    upper: 0
+    maxVelocity: 0.5
+    mimic:
+      leader: robotiq_85_left_knuckle_joint
+      multiplier: 1
+      offset: 0
+  - name: robotiq_85_right_inner_knuckle_joint
+    childLink: robotiq_85_right_inner_knuckle_link
+    kind: 0
+    role: 1
+    urdfLower: -0.8
+    urdfUpper: 0
+    overrideLimits: 0
+    lower: 0
+    upper: 0
+    maxVelocity: 0.5
+    mimic:
+      leader: robotiq_85_left_knuckle_joint
+      multiplier: -1
+      offset: 0
+  - name: robotiq_85_left_finger_tip_joint
+    childLink: robotiq_85_left_finger_tip_link
+    kind: 0
+    role: 1
+    urdfLower: -0.8
+    urdfUpper: 0
+    overrideLimits: 0
+    lower: 0
+    upper: 0
+    maxVelocity: 0.5
+    mimic:
+      leader: robotiq_85_left_knuckle_joint
+      multiplier: -1
+      offset: 0
+  - name: robotiq_85_right_finger_tip_joint
+    childLink: robotiq_85_right_finger_tip_link
+    kind: 0
+    role: 1
+    urdfLower: 0
+    urdfUpper: 0.8
+    overrideLimits: 0
+    lower: 0
+    upper: 0
+    maxVelocity: 0.5
+    mimic:
+      leader: robotiq_85_left_knuckle_joint
+      multiplier: 1
+      offset: 0
+  limitMarginRadians: 0
+  limitMarginMetres: 0
+  limitUserVelocity: 0
+  poses:
+  - name: zero
+    joints:
+    - joint: lbr_A1
+      value: 0
+    - joint: lbr_A2
+      value: 0
+    - joint: lbr_A3
+      value: 0
+    - joint: lbr_A4
+      value: 0
+    - joint: lbr_A5
+      value: 0
+    - joint: lbr_A6
+      value: 0
+    - joint: lbr_A7
+      value: 0
+  - name: transport
+    joints:
+    - joint: lbr_A1
+      value: 0
+    - joint: lbr_A2
+      value: 0.4363
+    - joint: lbr_A3
+      value: 0
+    - joint: lbr_A4
+      value: 1.5707
+    - joint: lbr_A5
+      value: 0
+    - joint: lbr_A6
+      value: 0
+    - joint: lbr_A7
+      value: 0
+  - name: ready
+    joints:
+    - joint: lbr_A1
+      value: 0
+    - joint: lbr_A2
+      value: 0.5
+    - joint: lbr_A3
+      value: 0
+    - joint: lbr_A4
+      value: -1.6
+    - joint: lbr_A5
+      value: 0
+    - joint: lbr_A6
+      value: 1.04
+    - joint: lbr_A7
+      value: 0
+  - name: open
+    joints:
+    - joint: robotiq_85_left_knuckle_joint
+      value: 0
+  - name: close
+    joints:
+    - joint: robotiq_85_left_knuckle_joint
+      value: 0.79
+  initialPose: ready
+  gripper:
+    kind: 2
+    driverJoint: robotiq_85_left_knuckle_joint
+    open: 0
+    closed: 0.79
+    openWidthMetres: 0.083698206
+    speed: 0.1
+  rosRobotName: iiwa14
+  jointStatesTopic: joint_states
+  trajectoryCommandTopic: joint_trajectory_controller/joint_trajectory
+  names:
+    localPrefix: 
+    rosPrefix: 
+    pairs: []
+  ghostPrefab: {fileID: 8286257955056397233, guid: 05fd3a18a5ac1418f9f3f85c34026311, type: 3}

@@ -1,0 +1,33 @@
+{
+  "metadata": [
+    {
+      "src": [
+        {
+          "src": "../Packages",
+          "files": [ "com.erupt.*/Runtime/**/*.cs" ],
+          "exclude": [ "**/Messages/**", "com.erupt.plugin.lab/**" ]
+        }
+      ],
+      "dest": "api",
+      "allowCompilationErrors": true,
+      "filter": "filterConfig.yml"
+    }
+  ],
+  "build": {
+    "content": [
+      { "files": [ "index.md", "toc.yml", "guides/**.md", "guides/toc.yml", "reference/toc.yml", "api/**.yml", "api/index.md" ] },
+      { "src": "../Packages/com.erupt.core/Documentation~", "files": [ "*.md" ], "dest": "reference/core" },
+      { "src": "../Packages/com.erupt.plugin.mtc/Documentation~", "files": [ "*.md" ], "dest": "reference/mtc" }
+    ],
+    "resource": [ { "files": [ "images/**" ] } ],
+    "output": "_site",
+    "template": [ "default", "modern" ],
+    "globalMetadata": {
+      "_appName": "ERUPT",
+      "_appTitle": "ERUPT",
+      "_appFooter": "ERUPT — Extended Reality Universal Programming Toolkit. BSD 3-Clause, Parasol Lab.",
+      "_enableSearch": true,
+      "_gitContribute": { "repo": "https://github.com/parasollab/erupt", "branch": "release" }
+    }
+  }
+}

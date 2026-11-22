@@ -1,6 +1,8 @@
 using UnityEngine;
+using UnityEngine.XR.Interaction.Toolkit;
+using UnityEngine.XR.Interaction.Toolkit.Transformers;
 
-namespace UnityEngine.XR.Interaction.Toolkit.Transformers
+namespace Erupt.Environment
 {
     /// <summary>
     /// Two-handed grab transformer that scales an object based on the frame-to-frame

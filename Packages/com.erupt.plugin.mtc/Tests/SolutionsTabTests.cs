@@ -14,17 +14,17 @@ using Unity.Robotics.ROSTCPConnector;
 using RosMessageTypes.Geometry;
 using RosMessageTypes.Moveit;
 using RosMessageTypes.MoveitTaskConstructorMsgs;
-using RosMessageTypes.StudyInterfaces;
+using RosMessageTypes.EruptInterfaces;
 using RosMessageTypes.Trajectory;
 using Erupt.Robot.Tests;
-using GetSolutionRequest = RosMessageTypes.StudyInterfaces.GetSolutionRequest;
-using GetSolutionResponse = RosMessageTypes.StudyInterfaces.GetSolutionResponse;
+using GetSolutionRequest = RosMessageTypes.EruptInterfaces.GetSolutionRequest;
+using GetSolutionResponse = RosMessageTypes.EruptInterfaces.GetSolutionResponse;
 
 namespace Erupt.Plugins.Mtc.Tests
 {
     /// <summary>
-    /// The tier 3 MTC tab: solution browser, execution highlight, element budget, Teach-mode
-    /// gate on recording, preview scope and the stage attempts previewed from their start scene.
+    /// The tier 3 MTC tab: solution browser, execution highlight, element budget, the record
+    /// button, preview scope and the stage attempts previewed from their start scene.
     /// </summary>
     public class SolutionsTabTests
     {
@@ -32,14 +32,14 @@ namespace Erupt.Plugins.Mtc.Tests
         const string k_TopicTask = "introspection_host_42_0xbeef";
 
         private FakeRosBus bus;
-        private GameObject pluginGo, canvasGo, modesGo;
+        private GameObject pluginGo, canvasGo;
         private MtcPlugin plugin;
         private PickPlaceClient client;
         private MtcSolutionPlayer player;
         private FakeRobotModel robot;
         private FakeUiHost ui;
-        private ModeManager modes;
         private SolutionsTab tab;
+        private Erupt.Robot.RobotRegistry robots;
         private FakeRosBus.FakeActionClient<PickPlaceGoal, PickPlaceResult, PickPlaceFeedback> plan;
         private FakeRosBus.FakeActionClient<ExecuteSolutionGoal, ExecuteSolutionResult, ExecuteSolutionFeedback> execute;
 
@@ -50,8 +50,6 @@ namespace Erupt.Plugins.Mtc.Tests
             RosBus.Override(bus);
             bus.SetServiceHandler("/get_solution", request =>
                 new GetSolutionResponse(true, "", Solution(((GetSolutionRequest)request).solution_id)));
-            modesGo = new GameObject("modes");
-            modes = modesGo.AddComponent<ModeManager>();
 
             pluginGo = new GameObject("mtc");
             client = pluginGo.AddComponent<PickPlaceClient>();
@@ -60,8 +58,9 @@ namespace Erupt.Plugins.Mtc.Tests
             plugin = pluginGo.AddComponent<MtcPlugin>();
             robot = new FakeRobotModel("fr3_joint1");
             ui = new FakeUiHost();
-            yield return null;                                   // PickPlaceClient.Start subscribes
-            ((IEruptPlugin)plugin).OnRegister(new EruptContext { Ros = bus, Ui = ui, Modes = modes, Undo = new UndoStack(), Robot = robot });
+            yield return null;                                   // Start of every component; the client connects when the plugin registers
+            robots = FakeRobots.Single(bus, robot);
+            ((IEruptPlugin)plugin).OnRegister(new EruptContext { Ros = bus, Ui = ui, Undo = new UndoStack(), Robots = robots });
             plan = bus.ActionClient<PickPlaceGoal, PickPlaceResult, PickPlaceFeedback>("/pick_place");
             execute = bus.ActionClient<ExecuteSolutionGoal, ExecuteSolutionResult, ExecuteSolutionFeedback>("/execute_solution");
 
@@ -77,7 +76,7 @@ namespace Erupt.Plugins.Mtc.Tests
             RosBus.Reset();
             Object.DestroyImmediate(canvasGo);
             Object.DestroyImmediate(pluginGo);
-            Object.DestroyImmediate(modesGo);
+            FakeRobots.DestroyAll(robots);
         }
 
         [UnityTest]
@@ -163,16 +162,11 @@ namespace Erupt.Plugins.Mtc.Tests
         }
 
         [Test]
-        public void Record_IsGatedOnTeachMode()
+        public void Record_IsAvailable_WithNothingToSwitchFirst()
         {
-            Assert.IsFalse(plugin.InTeachMode);
             var record = tab.Root.GetComponentsInChildren<UnityEngine.UI.Button>(true).First(b => b.name == "Record");
-            Assert.IsFalse(record.interactable, "Recording is a Teach-mode activity (Part 5).");
-
-            modes.SetMode(AppMode.Teach);
-            ((IEruptPlugin)plugin).OnModeChanged(AppMode.Teach);
-            Assert.IsTrue(plugin.InTeachMode);
-            Assert.IsTrue(record.interactable);
+            Assert.IsTrue(record.interactable, "The server is there and idle: a pick & place can be recorded.");
+            Assert.AreEqual("Record pick & place", record.GetComponentInChildren<TMPro.TextMeshProUGUI>().text);
         }
 
         // --- preview scope ----------------------------------------------------------------

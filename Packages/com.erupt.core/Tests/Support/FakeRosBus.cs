@@ -28,7 +28,18 @@ namespace Erupt.Ros.Tests
         private readonly Dictionary<string, Func<Message, Message>> serviceHandlers = new();
         private readonly Dictionary<string, object> actionClients = new();
 
+        private IRosBus root;
+
+        /// <summary>
+        /// This bus as a robot in the root namespace sees it: relative names resolve to
+        /// <c>/name</c>. Hand it to components that use relative names; what they send is
+        /// recorded here under the absolute name. Always the same object.
+        /// </summary>
+        public IRosBus Root => root ??= this.Scoped("");
+
         public bool HasConnectionThread { get; set; } = true;
+
+        public bool HasConnectionError { get; set; } = false;
 
         public void Subscribe<T>(string topic, Action<T> callback) where T : Message
         {
@@ -46,6 +57,9 @@ namespace Erupt.Ros.Tests
         }
 
         public void RegisterPublisher<T>(string topic) where T : Message =>
+            RegisteredPublishers.Add(topic);
+
+        public void RegisterPublisher<T>(string topic, int queueSize) where T : Message =>
             RegisteredPublishers.Add(topic);
 
         public void RegisterRosService<TRequest, TResponse>(string serviceName)

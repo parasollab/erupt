@@ -1,0 +1,58 @@
+# The documentation site (website/, built with DocFX).
+#
+# Every pull request builds the site and fails on a warning in a page (a broken link, a page
+# named in the table of contents that does not exist). A push to the release branch also publishes it to GitHub Pages; for that,
+# set Settings > Pages > Source to "GitHub Actions" once.
+#
+# To build it on your machine:
+#   dotnet tool install -g docfx --version 2.81.0
+#   docfx website/docfx.json --serve
+name: docs
+
+on:
+  push:
+    branches: [release]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.x
+      - name: Install DocFX
+        run: dotnet tool install -g docfx --version 2.81.0
+      # The API reference is read from the C# sources without Unity's assemblies, so this
+      # step reports unresolved Unity types; they do not affect what is generated.
+      - name: Generate the API reference
+        run: docfx metadata website/docfx.json
+      - name: Build the site
+        run: docfx build website/docfx.json --warningsAsErrors
+      - uses: actions/upload-pages-artifact@v3
+        if: github.event_name != 'pull_request'
+        with:
+          path: website/_site
+
+  deploy:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/release'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

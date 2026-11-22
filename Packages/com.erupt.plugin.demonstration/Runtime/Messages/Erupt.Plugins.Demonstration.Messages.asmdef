@@ -1,0 +1,34 @@
+{
+    "name": "Erupt.Plugins.Demonstration.Messages",
+    "rootNamespace": "RosMessageTypes",
+    "references": [
+        "Unity.Robotics.ROSTCPConnector.MessageGeneration",
+        "Unity.Robotics.ROSTCPConnector.Messages"
+    ],
+    "includePlatforms": [
+        "Android",
+        "Editor",
+        "EmbeddedLinux",
+        "LinuxStandalone64",
+        "macOSStandalone",
+        "WindowsStandalone32",
+        "WindowsStandalone64"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "ERUPT_ROS_TCP_CONNECTOR",
+        "ROS2"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.unity.robotics.ros-tcp-connector",
+            "expression": "",
+            "define": "ERUPT_ROS_TCP_CONNECTOR"
+        }
+    ],
+    "noEngineReferences": false
+}

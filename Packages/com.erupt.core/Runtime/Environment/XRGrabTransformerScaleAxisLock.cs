@@ -1,4 +1,8 @@
-namespace UnityEngine.XR.Interaction.Toolkit.Transformers
+using UnityEngine;
+using UnityEngine.XR.Interaction.Toolkit;
+using UnityEngine.XR.Interaction.Toolkit.Transformers;
+
+namespace Erupt.Environment
 {
     /// <summary>
     /// Scale transformer that restricts scaling on a per axis basis.

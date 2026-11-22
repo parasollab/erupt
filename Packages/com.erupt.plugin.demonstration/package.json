@@ -1,0 +1,23 @@
+{
+  "name": "com.erupt.plugin.demonstration",
+  "version": "1.0.0-preview.1",
+  "displayName": "ERUPT Demonstration Plugin",
+  "description": "Demonstration collection (Demonstration family) plugin for ERUPT: joint-space demonstration recording, replay and publishing, hand and gripper mirroring, point-cloud publishing.",
+  "unity": "6000.3",
+  "license": "BSD-3-Clause",
+  "dependencies": {
+    "com.erupt.core": "1.0.0-preview.1"
+  },
+  "keywords": [
+    "robotics",
+    "xr",
+    "erupt",
+    "plugin",
+    "learning-from-demonstration"
+  ],
+  "author": {
+    "name": "Parasol Lab, UIUC",
+    "email": "parasol-opensource@cs.illinois.edu",
+    "url": "https://parasollab.web.illinois.edu"
+  }
+}

@@ -1,0 +1,55 @@
+{
+    "name": "Erupt.Plugins.Ar",
+    "rootNamespace": "Erupt.Plugins.Ar",
+    "references": [
+        "Erupt.Plugins",
+        "Erupt.Interaction.Core",
+        "Erupt.Ui",
+        "Erupt.Ros",
+        "Erupt.Robot",
+        "Erupt.Environment",
+        "AprilTag.Runtime",
+        "meta.xr.mrutilitykit",
+        "Oculus.VR",
+        "UnityEngine.UI",
+        "Unity.TextMeshPro"
+    ],
+    "includePlatforms": [
+        "Android",
+        "Editor",
+        "EmbeddedLinux",
+        "LinuxStandalone64",
+        "macOSStandalone",
+        "WindowsStandalone32",
+        "WindowsStandalone64"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "ERUPT_ROS_TCP_CONNECTOR",
+        "ROS2",
+        "ERUPT_APRILTAG",
+        "ERUPT_MRUK"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.unity.robotics.ros-tcp-connector",
+            "expression": "",
+            "define": "ERUPT_ROS_TCP_CONNECTOR"
+        },
+        {
+            "name": "jp.keijiro.apriltag",
+            "expression": "",
+            "define": "ERUPT_APRILTAG"
+        },
+        {
+            "name": "com.meta.xr.mrutilitykit",
+            "expression": "",
+            "define": "ERUPT_MRUK"
+        }
+    ],
+    "noEngineReferences": false
+}

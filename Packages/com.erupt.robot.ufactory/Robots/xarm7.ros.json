@@ -1,0 +1,41 @@
+{
+  "robot": "xarm7",
+  "planning_frame": "world",
+  "arm_group": "xarm7",
+  "arm_joints": [
+    "joint1",
+    "joint2",
+    "joint3",
+    "joint4",
+    "joint5",
+    "joint6",
+    "joint7"
+  ],
+  "joint_states_topic": "joint_states",
+  "trajectory_command_topic": "xarm7_traj_controller/joint_trajectory",
+  "named_poses": {
+    "xarm7": [
+      "home",
+      "hold-up",
+      "ready"
+    ],
+    "xarm_gripper": [
+      "open",
+      "close",
+      "closed"
+    ]
+  },
+  "base_link": "link_base",
+  "gripper_controller": {
+    "name": "xarm_gripper_traj_controller",
+    "type": "joint_trajectory_controller/JointTrajectoryController",
+    "joints": [
+      "drive_joint"
+    ]
+  },
+  "gripper_group": "xarm_gripper",
+  "end_effector_link": "link_tcp",
+  "initial_pose": "ready",
+  "gripper_open_pose": "open",
+  "gripper_closed_pose": "closed"
+}
