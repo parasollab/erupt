@@ -4,10 +4,10 @@
 # the architecture relies on (core never names a plugin, one joint write point, no absolute
 # per-robot ROS name), plus the lab-only package rule.
 #
-# `unity-tests` runs the EditMode + PlayMode suites in batchmode through game-ci, on every
+# `unity-tests` runs the EditMode + PlayMode suites in the macOS editor, on every
 # push and pull request, as soon as the repository has these secrets (Settings > Secrets and
 # variables > Actions); until then the job is skipped and the workflow still passes:
-#   UNITY_LICENSE   the contents of the .ulf licence file (https://game.ci/docs/github/activation)
+#   UNITY_LICENSE   the contents of the .ulf licence file
 #   UNITY_EMAIL / UNITY_PASSWORD   the Unity account the licence belongs to
 # A pull request from a fork cannot read secrets, so there the job is skipped as well.
 # Every package comes from a public source (the Unity registry, Meta's registry and pinned
@@ -158,33 +158,47 @@ jobs:
   unity-tests:
     needs: unity-licence
     if: needs.unity-licence.outputs.present == 'true'
-    runs-on: ubuntu-latest
+    # PlayMode loads MRUK and Meta XR Audio in the editor process. Both ship macOS
+    # editor libraries. Selecting Android as the build target still uses those host libraries.
+    runs-on: macos-15
     timeout-minutes: 120
     steps:
-      # The editor image with Android support and the imported project need more room than
-      # a hosted runner has free.
-      - uses: jlumbroso/free-disk-space@v1.3.1
-        with:
-          tool-cache: false
-          large-packages: false
+      - name: Free space on the hosted runner by removing simulator runtimes
+        if: runner.environment == 'github-hosted'
+        run: xcrun simctl runtime delete all
       - uses: actions/checkout@v4
+      - uses: buildalon/unity-setup@453f9a30d71fe80e98ebadb5dd75249fd8694c42 # v3.0.6
+        with:
+          version-file: ProjectSettings/ProjectVersion.txt
+          build-targets: Android
       - uses: actions/cache@v4
         with:
           path: Library
-          key: Library-${{ hashFiles('Packages/packages-lock.json', 'ProjectSettings/ProjectVersion.txt') }}
-      - uses: game-ci/unity-test-runner@v4
+          key: Library-${{ runner.os }}-${{ runner.arch }}-Android-${{ hashFiles('Packages/packages-lock.json', 'ProjectSettings/ProjectVersion.txt') }}
+      - uses: buildalon/activate-unity-license@38058846eff1bd04b5b2a5a05239d61be2af2352 # v3.0.3
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
-          testMode: all            # EditMode (boundary, generator) + PlayMode (every Erupt.*.Tests)
-          # The suites are developed against the Android build target, the one the headset uses.
-          # Keep the image's version in step with ProjectSettings/ProjectVersion.txt.
-          customImage: unityci/editor:ubuntu-6000.3.15f1-android-4
-          customParameters: -buildTarget Android
-          artifactsPath: test-results
-          githubToken: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ secrets.UNITY_EMAIL }}
+          password: ${{ secrets.UNITY_PASSWORD }}
+      - name: Run Unity tests
+        run: |
+          mkdir -p test-results
+          status=0
+          for mode in EditMode PlayMode; do
+            report="$PWD/test-results/$mode.xml"
+            "$UNITY_EDITOR_PATH" -batchmode -nographics -projectPath "$PWD" -buildTarget Android \
+              -runTests -testPlatform "$mode" -testResults "$report" -logFile "$PWD/test-results/$mode.log" || status=1
+            if counts=$(xmllint --xpath 'concat("passed=", /test-run/@passed, " failed=", /test-run/@failed, " skipped=", /test-run/@skipped)' "$report"); then
+              echo "$mode $counts" | tee -a "$GITHUB_STEP_SUMMARY"
+            fi
+            # Unity marks the whole run Skipped:Ignored when the opt-in live ROS tests skip.
+            if [[ "$(xmllint --xpath 'boolean(/test-run[@passed > 0 and @failed = 0 and @inconclusive = 0 and (@result="Passed" or @result="Skipped:Ignored")])' "$report")" != true ]]; then
+              echo "::error::$mode did not produce a passing test report. See the test-results artifact."
+              status=1
+            fi
+          done
+          exit "$status"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
