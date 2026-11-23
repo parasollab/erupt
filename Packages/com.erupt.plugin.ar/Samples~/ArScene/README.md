@@ -27,8 +27,8 @@ where their printed AprilTags say.
    enter the size and the offset of the robot's base on the `MarkerAnchor`. The package README
    has the steps and the picture of the offset.
 4. Build for the headset (Android). In the headset, run Space Setup once, allow the camera and
-   the scene permissions when the app asks, look at the tag, select the robot and choose
-   **Place at Marker**.
+   the scene permissions when the app asks, look at the tag and press **Place here** beside
+   the translucent robot’s base.
 
 Passthrough, the passthrough camera and the room anchors exist only on the headset. In the
 editor the scene plays with a black background and the tracker does nothing.

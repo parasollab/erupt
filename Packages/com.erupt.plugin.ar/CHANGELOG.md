@@ -7,6 +7,8 @@ All notable changes to `com.erupt.plugin.ar` are documented here. The format fol
 
 ### Changed
 
+- **Place here** now appears beside each marker preview. In multi-arm scenes the button names
+  its robot. It disappears when placement is accepted or tracking expires.
 - The AR tab is removed when the plugin is unregistered, like its verb. (Core removed the
   application modes; the module never used them.)
 

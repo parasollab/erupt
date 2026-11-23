@@ -76,7 +76,7 @@ namespace Erupt.Plugins.Ar.Tests
             yield return null;
             Assert.IsTrue(plugin.SessionFor(third).HasProposal);
             Assert.AreEqual(Vector3.zero, third.transform.position);
-            ui.Bound[ArPlugin.PlaceVerb](FakeRobots.EndEffectorOf(third));
+            ui.Widgets.Single(w => w.Id == $"ar.place.{third.Id}").GameObject.GetComponentInChildren<UnityEngine.UI.Button>().onClick.Invoke();
             Assert.Less(Vector3.Distance(new Vector3(1f, 0f, 2.5f), third.transform.position), 1e-4f);
             Assert.AreEqual(Vector3.zero, robots.All[0].transform.position);
         }

@@ -7,7 +7,7 @@ namespace Erupt.Plugins.Ar
     /// Binds a robot to a printed AprilTag: which tag, how large it is, and where the robot's
     /// base stands relative to it. Put it on the robot or on an object under it. While the tag
     /// is in view the AR plugin shows where the robot would go, and the user confirms with
-    /// <c>Place at Marker</c> on the robot.
+    /// <c>Place here</c> beside the proposed base.
     /// </summary>
     /// <remarks>
     /// Two layouts use the same component. One tag per robot: each robot's anchor names its

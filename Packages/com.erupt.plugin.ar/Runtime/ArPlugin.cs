@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Text;
 using TMPro;
 using UnityEngine;
@@ -14,7 +13,7 @@ namespace Erupt.Plugins.Ar
     /// robots. Each robot may carry a <see cref="MarkerAnchor"/> (which tag, how large, where
     /// the base stands relative to it). While a robot's tag is in view the plugin shows where
     /// the robot would go, as a translucent copy of the robot, and the user confirms with the
-    /// verb <c>place-at-marker</c> on the robot. Nothing moves until then, and a placed robot
+    /// button beside its proposed base. Nothing moves until then, and a placed robot
     /// stays where it is when its tag goes out of view.
     /// </summary>
     /// <remarks>
@@ -30,7 +29,8 @@ namespace Erupt.Plugins.Ar
     /// </remarks>
     public class ArPlugin : EruptPluginBehaviour
     {
-        /// <summary>The verb that confirms a placement.</summary>
+        /// <summary>Identifier of the retired robot-menu verb.</summary>
+        [Obsolete("Placement is confirmed by the world widget beside the proposed base.")]
         public const string PlaceVerb = "place-at-marker";
         public const string TabId = "ar";
 
@@ -58,6 +58,7 @@ namespace Erupt.Plugins.Ar
             private bool ghostUnavailable;
             private Pose shown;
             private float nextGhostPose;
+            private PlacementWidget widget;
 
             public RobotInstance Robot { get; }
 
@@ -101,10 +102,8 @@ namespace Erupt.Plugins.Ar
                 return trackedOk;
             }
 
-            // Returns true when the proposal appeared or went.
-            internal bool Refresh(AprilTagTracker tracker)
+            internal void Refresh(AprilTagTracker tracker, Camera viewer)
             {
-                bool had = HasProposal;
                 MarkerAnchor from = Anchor;
                 HasProposal = false;
                 if (from != null && tracker != null && Robot != null && TagIsTracked(tracker, from) &&
@@ -136,11 +135,38 @@ namespace Erupt.Plugins.Ar
                     ghosts.ClearPlacementGhost();
                 }
                 ShowsProposal = show && ghosts != null && !ghostUnavailable;
-                return had != HasProposal;
+                if (show && plugin.Context.Ui != null)
+                {
+                    widget ??= new PlacementWidget(plugin.Context.Ui, plugin.transform, Robot.Id, Confirm);
+                    widget.Follow(Proposal.position, viewer, plugin.Sessions.Count > 1);
+                }
+                else
+                {
+                    ClearWidget();
+                }
+            }
+
+            private void Confirm()
+            {
+                if (widget == null) return;
+                Vector3 at = widget.GameObject.transform.position;
+                InteractionRefusal refusal = plugin.PlaceAtMarker(Robot, Proposal);
+                if (refusal.IsRefused)
+                {
+                    plugin.Context?.Router?.ReportRefusal(InteractionRefusal.Refuse(refusal.Code, refusal.Reason, at, refusal.Subject));
+                    plugin.Refresh();
+                }
+            }
+
+            private void ClearWidget()
+            {
+                widget?.Dispose();
+                widget = null;
             }
 
             public void Dispose()
             {
+                ClearWidget();
                 HasProposal = false;
                 ShowsProposal = false;
                 RobotGhosts ghosts = Robot != null ? Robot.Ghosts : null;
@@ -177,14 +203,6 @@ namespace Erupt.Plugins.Ar
             IUiHost ui = context.Ui;
             if (ui == null) return;
 
-            // A robot is selected by one of its links or by its end effector; the verb is on
-            // both rows, and on each only for a robot whose tag is in view.
-            foreach (SelectionKind kind in new[] { SelectionKind.RobotLink, SelectionKind.EndEffector })
-            {
-                if (ui.Verbs.Contains(kind, PlaceVerb)) continue;
-                ui.RegisterVerb(kind, PlaceVerb, "Place at Marker", PlaceSelected, Id);
-                ui.Verbs.ShowWhen(kind, PlaceVerb, CanOfferPlacement);
-            }
             Erupt.Ui.PanelTab tab = ui.AddTab(TabId, DisplayName, BuildTab);
             if (tab != null) tab.Order = 40;
         }
@@ -209,34 +227,13 @@ namespace Erupt.Plugins.Ar
         }
 
         /// <summary>
-        /// Bring every robot's proposal up to date with the tracker now (the plugin does this
-        /// every frame): where each robot would go, whether a copy shows it, and whether the
-        /// verb is offered.
+        /// Update every proposed base, ghost and confirmation button from the tracker.
         /// </summary>
         public void Refresh()
         {
             if (sessions == null) return;
-            bool changed = false;
-            foreach (RobotSession session in sessions) changed |= session.Refresh(tracker);
-            // An open menu on a robot gains or loses the verb as its tag comes into view or goes.
-            if (changed) Context?.Ui?.Verbs.Refresh();
-        }
-
-        // The robot the selected object belongs to; never the active robot by default: the verb
-        // is offered for the robot that was selected, or not at all.
-        private RobotInstance OwnerOf(ISelectable target) =>
-            target?.GameObject != null ? Context?.Robots?.OwnerOf(target.GameObject) : null;
-
-        private bool CanOfferPlacement(ISelectable target)
-        {
-            RobotSession session = SessionFor(OwnerOf(target));
-            return session != null && session.Anchor != null && session.HasProposal;
-        }
-
-        private void PlaceSelected(ISelectable target)
-        {
-            InteractionRefusal refusal = PlaceAtMarker(OwnerOf(target));
-            if (refusal.IsRefused) Context?.Router?.ReportRefusal(refusal);
+            Camera viewer = Camera.main;
+            foreach (RobotSession session in sessions) session.Refresh(tracker, viewer);
         }
 
         /// <summary>
@@ -245,7 +242,9 @@ namespace Erupt.Plugins.Ar
         /// or is not in view, or the robot is executing or carrying something. The move goes
         /// on the undo stack; undo puts the base back.
         /// </summary>
-        public InteractionRefusal PlaceAtMarker(RobotInstance robot)
+        public InteractionRefusal PlaceAtMarker(RobotInstance robot) => PlaceAtMarker(robot, null);
+
+        private InteractionRefusal PlaceAtMarker(RobotInstance robot, Pose? preview)
         {
             if (robot == null) return Refuse(null, "Select a robot to place it at its marker.");
             RobotSession session = SessionFor(robot);
@@ -270,7 +269,11 @@ namespace Erupt.Plugins.Ar
 
             if (!robot.CanPlaceBase(out string reason)) return Refuse(robot, $"{reason} It cannot be moved now.");
 
-            var command = new PlaceBaseCommand(robot, anchor.ProposedBase(tag.Pose));
+            Pose latest = anchor.ProposedBase(tag.Pose);
+            if (preview.HasValue && !MarkerMath.Agree(preview.Value, latest, agreementDistance, agreementAngle))
+                return Refuse(robot, "The marker moved. Check the new placement and press again.");
+
+            var command = new PlaceBaseCommand(robot, preview ?? latest);
             // An undo or redo that the robot refuses later (it is executing by then) says so too.
             command.Refused += why => Context?.Router?.ReportRefusal(Refuse(robot, $"{why} It cannot be moved now."));
             UndoStack undo = Context?.Undo;
@@ -311,9 +314,9 @@ namespace Erupt.Plugins.Ar
                 text.Append("tag ").Append(anchor.TagId);
                 if (session.HasProposal)
                 {
-                    float distance = Vector3.Distance(session.Proposal.position, session.Robot.transform.position);
-                    text.Append(session.ShowsProposal || distance > agreementDistance
-                        ? $" in view, {distance * 100f:0} cm from the robot. Select the robot, then Place at Marker."
+                    float distance = Vector3.Distance(session.Proposal.position, session.Robot.BasePose.position);
+                    text.Append(!MarkerMath.Agree(session.Proposal, session.Robot.BasePose, agreementDistance, agreementAngle)
+                        ? $" in view, {distance * 100f:0} cm from the robot. Press the placement button beside the proposed base."
                         : " in view; the robot stands where it puts it.");
                 }
                 else if (tracker != null && tracker.TryGetTag(anchor.TagId, out _)) text.Append(" not in view");

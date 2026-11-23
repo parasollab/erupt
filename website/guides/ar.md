@@ -21,7 +21,7 @@ when you want to preview a MoveIt plan.
   100 %. Lay it flat where the arm’s base should stand, with the arrow pointing in the
   direction the arm should face. In **File > Build Profiles**, put the workbench first in
   your Android profile’s scene list and choose **Build And Run**. Allow camera access, look
-  at the tag, select the arm and choose **Place at Marker** to accept its translucent preview.
+  at the tag and press **Place here** beside the translucent arm’s base.
   Select and grab the block to put it on your table, then set the start and goal as above.
 
 The block stays where the user puts it when the arm is placed again. The printed tag is
@@ -75,7 +75,7 @@ enough for this demo.
 6. **Build for the headset** and start the ROS side as usual.
 
 7. **Confirm in the headset.** Look at the tag. A translucent copy of the robot appears where
-   the tag puts it. Select the robot and choose **Place at Marker**. The robot moves there and
+   the tag puts it. Press **Place here** beside the translucent base. The robot moves there and
    stays, also when the tag is covered or removed. **Undo** puts it back. To correct the
    placement, look at the tag again and place again.
 
@@ -83,7 +83,8 @@ The robot is never moved without your confirmation.
 
 ## Several robots
 
-Give every robot its own slot with a **Marker Anchor**.
+Give every robot its own slot with a **Marker Anchor**. Each preview has its own button,
+for example **Place left here**. Pressing it places only that robot.
 
 - **One tag per robot:** each anchor gets a different tag id.
 - **One tag for the whole cell:** every anchor gets the same tag id and size, and its own

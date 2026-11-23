@@ -1,16 +1,20 @@
 #if UNITY_EDITOR && ERUPT_PLUGIN_MOVEIT
 using System.Collections;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Erupt.Environment;
 using Erupt.Robot;
 using Erupt.Ros;
 using Erupt.Ros.Tests;
+using Erupt.Ui;
 using NUnit.Framework;
 using RosMessageTypes.Moveit;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
 using UnityEngine.TestTools;
 
 namespace Erupt.Plugins.Ar.Tests
@@ -46,17 +50,42 @@ namespace Erupt.Plugins.Ar.Tests
             Vector3 initial = robot.BasePose.position;
             Assert.Less(Vector3.Distance(initial, blockPosition), 0.6f);
 
-            Vector3 proposed = initial + Vector3.right * 0.3f;
+            // The block publishes its geometry on its own timer.
+            bool SentBlock(sbyte operation) => bus.PublishedOn("/collision_object").OfType<CollisionObjectMsg>()
+                .Any(message => message.id == "workbench_block" && message.operation == operation);
+            float deadline = Time.realtimeSinceStartup + 5f;
+            while (!SentBlock(CollisionObjectMsg.ADD) && Time.realtimeSinceStartup < deadline) yield return null;
+            Assert.IsTrue(SentBlock(CollisionObjectMsg.ADD), "MoveIt received the initial workbench block.");
+
+            // Aim at a tag in view, as the user does when accepting the preview.
+            var viewer = Camera.main.transform;
+            Vector3 proposed = viewer.position + viewer.forward * 1.2f;
             Assert.IsTrue(plugin.Tracker.InjectObservation(0, MarkerMathTests.FlatTag(proposed)));
             yield return null;
             Assert.IsTrue(plugin.SessionFor(robot).ShowsProposal);
             Assert.AreEqual(initial, robot.BasePose.position);
-            var placement = plugin.PlaceAtMarker(robot);
-            Assert.IsFalse(placement.IsRefused, placement.Reason);
+            var ui = (TierUiRig)host.Context.Ui;
+            Canvas canvas = ui.Widgets.Single(w => w.Id == $"ar.place.{robot.Id}").GameObject.GetComponent<Canvas>();
+            Assert.Less(Vector3.Distance(canvas.transform.position, proposed), 0.4f);
+            Assert.Greater(canvas.transform.position.y, proposed.y);
+            Camera camera = canvas.worldCamera;
+            Assert.IsNotNull(camera);
+            Assert.Greater(Vector3.Dot(canvas.transform.forward, (canvas.transform.position - camera.transform.position).normalized), 0.99f);
+
+            camera.transform.LookAt(canvas.transform.position);
+            plugin.Refresh();
+            yield return null; // Let the new canvas submit its graphics before the pointer press.
+            Canvas.ForceUpdateCanvases();
+            var pointer = new PointerEventData(EventSystem.current) { position = camera.WorldToScreenPoint(canvas.transform.position) };
+            var hits = new List<RaycastResult>();
+            canvas.GetComponent<GraphicRaycaster>().Raycast(pointer, hits);
+            Assert.IsNotEmpty(hits, $"The preview button must be reachable at viewport {camera.WorldToViewportPoint(canvas.transform.position)}, " +
+                $"active={canvas.gameObject.activeInHierarchy}, graphic depth={canvas.GetComponentInChildren<Image>().depth}.");
+            ExecuteEvents.ExecuteHierarchy(hits[0].gameObject, pointer, ExecuteEvents.pointerClickHandler);
+            Assert.IsFalse(canvas.gameObject.activeSelf);
             Assert.Less(Vector3.Distance(proposed, robot.BasePose.position), 0.001f);
             Assert.AreEqual(blockPosition, block.transform.position);
-            Assert.IsTrue(bus.PublishedOn("/collision_object").OfType<CollisionObjectMsg>()
-                .Any(message => message.id == "workbench_block" && message.operation == CollisionObjectMsg.ADD));
+            Assert.IsTrue(SentBlock(CollisionObjectMsg.MOVE), "MoveIt received the block in the new base frame.");
         }
 
         [UnityTearDown]

@@ -126,7 +126,7 @@ namespace Erupt.Plugins.Ar.Tests
 
             int moved = 0;
             right.BaseMoved += (_, _) => moved++;
-            ui.Bound[ArPlugin.PlaceVerb](FakeRobots.EndEffectorOf(right));
+            ui.Widgets.Single(w => w.Id == $"ar.place.{right.Id}").GameObject.GetComponentInChildren<UnityEngine.UI.Button>().onClick.Invoke();
 
             MarkerMathTests.AssertPose(new Pose(new Vector3(1f, 0f, 1f), Quaternion.Euler(0f, 90f, 0f)), right.BasePose);
             Assert.AreEqual(1, moved);

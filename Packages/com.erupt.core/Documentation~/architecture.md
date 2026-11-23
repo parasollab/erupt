@@ -306,14 +306,12 @@ No path moves a joint past its limits, and there is one reason for that:
   the ones the table marks as not implemented yet, and the ones nothing has bound, are left
   out unless `TierUiRig.ShowUnimplementedVerbs` is on (a selection with nothing to offer has
   no menu). A verb may carry a condition
-  (`VerbRegistry.ShowWhen`): it is then listed only for the selections the condition accepts
-  (the AR module's `place-at-marker`: only for a robot whose tag is in view). A verb that
+  (`VerbRegistry.ShowWhen`): it is then listed only for the selections the condition accepts. A verb that
   cannot run is a refusal on the router (`ContextualMenuView.Invoke`). A selection that
   belongs to a robot makes that robot active.
 - **A module's buttons come and go with the module.** Nothing of a plugin is on a menu or on
   the tab strip unless the plugin is registered, which needs its prefab in the scene (and so
-  its package in the project). The verbs a plugin adds (`Set Start`, `Plan`, `Place at
-  Marker`) are in the registry only while it is registered. The guideline verbs a plugin
+  its package in the project). The verbs a plugin adds (`Set Start`, `Plan`) are in the registry only while it is registered. The guideline verbs a plugin
   implements (`Set Goal`, `Execute`, `Preview` by the planning family) are in the table for
   everyone, but a menu leaves out a verb nothing has bound, and the family also gives its
   verbs a condition, so they leave the menus again when its last plugin is unregistered
@@ -501,7 +499,7 @@ refers to AprilTag, the MR Utility Kit or the passthrough camera (`Erupt.Boundar
 deleting the package folder and the two manifest lines leaves the rest compiling and its tests
 passing. Its plugin (`ar`) places robots at printed AprilTags through
 `RobotInstance.PlaceBase`: the detected pose is shown as a translucent copy of the robot and
-the user confirms it with `place-at-marker`. See the package's `README.md`.
+the user confirms it with the world-space **Place here** button beside the proposed base. See the package's `README.md`.
 
 ## History
 
