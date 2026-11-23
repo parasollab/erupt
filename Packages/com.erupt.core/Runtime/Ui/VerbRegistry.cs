@@ -103,10 +103,26 @@ namespace Erupt.Ui
 
             var verb = new Verb(verbId, label, VerbAvailability.Available, VerbOrigin.Plugin, pluginId);
             if (!rows.TryGetValue(kind, out var list)) rows[kind] = list = new List<Verb>();
-            list.Add(verb);
+            int index = list.Count;
+            if (kind == SelectionKind.EndEffector)
+            {
+                int order = EndEffectorOrder(verbId);
+                index = list.FindIndex(existing => EndEffectorOrder(existing.Id) > order);
+                if (index < 0) index = list.Count;
+            }
+            list.Insert(index, verb);
             Changed?.Invoke();
             return verb;
         }
+
+        // Planning steps lead the row, whichever plugin registers first. Other verbs keep their order.
+        private static int EndEffectorOrder(string id) => id switch
+        {
+            "set-start" => 0,
+            "set-goal" => 1,
+            "plan" => 2,
+            _ => 3
+        };
 
         /// <summary>Remove every verb a plugin contributed (on unregister).</summary>
         public int RemoveAllFrom(string pluginId)

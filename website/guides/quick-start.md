@@ -59,7 +59,7 @@ beyond the one Unity itself asks for.
     <input id="motion-plan" aria-controls="plan-frame" type="radio" name="motion-step">
     <label for="motion-plan">Preview the plan</label>
     <figure id="select-frame">
-      <a href="../images/kitchen-fr3-selection.webp"><img width="1600" height="1000" src="../images/kitchen-fr3-selection.webp" alt="The selected yellow handle and, above it, the End Effector menu with Set Goal, Open/Close Gripper, Set Start and Plan." loading="lazy"></a>
+      <a href="../images/kitchen-fr3-selection.webp"><img width="1600" height="1000" src="../images/kitchen-fr3-selection.webp" alt="The selected yellow handle and, above it, the End Effector menu with Set Start, Set Goal and Plan above Open/Close Gripper." loading="lazy"></a>
       <figcaption>Left-click the blue sphere at the end effector. When the handle turns yellow, click <strong>Set Start</strong> in the menu to save the arm’s current pose.</figcaption>
     </figure>
     <figure id="goal-frame">

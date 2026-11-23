@@ -116,9 +116,6 @@ namespace Erupt.Ui
             Canvas.gameObject.SetActive(visible);
             if (!visible) return;
 
-            int count = Model.Verbs.Count;
-            UiBuilder.ResizeWorldCanvas(Canvas, new Vector2(Width, HeaderHeight + count * (buttonSize.y + Spacing)));
-
             var layout = UiBuilder.CreateColumn("Verbs", Canvas.transform, Spacing);
             column = layout.gameObject;
             UiBuilder.Stretch(layout.GetComponent<RectTransform>());
@@ -129,15 +126,25 @@ namespace Erupt.Ui
             var header = UiBuilder.CreateLabel("Header", column.transform, Model.Target.DisplayName, 24f);
             header.gameObject.AddComponent<LayoutElement>().preferredHeight = HeaderHeight;
 
+            float height = HeaderHeight;
             foreach (var verb in Model.Verbs)
             {
+                if (Model.Kind == SelectionKind.EndEffector && verb.Id == "gripper" && buttons.Count > 0)
+                {
+                    // An empty layout child adds one extra interval before the gripper.
+                    var gap = new GameObject("Gripper gap", typeof(RectTransform));
+                    gap.transform.SetParent(column.transform, false);
+                    height += Spacing;
+                }
                 Verb captured = verb;
                 Button button = UiBuilder.CreateButton(verb.Id, column.transform, verb.Label, buttonSize,
                     () => Invoke(captured));
 
                 UiBuilder.SetInteractable(button, Model.CanInvoke(verb));
                 buttons.Add(button);
+                height += buttonSize.y + Spacing;
             }
+            UiBuilder.ResizeWorldCanvas(Canvas, new Vector2(Width, height));
         }
 
         /// <summary>Use this router for the menu's refusals.</summary>

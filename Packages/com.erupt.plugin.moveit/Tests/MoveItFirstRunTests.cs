@@ -547,12 +547,12 @@ namespace Erupt.Plugins.MoveIt.Tests
         }
 
         [UnityTest]
-        public IEnumerator TheEndEffectorMenu_ReadsSetGoalGripperSetStartPlan()
+        public IEnumerator TheEndEffectorMenu_ListsPlanningStepsBeforeGripperActions()
         {
             yield return Build();
-            CollectionAssert.AreEqual(new[] { "set-goal", "gripper", "preview-grasp", "set-start", "plan" },
+            CollectionAssert.AreEqual(new[] { "set-start", "set-goal", "plan", "gripper", "preview-grasp" },
                 ui.Verbs.For(SelectionKind.EndEffector).Select(v => v.Id).ToArray(),
-                "Plan is the last button (Preview Grasp is pending and left out of the menu).");
+                "The planning steps precede the gripper actions.");
         }
     }
 }

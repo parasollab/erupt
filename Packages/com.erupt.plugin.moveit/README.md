@@ -37,7 +37,8 @@ Contract and lifecycle: `com.erupt.core/Documentation~/plugin-authoring.md`. Gen
    With one robot in the root namespace this is the single `/collision_object` /
    `/collision_objects_ros` pair it always was.
 4. **Use.** Select the end effector (its handle) → `Set Start` (tier 2) → drag the end
-   effector to where the motion should end → `Set Goal` → `Plan`. The plan appears as a
+   effector to where the motion should end → `Set Goal` → `Plan`. These three buttons are
+   grouped at the top of the menu, above `Open/Close Gripper`. The plan appears as a
    handle halfway between start and goal, becomes the selection (`selectNewPlan`) and previews, in a loop, on a blue
    copy of the robot while the robot stays where it is; its menu has `Execute` and
    `Stop Preview` (`Preview` once the preview has been stopped). Executing publishes the trajectory and the Unity robot

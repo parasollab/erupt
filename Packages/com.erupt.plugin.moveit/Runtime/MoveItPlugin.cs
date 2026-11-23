@@ -151,9 +151,7 @@ namespace Erupt.Plugins.MoveIt
                 }
             }
 
-            // The user poses the robot, sets the start, poses it again, sets the goal. set-goal
-            // alone cannot express that, so start gets its own verb (plugin origin). It is
-            // added before the base class adds "plan", so Plan is the last button of the menu.
+            // MoveIt captures a start pose as well as the planning family's goal pose.
             if (context.Ui != null && !context.Ui.Verbs.Contains(SelectionKind.EndEffector, "set-start"))
                 context.Ui.RegisterVerb(SelectionKind.EndEffector, "set-start", "Set Start", target => SetStartFromRobot(RobotOf(target)), Id);
 

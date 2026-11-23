@@ -37,7 +37,7 @@ namespace Erupt.App.Modules.Tests
 
         // What each module puts on the menus and on the strip.
         private static readonly string[] CoreEndEffector = { "Open/Close Gripper" };
-        private static readonly string[] PlanningEndEffector = { "Set Goal", "Open/Close Gripper", "Set Start", "Plan" };
+        private static readonly string[] PlanningEndEffector = { "Set Start", "Set Goal", "Plan", "Open/Close Gripper" };
         private static readonly string[] PlanningPlan = { "Execute", "Preview" };
 
         private FakeRosBus bus;
