@@ -28,6 +28,48 @@ Controls live in three places, called tiers. Nothing else in the app is a menu.
   A tab is there only when its module is: without the MTC package there is no MTC tab, and
   the same goes for the actions a module adds to the menus.
 
+<figure class="guide-shot">
+  <a href="../images/kitchen-fr3-selection.webp"><img width="1600" height="1000" src="../images/kitchen-fr3-selection.webp" alt="The bar with Menu, Undo and Redo at the top of the view, and the End Effector menu above the selected end effector." loading="lazy"></a>
+  <figcaption>Tier 1 is the bar with <strong>Menu</strong>, <strong>Undo</strong> and <strong>Redo</strong>. Tier 2 is the menu above the selection, here the end effector. The pictures on this page are from the editor without a headset, where the bar sits at the top of the view instead of on your wrist.</figcaption>
+</figure>
+
+Tier 3, the panel, tab by tab:
+
+<fieldset class="motion-steps" aria-label="The tabs of the panel">
+  <div class="motion-frames" style="--frames: 5">
+    <input id="panel-scene" type="radio" name="panel-tab" checked>
+    <label for="panel-scene">Scene</label>
+    <input id="panel-moveit" type="radio" name="panel-tab">
+    <label for="panel-moveit">MoveIt</label>
+    <input id="panel-mtc" type="radio" name="panel-tab">
+    <label for="panel-mtc">MTC</label>
+    <input id="panel-demonstrations" type="radio" name="panel-tab">
+    <label for="panel-demonstrations">Demonstrations</label>
+    <input id="panel-settings" type="radio" name="panel-tab">
+    <label for="panel-settings">Settings</label>
+    <figure>
+      <img width="1055" height="750" src="../images/panel-scene.webp" alt="The Scene tab: Add Cube, Add Sphere, Add Cylinder." loading="lazy">
+      <figcaption><strong>Scene.</strong> Each button puts a shape in front of you, selected and ready to move.</figcaption>
+    </figure>
+    <figure>
+      <img width="1055" height="750" src="../images/panel-moveit.webp" alt="The MoveIt tab: Pipeline ompl, Planner default, Attempts 10, Time 5 s, Mirror joints off, Plan, Reset start/goal." loading="lazy">
+      <figcaption><strong>MoveIt.</strong> Press a setting to step through its values. <strong>Plan</strong> and <strong>Reset start/goal</strong> are greyed out until a start and a goal are set.</figcaption>
+    </figure>
+    <figure>
+      <img width="1055" height="750" src="../images/panel-mtc.webp" alt="The MTC tab before a task: No task, Record pick and place, READY, and the greyed-out buttons Preview: whole solution, Attempt and Cancel." loading="lazy">
+      <figcaption><strong>MTC.</strong> Before a task is recorded, only <strong>Record pick &amp; place</strong> can be pressed.</figcaption>
+    </figure>
+    <figure>
+      <img width="1055" height="750" src="../images/panel-demonstrations.webp" alt="The Demonstrations tab: Ready to record, Record, Replay, Publish, Publish state on, Mirror joint_states off." loading="lazy">
+      <figcaption><strong>Demonstrations.</strong> <strong>Replay</strong> and <strong>Publish</strong> are greyed out until something is recorded.</figcaption>
+    </figure>
+    <figure>
+      <img width="1055" height="750" src="../images/panel-settings.webp" alt="The Settings tab: Collision haptics on, a Strength slider at 100 %, a Distance slider at 30 cm." loading="lazy">
+      <figcaption><strong>Settings.</strong> The collision haptics, described <a href="#collision-haptics">below</a>.</figcaption>
+    </figure>
+  </div>
+</fieldset>
+
 ## The basic flow
 
 1. Open the panel's Scene tab and place an obstacle. Grab it to move it; use its menu to
@@ -48,6 +90,22 @@ Controls live in three places, called tiers. Nothing else in the app is a menu.
 
 After the robot has moved, choose **Set Start** again before the next plan.
 
+<div class="shot-pair">
+  <figure class="guide-shot">
+    <a href="../images/obstacle-menu.webp"><img width="1600" height="1000" src="../images/obstacle-menu.webp" alt="A cube on the counter next to the robot, selected, with its menu: Resize, Delete, Snap to Surface, Duplicate." loading="lazy"></a>
+    <figcaption>Step 1: a new cube is selected, so its menu is there straight away.</figcaption>
+  </figure>
+  <figure class="guide-shot">
+    <a href="../images/obstacle-resize.webp"><img width="1600" height="1000" src="../images/obstacle-resize.webp" alt="The same cube with a small panel beside it that has a minus and a plus button for Width, Height and Depth, and a Done button." loading="lazy"></a>
+    <figcaption><strong>Resize</strong> opens a minus and a plus for each dimension.</figcaption>
+  </figure>
+</div>
+
+<figure class="guide-shot">
+  <a href="../images/home-plan-preview.webp"><img width="1600" height="1000" src="../images/home-plan-preview.webp" alt="A blue copy of the arm on its way from a green copy over a pot to an orange copy over a bowl. The arm itself stands upright behind the plan's menu, which offers Execute and Stop Preview." loading="lazy"></a>
+  <figcaption>Step 5: the preview. <span class="copy-key" style="--copy: #5fd96b">Green</span> is the start, <span class="copy-key" style="--copy: #f5a25f">orange</span> the goal, <span class="copy-key" style="--copy: #5b7cf0">blue</span> the motion, and the <span class="copy-key" style="--copy: #8e5fe8">purple</span> sphere is the plan. The goal copy appears where the robot is when you choose <strong>Set Goal</strong>; here the robot has been dragged up and out of it afterwards. The <a href="quick-start.md">quick start</a> shows the steps one at a time.</figcaption>
+</figure>
+
 When the app connects, each robot takes the pose its ROS robot reports, once. After that the
 robot in the headset is yours to pose, and it follows the ROS robot only while a motion is
 executed or while **Mirror joints** is on in the MoveIt tab. A start you had already set is
@@ -58,6 +116,17 @@ place**. Grab the object and let it go where it should end up. ERUPT sends the t
 Task Constructor and lists the best three solutions it finds. Select one to see its stages,
 preview the whole solution or one stage at a time, and execute it. For a stage that failed,
 the tab shows the planner's reason.
+
+<div class="shot-pair">
+  <figure class="guide-shot">
+    <a href="../images/pick-place-record.webp"><img width="1600" height="1000" src="../images/pick-place-record.webp" alt="A small cube held above the counter between a mug and a bowl, selected, with its menu above it." loading="lazy"></a>
+    <figcaption>While recording, the object is carried to where it should end up.</figcaption>
+  </figure>
+  <figure class="guide-shot">
+    <a href="../images/pick-place-preview.webp"><img width="1600" height="1000" src="../images/pick-place-preview.webp" alt="The robot lifting the cube off the counter in its gripper." loading="lazy"></a>
+    <figcaption>The preview of a solution plays on the robot itself, and the object rides in the gripper.</figcaption>
+  </figure>
+</div>
 
 For a demonstration, press Record in the Demonstrations tab, move the
 robot by its handle, and stop. You can replay the demonstration and publish it to ROS. See
@@ -134,6 +203,11 @@ The robot in the headset cannot be moved past its joint limits, whichever way yo
   the robot model in Unity and the robot description in ROS disagree. ERUPT shows the robot
   at the limit and warns about the mismatch.
 
+<figure class="guide-shot">
+  <a href="../images/joint-limit.webp"><img width="1600" height="1000" src="../images/joint-limit.webp" alt="The arm stretched upwards with one link tinted red, and a red message next to it: fr3_joint4 is at its upper limit." loading="lazy"></a>
+  <figcaption>The elbow joint turned as far as it goes: the link it moves is tinted and the message names the joint.</figcaption>
+</figure>
+
 The limits come from the robot's profile, which is generated from its URDF. See
 [Adding a robot](add-a-robot.md).
 
@@ -155,3 +229,8 @@ An action that cannot be carried out is never silently dropped. A short message 
 you were pointing and says why: the goal is out of reach, a joint is at its limit, no planner
 is connected for this robot, the robot has no gripper, the execution failed on the ROS side,
 and so on.
+
+<figure class="guide-shot">
+  <a href="../images/out-of-reach.webp"><img width="1600" height="1000" src="../images/out-of-reach.webp" alt="The arm stretched out flat along the counter, with a red message at its end effector: Target is out of reach by 23 cm." loading="lazy"></a>
+  <figcaption>The handle was dragged further than the arm goes. The arm follows as far as it can and the message says by how much it falls short.</figcaption>
+</figure>

@@ -40,6 +40,11 @@ the tags, the `ROS2` scripting define, the menu font, the Input System, the XR s
 starter rig is built from, and OpenXR with the Quest features. Each line ends as *fine*,
 *fixed* or *needs you*, with what to do.
 
+<figure class="guide-shot">
+  <a href="../images/editor-project-setup.webp"><img width="1280" height="1240" src="../images/editor-project-setup.webp" alt="The Project Setup window listing ten checks, each marked Fine: packages, tags, the ROS2 scripting define, TextMesh Pro resources, input handling, render pipeline, samples, the OpenXR plug-in and its features. Below are the buttons Check Again and Fix and the line 10 fine, 0 fixed, 0 need you." loading="lazy"></a>
+  <figcaption>Project Setup in a project where everything is in place.</figcaption>
+</figure>
+
 Press **Fix** a second time after the editor has recompiled. The XR settings can only be
 checked once the OpenXR package is there. If Project Setup changed the input handling, restart
 the editor when Unity asks.

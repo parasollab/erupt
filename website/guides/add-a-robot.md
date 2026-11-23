@@ -35,6 +35,11 @@ The files can be anywhere on disk. Robot Setup copies what it needs.
    | Initial pose | A named pose from the SRDF, or joint values |
    | Trajectory topic | `<controller name>/joint_trajectory` of the arm's trajectory controller |
 
+   <figure class="guide-shot">
+     <a href="../images/editor-robot-setup.webp"><img width="1520" height="1120" src="../images/editor-robot-setup.webp" alt="The Robot Setup window after Check for the Franka description: the three files, the display name and output folder, then 0 problems and 2 warnings, followed by a list of what was found and where each answer came from." loading="lazy"></a>
+     <figcaption>Robot Setup after <strong>Check</strong>, here for the Franka description that ships with ERUPT. Warnings come first, then what was found and where each answer came from.</figcaption>
+   </figure>
+
 5. Press **Set Up Robot**, then read the report (`<Name>.setup.md` in the output
    folder). *Problems* have to be fixed before the robot works; *Warnings* are for you to
    confirm. Drag `<Name>.prefab` into a scene to use the robot.

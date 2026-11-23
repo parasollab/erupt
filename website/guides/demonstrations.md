@@ -20,6 +20,17 @@ demonstrations for learning from demonstration.
 5. Press **Replay** to watch the demonstration on the robot.
 6. Press **Publish** to send it to ROS.
 
+<div class="shot-pair">
+  <figure class="guide-shot">
+    <a href="../images/panel-demonstrations-recording.webp"><img width="1055" height="750" src="../images/panel-demonstrations-recording.webp" alt="The Demonstrations tab while recording: Recording, 9 points, a Stop button, and Replay and Publish greyed out." loading="lazy"></a>
+    <figcaption>While recording, the tab counts the points and <strong>Record</strong> reads <strong>Stop</strong>.</figcaption>
+  </figure>
+  <figure class="guide-shot">
+    <a href="../images/demonstration-record.webp"><img width="1600" height="1000" src="../images/demonstration-record.webp" alt="The robot with its end effector dragged up and back, the handle yellow and the End Effector menu above it." loading="lazy"></a>
+    <figcaption>The robot is moved by its handle as usual; every pose on the way is recorded.</figcaption>
+  </figure>
+</div>
+
 One demonstration is recorded at a time, on the robot it was started for. The robot cannot
 leave its joint limits while you record, and a replay names any joint that would.
 

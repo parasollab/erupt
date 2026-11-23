@@ -16,8 +16,8 @@ description: Plan your first robot motion in Unity, connect ROS 2, and build wit
       </div>
     </div>
     <figure class="field-view">
-      <img width="1060" height="650" src="images/kitchen-fr3-plan.webp" alt="A translucent blue Franka arm previews a motion beside the solid arm. A small purple sphere sits below the plan menu.">
-      <figcaption><span>KitchenFR3</span><span class="motion-key">Motion preview</span><span class="handle-key">Plan handle</span></figcaption>
+      <img width="1600" height="1000" src="images/home-plan-preview.webp" alt="A Franka arm on a kitchen counter with three translucent copies of itself. A green copy over a pot marks the start, an orange copy over a bowl marks the goal, and a blue copy between them plays the planned motion. The plan's menu offers Execute and Stop Preview.">
+      <figcaption><span>KitchenFR3</span><span class="start-key">Start</span><span class="goal-key">Goal</span><span class="motion-key">Motion preview</span><span class="handle-key">Plan handle</span></figcaption>
     </figure>
   </div>
 </section>
