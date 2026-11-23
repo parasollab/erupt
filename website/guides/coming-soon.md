@@ -1,7 +1,6 @@
 # Coming soon
 
-Actions that are planned for ERUPT and are not in it yet. None of them can be used today, and
-none has a date. They are all actions for the menu that appears on a selected thing (tier 2;
+Actions that are planned for ERUPT, but are not available yet. They are all actions for the menu that appears on a selected thing (tier 2;
 see [Using the app](using-the-app.md)), and they are listed here by what you select.
 
 ## On an obstacle
