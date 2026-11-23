@@ -14,7 +14,7 @@ Controls live in three places, called tiers. Nothing else in the app is a menu.
 - **Tier 2, the menu on the selected thing.** Select something and its actions appear above
   it:
   - an obstacle: **Resize**, **Delete**, **Snap to Surface**, **Duplicate**
-  - the end effector: **Set Goal**, **Open/Close Gripper**, **Set Start**, **Plan**
+  - the end effector: **Set Start**, **Set Goal**, **Plan**, then **Open/Close Gripper**
   - a plan: **Execute**, **Preview** (or **Stop Preview** while it plays)
 - **Tier 3, the panel.** Open it with **Menu** on the wrist bar, with the controller's Menu
   button, or with the hand menu gesture. It shows one tab at a time:

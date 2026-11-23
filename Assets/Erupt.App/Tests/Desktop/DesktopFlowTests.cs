@@ -258,8 +258,13 @@ namespace Erupt.App.Desktop.Tests
             yield return Click(OnScreen(HandlePosition, "The end-effector handle"));
             Assert.AreEqual(SelectionKind.EndEffector, selection.CurrentKind, "A left click on the handle selects the end effector.");
             Assert.IsTrue(ui.TierTwo.Canvas.gameObject.activeInHierarchy, "Its tier 2 menu appears.");
-            CollectionAssert.AreEqual(new[] { "set-goal", "gripper", "set-start", "plan" }, ui.TierTwo.Model.Verbs.Select(v => v.Id).ToArray(),
+            CollectionAssert.AreEqual(new[] { "set-start", "set-goal", "plan", "gripper" }, ui.TierTwo.Model.Verbs.Select(v => v.Id).ToArray(),
                 "The menu holds what can be pressed, and nothing else.");
+            float ButtonY(string id) => ui.TierTwo.ButtonFor(id).transform.localPosition.y;
+            float planningStep = ButtonY("set-start") - ButtonY("set-goal");
+            Assert.Greater(planningStep, 0f);
+            Assert.AreEqual(planningStep, ButtonY("set-goal") - ButtonY("plan"), 0.01f);
+            Assert.Greater(ButtonY("plan") - ButtonY("gripper"), planningStep, "A gap separates the gripper from the planning steps.");
 
             // 2. Set Start.
             yield return ClickVerb("set-start");

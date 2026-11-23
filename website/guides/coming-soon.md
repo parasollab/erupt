@@ -33,8 +33,8 @@ Today an obstacle's menu has **Resize**, **Delete**, **Snap to Surface** and **D
 | --- | --- |
 | **Preview Grasp** | See a grasp on the gripper before the robot uses it. |
 
-Today the end effector's menu has **Set Goal**, **Open/Close Gripper**, **Set Start** and
-**Plan**.
+Today the end effector's menu has **Set Start**, **Set Goal**, **Plan** and
+**Open/Close Gripper**.
 
 ## On a plan
 

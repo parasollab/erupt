@@ -48,8 +48,8 @@ All notable changes to `com.erupt.plugin.moveit` are documented here. The format
 
 ### Changed
 
-- The end-effector menu reads Set Goal, Open/Close Gripper, Set Start, Plan (Set Start is
-  registered before the base class adds Plan).
+- The end-effector menu lists Set Start, Set Goal and Plan in workflow order, with a small
+  gap before Open/Close Gripper.
 
 ### Fixed (buttons that did nothing)
 
