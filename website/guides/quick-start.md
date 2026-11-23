@@ -4,7 +4,12 @@ This gets you from nothing to planning and executing a motion on a simulated Fra
 first in the Unity editor and then in the headset. It takes about half an hour, most of it
 waiting for downloads and the first build.
 
-You need:
+<figure class="guide-shot guide-overview">
+  <a href="../images/kitchen-fr3.webp"><img width="1280" height="800" src="../images/kitchen-fr3.webp" alt="A Franka Research 3 arm mounted on the kitchen counter in the KitchenFR3 scene."></a>
+  <figcaption>In the kitchen scene, you’ll move the blue handle to give the Franka arm its first goal.</figcaption>
+</figure>
+
+## Before you start
 
 - Unity 6 (the exact version is in `ProjectSettings/ProjectVersion.txt`), with Android Build
   Support if you want to run in the headset
@@ -42,16 +47,34 @@ beyond the one Unity itself asks for.
    and **Redo** at the top and the keys in the lower left corner. The Unity console should
    show no repeating `Connection to ... failed` message; if it does, see
    [Troubleshooting](troubleshooting.md).
-3. Plan a motion with the mouse:
-   1. Left-click the blue sphere at the robot's end effector. It turns yellow, and a menu
-      named **End Effector** appears above it.
-   2. Click **Set Start**. The motion will start from the pose the robot is in now.
-   3. Hold the right mouse button on the sphere and drag it somewhere else. The arm follows.
-   4. Click **Set Goal**, then **Plan**. A blue translucent copy of the robot plays the plan
-      over and over while the robot itself stays where it is, and the menu changes to the
-      plan's: **Execute** and **Stop Preview**.
-   5. Click **Execute**. The blue copy goes away, the simulated robot moves, and the robot in
-      Unity follows it.
+
+### Plan your first motion
+
+<fieldset class="motion-steps" aria-labelledby="plan-your-first-motion">
+  <div class="motion-frames">
+    <input id="motion-select" aria-controls="select-frame" type="radio" name="motion-step" checked>
+    <label for="motion-select">Select the handle</label>
+    <input id="motion-goal" aria-controls="goal-frame" type="radio" name="motion-step">
+    <label for="motion-goal">Set a goal</label>
+    <input id="motion-plan" aria-controls="plan-frame" type="radio" name="motion-step">
+    <label for="motion-plan">Preview the plan</label>
+    <figure id="select-frame">
+      <a href="../images/kitchen-fr3-selection.webp"><img width="1060" height="650" src="../images/kitchen-fr3-selection.webp" alt="The selected yellow handle and the End Effector menu above the Franka arm." loading="lazy"></a>
+      <figcaption>Left-click the blue sphere at the end effector. When the handle turns yellow, click <strong>Set Start</strong> in the menu to save the arm’s current pose.</figcaption>
+    </figure>
+    <figure id="goal-frame">
+      <a href="../images/kitchen-fr3-goal.webp"><img width="1060" height="650" src="../images/kitchen-fr3-goal.webp" alt="The Franka arm at the dragged handle, with green and orange copies marking the start and goal." loading="lazy"></a>
+      <figcaption>Hold the right mouse button on the sphere and drag it to the pose you want. Release the mouse button and click <strong>Set Goal</strong>. Green marks the start pose and orange marks the goal.</figcaption>
+    </figure>
+    <figure id="plan-frame">
+      <a href="../images/kitchen-fr3-plan.webp"><img width="1060" height="650" src="../images/kitchen-fr3-plan.webp" alt="The blue preview arm showing the planned motion alongside the stationary robot." loading="lazy"></a>
+      <figcaption>Click <strong>Plan</strong>. The translucent blue arm plays the motion on a loop while the solid arm stays still. Choose <strong>Stop Preview</strong> to end playback. If you select something else, point at the purple sphere and select it to reopen this plan’s menu.</figcaption>
+    </figure>
+  </div>
+</fieldset>
+
+When you’re ready, click **Execute** in the plan menu. The preview ends, the simulated
+robot moves, and the arm in Unity follows it.
 
 To look around, use `W` `A` `S` `D` to move, the arrow keys to turn, and `F` to get back to
 a view of the robot. `Tab` opens the panel with the settings and the tools for adding

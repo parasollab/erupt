@@ -291,6 +291,14 @@ namespace Erupt.App.Desktop.Tests
             Assert.IsNotNull(moveIt.LastResult, "A click on Plan produced a plan.");
             TrajectorySelectable plan = moveIt.Results.Single();
             Assert.AreSame(plan, selection.Current, "The new plan is the selection: its menu is there.");
+            var handleRenderer = plan.GetComponentInChildren<MeshRenderer>();
+            Assert.IsTrue(UnityEditor.AssetDatabase.Contains(handleRenderer.sharedMaterial),
+                "The handle must use a material asset included in the player.");
+            Assert.AreEqual("Universal Render Pipeline/Lit", handleRenderer.sharedMaterial.shader.name);
+            var handleTint = new MaterialPropertyBlock();
+            handleRenderer.GetPropertyBlock(handleTint);
+            Assert.That(handleTint.GetColor(MaterialColor.BaseColorId), Is.EqualTo(new Color(0.55f, 0.35f, 1f, 0.9f))
+                .Using(UnityEngine.TestTools.Utils.ColorEqualityComparer.Instance));
             // The plan plays on the robot's blue copy, over and over; the robot itself stays put,
             // and the plan's menu offers to stop the preview where it would offer to play it.
             CollectionAssert.AreEquivalent(new[] { "execute", Erupt.Plugins.PlanningPlugin.StopPreviewVerb, "correct" },

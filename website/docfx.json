@@ -19,11 +19,13 @@
       { "src": "../Packages/com.erupt.core/Documentation~", "files": [ "*.md" ], "dest": "reference/core" },
       { "src": "../Packages/com.erupt.plugin.mtc/Documentation~", "files": [ "*.md" ], "dest": "reference/mtc" }
     ],
-    "resource": [ { "files": [ "images/**" ] } ],
+    "resource": [ { "files": [ "images/**", "fonts/**" ] } ],
     "output": "_site",
-    "template": [ "default", "modern" ],
+    "template": [ "default", "modern", "theme" ],
     "globalMetadata": {
       "_appName": "ERUPT",
+      "_appLogoPath": "images/erupt-mark.svg",
+      "_appFaviconPath": "images/erupt-mark.svg",
       "_appTitle": "ERUPT",
       "_appFooter": "ERUPT — Extended Reality Universal Programming Toolkit. BSD 3-Clause, Parasol Lab.",
       "_enableSearch": true,

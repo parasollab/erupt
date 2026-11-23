@@ -46,6 +46,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Erupt.Plugins.MoveIt::MoveItPlugin
   handleDiameter: 0.06
   handleColor: {r: 0.55, g: 0.35, b: 1, a: 0.9}
+  urpHandleMaterial: {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
   settings:
     motionPlanServiceName: plan_kinematic_path
     plannerQueryServiceName: query_planner_interface

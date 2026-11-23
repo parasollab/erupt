@@ -1,65 +1,73 @@
-# ERUPT
+---
+_layout: landing
+title: ERUPT Documentation
+description: Plan your first robot motion in Unity, connect ROS 2, and build with the Extended Reality Universal Programming Toolkit.
+---
 
-**Extended Reality Universal Programming Toolkit.** ERUPT lets you program robot arms from
-inside a Meta Quest headset. You see the robot and its surroundings, place obstacles, set
-goals, look at each plan before anything moves, and run it. Planning and execution happen in
-ROS 2 with MoveIt 2; ERUPT is the front end.
+<section class="field-hero" aria-labelledby="erupt">
+  <div class="field-hero-inner">
+    <div class="field-intro">
+      <p class="field-label">ERUPT Documentation</p>
+      <h1 id="erupt">Robot programming<br> in extended reality.</h1>
+      <p class="field-summary">Pose a robot arm, preview its motion, and run the plan. Start with a mouse in Unity or step into the scene with a Meta Quest headset.</p>
+      <div class="field-actions">
+        <a class="field-button" href="guides/quick-start.md">Get started</a>
+        <a class="field-source" href="https://github.com/parasollab/erupt">View on GitHub</a>
+      </div>
+    </div>
+    <figure class="field-view">
+      <img width="1060" height="650" src="images/kitchen-fr3-plan.webp" alt="A translucent blue Franka arm previews a motion beside the solid arm. A small purple sphere sits below the plan menu.">
+      <figcaption><span>KitchenFR3</span><span class="motion-key">Motion preview</span><span class="handle-key">Plan handle</span></figcaption>
+    </figure>
+  </div>
+</section>
 
-## What you can do with it
-
-- **Plan and execute motions.** Pose the robot to set a start and a goal, plan with MoveIt,
-  watch the plan play on the robot, execute.
-- **Build the planning scene by hand.** Place, move and resize obstacles; every change reaches
-  MoveIt as a collision object, and objects added on the ROS side appear in the headset.
-- **Pick and place.** Show a task by grabbing an object and putting it down. MoveIt Task
-  Constructor plans it; browse the solutions stage by stage, see why a stage failed, execute.
-- **Collect demonstrations.** Record the motions you make the robot do, replay them and
-  publish them to ROS.
-- **Work with any number of arms.** Each arm has its own ROS namespace and its own MoveIt;
-  the scene is shared between all of them.
-- **Stay inside joint limits.** No interaction, plan or replay moves a joint past its limits,
-  and ERUPT tells you which joint stopped you.
-- **Use controllers or bare hands.**
-
-## Start here
-
-| If you want to | Read |
-| --- | --- |
-| Try ERUPT with a simulated robot | [Quick start](guides/quick-start.md) |
-| Add ERUPT to a Unity project you already have | [Add ERUPT to your own project](guides/install-package.md) |
-| Set up the ROS 2 side, in Docker or on a real robot | [The ROS 2 side](guides/ros-setup.md) |
-| Learn the controls | [Using the app](guides/using-the-app.md) |
-| Use another of the shipped robots | [Robots](guides/robots.md) |
-| Use a robot that ERUPT does not ship | [Adding a robot](guides/add-a-robot.md) |
-| Run two or more arms | [Several robot arms](guides/multi-arm.md) |
-| Put the virtual robot where the real one stands | [AR placement](guides/ar.md) |
-| Add your own planner or learning method | [Writing a plugin](guides/write-a-plugin.md) |
-| Find out why something does not work | [Troubleshooting](guides/troubleshooting.md) |
-
-## How it is put together
-
-ERUPT is a set of Unity packages. **ERUPT Core** holds what every such app needs: the robot
-model with inverse kinematics and joint limits, the environment, input from controllers and
-hands, selection, undo, the user interface and the connection to ROS. Everything specific to a
-planning or learning method is a **plugin** in its own package. Robots are packages too.
-
-| Package | What it adds |
-| --- | --- |
-| `com.erupt.core` | The core. Required |
-| `com.erupt.plugin.moveit` | Motion planning with MoveIt 2 and planning-scene synchronisation |
-| `com.erupt.plugin.mtc` | Pick-and-place with MoveIt Task Constructor. Needs the MoveIt plugin |
-| `com.erupt.plugin.demonstration` | Recording, replaying and publishing demonstrations |
-| `com.erupt.plugin.ar` | Optional. Places robots in the room from AprilTag markers |
-| `com.erupt.robot.*` | One package per robot maker, see [Robots](guides/robots.md) |
-
-The [architecture reference](../Packages/com.erupt.core/Documentation~/architecture.md) describes the pieces and how they
-talk to each other.
-
-## Requirements
-
-- Unity 6 (the exact version is in `ProjectSettings/ProjectVersion.txt` of the repository)
-- A Meta Quest 3 for use in the headset; the Unity editor is enough to try it with a mouse
-- A computer that runs ROS 2 Jazzy with MoveIt 2, or Docker to run the provided container
-
-ERUPT is developed by the Parasol Lab at the University of Illinois Urbana-Champaign and
-released under the BSD 3-Clause licence.
+<div class="field-body">
+  <section aria-labelledby="start-here">
+    <h2 id="start-here">Explore the toolkit</h2>
+    <div class="field-paths">
+      <section>
+        <i class="bi bi-bounding-box-circles" aria-hidden="true"></i>
+        <h3>Operate the robot</h3>
+        <p>Set a goal, place obstacles, and inspect a plan before the arm moves.</p>
+        <ul>
+          <li><a href="guides/using-the-app.md">Controls and motion planning</a></li>
+          <li><a href="guides/demonstrations.md">Record a demonstration</a></li>
+          <li><a href="guides/ar.md">Place the robot in AR</a></li>
+        </ul>
+      </section>
+      <section>
+        <i class="bi bi-layers" aria-hidden="true"></i>
+        <h3>Set up a workspace</h3>
+        <p>Connect Unity to MoveIt 2 and choose the arms for your scene.</p>
+        <ul>
+          <li><a href="guides/ros-setup.md">Connect ROS 2</a></li>
+          <li><a href="guides/robots.md">Choose a robot</a></li>
+          <li><a href="guides/multi-arm.md">Run several arms</a></li>
+        </ul>
+      </section>
+      <section>
+        <i class="bi bi-braces" aria-hidden="true"></i>
+        <h3>Build with ERUPT</h3>
+        <p>Bring the toolkit into a Unity project or add your own planning method.</p>
+        <ul>
+          <li><a href="guides/install-package.md">Install the packages</a></li>
+          <li><a href="guides/add-a-robot.md">Add a robot from URDF</a></li>
+          <li><a href="guides/write-a-plugin.md">Write a plugin</a></li>
+        </ul>
+      </section>
+    </div>
+  </section>
+  <div class="field-notes">
+    <section aria-labelledby="how-it-is-put-together">
+      <h2 id="how-it-is-put-together">Inside ERUPT</h2>
+      <p>The Extended Reality Universal Programming Toolkit is a set of Unity packages. Core handles input, inverse kinematics, joint limits, and ROS transport. Plugins add motion planning, pick-and-place tasks, demonstrations, and AR placement.</p>
+      <p><a href="../Packages/com.erupt.core/Documentation~/architecture.md">Architecture reference</a> <span aria-hidden="true">/</span> <a href="api/index.md">API reference</a></p>
+    </section>
+    <section aria-labelledby="requirements">
+      <h2 id="requirements">What you’ll need</h2>
+      <p>Use Unity 6 and Docker to try the simulated robot. For a headset session, use a Meta Quest 3. An existing ROS 2 Jazzy and MoveIt 2 setup can also supply the robot.</p>
+      <p><a href="guides/troubleshooting.md">Troubleshoot your setup</a></p>
+    </section>
+  </div>
+</div>

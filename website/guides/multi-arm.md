@@ -4,6 +4,16 @@ ERUPT works with any number of arms in one scene, of the same model or of differ
 arm is an independent robot on the ROS side, in its own namespace, with its own MoveIt. In the
 headset they share one scene: an obstacle you place is known to every arm's planner.
 
+<figure class="guide-shot">
+  <div class="namespace-map">
+    <img width="986" height="568" src="../images/multi-arm-fr3.webp" alt="Three Franka arms in MultiArmFR3. The front-left arm uses /right, the rear arm uses /left, and the front-right arm uses /third.">
+    <span aria-hidden="true" style="--arm-x: 25%; --arm-y: 35%">/right</span>
+    <span aria-hidden="true" style="--arm-x: 47%; --arm-y: 20%">/left</span>
+    <span aria-hidden="true" style="--arm-x: 73%; --arm-y: 35%">/third</span>
+  </div>
+  <figcaption>Each label shows the arm’s ROS namespace in <code>MultiArmFR3</code>. Selecting an arm switches the controls to its planner.</figcaption>
+</figure>
+
 ## 1. Start one ROS stack per arm
 
 Give every arm a namespace and say which robot it is:
@@ -12,6 +22,9 @@ Give every arm a namespace and say which robot it is:
 ARMS="left=fr3 right=ur5e third=xarm7" \
   docker compose -f docker/compose.yaml --profile arms up arms
 ```
+
+For the three Franka arms in the bundled `MultiArmFR3` scene, use
+`ARMS="left=fr3 right=fr3 third=fr3"` in the same command.
 
 Without Docker, the same list goes to the launch file:
 

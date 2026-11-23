@@ -91,6 +91,21 @@ Tools/live-tests.sh       tests of the app against a running ROS 2 stack
 website/                  the documentation site (DocFX)
 ```
 
+## Preview the documentation
+
+With the .NET 8 SDK or later installed, run these commands from the repository root.
+The first command installs the version of DocFX used by the documentation workflow and is
+needed only once. If your shell cannot find `docfx`, add the tools directory printed by the
+installer to your PATH.
+
+```bash
+dotnet tool install --global docfx --version 2.81.0
+docfx website/docfx.json --serve --port 8080
+```
+
+Open [the local preview](http://localhost:8080/). After editing a page or the theme, stop
+the server with Ctrl+C, rerun the second command, and refresh the browser.
+
 ## Tests
 
 **Window > General > Test Runner** runs every suite without ROS: the tests use a stand-in for

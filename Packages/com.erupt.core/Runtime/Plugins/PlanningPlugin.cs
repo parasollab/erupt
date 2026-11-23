@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.Rendering;
 using RosMessageTypes.Trajectory;
 using Erupt.Interaction;
 using Erupt.Robot;
@@ -382,6 +383,8 @@ namespace Erupt.Plugins
         [Tooltip("Diameter of the sphere that makes a plan selectable in the world.")]
         [SerializeField, Min(0.01f)] private float handleDiameter = 0.06f;
         [SerializeField] private Color handleColor = new Color(0.55f, 0.35f, 1f, 0.9f);
+        [Tooltip("Lit material included in URP player builds for the plan handle.")]
+        [SerializeField] private Material urpHandleMaterial;
 
         /// <summary>
         /// Give a plan a presence in the world: a small sphere at <paramref name="worldPosition"/>
@@ -396,7 +399,7 @@ namespace Erupt.Plugins
             if (selectable == null) return null;
 
             GameObject go = selectable.gameObject;
-            if (go.GetComponent<Collider>() == null)
+            if (go.GetComponentInChildren<Collider>(true) == null)
             {
                 var sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
                 sphere.name = "Handle";
@@ -404,7 +407,12 @@ namespace Erupt.Plugins
                 sphere.transform.localScale = Vector3.one * handleDiameter;
                 sphere.GetComponent<Collider>().isTrigger = true;
                 var renderer = sphere.GetComponent<Renderer>();
-                renderer.material.color = handleColor;
+                if (urpHandleMaterial != null && GraphicsSettings.currentRenderPipeline?.renderPipelineShaderTag == "UniversalPipeline")
+                    renderer.sharedMaterial = urpHandleMaterial;
+
+                var tint = new MaterialPropertyBlock();
+                MaterialColor.Set(tint, handleColor);
+                renderer.SetPropertyBlock(tint);
                 // The handle is the collider the ray hits; SelectionService.Resolve walks
                 // up to the TrajectorySelectable on this object.
             }

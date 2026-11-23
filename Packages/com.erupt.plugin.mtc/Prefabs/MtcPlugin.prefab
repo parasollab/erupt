@@ -71,6 +71,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Erupt.Plugins.Mtc::MtcPlugin
   handleDiameter: 0.06
   handleColor: {r: 0.55, g: 0.35, b: 1, a: 0.9}
+  urpHandleMaterial: {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
   player: {fileID: 5944249871928009853}
   recorder: {fileID: 4505992547924270343}
   pickPlace: {fileID: 8443120186093180874}
