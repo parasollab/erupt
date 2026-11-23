@@ -5,7 +5,7 @@ first in the Unity editor and then in the headset. It takes about half an hour, 
 waiting for downloads and the first build.
 
 <figure class="guide-shot guide-overview">
-  <a href="../images/kitchen-fr3.webp"><img width="1280" height="800" src="../images/kitchen-fr3.webp" alt="A Franka Research 3 arm mounted on the kitchen counter in the KitchenFR3 scene."></a>
+  <a href="../images/kitchen-fr3.webp"><img width="1600" height="1000" src="../images/kitchen-fr3.webp" alt="A Franka Research 3 arm mounted on the kitchen counter, next to the hob, in the KitchenFR3 scene."></a>
   <figcaption>In the kitchen scene, you’ll move the blue handle to give the Franka arm its first goal.</figcaption>
 </figure>
 
@@ -59,19 +59,26 @@ beyond the one Unity itself asks for.
     <input id="motion-plan" aria-controls="plan-frame" type="radio" name="motion-step">
     <label for="motion-plan">Preview the plan</label>
     <figure id="select-frame">
-      <a href="../images/kitchen-fr3-selection.webp"><img width="1060" height="650" src="../images/kitchen-fr3-selection.webp" alt="The selected yellow handle and the End Effector menu above the Franka arm." loading="lazy"></a>
+      <a href="../images/kitchen-fr3-selection.webp"><img width="1600" height="1000" src="../images/kitchen-fr3-selection.webp" alt="The selected yellow handle and, above it, the End Effector menu with Set Goal, Open/Close Gripper, Set Start and Plan." loading="lazy"></a>
       <figcaption>Left-click the blue sphere at the end effector. When the handle turns yellow, click <strong>Set Start</strong> in the menu to save the arm’s current pose.</figcaption>
     </figure>
     <figure id="goal-frame">
-      <a href="../images/kitchen-fr3-goal.webp"><img width="1060" height="650" src="../images/kitchen-fr3-goal.webp" alt="The Franka arm at the dragged handle, with green and orange copies marking the start and goal." loading="lazy"></a>
-      <figcaption>Hold the right mouse button on the sphere and drag it to the pose you want. Release the mouse button and click <strong>Set Goal</strong>. Green marks the start pose and orange marks the goal.</figcaption>
+      <a href="../images/kitchen-fr3-goal.webp"><img width="1600" height="1000" src="../images/kitchen-fr3-goal.webp" alt="A green copy of the arm at the start pose and an orange copy reaching down to the counter at the goal. The arm itself has been dragged up, out of the orange copy." loading="lazy"></a>
+      <figcaption>Hold the right mouse button on the sphere and drag it to the pose you want. Release the mouse button and click <strong>Set Goal</strong>. Green marks the start pose and orange marks the goal. The orange copy appears where the arm is, so the arm in this picture has been dragged up and out of it to show both.</figcaption>
     </figure>
     <figure id="plan-frame">
-      <a href="../images/kitchen-fr3-plan.webp"><img width="1060" height="650" src="../images/kitchen-fr3-plan.webp" alt="The blue preview arm showing the planned motion alongside the stationary robot." loading="lazy"></a>
+      <a href="../images/kitchen-fr3-plan.webp"><img width="1600" height="1000" src="../images/kitchen-fr3-plan.webp" alt="A blue copy of the arm on its way from the green start copy to the orange goal copy, while the arm itself stays still. The plan's menu offers Execute and Stop Preview." loading="lazy"></a>
       <figcaption>Click <strong>Plan</strong>. The translucent blue arm plays the motion on a loop while the solid arm stays still. Choose <strong>Stop Preview</strong> to end playback. If you select something else, point at the purple sphere and select it to reopen this plan’s menu.</figcaption>
     </figure>
   </div>
 </fieldset>
+
+<figure class="guide-shot">
+  <video controls loop muted playsinline preload="metadata" width="1280" height="800" poster="../images/kitchen-fr3-plan.webp" aria-label="The blue copy of the arm moving from the start pose to the goal pose, over and over.">
+    <source src="../images/kitchen-fr3-plan.mp4" type="video/mp4">
+  </video>
+  <figcaption>The preview as it plays. The motion takes about a second and a half and repeats until you stop it.</figcaption>
+</figure>
 
 When you’re ready, click **Execute** in the plan menu. The preview ends, the simulated
 robot moves, and the arm in Unity follows it.

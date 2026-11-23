@@ -6,10 +6,10 @@ headset they share one scene: an obstacle you place is known to every arm's plan
 
 <figure class="guide-shot">
   <div class="namespace-map">
-    <img width="986" height="568" src="../images/multi-arm-fr3.webp" alt="Three Franka arms in MultiArmFR3. The front-left arm uses /right, the rear arm uses /left, and the front-right arm uses /third.">
-    <span aria-hidden="true" style="--arm-x: 25%; --arm-y: 35%">/right</span>
-    <span aria-hidden="true" style="--arm-x: 47%; --arm-y: 20%">/left</span>
-    <span aria-hidden="true" style="--arm-x: 73%; --arm-y: 35%">/third</span>
+    <img width="1600" height="1000" src="../images/multi-arm-fr3.webp" alt="Three Franka arms in MultiArmFR3, standing around two obstacles. The arm on the left uses /third, the arm at the back uses /right, and the arm on the right uses /left.">
+    <span aria-hidden="true" style="--arm-x: 22%; --arm-y: 31%">/third</span>
+    <span aria-hidden="true" style="--arm-x: 50%; --arm-y: 29%">/right</span>
+    <span aria-hidden="true" style="--arm-x: 76%; --arm-y: 32%">/left</span>
   </div>
   <figcaption>Each label shows the arm’s ROS namespace in <code>MultiArmFR3</code>. Selecting an arm switches the controls to its planner.</figcaption>
 </figure>
@@ -46,6 +46,11 @@ ROS side where the arms stand.
    | **Id** | A name of your choice, shown in the headset, for example `left` |
    | **Ros Namespace** | The namespace you gave that arm in step 1, for example `left` |
 
+<figure class="guide-shot">
+  <a href="../images/editor-robot-instance.webp"><img width="1040" height="990" src="../images/editor-robot-instance.webp" alt="The Inspector for the robot named left in MultiArmFR3. Its Robot Instance component has Id left, Ros Namespace left and the FR3 profile." loading="lazy"></a>
+  <figcaption>The <strong>Robot Instance</strong> component of the arm <code>left</code> in <code>MultiArmFR3</code>. The fields below <strong>Profile</strong> are filled in by the prefab.</figcaption>
+</figure>
+
 That is all. The plugins find every robot in the scene on their own.
 
 `Assets/Scenes/MultiArmFR3` is a finished example with three arms.
@@ -63,6 +68,22 @@ of the list, and build.
   expressed relative to that arm.
 - **Plans, tasks and demonstrations belong to one arm.** Each arm has its own start, goal,
   plans, pick-and-place tasks and recordings.
+
+<div class="shot-pair">
+  <figure class="guide-shot">
+    <a href="../images/multi-arm-active.webp"><img width="1600" height="1000" src="../images/multi-arm-active.webp" alt="The end effector of the arm on the right is selected. Its menu is headed End Effector, left." loading="lazy"></a>
+    <figcaption>The menu names the arm it acts on: <strong>End Effector · left</strong>.</figcaption>
+  </figure>
+  <figure class="guide-shot">
+    <a href="../images/panel-moveit-left.webp"><img width="1055" height="750" src="../images/panel-moveit-left.webp" alt="The panel with the tabs Scene, MoveIt left, MTC left, Demonstrations left and Settings." loading="lazy"></a>
+    <figcaption>So do the tabs that belong to one arm.</figcaption>
+  </figure>
+</div>
+
+<figure class="guide-shot">
+  <a href="../images/multi-arm-plans.webp"><img width="1600" height="1000" src="../images/multi-arm-plans.webp" alt="Two of the three arms each have a green start copy, an orange goal copy and a blue copy playing a plan. The third arm stands still." loading="lazy"></a>
+  <figcaption>Two arms with a plan each, previewing at the same time. Both arms have been turned aside at the base so that their copies can be seen: green for the start, orange for the goal, blue for the motion.</figcaption>
+</figure>
 
 ## What to know
 

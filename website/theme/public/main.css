@@ -317,3 +317,54 @@ body[data-layout="landing"] > main {
   .field-paths section + section { border-left: 0; border-top: 1px solid var(--bs-border-color); }
   .field-notes { margin-top: 2.5rem; }
 }
+
+/* Pictures of the app in the guides. */
+.guide-shot video { display: block; width: 100%; height: auto; border: 1px solid var(--bs-border-color); }
+.shot-pair { display: grid; gap: 1.25rem; margin: 1.4rem 0 1.8rem; }
+.shot-pair .guide-shot { margin: 0; }
+@media (min-width: 650px) {
+  .shot-pair { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* A set of frames with any number of tabs (--frames), chosen by position. */
+.motion-frames { grid-template-columns: repeat(var(--frames, 3), minmax(0, 1fr)); }
+.motion-frames label { overflow-wrap: anywhere; }
+@media screen {
+  .motion-frames input:nth-of-type(1):checked ~ figure:nth-of-type(1),
+  .motion-frames input:nth-of-type(2):checked ~ figure:nth-of-type(2),
+  .motion-frames input:nth-of-type(3):checked ~ figure:nth-of-type(3),
+  .motion-frames input:nth-of-type(4):checked ~ figure:nth-of-type(4),
+  .motion-frames input:nth-of-type(5):checked ~ figure:nth-of-type(5) { display: block; }
+}
+@media (max-width: 650px) {
+  .motion-frames label { font-size: .8rem; }
+}
+
+.robot-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: 1rem;
+  margin: 1.4rem 0 1.8rem;
+}
+.robot-gallery figure { margin: 0; }
+.robot-gallery img { display: block; width: 100%; height: auto; border: 1px solid var(--bs-border-color); }
+.robot-gallery figcaption { margin-top: .4rem; font-weight: 650; line-height: 1.25; }
+.robot-gallery figcaption span { display: block; color: var(--field-muted); font-weight: 400; }
+
+/* The colours of the robot's copies, for captions. */
+.copy-key { white-space: nowrap; }
+.copy-key::before {
+  content: "";
+  display: inline-block;
+  width: .7rem;
+  height: .7rem;
+  margin-right: .3rem;
+  border: 1px solid #0006;
+  background: var(--copy);
+}
+.start-key, .goal-key { display: inline-flex; align-items: center; gap: .5rem; }
+.start-key { color: #86e391; }
+.goal-key { color: #ffb168; }
+.start-key::before, .goal-key::before { content: ""; width: .85rem; height: .6rem; border: 1px solid currentColor; }
+.start-key::before { background: #86e39150; }
+.goal-key::before { background: #ffb16850; }

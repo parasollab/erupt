@@ -12,6 +12,36 @@ on the ROS side.
 | UFactory xArm7 | xArm gripper | `Packages/com.erupt.robot.ufactory/Robots/xArm7` | `ROBOT=xarm7` |
 | KUKA LBR iiwa 14 | Robotiq 2F-85 | `Packages/com.erupt.robot.kuka/Robots/iiwa14` | `ROBOT=iiwa14` |
 
+<div class="robot-gallery">
+  <figure>
+    <a href="../images/robot-fr3.webp"><img width="1200" height="900" src="../images/robot-fr3.webp" alt="The Franka Research 3 with its Franka hand on the kitchen counter." loading="lazy"></a>
+    <figcaption>Franka Research 3<span>Franka hand</span></figcaption>
+  </figure>
+  <figure>
+    <a href="../images/robot-ur5e.webp"><img width="1200" height="900" src="../images/robot-ur5e.webp" alt="The Universal Robots UR5e with its Robotiq 2F-85 on the kitchen counter." loading="lazy"></a>
+    <figcaption>Universal Robots UR5e<span>Robotiq 2F-85</span></figcaption>
+  </figure>
+  <figure>
+    <a href="../images/robot-ur10e.webp"><img width="1200" height="900" src="../images/robot-ur10e.webp" alt="The Universal Robots UR10e with its Robotiq 2F-85 on the kitchen counter." loading="lazy"></a>
+    <figcaption>Universal Robots UR10e<span>Robotiq 2F-85</span></figcaption>
+  </figure>
+  <figure>
+    <a href="../images/robot-kinova-gen3.webp"><img width="1200" height="900" src="../images/robot-kinova-gen3.webp" alt="The Kinova Gen3 with its Robotiq 2F-85 on the kitchen counter." loading="lazy"></a>
+    <figcaption>Kinova Gen3<span>Robotiq 2F-85</span></figcaption>
+  </figure>
+  <figure>
+    <a href="../images/robot-xarm7.webp"><img width="1200" height="900" src="../images/robot-xarm7.webp" alt="The UFactory xArm7 with its xArm gripper on the kitchen counter." loading="lazy"></a>
+    <figcaption>UFactory xArm7<span>xArm gripper</span></figcaption>
+  </figure>
+  <figure>
+    <a href="../images/robot-iiwa14.webp"><img width="1200" height="900" src="../images/robot-iiwa14.webp" alt="The KUKA LBR iiwa 14 with its Robotiq 2F-85 on the kitchen counter." loading="lazy"></a>
+    <figcaption>KUKA LBR iiwa 14<span>Robotiq 2F-85</span></figcaption>
+  </figure>
+</div>
+
+Each picture is the same kitchen scene with the robot swapped, from the same place, in the
+pose the simulated robot starts in.
+
 The Unity robot and the ROS robot are made from the same description, so joint names, limits,
 planning groups and named poses agree on both sides.
 
