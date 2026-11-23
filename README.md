@@ -114,6 +114,9 @@ the server with Ctrl+C, rerun the second command, and refresh the browser.
 the ROS connection. `Tools/live-tests.sh single` runs the app against a real ROS 2 stack; see
 [`Assets/Erupt.App/Tests/Live/README.md`](Assets/Erupt.App/Tests/Live/README.md).
 
+On macOS, the reference project closes the Meta Interaction SDK 207.0.0 telemetry session
+when the editor quits. See [editor shutdown troubleshooting](https://parasollab.github.io/erupt/guides/troubleshooting.html#the-macos-editor-crashes-on-exit).
+
 ## Licence
 
 BSD 3-Clause, © Parasol Lab, University of Illinois Urbana-Champaign. See `LICENSE`; each

@@ -38,6 +38,12 @@
     "precompiledReferences": [],
     "autoReferenced": true,
     "defineConstraints": [],
-    "versionDefines": [],
+    "versionDefines": [
+        {
+            "name": "com.meta.xr.sdk.interaction",
+            "expression": "[207.0.0]",
+            "define": "ERUPT_ISDK_207_0_0"
+        }
+    ],
     "noEngineReferences": false
 }
