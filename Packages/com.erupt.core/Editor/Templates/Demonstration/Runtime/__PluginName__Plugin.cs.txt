@@ -8,8 +8,8 @@ namespace {{Namespace}}
 {
     /// <summary>
     /// {{DisplayName}}: an ERUPT demonstration (learning-from-demonstration) plugin. The base
-    /// class feeds interaction samples to OnSample while a demonstration is being recorded,
-    /// binds the trajectory "correct" verb and adds a tier 3 tab "demos-{{PluginId}}".
+    /// class feeds interaction samples to OnSample while a demonstration is being recorded
+    /// and adds a tier 3 tab "demos-{{PluginId}}".
     /// Recording starts and stops on a button press; there is no mode to enter first.
     /// Guidelines Part 5 (Learning from demonstration).
     /// </summary>

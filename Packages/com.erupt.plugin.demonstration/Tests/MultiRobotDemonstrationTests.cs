@@ -94,7 +94,7 @@ namespace Erupt.Plugins.Demonstration.Tests
         [Test]
         public void ADemonstration_IsRecordedAndPublished_OnTheRobotItWasStartedFor()
         {
-            ui.Bound["correct"](FakeRobots.EndEffectorOf(right));
+            plugin.StartDemonstration(right);
 
             Assert.IsTrue(plugin.IsRecording);
             Assert.AreSame(right, plugin.RecordingRobot);

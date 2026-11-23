@@ -23,9 +23,8 @@ demonstrations for learning from demonstration.
 One demonstration is recorded at a time, on the robot it was started for. The robot cannot
 leave its joint limits while you record, and a replay names any joint that would.
 
-To show the robot a better motion than one it planned, select the plan and choose
-**Correct**. That starts a recording on the plan's robot, from the pose the robot is
-in, and opens the Demonstrations tab so that you can stop it.
+Correcting a plan the robot made, from the plan's own menu, is not available yet. See
+[Coming soon](coming-soon.md).
 
 ## What goes to ROS
 

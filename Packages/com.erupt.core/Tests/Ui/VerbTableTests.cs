@@ -46,7 +46,6 @@ namespace Erupt.Ui.Tests
         [TestCase(SelectionKind.EndEffector, "set-goal")]
         [TestCase(SelectionKind.Trajectory, "execute")]
         [TestCase(SelectionKind.Trajectory, "preview")]
-        [TestCase(SelectionKind.Trajectory, "correct")]   // the demonstration family implements it
         public void ExistingFunctionalityIsMarkedAvailable(SelectionKind kind, string verbId)
         {
             var verb = VerbTable.For(kind).Single(v => v.Id == verbId);
@@ -59,6 +58,7 @@ namespace Erupt.Ui.Tests
         [TestCase(SelectionKind.Obstacle, "lock")]
         [TestCase(SelectionKind.EndEffector, "preview-grasp")]
         [TestCase(SelectionKind.Trajectory, "scrub")]
+        [TestCase(SelectionKind.Trajectory, "correct")]
         [TestCase(SelectionKind.Trajectory, "compare")]
         [TestCase(SelectionKind.RobotLink, "lock-joint")]
         [TestCase(SelectionKind.Obstacle, "paint-cost")]

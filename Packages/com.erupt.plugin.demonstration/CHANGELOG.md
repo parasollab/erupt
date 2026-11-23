@@ -9,8 +9,7 @@ All notable changes to `com.erupt.plugin.demonstration` are documented here. The
 
 - **Breaking, with core.** There is no Teach mode. **Record** on the Demonstrations tab is
   available whenever the robot can record (it reads **Stop** while a recording runs; the
-  status reads "Ready to record"), **Correct** is on a plan's menu whenever the plugin is
-  registered, and `/record_start` toggles a recording at any time. A recording ends when it
+  status reads "Ready to record"), and `/record_start` toggles a recording at any time. A recording ends when it
   is stopped (the button, the topic, `StopDemonstration`) or when its robot leaves; it no
   longer ends because a mode was left. `StartDemonstration` is no longer refused with
   "Demonstrations are recorded in Teach mode only."; `OnModeChanged` is gone.
@@ -18,12 +17,10 @@ All notable changes to `com.erupt.plugin.demonstration` are documented here. The
 
 ### Changed (first run)
 
-- **Correct** on a plan can be pressed: core no longer marks the verb pending. It starts a
-  demonstration on the plan's robot and opens the
-  Demonstrations tab. (Checked: with a plan selected the recorder of the plan's
-  robot starts, samples the robot as the user moves it, and the demonstration can be
-  replayed and published. It records from where the robot is; it does not replay the plan
-  first.)
+- **Correct** is not on a plan's menu. It only started an ordinary recording on the plan's
+  robot (from where the robot was, without using the plan), which was confusing; the verb
+  is pending in core until correcting a plan is designed. Record on the Demonstrations tab
+  and `/record_start` start a recording as before.
 
 ### Fixed (buttons that did nothing)
 

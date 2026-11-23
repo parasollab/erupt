@@ -58,7 +58,7 @@ namespace Erupt.Ui
             [SelectionKind.Trajectory] = new[]
             {
                 Pending  ("scrub",   "Scrub"),
-                Available("correct", "Correct"),
+                Pending  ("correct", "Correct"),
                 Pending  ("compare", "Compare"),
                 Available("execute", "Execute"),
                 Extra    ("preview", "Preview")

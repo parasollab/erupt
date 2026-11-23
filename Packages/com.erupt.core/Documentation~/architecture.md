@@ -314,10 +314,11 @@ No path moves a joint past its limits, and there is one reason for that:
   the tab strip unless the plugin is registered, which needs its prefab in the scene (and so
   its package in the project). The verbs a plugin adds (`Set Start`, `Plan`, `Place at
   Marker`) are in the registry only while it is registered. The guideline verbs a plugin
-  implements (`Set Goal`, `Execute`, `Preview` by the planning family, `Correct` by the
-  demonstration family) are in the table for everyone, but a menu leaves out a verb nothing
-  has bound, and each family also gives its verbs a condition, so they leave the menus again
-  when the last plugin of the family is unregistered while the app runs. A plugin removes
+  implements (`Set Goal`, `Execute`, `Preview` by the planning family) are in the table for
+  everyone, but a menu leaves out a verb nothing has bound, and the family also gives its
+  verbs a condition, so they leave the menus again when its last plugin is unregistered
+  while the app runs. The demonstration family adds a tab and no verb (`Correct` on a plan
+  is in the table, marked pending). A plugin removes
   its tab when it is unregistered. The gripper verb is core's own: it is there with any
   robot. `Assets/Erupt.App/Tests/Modules` checks all of this with the real prefabs.
 - **Environment → planning scenes** (one Unity environment, N independent MoveIt planning
@@ -455,7 +456,7 @@ No path moves a joint past its limits, and there is one reason for that:
 - **Demonstration**: `DemonstrationPlugin` feeds `InteractionSampleBus` samples while a
   demonstration is being recorded; the demonstration plugin samples a robot's joint state
   into a `JointTrajectory`, replays it on that robot's player, and publishes it in that
-  robot's namespace. A recording starts with Record on the tab, `Correct` on a plan or a
+  robot's namespace. A recording starts with Record on the tab or a
   message on `/record_start`, at any time, and ends with Stop (or the same message). One
   demonstration is recorded at a time, on the robot it was started for.
 - **Haptics**: `CollisionHaptics` (OpenXR backend) pulses both controllers as any robot's tip

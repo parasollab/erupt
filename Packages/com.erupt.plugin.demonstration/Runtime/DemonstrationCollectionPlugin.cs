@@ -9,8 +9,8 @@ namespace Erupt.Plugins.Demonstration
 {
     /// <summary>
     /// Demonstration collection as an ERUPT demonstration plugin (Guidelines Part 5), for
-    /// any number of robots. The base class feeds the interaction samples and binds the
-    /// "correct" verb; this class owns, per robot, a joint-space <see cref="DemonstrationRecorder"/> and
+    /// any number of robots. The base class feeds the interaction samples and adds the
+    /// tab; this class owns, per robot, a joint-space <see cref="DemonstrationRecorder"/> and
     /// a <see cref="JointTrajectoryPlayer"/> for replay (<see cref="RobotSession"/>), plus the
     /// info log, and points the hand/gripper mirrors and the point-cloud publisher at the
     /// context. A robot's demonstrations, virtual joint state and interaction flag go out in

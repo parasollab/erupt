@@ -39,7 +39,6 @@ namespace Erupt.App.Modules.Tests
         private static readonly string[] CoreEndEffector = { "Open/Close Gripper" };
         private static readonly string[] PlanningEndEffector = { "Set Goal", "Open/Close Gripper", "Set Start", "Plan" };
         private static readonly string[] PlanningPlan = { "Execute", "Preview" };
-        private static readonly string[] DemonstrationPlan = { "Correct" };
 
         private FakeRosBus bus;
         private GameObject root;
@@ -121,7 +120,7 @@ namespace Erupt.App.Modules.Tests
 
             Assert.IsEmpty(Registered());
             CollectionAssert.AreEqual(CoreEndEffector, MenuOf(endEffector), "The gripper is the robot's own; nothing of a planner.");
-            Assert.IsEmpty(MenuOf(plan), "No Correct, Execute or Preview without the modules that offer them.");
+            Assert.IsEmpty(MenuOf(plan), "No Execute or Preview without the module that offers them.");
             CollectionAssert.AreEqual(new[] { "Scene" }, Strip(), "The Scene tab is core's; no module's tab.");
         }
 
@@ -132,7 +131,7 @@ namespace Erupt.App.Modules.Tests
 
             CollectionAssert.AreEqual(new[] { "moveit" }, Registered());
             CollectionAssert.AreEqual(PlanningEndEffector, MenuOf(endEffector));
-            CollectionAssert.AreEqual(PlanningPlan, MenuOf(plan), "No Correct without the demonstration module.");
+            CollectionAssert.AreEqual(PlanningPlan, MenuOf(plan));
             CollectionAssert.AreEqual(new[] { "Scene", "MoveIt" }, Strip(), "No MTC tab and no Demonstrations tab.");
         }
 
@@ -148,13 +147,13 @@ namespace Erupt.App.Modules.Tests
         }
 
         [UnityTest]
-        public IEnumerator DemonstrationAlone_BringsCorrectAndItsTab_AndNoPlanningVerb()
+        public IEnumerator DemonstrationAlone_BringsItsTab_AndNoVerb()
         {
             yield return Build(Demonstration);
 
             CollectionAssert.AreEqual(new[] { "demonstration" }, Registered());
             CollectionAssert.AreEqual(CoreEndEffector, MenuOf(endEffector), "No Set Start, Set Goal or Plan without a planner.");
-            CollectionAssert.AreEqual(DemonstrationPlan, MenuOf(plan), "No Execute or Preview without a planner.");
+            Assert.IsEmpty(MenuOf(plan), "The demonstration module puts nothing on a plan's menu, and there is no planner.");
             CollectionAssert.AreEqual(new[] { "Scene", "Demonstrations" }, Strip());
         }
 
@@ -178,7 +177,7 @@ namespace Erupt.App.Modules.Tests
 
             CollectionAssert.AreEquivalent(new[] { "moveit", "mtc", "demonstration" }, Registered());
             CollectionAssert.AreEqual(PlanningEndEffector, MenuOf(endEffector));
-            CollectionAssert.AreEqual(new[] { "Correct", "Execute", "Preview" }, MenuOf(plan));
+            CollectionAssert.AreEqual(PlanningPlan, MenuOf(plan), "The demonstration module adds nothing to a plan's menu.");
             CollectionAssert.AreEqual(new[] { "Scene", "MoveIt", "MTC", "Demonstrations" }, Strip());
 
             // The modules' own tabs hold no dead control for a module that is there.
@@ -193,7 +192,7 @@ namespace Erupt.App.Modules.Tests
             selection.Select(plan);
             host.Unregister(demonstrations);
             yield return null;
-            CollectionAssert.AreEqual(PlanningPlan, rig.TierTwo.Model.Verbs.Select(v => v.Label).ToArray(), "The open menu lost Correct at once.");
+            CollectionAssert.AreEqual(PlanningPlan, rig.TierTwo.Model.Verbs.Select(v => v.Label).ToArray(), "The planners' verbs stay.");
             CollectionAssert.AreEqual(new[] { "Scene", "MoveIt", "MTC" }, Strip());
 
             host.Unregister(mtc);

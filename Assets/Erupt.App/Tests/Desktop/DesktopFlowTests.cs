@@ -301,7 +301,7 @@ namespace Erupt.App.Desktop.Tests
                 .Using(UnityEngine.TestTools.Utils.ColorEqualityComparer.Instance));
             // The plan plays on the robot's blue copy, over and over; the robot itself stays put,
             // and the plan's menu offers to stop the preview where it would offer to play it.
-            CollectionAssert.AreEquivalent(new[] { "execute", Erupt.Plugins.PlanningPlugin.StopPreviewVerb, "correct" },
+            CollectionAssert.AreEquivalent(new[] { "execute", Erupt.Plugins.PlanningPlugin.StopPreviewVerb },
                 ui.TierTwo.Model.Verbs.Select(v => v.Id).ToArray());
             Assert.IsTrue(robot.Ghosts.IsPreviewPlaying, "The new plan plays on a copy of the robot.");
             float[] posed = robot.Model.GetJointStatePositions();
@@ -312,7 +312,7 @@ namespace Erupt.App.Desktop.Tests
 
             yield return ClickVerb(Erupt.Plugins.PlanningPlugin.StopPreviewVerb);
             Assert.IsFalse(robot.Ghosts.IsPreviewPlaying, "A click on Stop Preview stops it and removes the copy.");
-            CollectionAssert.AreEquivalent(new[] { "execute", "preview", "correct" }, ui.TierTwo.Model.Verbs.Select(v => v.Id).ToArray());
+            CollectionAssert.AreEquivalent(new[] { "execute", "preview" }, ui.TierTwo.Model.Verbs.Select(v => v.Id).ToArray());
             yield return ClickVerb("preview");
             Assert.IsTrue(robot.Ghosts.IsPreviewPlaying, "A click on Preview plays it again.");
 

@@ -279,7 +279,7 @@ namespace Erupt.Plugins.Tests
         }
 
         [Test]
-        public void TheDemosTab_FollowsTheActiveRobot_AndCorrectStartsOnTheOwner()
+        public void TheDemosTab_FollowsTheActiveRobot_AndADemonstrationStartsOnTheRobotNamed()
         {
             FakeDemonstrator demonstrator = Register<FakeDemonstrator>();
 
@@ -289,7 +289,8 @@ namespace Erupt.Plugins.Tests
             Assert.AreEqual("Fake Demonstrator · right", tab.Label);
             Assert.AreEqual(2, demonstrator.TabBuilds);
 
-            ui.Bound["correct"](FakeRobots.EndEffectorOf(third));
+            Assert.AreSame(third, demonstrator.RobotOf(FakeRobots.EndEffectorOf(third)), "A selected object names the robot it belongs to.");
+            demonstrator.StartDemonstration(third);
             CollectionAssert.AreEqual(new[] { third }, demonstrator.StartRobots);
             demonstrator.StartDemonstration();
             Assert.AreSame(right, demonstrator.StartRobots[1], "Without a target the active robot is meant.");

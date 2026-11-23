@@ -32,8 +32,8 @@ All notable changes to `com.erupt.core` are documented here. The format follows
   read from `Modes`, and let the control that was gated start the thing. The plugin
   templates (`ERUPT > New Plugin…`) no longer generate a mode hook.
 - What the modes gated is always available: **Add Cube / Add Sphere / Add Cylinder** on the
-  Scene tab (its hint is gone; there is nothing to explain), **Record** on a demonstration
-  tab, and **Correct** on a plan's menu whenever a demonstration plugin is registered.
+  Scene tab (its hint is gone; there is nothing to explain) and **Record** on a
+  demonstration tab.
   `DemonstrationPlugin` feeds samples while a demonstration is being recorded, and a
   recording ends when it is stopped: leaving a mode no longer ends it.
 - The floating "≡ Scene Menu" label next to the left controller (`MenuLabel` in the app's
@@ -154,10 +154,11 @@ All notable changes to `com.erupt.core` are documented here. The format follows
   links do not come in front of it. `verticalOffset` is now the gap above the object (5 cm).
 - **Dragging the end effector selects it**, as dragging a joint selects the joint; it used
   to clear the selection, so the menu with Set Goal was gone after every drag.
-- **"Correct"** on a plan is available (it was marked pending in the table and could never
-  be pressed, although the demonstration family binds it). `DemonstrationPlugin` starts a
-  demonstration on the plan's robot and opens the demos tab, where the recording shows and
-  is stopped.
+- **"Correct"** on a plan is not offered. The verb stays in the table, marked pending like
+  Scrub and Compare, until what correcting a plan should do is designed; a menu leaves it
+  out. `DemonstrationPlugin` no longer binds it (`DemonstrationPlugin.CorrectVerb` is gone),
+  so the demonstration family contributes its tab and no verb. A demonstration is started
+  with Record on the tab or by the subclass's own triggers.
 - **A new shape** from the Scene tab rests on the first surface the gaze meets within the
   placement distance (not a robot, not a menu), or is put that distance ahead when it meets
   none; it used to be put 2 m ahead whatever was there. The free-spot search steps to both

@@ -257,8 +257,7 @@ Language is an accelerator that sits parallel to the tiers, not inside them.
 LfD is part of the same application: not a separate one, and not a mode to
 enter. Demonstration reuses the existing manipulation interactions with a
 recording running, which the user starts and stops with one button (Record on
-the demonstrations tab, or Correct on a plan) — no new interaction vocabulary,
-only a new intent.
+the demonstrations tab) — no new interaction vocabulary, only a new intent.
 
 - Correction of an existing plan is the primary entry point, not full
   demonstration. It is gentler for novices and produces better-conditioned data.

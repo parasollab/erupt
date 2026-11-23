@@ -57,7 +57,7 @@ namespace Erupt.Plugins.Demonstration.Tests
             Assert.IsTrue(plugin.IsRegistered);
             Assert.AreEqual("demonstration", plugin.Id);
             CollectionAssert.Contains(ui.Tabs, "demos-demonstration");
-            Assert.Contains("correct", ui.Bound.Keys.ToList());
+            Assert.IsEmpty(ui.Bound, "No verb on any menu: a demonstration is started from the tab or the topic.");
 
             CollectionAssert.IsSubsetOf(
                 new[] { "/joint_trajectory", "/virtual_joint_state", "/interaction" },
@@ -78,14 +78,6 @@ namespace Erupt.Plugins.Demonstration.Tests
             Assert.IsTrue(plugin.IsRecording);
             Assert.IsTrue(plugin.Recorder.IsRecording);
             Assert.AreSame(robots.Active, plugin.RecordingRobot);
-        }
-
-        [Test]
-        public void CorrectVerb_StartsRecording()
-        {
-            ui.Bound["correct"](null);
-            Assert.IsTrue(plugin.IsRecording);
-            Assert.IsTrue(plugin.Recorder.IsRecording);
             Assert.AreEqual(false, ros.PublishedOn("/interaction").Cast<BoolMsg>().Last().data);
         }
 
@@ -143,8 +135,8 @@ namespace Erupt.Plugins.Demonstration.Tests
 
                 plugin.StartDemonstration();
                 Assert.AreEqual(2, refusals.Count, "Starting a demonstration is no refusal.");
-                // "Correct" pressed again while the demonstration is being recorded.
-                ui.Bound["correct"](null);
+                // Asked for again while the demonstration is being recorded.
+                plugin.StartDemonstration();
                 Assert.AreEqual("A demonstration is already being recorded on this robot.", refusals.Last().Reason);
                 Assert.IsTrue(plugin.IsRecording);
 
@@ -158,14 +150,6 @@ namespace Erupt.Plugins.Demonstration.Tests
                 context.Router = null;
                 Object.DestroyImmediate(routerGo);
             }
-        }
-
-        [Test]
-        public void CorrectVerb_OpensTheDemonstrationsTab()
-        {
-            ui.Bound["correct"](null);
-            Assert.IsTrue(plugin.IsRecording);
-            Assert.AreEqual(plugin.DemosTabId, ui.Summoned);
         }
 
         [Test]

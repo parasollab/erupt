@@ -22,9 +22,7 @@ mirrors tracked hands onto the end effector and a Robotiq 2F gripper. Contract a
 3. **Recording.** There is no mode to switch to. The tier 3 **Demonstrations** tab has
    **Record** (which reads **Stop** while a recording runs), **Replay**, **Publish** and the
    two streaming toggles (**Publish state**, **Mirror joint_states**), and shows the last
-   `/user_info` message. A selected plan has the verb **Correct** on its menu: it starts a
-   recording on the plan's robot and opens the Demonstrations tab, where the recording shows
-   and is stopped. Any message on `/record_start` toggles a recording too, at any time. A
+   `/user_info` message. Any message on `/record_start` toggles a recording too, at any time. A
    recording ends when it is stopped (the button, the topic) or when its robot leaves the
    scene. What cannot be done (a second recording, publishing or replaying nothing) is a
    refusal with the reason.
