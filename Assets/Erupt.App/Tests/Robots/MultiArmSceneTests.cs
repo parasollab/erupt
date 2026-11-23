@@ -28,12 +28,14 @@ namespace Erupt.App.Robots.Tests
         private static readonly string[] Ids = { "left", "right", "third" };
 
         private Scene scene;
+        private GameObject rosConnection;
 
         [UnityTearDown]
         public IEnumerator TearDown()
         {
             if (scene.IsValid() && scene.isLoaded) yield return SceneManager.UnloadSceneAsync(scene);
             scene = default;
+            if (rosConnection != null) Object.DestroyImmediate(rosConnection);
             RosBus.Reset();
             // The scene's plugin host gave the default registry the fake bus; later tests start without one.
             RobotRegistry.Default.SetBus(null);
@@ -47,6 +49,9 @@ namespace Erupt.App.Robots.Tests
 
             var bus = new FakeRosBus();
             RosBus.Override(bus);
+            // The scene's visualization suite asks the connector itself for a connection: give it
+            // one that never connects, or a real one keeps trying (and logging) into later tests.
+            rosConnection = IdleRosConnection.Create();
             // The scene carries the XR rig, which reports missing devices when run headless.
             LogAssert.ignoreFailingMessages = true;
             {

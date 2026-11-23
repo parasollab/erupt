@@ -187,15 +187,21 @@ jobs:
           status=0
           for mode in EditMode PlayMode; do
             report="$PWD/test-results/$mode.xml"
+            # The report decides, not the exit code: the editor can crash while it shuts down
+            # after a complete run ("Abort trap: 6" once the report is written), and that is not
+            # a test failure. A crash before the end leaves no report, which fails the check below.
+            code=0
             "$UNITY_EDITOR_PATH" -batchmode -nographics -projectPath "$PWD" -buildTarget Android \
-              -runTests -testPlatform "$mode" -testResults "$report" -logFile "$PWD/test-results/$mode.log" || status=1
+              -runTests -testPlatform "$mode" -testResults "$report" -logFile "$PWD/test-results/$mode.log" || code=$?
             if counts=$(xmllint --xpath 'concat("passed=", /test-run/@passed, " failed=", /test-run/@failed, " skipped=", /test-run/@skipped)' "$report"); then
               echo "$mode $counts" | tee -a "$GITHUB_STEP_SUMMARY"
             fi
             # Unity marks the whole run Skipped:Ignored when the opt-in live ROS tests skip.
             if [[ "$(xmllint --xpath 'boolean(/test-run[@passed > 0 and @failed = 0 and @inconclusive = 0 and (@result="Passed" or @result="Skipped:Ignored")])' "$report")" != true ]]; then
-              echo "::error::$mode did not produce a passing test report. See the test-results artifact."
+              echo "::error::$mode did not produce a passing test report (the editor exited with code $code). See the test-results artifact."
               status=1
+            elif [ "$code" -ne 0 ]; then
+              echo "::warning::$mode: the editor exited with code $code after writing a passing report (a crash on exit). Not counted as a failure."
             fi
           done
           exit "$status"

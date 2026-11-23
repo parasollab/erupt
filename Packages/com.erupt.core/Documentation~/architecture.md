@@ -33,7 +33,7 @@ Erupt.Plugins.Ar        →  Erupt.Plugins and core; AprilTag, Meta MR Utility K
 Erupt.App               →  everything (the reference app may see plugins)
 Erupt.Core.Editor       →  core (plugin generator, templates, Robot Setup); the URDF Importer when it is installed
 Erupt.Setup.Editor      →  nothing (the offer to add missing packages, Project Setup, Collada materials for the render pipeline)
-Tests: Erupt.TestSupport (FakeRosBus, FakeRobotModel, FakeRobots, TestInteractionSource) ← every *.Tests; Erupt.Boundary.Tests enforces the graph
+Tests: Erupt.TestSupport (FakeRosBus, FakeRobotModel, FakeRobots, TestInteractionSource, IdleRosConnection) ← every *.Tests; Erupt.Boundary.Tests enforces the graph
 ```
 
 The assemblies that need the ROS-TCP-Connector (`Erupt.Ros`, `Erupt.Robot`, `Erupt.Plugins`,

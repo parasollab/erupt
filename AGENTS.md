@@ -65,7 +65,8 @@ grep checks you can run locally without Unity. The main ones:
   ```
 
   Use `PlayMode` for the larger suite; it takes several minutes. Judge a run by the counts in
-  the results file, as CI does, not by the exit code alone. For a compile check only, replace
+  the results file, as CI does, not by the exit code: the editor can crash while it shuts down
+  after a complete, passing run, and CI only warns about that. For a compile check only, replace
   the test arguments with `-quit` and search the log for `error CS`.
 - A PlayMode run can leave an empty `Assets/StreamingAssets` folder and change a line in
   `Assets/XR/Settings/OpenXR Package Settings.asset`. Do not commit either.

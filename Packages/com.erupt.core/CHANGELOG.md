@@ -98,6 +98,13 @@ All notable changes to `com.erupt.core` are documented here. The format follows
 - `DesktopMouseBackendTests.APressOnAMenu_IsNotAWorldSelect` aimed "beside the menu" at a
   point behind the menu's collider and passed only while no physics step had run since the
   menu was placed; the menu now leaves part of the cube in the clear.
+- The tests that load a reference scene left a real `ROSConnection` behind: the scene's
+  visualization suite asks the connector for one directly, and the connector does not stop
+  its connection thread when the scene is unloaded. Each kept logging a failed connection
+  every second, which now and then failed a later test that asserts nothing was logged
+  (`AprilTagTrackerTests.WithoutAPassthroughCamera_TheTrackerDoesNothing_AndSaysSo` in CI).
+  `IdleRosConnection` in `Erupt.TestSupport` gives such a test a connection that never
+  connects.
 
 ### Added (first run: the editor without a headset)
 

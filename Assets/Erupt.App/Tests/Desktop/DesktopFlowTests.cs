@@ -44,6 +44,7 @@ namespace Erupt.App.Desktop.Tests
         private FakeRosBus bus;
         private MemoryUserSettingsStore settings;
         private Scene scene;
+        private GameObject rosConnection;
 
         private Camera cam;
         private DesktopControls controls;
@@ -72,6 +73,9 @@ namespace Erupt.App.Desktop.Tests
 
             bus = new FakeRosBus();
             RosBus.Override(bus);
+            // The scene's visualization suite asks the connector itself for a connection: give it
+            // one that never connects, or a real one keeps trying (and logging) into later tests.
+            rosConnection = IdleRosConnection.Create();
             // The scene's collision haptics start from the scene's values and remember nothing
             // on this machine.
             settings = new MemoryUserSettingsStore();
@@ -108,6 +112,7 @@ namespace Erupt.App.Desktop.Tests
         {
             if (scene.IsValid() && scene.isLoaded) yield return SceneManager.UnloadSceneAsync(scene);
             scene = default;
+            if (rosConnection != null) UnityEngine.Object.DestroyImmediate(rosConnection);
             RosBus.Reset();
             RobotRegistry.Default.SetBus(null);
             UserSettings.Store = null;

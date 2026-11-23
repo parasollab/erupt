@@ -84,7 +84,7 @@ Editor                Erupt.Core.Editor  plugin generator and templates, Robot S
 Editor/Setup          Erupt.Setup.Editor the offer to add missing packages, Project Setup, Collada materials for the project's render pipeline (references no other package)
 Samples~/StarterScene the Starter Scene sample: ERUPT root, XR rig, the three plugins, a floor and a table, no robot
 Prefabs/EruptCore     the ERUPT root: PluginHost + SelectionService/Highlighter/RouterBinding + EnvironmentRegistry + TierUiRig + the desktop controls
-Tests/Support         Erupt.TestSupport  FakeRosBus, FakeRobotModel, FakeRobots, TestInteractionSource (UNITY_INCLUDE_TESTS)
+Tests/Support         Erupt.TestSupport  FakeRosBus, FakeRobotModel, FakeRobots, TestInteractionSource, IdleRosConnection (UNITY_INCLUDE_TESTS)
 Tests/*               per-assembly PlayMode tests; Tests/Boundary (the package boundary), Tests/Editor and Tests/Ros are EditMode
 ```
 
