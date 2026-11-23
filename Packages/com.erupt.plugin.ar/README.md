@@ -15,6 +15,19 @@ A project gets this package only if it wants AR. Without it a project has no Apr
 no AprilTag native library and no use of the passthrough camera; nothing else in ERUPT
 refers to this package. Meta Quest only: there is no camera abstraction and no other headset.
 
+## Tabletop workbench in the reference app
+
+Open `Assets/Scenes/ARWorkbenchFR3.unity` for a ready-to-use FR3 and a movable planning
+obstacle. Press Play to try the block with the mouse. On Quest, lay the supplied 100 mm
+tag 0 flat on the table and use **Place at Marker**. The base sits at the centre of the tag
+and faces the printed arrow. Select and grab the block to put it in the arm’s path.
+Use the single-FR3 MoveIt stack to preview a plan around it.
+
+The scene carries the asset label `EruptTabletopWorkbench`. For Play mode and player builds
+the module adds its `TabletopAR` prefab and a default `MarkerAnchor` on the root named
+`Robot Slot`. The robot uses its own planning frame. Removing the module leaves the desktop
+workbench usable.
+
 ## Install
 
 The package needs two packages that it cannot bring along by itself:

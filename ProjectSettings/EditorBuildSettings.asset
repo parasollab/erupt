@@ -11,6 +11,9 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/MultiArmFR3.unity
     guid: 4741af08e3b7a42f1954fcde53f883b4
+  - enabled: 1
+    path: Assets/Scenes/ARWorkbenchFR3.unity
+    guid: 3bd466439e92048f3a56eeefa7d59a7f
   m_configObjects:
     com.unity.dt.app-ui: {fileID: 11400000, guid: 1b1c20d82303e4b5781c3ef50ac1449f, type: 2}
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: c348712bda248c246b8c49b3db54643f, type: 3}

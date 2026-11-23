@@ -46,7 +46,9 @@ here: planning a first motion with the mouse, then building for the headset.
 ## Two ways to use it
 
 - **This repository as your project.** Clone or fork it and change the scenes. It is a
-  complete Unity project with a kitchen scene, a three-arm scene and every shipped robot.
+  complete Unity project with a kitchen scene, a three-arm scene, an AR tabletop workbench
+  and every shipped robot. In `Assets/Scenes/ARWorkbenchFR3.unity`, you can place an FR3
+  on your own table and preview a motion around a movable block.
 - **The packages in your own project.** Add them by git URL, for example
   `https://github.com/parasollab/erupt.git?path=/Packages/com.erupt.core`. See
   [Add ERUPT to your own project](https://parasollab.github.io/erupt/guides/install-package.html).
@@ -83,7 +85,7 @@ needs from a ROS system you bring yourself.
 ## Repository layout
 
 ```
-Assets/Scenes             KitchenFR3 (the reference scene), MultiArmFR3 (three arms)
+Assets/Scenes             KitchenFR3, MultiArmFR3 and ARWorkbenchFR3
 Assets/Erupt.App          scripts that belong to the reference scenes only
 Packages/com.erupt.*      the ERUPT packages
 Tools/robot-descriptions  makes the robot packages from the descriptions the ROS workspace exports
