@@ -175,6 +175,7 @@ namespace Erupt.Plugins.Ar
         }
 
         private RobotSessions<RobotSession> sessions;
+        private SceneAnchorCollisionBridge roomBridge;
         private TextMeshProUGUI statusLabel;
         private float nextStatus;
 
@@ -203,6 +204,11 @@ namespace Erupt.Plugins.Ar
             IUiHost ui = context.Ui;
             if (ui == null) return;
 
+            foreach (var root in gameObject.scene.GetRootGameObjects())
+            {
+                roomBridge = root.GetComponentInChildren<SceneAnchorCollisionBridge>();
+                if (roomBridge != null) break;
+            }
             Erupt.Ui.PanelTab tab = ui.AddTab(TabId, DisplayName, BuildTab);
             if (tab != null) tab.Order = 40;
         }
@@ -295,8 +301,12 @@ namespace Erupt.Plugins.Ar
             if (content == null) return;   // a headless UI host (tests) passes no content
             var column = UiBuilder.CreateColumn("AR", content);
             UiBuilder.Stretch(column.GetComponent<RectTransform>());
+            if (roomBridge != null)
+                UiBuilder.CreateToggle("RoomOverlays", column.transform, "Room overlays", roomBridge.VisualsVisible,
+                    new Vector2(320f, 60f), roomBridge.SetVisualsVisible);
             statusLabel = UiBuilder.CreateLabel("Status", column.transform, StatusText(), 22f);
             statusLabel.alignment = TextAlignmentOptions.TopLeft;
+            statusLabel.textWrappingMode = TextWrappingModes.Normal;
         }
 
         /// <summary>The tracker's state and, per robot, its tag and what the user can do next.</summary>
@@ -305,6 +315,8 @@ namespace Erupt.Plugins.Ar
             var text = new StringBuilder();
             text.Append("Tracker: ").Append(tracker != null ? tracker.StatusText : "none in the scene");
             if (sessions == null) return text.ToString();
+            if (sessions.Count == 0)
+                text.Append("\nNo robot in the scene. Add a robot prefab to the Robot Slot in Unity to track its tag.");
             foreach (RobotSession session in sessions)
             {
                 if (session.Robot == null) continue;

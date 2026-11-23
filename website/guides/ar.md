@@ -101,8 +101,14 @@ position. Nothing has to be changed on the ROS side.
 
 ## Room furniture as obstacles
 
-Run Space Setup on the headset once. With the AR scene, every piece of furniture it knows
-becomes an obstacle for the planner, shown as a translucent box.
+Run Space Setup in the room you want to use and allow the app to access the room scan.
+In the imported **AR Scene**, walk or turn physically. The headset, controllers and tag
+tracker share the Quest room's tracking space. The thumbsticks cannot move or turn the view.
+
+Open **Menu** on the wrist bar, choose **AR**, and press **Room overlays** to hide or show
+the coloured boxes and surfaces. They start visible. A scanned table stays in the robot's
+planning scene while its box is hidden. Walls, floor and ceiling are displayed too. To
+include those surfaces in planning, enable **Publish Planes** on **Room Anchors** in Unity.
 
 ## If no tag is found
 

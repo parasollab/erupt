@@ -152,6 +152,11 @@ becomes an obstacle (a box at the anchor's bounds) and a coloured translucent bo
 view; *Publish Planes* adds the floor, the walls and the ceiling. The anchors are ordinary
 environment objects, so a robot that is placed elsewhere gets them again in its own frame.
 
+In the AR Scene sample, the XR rig starts at the Quest floor origin inside Meta's world-locked
+tracking space. Physical movement and turning move the view. Joystick locomotion is disabled.
+Open **Menu > AR > Room overlays** to hide or show the scan. The toggle affects the rendering of
+current and newly loaded anchors. Their colliders and planning obstacles stay active.
+
 ## Components
 
 | Component | What it does |

@@ -8,8 +8,10 @@ using Erupt.Robot;
 using Erupt.Ros;
 using Erupt.Ros.Tests;
 using Erupt.Ui;
+using Meta.XR.MRUtilityKit;
 using NUnit.Framework;
 using RosMessageTypes.Moveit;
+using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -24,21 +26,64 @@ namespace Erupt.Plugins.Ar.Tests
         private const string ScenePath = "Assets/Scenes/ARWorkbenchFR3.unity";
         private Scene scene;
         private GameObject connection;
+        private string temporaryScene;
 
-        [UnityTest]
-        public IEnumerator WorkbenchRegistersTheBlockAndPlacesTheArmOnlyOnConfirmation()
+        private IEnumerator OpenScene(string path, FakeRosBus bus)
         {
-            Assume.That(File.Exists(ScenePath), "The reference app is absent.");
-            var bus = new FakeRosBus();
+            Assume.That(File.Exists(path), "The reference app is absent.");
             RosBus.Override(bus);
             connection = IdleRosConnection.Create();
             // The Meta and XR components report unavailable hardware in a headless editor.
             LogAssert.ignoreFailingMessages = true;
-            yield return EditorSceneManager.LoadSceneAsyncInPlayMode(ScenePath, new LoadSceneParameters(LoadSceneMode.Additive));
-            scene = SceneManager.GetSceneByPath(ScenePath);
+            yield return EditorSceneManager.LoadSceneAsyncInPlayMode(path, new LoadSceneParameters(LoadSceneMode.Additive));
+            scene = SceneManager.GetSceneByPath(path);
             yield return null;
             yield return null;
+        }
 
+        [UnityTest]
+        public IEnumerator RoomOverlayButtonKeepsNewFurnitureInThePlanningSceneWhenHidden()
+        {
+            // Package Manager samples live outside the asset database until imported.
+            temporaryScene = AssetDatabase.GenerateUniqueAssetPath("Assets/RoomOverlayTest.unity");
+            File.Copy("Packages/com.erupt.plugin.ar/Samples~/ArScene/ArScene.unity", temporaryScene);
+            AssetDatabase.ImportAsset(temporaryScene);
+            yield return OpenScene(temporaryScene, new FakeRosBus());
+            var roots = scene.GetRootGameObjects();
+            var bridge = roots.SelectMany(root => root.GetComponentsInChildren<SceneAnchorCollisionBridge>()).Single();
+            var button = roots.SelectMany(root => root.GetComponentsInChildren<Button>(true)).Single(b => b.name == "RoomOverlays");
+            var registry = roots.SelectMany(root => root.GetComponentsInChildren<EnvironmentRegistry>()).Single();
+            var room = new GameObject("Test room").AddComponent<MRUKRoom>();
+            room.transform.SetParent(bridge.transform, false);
+            var anchor = new GameObject("Scanned furniture").AddComponent<MRUKAnchor>();
+            anchor.transform.SetParent(room.transform, false);
+            // The SDK fills these properties from the device scan.
+            typeof(MRUKAnchor).GetProperty(nameof(MRUKAnchor.VolumeBounds)).SetValue(anchor, new Bounds(Vector3.zero, Vector3.one));
+            room.Anchors.Add(anchor);
+
+            Assert.IsTrue(bridge.VisualsVisible);
+            button.onClick.Invoke();
+            Assert.IsFalse(bridge.VisualsVisible);
+            MRUK.Instance.RoomCreatedEvent.Invoke(room);
+            var box = bridge.GetComponentsInChildren<MeshRenderer>().Single();
+            string id = $"scene_{anchor.Label}_{anchor.GetInstanceID()}";
+            Assert.IsFalse(box.enabled);
+            Assert.IsTrue(box.GetComponent<BoxCollider>().enabled && box.gameObject.activeInHierarchy);
+            Assert.IsTrue(registry.TryGet(id, out var obstacle));
+
+            button.onClick.Invoke();
+            Assert.IsTrue(box.enabled);
+            button.onClick.Invoke();
+            Assert.IsFalse(box.enabled);
+            Assert.IsTrue(registry.TryGet(id, out var hiddenObstacle));
+            Assert.AreSame(obstacle, hiddenObstacle);
+        }
+
+        [UnityTest]
+        public IEnumerator WorkbenchRegistersTheBlockAndPlacesTheArmOnlyOnConfirmation()
+        {
+            var bus = new FakeRosBus();
+            yield return OpenScene(ScenePath, bus);
             var host = scene.GetRootGameObjects().SelectMany(root => root.GetComponentsInChildren<PluginHost>()).Single();
             Assert.IsTrue(host.TryGet(out ArPlugin plugin), "The AR rig should be present when the module is installed.");
             var robot = host.Context.Robots.All.Single();
@@ -92,6 +137,8 @@ namespace Erupt.Plugins.Ar.Tests
         public IEnumerator TearDown()
         {
             if (scene.IsValid() && scene.isLoaded) yield return SceneManager.UnloadSceneAsync(scene);
+            if (temporaryScene != null) AssetDatabase.DeleteAsset(temporaryScene);
+            temporaryScene = null;
             if (connection != null) Object.DestroyImmediate(connection);
             RosBus.Reset();
             RobotRegistry.Default.SetBus(null);

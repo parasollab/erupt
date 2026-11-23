@@ -128,6 +128,7 @@ namespace Erupt.Plugins.Ar.Tests
             Assert.AreSame(tracker, plugin.Tracker, "The tracker next to the plugin is the one it reads.");
             plugin.Refresh();
             StringAssert.Contains("no passthrough camera", plugin.StatusText());
+            StringAssert.Contains("No robot in the scene", plugin.StatusText());
             Assert.IsTrue(plugin.PlaceAtMarker(null).IsRefused);
             Assert.IsEmpty(bus.Publishes, "The plugin itself says nothing on ROS.");
             Assert.IsEmpty(bus.Subscriptions);
