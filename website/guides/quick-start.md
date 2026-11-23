@@ -74,7 +74,7 @@ beyond the one Unity itself asks for.
 </fieldset>
 
 <figure class="guide-shot">
-  <video controls loop muted playsinline preload="metadata" width="1280" height="800" poster="../images/kitchen-fr3-plan.webp" aria-label="The blue copy of the arm moving from the start pose to the goal pose, over and over.">
+  <video controls loop muted playsinline preload="metadata" width="1280" height="800" style="display: block; width: 100%; max-width: 100%; height: auto; aspect-ratio: 8 / 5" poster="../images/kitchen-fr3-plan.webp" aria-label="The blue copy of the arm moving from the start pose to the goal pose, over and over.">
     <source src="../images/kitchen-fr3-plan.mp4" type="video/mp4">
   </video>
   <figcaption>The preview as it plays. The motion takes about a second and a half and repeats until you stop it.</figcaption>
