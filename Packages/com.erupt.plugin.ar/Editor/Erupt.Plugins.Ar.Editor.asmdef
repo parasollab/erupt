@@ -1,0 +1,39 @@
+{
+    "name": "Erupt.Plugins.Ar.Editor",
+    "rootNamespace": "Erupt.Plugins.Ar.Editor",
+    "references": [
+        "Erupt.Plugins.Ar"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "ERUPT_ROS_TCP_CONNECTOR",
+        "ROS2",
+        "ERUPT_APRILTAG",
+        "ERUPT_MRUK"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.unity.robotics.ros-tcp-connector",
+            "expression": "",
+            "define": "ERUPT_ROS_TCP_CONNECTOR"
+        },
+        {
+            "name": "jp.keijiro.apriltag",
+            "expression": "",
+            "define": "ERUPT_APRILTAG"
+        },
+        {
+            "name": "com.meta.xr.mrutilitykit",
+            "expression": "",
+            "define": "ERUPT_MRUK"
+        }
+    ],
+    "noEngineReferences": false
+}

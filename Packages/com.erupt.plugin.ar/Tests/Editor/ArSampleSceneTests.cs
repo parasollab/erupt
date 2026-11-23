@@ -74,7 +74,7 @@ namespace Erupt.Plugins.Ar.Editor.Tests
                          // the AR module: plugin + tracker, the robot slot's anchor, the room anchors
                          "ArPlugin.prefab", "MarkerAnchor.cs", "SceneAnchorCollisionBridge.cs",
                          // passthrough, the passthrough camera and the room
-                         "OVRManager.cs", "OVRPassthroughLayer.cs", "PassthroughCameraAccess.cs", "MRUK.cs"
+                         "OVRCameraRig.cs", "OVRManager.cs", "OVRPassthroughLayer.cs", "PassthroughCameraAccess.cs", "MRUK.cs"
                      })
                 CollectionAssert.Contains(used, expected);
 
@@ -83,6 +83,11 @@ namespace Erupt.Plugins.Ar.Editor.Tests
             StringAssert.Contains("requestPassthroughCameraAccessPermissionOnStartup: 1", Scene);
             StringAssert.Contains("requestScenePermissionOnStartup: 1", Scene);
             StringAssert.IsMatch(@"m_ClearFlags: 2\s+m_BackGroundColor: \{r: 0, g: 0, b: 0, a: 0\}", Scene);
+
+            StringAssert.Contains("EnableWorldLock: 1", Scene);
+            StringAssert.Contains("disableEyeAnchorCameras: 1", Scene);
+            StringAssert.IsMatch(@"m_Name: Locomotion\n(?:  [^\n]*\n)*?  m_IsActive: 0", Scene);
+            StringAssert.Contains("m_RequestedTrackingOriginMode: 2", Scene);
 
             // No robot comes with it (a plugin never names a robot package): the slot is empty.
             // (The package name is put together here so that this file does not name a robot package either.)

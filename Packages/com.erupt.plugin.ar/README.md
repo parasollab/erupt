@@ -6,7 +6,7 @@ Optional. Augmented reality for ERUPT on Meta Quest 3 / 3S:
   from the headset's passthrough camera: any number of tags, each with its own id and size.
 - **Placing robots at markers.** A robot with a `MarkerAnchor` is bound to a tag. While the
   tag is in view the plugin shows where the robot would go, as a translucent copy of the
-  robot; the user confirms with **Place at Marker** on the robot. Any number of robots, one
+  robot. The user presses **Place here** beside its proposed base. Any number of robots, one
   tag per robot or one shared work-cell tag.
 - **Room anchors.** `SceneAnchorCollisionBridge` turns the furniture from the headset's Space
   Setup into obstacles, which reach every robot's planning scene like any other obstacle.
@@ -14,6 +14,19 @@ Optional. Augmented reality for ERUPT on Meta Quest 3 / 3S:
 A project gets this package only if it wants AR. Without it a project has no AprilTag code,
 no AprilTag native library and no use of the passthrough camera; nothing else in ERUPT
 refers to this package. Meta Quest only: there is no camera abstraction and no other headset.
+
+## Tabletop workbench in the reference app
+
+Open `Assets/Scenes/ARWorkbenchFR3.unity` for a ready-to-use FR3 and a movable planning
+obstacle. Press Play to try the block with the mouse. On Quest, lay the supplied 100 mm
+tag 0 flat on the table and press **Place here** beside the preview. The base sits at the centre of the tag
+and faces the printed arrow. Select and grab the block to put it in the arm’s path.
+Use the single-FR3 MoveIt stack to preview a plan around it.
+
+The scene carries the asset label `EruptTabletopWorkbench`. For Play mode and player builds
+the module adds its `TabletopAR` prefab and a default `MarkerAnchor` on the root named
+`Robot Slot`. The robot uses its own planning frame. Removing the module leaves the desktop
+workbench usable.
 
 ## Install
 
@@ -103,15 +116,14 @@ ERUPT does not use it then.)
    ERUPT AR Module > Samples > AR Scene). The plugin tells the tracker which tags to look for.
 
 4. **Confirm in the headset.** Look at the tag. A translucent copy of the robot appears where
-   the tag puts it. Select the robot (any link or the end effector) and choose **Place at
-   Marker**. The robot moves there and stays there, also when the tag is covered or taken
+   the tag puts it. Press **Place here** beside the copy’s base. With several robots, each
+   button names its robot, for example **Place left here**. The robot moves there and stays there, also when the tag is covered or taken
    away; to correct the placement, look at the tag again and place again. **Undo** puts the
    robot back where it was. The *AR* tab of the panel says what the tracker sees and, per
    robot, whether its tag is in view.
 
-   The verb is offered only for a robot that has a marker anchor and whose tag is in view. A
-   placement that cannot be done says why: the tag has not been seen yet, the tag is not in
-   view, the robot is executing, or the robot is carrying an object.
+   The button disappears after placement or when tracking expires. If the robot is busy or
+   the tag moves before the press reaches the button, the reason appears at the button.
 
 ## What placing does
 
@@ -140,11 +152,16 @@ becomes an obstacle (a box at the anchor's bounds) and a coloured translucent bo
 view; *Publish Planes* adds the floor, the walls and the ceiling. The anchors are ordinary
 environment objects, so a robot that is placed elsewhere gets them again in its own frame.
 
+In the AR Scene sample, the XR rig starts at the Quest floor origin inside Meta's world-locked
+tracking space. Physical movement and turning move the view. Joystick locomotion is disabled.
+Open **Menu > AR > Room overlays** to hide or show the scan. The toggle affects the rendering of
+current and newly loaded anchors. Their colliders and planning obstacles stay active.
+
 ## Components
 
 | Component | What it does |
 |---|---|
-| `ArPlugin` | The plugin (id `ar`): a session per robot, the proposal and its ghost, the verb `place-at-marker` on robot links and end effectors, the *AR* tab |
+| `ArPlugin` | The plugin (id `ar`): a session per robot, the proposal and its ghost, the confirmation button beside each proposed base, the *AR* tab |
 | `AprilTagTracker` | Reads the passthrough camera a few times a second, detects the tags it was told to look for, filters each tag's pose. `Track(id, size)`, `TryGetTag`, `IsVisible`, `TagObserved`; `InjectObservation` feeds a pose without a camera (editor, tests) |
 | `MarkerAnchor` | Binds a robot to a tag: id, size, offset of the base |
 | `MarkerMath` | The arithmetic, free of the camera: the pose filter, the tag and marker frames, the rescale that lets one detection pass serve tags of any size, the row flip, the intrinsics of a cropped image, the proposed base |

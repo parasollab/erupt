@@ -7,6 +7,26 @@ module can also turn the furniture from the headset's Space Setup into obstacles
 The module is optional. A project without it contains none of its code and does not use the
 headset camera. It works on Meta Quest 3 and 3S.
 
+## Try the tabletop workbench
+
+Open `Assets/Scenes/ARWorkbenchFR3.unity` in the ERUPT project. It has a Franka Research 3
+and one movable block. Start the single simulated FR3 from the [quick start](quick-start.md)
+when you want to preview a MoveIt plan.
+
+- **In the editor**, press Play. Left-click the block to select it and right-drag it into the
+  arm’s path. Select the blue end-effector handle and choose **Set Start**. Drag the handle
+  to a reachable pose on the far side of the block, choose **Set Goal**, then **Plan** to
+  watch the preview.
+- **On Quest**, print `Documentation~/tags/tag41_12_id0_100mm.svg` from the AR package at
+  100 %. Lay it flat where the arm’s base should stand, with the arrow pointing in the
+  direction the arm should face. In **File > Build Profiles**, put the workbench first in
+  your Android profile’s scene list and choose **Build And Run**. Allow camera access, look
+  at the tag and press **Place here** beside the translucent arm’s base.
+  Select and grab the block to put it on your table, then set the start and goal as above.
+
+The block stays where the user puts it when the arm is placed again. The printed tag is
+enough for this demo.
+
 ## What you need
 
 - The package `com.erupt.plugin.ar`. The ERUPT project already has it. In your own project,
@@ -55,7 +75,7 @@ headset camera. It works on Meta Quest 3 and 3S.
 6. **Build for the headset** and start the ROS side as usual.
 
 7. **Confirm in the headset.** Look at the tag. A translucent copy of the robot appears where
-   the tag puts it. Select the robot and choose **Place at Marker**. The robot moves there and
+   the tag puts it. Press **Place here** beside the translucent base. The robot moves there and
    stays, also when the tag is covered or removed. **Undo** puts it back. To correct the
    placement, look at the tag again and place again.
 
@@ -63,7 +83,8 @@ The robot is never moved without your confirmation.
 
 ## Several robots
 
-Give every robot its own slot with a **Marker Anchor**.
+Give every robot its own slot with a **Marker Anchor**. Each preview has its own button,
+for example **Place left here**. Pressing it places only that robot.
 
 - **One tag per robot:** each anchor gets a different tag id.
 - **One tag for the whole cell:** every anchor gets the same tag id and size, and its own
@@ -80,8 +101,14 @@ position. Nothing has to be changed on the ROS side.
 
 ## Room furniture as obstacles
 
-Run Space Setup on the headset once. With the AR scene, every piece of furniture it knows
-becomes an obstacle for the planner, shown as a translucent box.
+Run Space Setup in the room you want to use and allow the app to access the room scan.
+In the imported **AR Scene**, walk or turn physically. The headset, controllers and tag
+tracker share the Quest room's tracking space. The thumbsticks cannot move or turn the view.
+
+Open **Menu** on the wrist bar, choose **AR**, and press **Room overlays** to hide or show
+the coloured boxes and surfaces. They start visible. A scanned table stays in the robot's
+planning scene while its box is hidden. Walls, floor and ceiling are displayed too. To
+include those surfaces in planning, enable **Publish Planes** on **Room Anchors** in Unity.
 
 ## If no tag is found
 

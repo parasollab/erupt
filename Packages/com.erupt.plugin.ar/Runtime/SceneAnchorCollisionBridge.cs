@@ -42,7 +42,6 @@ namespace Erupt.Plugins.Ar
 
         // The environment objects made for the shared anchors, by id.
         private readonly Dictionary<string, GameObject> _collisionBoxes = new();
-        private readonly List<GameObject> _visualBoxes = new();
 
         private struct AnchorData
         {
@@ -50,13 +49,15 @@ namespace Erupt.Plugins.Ar
             public Vector3 localCenter;
             public Vector3 size;
             public bool isPlane;
-            public GameObject visual;
+            public MeshRenderer visual;
         }
         private readonly List<AnchorData> _anchorData = new();
 
         private bool _hasFloor;
         private Vector3 _floorPosition;
         private Vector3 _floorNormal;
+
+        public bool VisualsVisible { get; private set; } = true;
 
         public bool HasFloor => _hasFloor;
         public Vector3 FloorPosition => _floorPosition;
@@ -173,7 +174,7 @@ namespace Erupt.Plugins.Ar
 
             var visual = SpawnVisual(anchor, size, worldCenter, worldRotation, isPlane);
             if (!isPlane || publishPlanes)
-                PublishBox(anchor, worldCenter, size, visual);
+                PublishBox(anchor, worldCenter, size);
 
             _anchorData.Add(new AnchorData
             {
@@ -185,7 +186,7 @@ namespace Erupt.Plugins.Ar
             });
         }
 
-        GameObject SpawnVisual(MRUKAnchor anchor, Vector3 size, Vector3 worldCenter, Quaternion worldRotation, bool isPlane)
+        MeshRenderer SpawnVisual(MRUKAnchor anchor, Vector3 size, Vector3 worldCenter, Quaternion worldRotation, bool isPlane)
         {
             var go = new GameObject($"Anchor_{anchor.Label}");
             go.transform.SetParent(this.transform, worldPositionStays: true);
@@ -220,24 +221,22 @@ namespace Erupt.Plugins.Ar
             mr.shadowCastingMode = ShadowCastingMode.Off;
             mr.receiveShadows = false;
 
-            _visualBoxes.Add(go);
-            return go;
+            mr.enabled = VisualsVisible;
+            return mr;
         }
 
         public void SetVisualsVisible(bool visible)
         {
-            foreach (var box in _visualBoxes)
-            {
-                if (box != null)
-                    box.SetActive(visible);
-            }
+            VisualsVisible = visible;
+            foreach (var data in _anchorData)
+                if (data.visual != null) data.visual.enabled = visible;
         }
 
         // Registers the anchor's bounds as an environment object: an invisible box at the
         // anchor's centre with the anchor's rotation and size, which is exactly what the
         // planning scenes should hold. (The visual is not used for this: a plane's visual is a
         // quad set off from the surface.)
-        void PublishBox(MRUKAnchor anchor, Vector3 worldCenter, Vector3 size, GameObject visual)
+        void PublishBox(MRUKAnchor anchor, Vector3 worldCenter, Vector3 size)
         {
             if (registry == null) return;
             string id = $"scene_{anchor.Label}_{anchor.GetInstanceID()}";
@@ -263,7 +262,7 @@ namespace Erupt.Plugins.Ar
             {
                 if (data.isPlane && !publishPlanes) continue;
                 Vector3 worldCenter = data.anchor.transform.TransformPoint(data.localCenter);
-                PublishBox(data.anchor, worldCenter, data.size, data.visual);
+                PublishBox(data.anchor, worldCenter, data.size);
             }
         }
 

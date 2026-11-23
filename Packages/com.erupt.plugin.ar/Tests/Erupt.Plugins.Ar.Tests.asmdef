@@ -3,6 +3,7 @@
     "rootNamespace": "Erupt.Plugins.Ar.Tests",
     "references": [
         "Erupt.Plugins.Ar",
+        "meta.xr.mrutilitykit",
         "Erupt.Plugins",
         "Erupt.Plugins.Tests",
         "Erupt.Plugins.MoveIt",

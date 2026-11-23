@@ -5,6 +5,8 @@ using System.Text.RegularExpressions;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
+using UnityEngine.UI;
+using TMPro;
 using Erupt.Interaction;
 using Erupt.Plugins.Tests;
 using Erupt.Robot;
@@ -17,7 +19,7 @@ namespace Erupt.Plugins.Ar.Tests
     /// <summary>
     /// Placing robots at markers on a fake bus, without a camera: tags are injected into the
     /// tracker. Zero, one and three robots; one tag per robot and one shared work-cell tag; the
-    /// proposal and its ghost; the verb and when it is offered; confirming, the refusals and undo.
+    /// proposal and its ghost; the preview button and when it appears; confirming, the refusals and undo.
     /// </summary>
     public class MarkerPlacementTests
     {
@@ -87,14 +89,6 @@ namespace Erupt.Plugins.Ar.Tests
             return anchor;
         }
 
-        // A link of the robot, selectable, as the robot's own interaction makes them.
-        private SelectableMarker LinkOf(RobotInstance robot)
-        {
-            var go = new GameObject("link");
-            go.transform.SetParent(robot.transform, false);
-            return SelectableMarker.Ensure(go, SelectionKind.RobotLink, "link");
-        }
-
         private void See(int tagId, Vector3 position, float heading = 0f)
         {
             plugin.Refresh();   // the plugin has the tracker look for the anchors' tags
@@ -102,8 +96,8 @@ namespace Erupt.Plugins.Ar.Tests
             plugin.Refresh();
         }
 
-        private bool Offered(ISelectable target) =>
-            ui.Verbs.For(target.Kind, target).Any(v => v.Id == ArPlugin.PlaceVerb);
+        private Button ButtonFor(RobotInstance robot) =>
+            ui.Widgets.SingleOrDefault(widget => widget.Id == $"ar.place.{robot.Id}")?.GameObject.GetComponentInChildren<Button>();
 
         private static Pose PoseOf(RobotInstance robot) => robot.BasePose;
 
@@ -122,24 +116,19 @@ namespace Erupt.Plugins.Ar.Tests
         // ---------- registration: zero, one, three robots ----------
 
         [Test]
-        public void WithNoRobot_ThePluginRegisters_ContributesItsVerbAndTab_AndHasNothingToPlace()
+        public void WithNoRobot_ThePluginRegisters_ContributesItsTab_AndHasNothingToPlace()
         {
             Register(FakeRobots.Registry(bus));
 
             Assert.AreEqual("ar", plugin.Id);
             Assert.AreEqual(0, plugin.Sessions.Count);
-            // Without the module there is no such verb in the vocabulary at all, and no AR tab:
-            // both are the plugin's own and come with its registration.
-            var without = new FakeUiHost();
-            Assert.IsFalse(without.Verbs.Contains(SelectionKind.RobotLink, ArPlugin.PlaceVerb));
-            Assert.IsFalse(without.Verbs.Contains(SelectionKind.EndEffector, ArPlugin.PlaceVerb));
             CollectionAssert.Contains(ui.Tabs, ArPlugin.TabId);
-            CollectionAssert.AreEquivalent(
-                new[] { (SelectionKind.RobotLink, ArPlugin.PlaceVerb, "ar"), (SelectionKind.EndEffector, ArPlugin.PlaceVerb, "ar") },
-                ui.Registered);
+            Assert.IsEmpty(ui.Registered, "Placement adds no verb to the solid robot.");
+            Assert.IsEmpty(ui.Widgets);
             Assert.AreSame(tracker, plugin.Tracker, "The tracker next to the plugin is the one it reads.");
             plugin.Refresh();
             StringAssert.Contains("no passthrough camera", plugin.StatusText());
+            StringAssert.Contains("No robot in the scene", plugin.StatusText());
             Assert.IsTrue(plugin.PlaceAtMarker(null).IsRefused);
             Assert.IsEmpty(bus.Publishes, "The plugin itself says nothing on ROS.");
             Assert.IsEmpty(bus.Subscriptions);
@@ -153,13 +142,12 @@ namespace Erupt.Plugins.Ar.Tests
             RobotGhosts ghosts = robot.gameObject.AddComponent<RobotGhosts>();
             // The base stands 40 cm behind the tag (away from its top edge), facing the top edge.
             Anchor(robot, 0, new Vector3(0f, 0f, -0.4f));
-            SelectableMarker link = LinkOf(robot);
             Register(registry);
             plugin.Refresh();
 
             // Before the tag is seen: no proposal, no verb, nothing shown.
             Assert.IsFalse(plugin.SessionFor(robot).HasProposal);
-            Assert.IsFalse(Offered(link));
+            Assert.IsNull(ButtonFor(robot));
             Assert.IsNull(ghosts.PlacementGhost);
 
             // The tag lies on a table at (2, 0.8, 1), top edge along world x.
@@ -172,19 +160,19 @@ namespace Erupt.Plugins.Ar.Tests
             Assert.IsTrue(session.ShowsProposal);
             Assert.IsNotNull(ghosts.PlacementGhost, "A translucent copy shows where the robot would go.");
             MarkerMathTests.AssertPose(expected, new Pose(ghosts.PlacementGhost.transform.position, ghosts.PlacementGhost.transform.rotation));
-            Assert.IsTrue(Offered(link));
+            Assert.AreEqual("Place here", ButtonFor(robot).GetComponentInChildren<TextMeshProUGUI>().text);
             Assert.AreEqual(Vector3.zero, robot.transform.position, "Nothing moves until the user confirms.");
 
             int moved = 0;
             robot.BaseMoved += (_, _) => moved++;
-            ui.Bound[ArPlugin.PlaceVerb](link);
+            ButtonFor(robot).onClick.Invoke();
 
             MarkerMathTests.AssertPose(expected, PoseOf(robot));
             Assert.AreEqual(1, moved);
             Assert.IsEmpty(refusals);
             Assert.IsFalse(session.ShowsProposal, "The robot stands where its tag puts it: no copy on top of it.");
             Assert.IsNull(ghosts.PlacementGhost);
-            Assert.IsTrue(Offered(link), "While the tag is in view the robot can be placed again.");
+            Assert.IsNull(ButtonFor(robot), "The button disappears when the preview is accepted.");
         }
 
         [Test]
@@ -193,10 +181,9 @@ namespace Erupt.Plugins.Ar.Tests
             RobotRegistry registry = FakeRobots.Single(bus, new FakeRobotModel("j1"));
             RobotInstance robot = registry.All[0];
             Anchor(robot, 0, Vector3.zero);
-            SelectableMarker link = LinkOf(robot);
             Register(registry);
             See(0, new Vector3(1f, 0f, 1f));
-            ui.Bound[ArPlugin.PlaceVerb](link);
+            ButtonFor(robot).onClick.Invoke();
             var placed = new Pose(new Vector3(1f, 0f, 1f), Quaternion.identity);
             MarkerMathTests.AssertPose(placed, PoseOf(robot));
 
@@ -210,7 +197,7 @@ namespace Erupt.Plugins.Ar.Tests
             plugin.Refresh();
             MarkerMathTests.AssertPose(placed, PoseOf(robot));
             Assert.IsFalse(plugin.SessionFor(robot).HasProposal);
-            Assert.IsFalse(Offered(link), "A tag that is not in view offers nothing.");
+            Assert.IsNull(ButtonFor(robot), "A tag that is not in view offers nothing.");
         }
 
         [Test]
@@ -221,18 +208,17 @@ namespace Erupt.Plugins.Ar.Tests
             Anchor(left, 10, Vector3.zero);
             Anchor(right, 11, new Vector3(0.2f, 0f, 0f), 180f);
             // third has no marker anchor: it is not bound to a tag.
-            var links = robots.All.ToDictionary(r => r, LinkOf);
             plugin.Refresh();
             Assert.AreEqual(3, plugin.Sessions.Count);
 
             See(11, new Vector3(0f, 1f, 4f));
 
-            Assert.IsTrue(Offered(links[right]));
-            Assert.IsFalse(Offered(links[left]), "Its own tag has not been seen.");
-            Assert.IsFalse(Offered(links[third]), "No marker anchor.");
-            Assert.IsTrue(Offered(FakeRobots.EndEffectorOf(right)), "The verb is on the end effector's row too.");
+            Assert.IsNotNull(ButtonFor(right));
+            Assert.IsNull(ButtonFor(left), "Its own tag has not been seen.");
+            Assert.IsNull(ButtonFor(third), "No marker anchor.");
+            Assert.AreEqual("Place right here", ButtonFor(right).GetComponentInChildren<TextMeshProUGUI>().text);
 
-            ui.Bound[ArPlugin.PlaceVerb](links[right]);
+            ButtonFor(right).onClick.Invoke();
 
             MarkerMathTests.AssertPose(new Pose(new Vector3(0.2f, 1f, 4f), Quaternion.Euler(0f, 180f, 0f)), PoseOf(right));
             Assert.AreEqual(Vector3.zero, left.transform.position);
@@ -249,24 +235,23 @@ namespace Erupt.Plugins.Ar.Tests
             Anchor(left, 5, new Vector3(-0.6f, 0f, 0f));
             Anchor(right, 5, new Vector3(0.6f, 0f, 0f));
             Anchor(third, 5, new Vector3(0f, 0f, 1.2f), 180f);
-            var links = robots.All.ToDictionary(r => r, LinkOf);
             plugin.Refresh();
 
             See(5, new Vector3(1f, 0.75f, 2f));
 
-            foreach (RobotInstance robot in robots.All) Assert.IsTrue(Offered(links[robot]), robot.Id);
+            foreach (RobotInstance robot in robots.All) Assert.IsNotNull(ButtonFor(robot), robot.Id);
             MarkerMathTests.AssertPose(new Pose(new Vector3(0.4f, 0.75f, 2f), Quaternion.identity), plugin.SessionFor(left).Proposal);
             MarkerMathTests.AssertPose(new Pose(new Vector3(1.6f, 0.75f, 2f), Quaternion.identity), plugin.SessionFor(right).Proposal);
             MarkerMathTests.AssertPose(new Pose(new Vector3(1f, 0.75f, 3.2f), Quaternion.Euler(0f, 180f, 0f)), plugin.SessionFor(third).Proposal);
 
             // Each is confirmed on its own; confirming one moves no other.
-            ui.Bound[ArPlugin.PlaceVerb](links[third]);
+            ButtonFor(third).onClick.Invoke();
             MarkerMathTests.AssertPose(new Pose(new Vector3(1f, 0.75f, 3.2f), Quaternion.Euler(0f, 180f, 0f)), PoseOf(third));
             Assert.AreEqual(Vector3.zero, left.transform.position);
             Assert.AreEqual(Vector3.zero, right.transform.position);
 
-            ui.Bound[ArPlugin.PlaceVerb](links[left]);
-            ui.Bound[ArPlugin.PlaceVerb](links[right]);
+            ButtonFor(left).onClick.Invoke();
+            ButtonFor(right).onClick.Invoke();
             Assert.Less(Vector3.Distance(new Vector3(0.4f, 0.75f, 2f), left.transform.position), 1e-4f);
             Assert.Less(Vector3.Distance(new Vector3(1.6f, 0.75f, 2f), right.transform.position), 1e-4f);
             Assert.IsEmpty(refusals);
@@ -288,6 +273,7 @@ namespace Erupt.Plugins.Ar.Tests
 
             Object.DestroyImmediate(late.gameObject);
             Assert.AreEqual(0, plugin.Sessions.Count);
+            Assert.IsEmpty(ui.Widgets);
             yield return null;
             Assert.IsTrue(ghost == null, "The copy does not outlive its robot.");
         }
@@ -347,19 +333,46 @@ namespace Erupt.Plugins.Ar.Tests
         }
 
         [Test]
-        public void TheVerb_ReportsItsRefusal_ToTheRouter()
+        public void PressingAfterTrackingExpires_ReportsTheRefusalBesideThePreview()
         {
             RobotRegistry registry = FakeRobots.Single(bus, new FakeRobotModel("j1"), id: "arm");
             Anchor(registry.All[0], 0, Vector3.zero);
-            SelectableMarker link = LinkOf(registry.All[0]);
+            RobotInstance robot = registry.All[0];
             Register(registry);
-
-            // Pressed although it is not offered (the tag went out of view while the menu was open).
-            ui.Bound[ArPlugin.PlaceVerb](link);
+            See(0, Vector3.right);
+            Button button = ButtonFor(robot);
+            Vector3 at = button.transform.position;
+            now += 5f; // The press can arrive before the next refresh hides the button.
+            button.onClick.Invoke();
 
             Assert.AreEqual(1, refusals.Count);
             Assert.AreEqual(RefusalCode.BaseNotPlaced, refusals[0].Code);
-            StringAssert.Contains("Tag 0 has not been seen yet", refusals[0].Reason);
+            Assert.AreEqual(at, refusals[0].WorldPoint);
+            StringAssert.Contains("not in view", refusals[0].Reason);
+            Assert.IsEmpty(ui.Widgets);
+            Assert.IsFalse(undo.CanUndo);
+        }
+
+        [Test]
+        public void SmallJitterLeavesTheButtonStill_AndANewDetectionCannotConfirmAnUnseenPose()
+        {
+            Register(FakeRobots.Three(bus));
+            var robot = robots.All[1];
+            Anchor(robot, 3, Vector3.zero);
+            See(3, Vector3.right);
+            var button = ButtonFor(robot);
+            Vector3 at = button.transform.position;
+            See(3, Vector3.right * 1.003f);
+            Assert.AreEqual(at, button.transform.position);
+
+            tracker.InjectObservation(3, MarkerMathTests.FlatTag(Vector3.right * 2f));
+            button.onClick.Invoke();
+            Assert.IsFalse(undo.CanUndo);
+            Assert.AreEqual(Vector3.zero, robot.BasePose.position);
+            Assert.AreEqual(1, refusals.Count);
+            Assert.Greater(Vector3.Distance(at, button.transform.position), 0.9f);
+            button.onClick.Invoke();
+            Assert.AreEqual(Vector3.right * 2f, robot.BasePose.position);
         }
 
         [Test]
@@ -439,11 +452,13 @@ namespace Erupt.Plugins.Ar.Tests
             MarkerMathTests.AssertPose(start, PoseOf(robot));
             plugin.Refresh();
             Assert.IsNotNull(ghosts.PlacementGhost, "Back where it was, the proposal is shown again.");
+            Assert.IsNotNull(ButtonFor(robot));
 
             Assert.IsTrue(undo.Redo());
             MarkerMathTests.AssertPose(placed, PoseOf(robot));
             plugin.Refresh();
             Assert.IsNull(ghosts.PlacementGhost);
+            Assert.IsEmpty(ui.Widgets);
         }
 
         // ---------- status ----------
@@ -460,7 +475,7 @@ namespace Erupt.Plugins.Ar.Tests
 
             string status = plugin.StatusText();
 
-            StringAssert.Contains("left: tag 10 in view, 50 cm from the robot. Select the robot, then Place at Marker.", status);
+            StringAssert.Contains("left: tag 10 in view, 50 cm from the robot. Press the placement button beside the proposed base.", status);
             StringAssert.Contains("right: tag 11 not seen yet", status);
             StringAssert.Contains("third: no marker anchor", status);
 
@@ -472,7 +487,7 @@ namespace Erupt.Plugins.Ar.Tests
         }
 
         [Test]
-        public void Unregistering_RemovesTheGhosts_AndTheHostTakesTheVerbsAway()
+        public void Unregistering_RemovesTheGhosts_AndThePlacementWidgets()
         {
             RobotRegistry registry = FakeRobots.Single(bus, new FakeRobotModel("j1"), profile: ProfileWithGhost());
             RobotInstance robot = registry.All[0];
@@ -483,12 +498,10 @@ namespace Erupt.Plugins.Ar.Tests
             Assert.IsNotNull(ghosts.PlacementGhost);
 
             ((IEruptPlugin)plugin).OnUnregister(context);
-            ui.Verbs.RemoveAllFrom(plugin.Id);   // what PluginHost does after OnUnregister
 
             Assert.IsNull(ghosts.PlacementGhost);
             Assert.IsNull(plugin.Sessions);
-            Assert.IsFalse(ui.Verbs.Contains(SelectionKind.RobotLink, ArPlugin.PlaceVerb));
-            Assert.IsFalse(ui.Verbs.Contains(SelectionKind.EndEffector, ArPlugin.PlaceVerb));
+            Assert.IsEmpty(ui.Widgets);
             CollectionAssert.DoesNotContain(ui.Tabs, ArPlugin.TabId, "The AR tab goes with the module.");
             Assert.IsTrue(plugin.PlaceAtMarker(robot).IsRefused);
         }
