@@ -2,6 +2,15 @@
 
 Find the symptom, then work through the causes in order; the most common one is first.
 
+## The macOS editor crashes on exit
+
+Open the latest `Unity-*.ips` report in `~/Library/Logs/DiagnosticReports` and check the
+crashed thread. With Meta Interaction SDK 207.0.0, a call to `std::__1::mutex::lock()` from
+`ISDKEngineTelemetry.dylib` can abort Unity after a successful build or an ordinary editor
+session. The reference project calls the SDK's editor shutdown function when Unity quits.
+Look for `Interaction SDK editor telemetry shutdown completed.` in the editor log to confirm
+the call returned successfully.
+
 ## The robot does not react to ROS: planning is refused, or Execute moves nothing
 
 Unity is not connected to ROS. The Unity console then repeats `Connection to ... failed`.
