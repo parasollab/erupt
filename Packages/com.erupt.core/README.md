@@ -65,7 +65,11 @@ build and in the editor while a headset drives the view; the check runs every fr
 headset that is connected or taken away mid-session changes hands cleanly.
 
 The panel's sliders (the **Settings** tab) take the mouse like its buttons: press on a
-slider to put its handle there, or drag it.
+slider to put its handle there, or drag it. The same tab shows the ROS address the app
+connects to; **Change address** opens a keypad whose keys are buttons like any other, so
+the address can be changed with the mouse, a ray or a poke while the app runs. It is kept
+between sessions and replaces the address set under **Robotics > ROS Settings** until that
+one changes.
 
 Not on the desktop: turning an obstacle (a drag moves it and keeps its orientation; Resize
 has its own − / + buttons, which the mouse presses), two-handed scaling, a second pointer
@@ -75,11 +79,11 @@ has its own − / + buttons, which the mouse presses), two-handed scaling, a sec
 
 ```
 Runtime/Interaction   Erupt.Interaction.Core (+ UserSettings; Backends/OpenXR incl. WristAnchor, CollisionHaptics; Backends/Desktop: DesktopMouseBackend, DesktopControls)
-Runtime/Ros           Erupt.Ros          IRosBus, RosBus, LiveRosBus, RosName, NamespacedRosBus, conversions
+Runtime/Ros           Erupt.Ros          IRosBus, RosBus, LiveRosBus, RosName, NamespacedRosBus, conversions; IRosEndpoint (where the bus connects, and ConnectTo), RosAddress
 Runtime/Robot         Erupt.Robot        RobotProfile, RobotInstance, RobotRegistry (any number of robots), DirectArticulationIKController, RobotInteractionController + RobotIntentDispatcher, trajectory replay, RobotGhosts
 Runtime/Environment   Erupt.Environment  EnvironmentRegistry/Object, obstacle factory + undoable commands, grab transformers
 Runtime/Ui            Erupt.Ui           tier UI building blocks (UiBuilder incl. the slider), VerbRegistry, IUiHost (TierUiRig), SettingsTab
-Runtime/Plugins       Erupt.Plugins      IEruptPlugin, PluginHost, IEruptContext, PlanningPlugin, DemonstrationPlugin
+Runtime/Plugins       Erupt.Plugins      IEruptPlugin, PluginHost, IEruptContext, PlanningPlugin, DemonstrationPlugin; RosConnectionSection + RosEndpointSetting (the ROS address on the Settings tab)
 Editor                Erupt.Core.Editor  plugin generator and templates, Robot Setup (Editor/RobotSetup), RobotProfileCreator
 Editor/Setup          Erupt.Setup.Editor the offer to add missing packages, Project Setup, Collada materials for the project's render pipeline (references no other package)
 Samples~/StarterScene the Starter Scene sample: ERUPT root, XR rig, the three plugins, a floor and a table, no robot
