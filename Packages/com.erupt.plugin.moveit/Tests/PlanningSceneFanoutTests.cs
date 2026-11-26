@@ -713,6 +713,49 @@ namespace Erupt.Plugins.MoveIt.Tests
             Assert.IsTrue(cube != null);
         }
 
+        // The answer to "what do you hold?" takes a moment. An obstacle the user deletes in that
+        // moment is still on the list, and used to come back as an object of the ROS side that
+        // the ROS side no longer had.
+        [UnityTest]
+        public IEnumerator Resync_DoesNotBringBack_AnObjectDeletedWhileThePlanningSceneWasAnswering()
+        {
+            mirror.requestInitialPlanningScene = true;
+            GameObject cube = MakeObstacle("crate", new Vector3(2f, 0.5f, 3f));
+            mirror.RegisterUnityOwnedObject("crate", cube);
+            yield return WaitForPublish();
+
+            foreach (string ns in Namespaces)
+            {
+                string scene = ns;
+                bus.SetServiceHandler($"/{ns}/get_planning_scene", _ =>
+                {
+                    // The last planning scene has been asked and has not answered yet: the user
+                    // deletes the crate now. Its answer still lists it.
+                    if (scene == Namespaces[Namespaces.Length - 1] && cube != null) Object.DestroyImmediate(cube);
+                    return new GetPlanningSceneResponse
+                    {
+                        scene = new PlanningSceneMsg
+                        {
+                            robot_model_name = "fake",
+                            world = new PlanningSceneWorldMsg { collision_objects = new[] { Box("crate", 2, 3, 0.5) } }
+                        }
+                    };
+                });
+            }
+            bus.Clear();
+            fanout.Resync();
+            yield return null;
+
+            Assert.IsTrue(cube == null);
+            Assert.IsFalse(mirror.TryGetObject("crate", out GameObject back) && back != null, "The crate is gone and stays gone.");
+            foreach (string ns in Namespaces)
+            {
+                CollisionObjectMsg last = bus.PublishedOn(Topic(ns)).Cast<CollisionObjectMsg>().LastOrDefault(m => m.id == "crate");
+                Assert.IsNotNull(last, $"'{ns}' heard about the crate.");
+                Assert.AreEqual(CollisionObjectMsg.REMOVE, last.operation, $"The last word to '{ns}' is that the crate is gone.");
+            }
+        }
+
         [UnityTest]
         public IEnumerator AnEmptyAnswer_ToARequestTheEndpointCouldNotDeliver_IsNotAnEmptyPlanningScene()
         {

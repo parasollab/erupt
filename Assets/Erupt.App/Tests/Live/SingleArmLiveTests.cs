@@ -155,6 +155,13 @@ namespace Erupt.App.Live.Tests
             yield return AssertSceneReloadKeepsOneConnection();
         }
 
+        [UnityTest, Order(140)]
+        public IEnumerator T14_TheRosAddress_IsChangedWhileTheAppRuns()
+        {
+            yield return Enter();
+            yield return AssertRosAddressCanBeChanged();
+        }
+
         [UnityTest, Order(990)]
         public IEnumerator T99_AfterEverything_TheConnectionIsUp_AndNothingWentWrongQuietly()
         {

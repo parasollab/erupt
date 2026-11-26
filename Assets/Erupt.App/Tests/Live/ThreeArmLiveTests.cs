@@ -224,6 +224,13 @@ namespace Erupt.App.Live.Tests
             foreach (string id in Ids) yield return AssertEveryPublisherIsInPlanningScene(Robot(id));
         }
 
+        [UnityTest, Order(140)]
+        public IEnumerator T14_TheRosAddress_IsChangedWhileTheAppRuns_AndEveryArmIsBroughtUpToDate()
+        {
+            yield return Enter();
+            yield return AssertRosAddressCanBeChanged();
+        }
+
         [UnityTest, Order(990)]
         public IEnumerator T99_AfterEverything_TheConnectionIsUp_AndNothingWentWrongQuietly()
         {

@@ -365,6 +365,10 @@ No path moves a joint past its limits, and there is one reason for that:
     return, or a `move_group` answer that was long in coming, and resynchronises
     (`PlanningSceneFanout.Resync`): every Unity object is sent again in full, each planning
     scene is asked what it holds, and what a planning scene owned and no longer holds is removed.
+    The answer says what the planning scene held when it was asked: an object Unity has taken
+    out since (the user deleted it while the answer was on its way) is still on the list and
+    is not brought back by it (`PlanningSceneLedgerEntry.RemovedSince`). The same happens when
+    the user sends the connection to another address (below, *The ROS address*).
 - **Attach / detach**: every robot has its own `AttachedCollisionObjectListener` on its
   `attached_collision_objects_ros`; link names are resolved on that robot only. An object a
   robot carries is silent in that robot's namespace (MoveIt has it as an attached body) and
