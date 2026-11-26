@@ -19,11 +19,31 @@ namespace Erupt.Ros
     /// or raised an error per object. The bus therefore keeps the connection across scene loads
     /// (<c>DontDestroyOnLoad</c>); each scene's components subscribe when they start and
     /// unsubscribe when they are destroyed.
+    ///
+    /// The connection can be sent to another address while the app runs
+    /// (<see cref="IRosEndpoint"/>). It stays the same <c>ROSConnection</c>, so what is
+    /// subscribed and registered on it stays too, and the connector announces all of it to
+    /// the new endpoint.
     /// </remarks>
-    public sealed class LiveRosBus : IRosBus
+    public sealed class LiveRosBus : IRosBus, IRosEndpoint
     {
         private ROSConnection connection;
         private static bool quitting;
+
+        // The connector's own fallback when a project has no ROS settings.
+        private const string FallbackHost = "127.0.0.1";
+        private const int FallbackPort = 10000;
+        private const string SettingsPrefab = "ROSConnectionPrefab";
+
+        // The endpoint asked for with ConnectTo, for a connection that does not exist yet.
+        private string requestedHost;
+        private int requestedPort;
+        private bool hasRequest;
+
+        // What the build carries, read once and before anything here changes it.
+        private string defaultHost;
+        private int defaultPort;
+        private bool defaultsKnown;
 
         // Static state survives entering play mode when domain reload is disabled.
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -79,6 +99,11 @@ namespace Erupt.Ros
             adopted.listenForTFMessages = false;
             registeredPublishers.Clear();
             registeredServices.Clear();
+            // The address the connection came with is the one the build carries; an address
+            // asked for before there was a connection replaces it now, which is before the
+            // connection's Start when the bus has just created it.
+            RememberDefaults(adopted);
+            if (hasRequest) Apply(adopted, connectWhenIdle: false);
             if (!Application.isPlaying) return;
             if (adopted.transform.parent == null) UnityEngine.Object.DontDestroyOnLoad(adopted.gameObject);
             SceneManager.sceneUnloaded -= OnSceneUnloaded;
@@ -128,6 +153,108 @@ namespace Erupt.Ros
             typeof(TFSystem).GetProperty(nameof(TFSystem.instance), BindingFlags.Public | BindingFlags.Static)
                 ?.GetSetMethod(true)?.Invoke(null, new object[] { null });
         }
+
+        // ---- IRosEndpoint -----------------------------------------------------------------------
+
+        public string Host
+        {
+            get
+            {
+                ROSConnection c = Existing;
+                if (c != null) return c.RosIPAddress;
+                return hasRequest ? requestedHost : DefaultHost;
+            }
+        }
+
+        public int Port
+        {
+            get
+            {
+                ROSConnection c = Existing;
+                if (c != null) return c.RosPort;
+                return hasRequest ? requestedPort : DefaultPort;
+            }
+        }
+
+        public string DefaultHost
+        {
+            get
+            {
+                RememberDefaults(null);
+                return defaultHost;
+            }
+        }
+
+        public int DefaultPort
+        {
+            get
+            {
+                RememberDefaults(null);
+                return defaultPort;
+            }
+        }
+
+        public void ConnectTo(string host, int port)
+        {
+            if (string.IsNullOrEmpty(host)) throw new ArgumentException("A ROS address is needed.", nameof(host));
+            // Before the request replaces anything: what the build carries is read from the
+            // connection as it stands.
+            RememberDefaults(null);
+            requestedHost = host;
+            requestedPort = port;
+            hasRequest = true;
+            ROSConnection c = Existing;
+            if (c == null)
+            {
+                // A connection something else made (a scene object, the connector's
+                // visualizations) is the one the bus will use: it is taken now. When there is
+                // none, none is created for this (a scene in which nothing talks to ROS opens
+                // no socket); Adopt applies the request to the connection when it comes.
+                c = UnityEngine.Object.FindFirstObjectByType<ROSConnection>();
+                if (c == null) return;
+                connection = c;
+                Adopt(c);
+            }
+            Apply(c, connectWhenIdle: true);
+        }
+
+        // Reads where the connector would connect by itself, in the order it looks
+        // (ROSConnection.GetOrCreateInstance): a connection that exists, the settings prefab,
+        // its own fallback. Never creates a connection.
+        private void RememberDefaults(ROSConnection adopted)
+        {
+            if (defaultsKnown) return;
+            ROSConnection source = adopted != null ? adopted : Existing;
+            if (source == null) source = UnityEngine.Object.FindFirstObjectByType<ROSConnection>();
+            if (source == null)
+            {
+                GameObject prefab = Resources.Load<GameObject>(SettingsPrefab);
+                if (prefab != null) source = prefab.GetComponent<ROSConnection>();
+            }
+            defaultHost = source != null ? source.RosIPAddress : FallbackHost;
+            defaultPort = source != null ? source.RosPort : FallbackPort;
+            defaultsKnown = true;
+        }
+
+        private void Apply(ROSConnection c, bool connectWhenIdle)
+        {
+            bool sameEndpoint = c.RosIPAddress == requestedHost && c.RosPort == requestedPort;
+            if (c.HasConnectionThread)
+            {
+                // Connected, or still trying the old address: Connect ends that and starts
+                // again at the new one.
+                if (!sameEndpoint) c.Connect(requestedHost, requestedPort);
+                return;
+            }
+            c.RosIPAddress = requestedHost;
+            c.RosPort = requestedPort;
+            // A connection that has not started yet connects from its Start, to the address it
+            // now has. One that started and is idle connects because it was asked to, not
+            // because the bus happened to adopt it.
+            if (connectWhenIdle && c.didStart) c.Connect();
+        }
+
+        // ---- IRosBus ----------------------------------------------------------------------------
 
         public bool HasConnectionThread
         {

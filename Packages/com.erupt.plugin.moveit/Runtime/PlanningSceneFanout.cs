@@ -245,6 +245,9 @@ namespace Erupt.Plugins.MoveIt
         // their echoes may still be on the way.
         private readonly List<PoseMsg> sent = new();
         private float removeSentAt = float.NegativeInfinity;
+        // When Unity last took the object out of that planning scene; unlike removeSentAt it
+        // stands until the object is sent or reported again, whether or not the echo came.
+        private float removedAt = float.NegativeInfinity;
 
         public bool HasPose => hasCurrent;
         public PoseMsg Pose => current;
@@ -261,6 +264,7 @@ namespace Erupt.Plugins.MoveIt
             }
             if (geometry != null) Geometry = geometry;
             removeSentAt = float.NegativeInfinity;
+            removedAt = float.NegativeInfinity;
         }
 
         public void RecordReceived(PoseMsg pose, string geometry)
@@ -271,6 +275,7 @@ namespace Erupt.Plugins.MoveIt
             sent.Clear();
             if (geometry != null) Geometry = geometry;
             removeSentAt = float.NegativeInfinity;
+            removedAt = float.NegativeInfinity;
         }
 
         public void RecordRemoveSent(float now)
@@ -280,7 +285,15 @@ namespace Erupt.Plugins.MoveIt
             Geometry = null;
             sent.Clear();
             removeSentAt = now;
+            removedAt = now;
         }
+
+        /// <summary>
+        /// Whether Unity took the object out of that planning scene at or after
+        /// <paramref name="time"/> and has not sent or been told of it since. A list of what the
+        /// planning scene holds that was asked for before then is older than the removal.
+        /// </summary>
+        public bool RemovedSince(float time) => removedAt >= time;
 
         public void Forget()
         {
@@ -289,6 +302,7 @@ namespace Erupt.Plugins.MoveIt
             Geometry = null;
             sent.Clear();
             removeSentAt = float.NegativeInfinity;
+            removedAt = float.NegativeInfinity;
         }
 
         /// <summary>True (once) for the REMOVE that echoes one Unity sent a moment ago.</summary>
@@ -900,6 +914,7 @@ namespace Erupt.Plugins.MoveIt
                 uint components = PlanningSceneComponentsMsg.WORLD_OBJECT_NAMES
                                 | PlanningSceneComponentsMsg.WORLD_OBJECT_GEOMETRY;
                 var request = new GetPlanningSceneRequest(new PlanningSceneComponentsMsg(components));
+                float askedAt = Time.unscaledTime;
                 endpoint.Ros.SendServiceMessage<GetPlanningSceneResponse>(service, request, response =>
                 {
                     CollisionObjectMsg[] objects = response?.scene?.world?.collision_objects;
@@ -918,7 +933,20 @@ namespace Erupt.Plugins.MoveIt
                     }
                     if (!endpoint.listening) return;
                     Debug.Log($"[CO Listener] Applying {(authoritative ? "the" : "initial")} planning-scene snapshot ({objects.Length} objects).");
-                    foreach (CollisionObjectMsg collisionObject in objects) OnInbound(endpoint, collisionObject);
+                    foreach (CollisionObjectMsg collisionObject in objects)
+                    {
+                        // The answer says what the planning scene held when it was asked. An
+                        // object Unity has taken out since (the user deleted it while the
+                        // answer was on its way) is still listed, and its REMOVE is on its way
+                        // too: taken at its word, the list would bring the object back as one
+                        // of the ROS side's, which the ROS side no longer has.
+                        if (!string.IsNullOrEmpty(collisionObject?.id) && endpoint.Entry(collisionObject.id).RemovedSince(askedAt))
+                        {
+                            Debug.Log($"[CO Listener] '{collisionObject.id}' was removed after the planning scene was asked what it holds; the answer is older and does not bring it back.");
+                            continue;
+                        }
+                        OnInbound(endpoint, collisionObject);
+                    }
                     if (authoritative) RemoveWhatIsGone(endpoint, objects);
                 });
             }

@@ -87,6 +87,10 @@ namespace Erupt.App.Live.Tests
                 Application.logMessageReceived += OnLog;
             }
             RosBus.Reset();
+            // The endpoint is the one ERUPT_LIVE_ROS names. An address the person at this machine
+            // entered in the app is kept in PlayerPrefs, and the plugin host would put it on the
+            // bus when the scene starts: the tests neither use nor change what was set there.
+            UserSettings.Store = new MemoryUserSettingsStore();
             LiveRos.UseEndpointIn(MainScene);
 
             yield return SceneManager.LoadSceneAsync(EntryScene, LoadSceneMode.Single);

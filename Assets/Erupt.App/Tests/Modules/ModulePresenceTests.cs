@@ -121,7 +121,7 @@ namespace Erupt.App.Modules.Tests
             Assert.IsEmpty(Registered());
             CollectionAssert.AreEqual(CoreEndEffector, MenuOf(endEffector), "The gripper is the robot's own; nothing of a planner.");
             Assert.IsEmpty(MenuOf(plan), "No Execute or Preview without the module that offers them.");
-            CollectionAssert.AreEqual(new[] { "Scene" }, Strip(), "The Scene tab is core's; no module's tab.");
+            CollectionAssert.AreEqual(new[] { "Scene", "Settings" }, Strip(), "The Scene tab and the ROS address on Settings are core's; no module's tab.");
         }
 
         [UnityTest]
@@ -132,7 +132,7 @@ namespace Erupt.App.Modules.Tests
             CollectionAssert.AreEqual(new[] { "moveit" }, Registered());
             CollectionAssert.AreEqual(PlanningEndEffector, MenuOf(endEffector));
             CollectionAssert.AreEqual(PlanningPlan, MenuOf(plan));
-            CollectionAssert.AreEqual(new[] { "Scene", "MoveIt" }, Strip(), "No MTC tab and no Demonstrations tab.");
+            CollectionAssert.AreEqual(new[] { "Scene", "MoveIt", "Settings" }, Strip(), "No MTC tab and no Demonstrations tab.");
         }
 
         [UnityTest]
@@ -143,7 +143,7 @@ namespace Erupt.App.Modules.Tests
             CollectionAssert.AreEquivalent(new[] { "moveit", "mtc" }, Registered());
             CollectionAssert.AreEqual(PlanningEndEffector, MenuOf(endEffector));
             CollectionAssert.AreEqual(PlanningPlan, MenuOf(plan));
-            CollectionAssert.AreEqual(new[] { "Scene", "MoveIt", "MTC" }, Strip());
+            CollectionAssert.AreEqual(new[] { "Scene", "MoveIt", "MTC", "Settings" }, Strip());
         }
 
         [UnityTest]
@@ -154,7 +154,7 @@ namespace Erupt.App.Modules.Tests
             CollectionAssert.AreEqual(new[] { "demonstration" }, Registered());
             CollectionAssert.AreEqual(CoreEndEffector, MenuOf(endEffector), "No Set Start, Set Goal or Plan without a planner.");
             Assert.IsEmpty(MenuOf(plan), "The demonstration module puts nothing on a plan's menu, and there is no planner.");
-            CollectionAssert.AreEqual(new[] { "Scene", "Demonstrations" }, Strip());
+            CollectionAssert.AreEqual(new[] { "Scene", "Demonstrations", "Settings" }, Strip());
         }
 
         // MTC needs the MoveIt plugin. Without it the host registers nothing and says why:
@@ -167,7 +167,7 @@ namespace Erupt.App.Modules.Tests
             Assert.IsEmpty(Registered());
             CollectionAssert.AreEqual(CoreEndEffector, MenuOf(endEffector));
             Assert.IsEmpty(MenuOf(plan));
-            CollectionAssert.AreEqual(new[] { "Scene" }, Strip());
+            CollectionAssert.AreEqual(new[] { "Scene", "Settings" }, Strip());
         }
 
         [UnityTest]
@@ -178,7 +178,7 @@ namespace Erupt.App.Modules.Tests
             CollectionAssert.AreEquivalent(new[] { "moveit", "mtc", "demonstration" }, Registered());
             CollectionAssert.AreEqual(PlanningEndEffector, MenuOf(endEffector));
             CollectionAssert.AreEqual(PlanningPlan, MenuOf(plan), "The demonstration module adds nothing to a plan's menu.");
-            CollectionAssert.AreEqual(new[] { "Scene", "MoveIt", "MTC", "Demonstrations" }, Strip());
+            CollectionAssert.AreEqual(new[] { "Scene", "MoveIt", "MTC", "Demonstrations", "Settings" }, Strip());
 
             // The modules' own tabs hold no dead control for a module that is there.
             Assert.IsTrue(host.TryGet(out DemonstrationCollectionPlugin demonstrations));
@@ -193,7 +193,7 @@ namespace Erupt.App.Modules.Tests
             host.Unregister(demonstrations);
             yield return null;
             CollectionAssert.AreEqual(PlanningPlan, rig.TierTwo.Model.Verbs.Select(v => v.Label).ToArray(), "The planners' verbs stay.");
-            CollectionAssert.AreEqual(new[] { "Scene", "MoveIt", "MTC" }, Strip());
+            CollectionAssert.AreEqual(new[] { "Scene", "MoveIt", "MTC", "Settings" }, Strip());
 
             host.Unregister(mtc);
             host.Unregister(moveIt);
@@ -201,7 +201,7 @@ namespace Erupt.App.Modules.Tests
             Assert.IsEmpty(Registered());
             CollectionAssert.AreEqual(CoreEndEffector, MenuOf(endEffector));
             Assert.IsEmpty(MenuOf(plan));
-            CollectionAssert.AreEqual(new[] { "Scene" }, Strip());
+            CollectionAssert.AreEqual(new[] { "Scene", "Settings" }, Strip());
         }
     }
 }

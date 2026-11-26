@@ -66,6 +66,11 @@ ROS and port 10000. When the Unity editor and Docker run on the same computer, `
 works. A headset needs the computer's address on the local network, and both must be on the
 same network.
 
+That address is built into the app. When the computer's address changes, or the headset is
+taken to another network, enter the new one in the app itself: the panel's **Settings** tab
+shows where the app connects and has a keypad to change it. See
+[ROS connection](using-the-app.md#ros-connection).
+
 ## Without Docker, or with a real robot
 
 Build `erupt_ws` from source on Ubuntu 24.04 with ROS 2 Jazzy (the repository's README has the

@@ -72,7 +72,8 @@ one for every ERUPT package.
 
 8. **ROS.** Start the ERUPT ROS workspace for that robot
    (`ROBOT=ur5e docker compose -f docker/compose.yaml up erupt`), set its address under
-   `Robotics > ROS Settings` when it is not this machine, and press Play. No headset is
+   `Robotics > ROS Settings` when it is not this machine, and press Play. That is the address
+   the app starts with; the panel's Settings tab changes it while the app runs. No headset is
    needed for a first look: without one the mouse and the keyboard drive the scene (left
    click selects, the right button drags, `Tab` or the Menu button opens the panel, `W A S D` and the arrow
    keys move the view; the keys are shown in the Game view and listed in core's README).
@@ -100,7 +101,8 @@ Unity -batchmode -projectPath . -executeMethod Erupt.Editor.Setup.ProjectSetup.R
 - **Your own rig.** The Starter Scene's rig is built from XR Interaction Toolkit's sample
   rig. To use another, put an `XriControllerBackend` on each controller and an
   `OpenXrHandBackend` for each hand, as the sample scene does.
-- **The ROS address** (`Robotics > ROS Settings`), which is per machine.
+- **The ROS address** (`Robotics > ROS Settings`), which is per machine. A build carries it;
+  the user can enter another one in the app (the Settings tab), which is kept on that device.
 
 ## How the offer works
 

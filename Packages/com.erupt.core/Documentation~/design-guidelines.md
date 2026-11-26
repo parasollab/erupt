@@ -93,9 +93,16 @@ Voice transcript · Robot connection and status · Settings
 
 **Settings** is the last tab and holds what is a preference of the person using
 the app rather than a part of the task: today the collision haptics (on or off,
-strength, distance). A setting has a default that works, is kept between
-sessions, and takes effect at once. The component a setting belongs to puts its
-controls there, so a scene without that component shows no dead control.
+strength, distance) and the ROS connection (where the app connects, whether it
+is connected, and a keypad to enter another address). A setting has a default
+that works, is kept between sessions, and takes effect at once. The component a
+setting belongs to puts its controls there, so a scene without that component
+shows no dead control.
+
+A keypad is the one way to enter text or a number that has no range to slide
+over. It is shown only after its own button was pressed, in the place of the
+tab's other controls, and the same button puts it away; it never waits behind a
+closed panel or another tab.
 
 ### In-world widgets (neither menu nor panel)
 
@@ -338,7 +345,8 @@ identification, goal specification) doubles as the competence ladder.
 - [ ] Tier 1 still has four or fewer controls.
 - [ ] The new feature added a verb to an existing context menu, not a new menu.
 - [ ] No more than ~7 interactive elements visible with an object selected and a
-      panel open (a slider is one element).
+      panel open (a slider is one element, and so is a keypad the user asked for,
+      which has its tab to itself while it is open).
 - [ ] No mode was added: nothing the feature offers waits behind a switch
       somewhere else, and a state that lasts (recording, previewing) is shown and
       ended by the control that started it.

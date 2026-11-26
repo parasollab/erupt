@@ -34,6 +34,7 @@ namespace Erupt.Ui
 
         private readonly TabbedPanelView panel;
         private readonly List<Section> sections = new();
+        private string only;
 
         /// <summary>The tab; null while there is no section.</summary>
         public PanelTab Tab { get; private set; }
@@ -48,6 +49,9 @@ namespace Erupt.Ui
 
         /// <summary>Interactive elements on the tab (Guidelines Part 8 counts them).</summary>
         public int InteractiveElementCount => Tab != null ? UiBuilder.CountInteractive(Tab.Content) : 0;
+
+        /// <summary>The section that has the tab to itself (<see cref="ShowOnly"/>), or null when all are shown.</summary>
+        public string Showing => only;
 
         internal SettingsTab(TabbedPanelView panel)
         {
@@ -77,10 +81,25 @@ namespace Erupt.Ui
             Tab.Rebuild(BuildAll);
         }
 
+        /// <summary>
+        /// Give one section the whole tab while it shows something that needs the room (a
+        /// keypad), and the tab back to all of them with null. The other sections are not
+        /// built meanwhile; they come back as they were. The section that asked ends it: by
+        /// the control that started it, and when the user leaves the tab.
+        /// </summary>
+        public void ShowOnly(string id)
+        {
+            if (id != null && !sections.Exists(s => s.Id == id)) id = null;
+            if (only == id) return;
+            only = id;
+            if (Tab != null) Tab.Rebuild(BuildAll);
+        }
+
         /// <summary>Take a section away; the tab goes with the last one. False when there is no such section.</summary>
         public bool RemoveSection(string id)
         {
             if (sections.RemoveAll(s => s.Id == id) == 0) return false;
+            if (only == id) only = null;
             if (Tab == null) return true;
             // On the way out with the scene there is nothing to rebuild.
             if (panel == null || !panel.gameObject.scene.isLoaded) return true;
@@ -100,6 +119,7 @@ namespace Erupt.Ui
             UiBuilder.Stretch(column.GetComponent<RectTransform>());
             foreach (Section section in sections)
             {
+                if (only != null && section.Id != only) continue;
                 try { section.Build(column.transform); }
                 catch (Exception e) { Debug.LogException(e); }
             }

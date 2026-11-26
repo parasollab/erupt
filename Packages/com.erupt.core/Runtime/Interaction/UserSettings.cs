@@ -8,6 +8,10 @@ namespace Erupt.Interaction
     {
         bool TryGetFloat(string key, out float value);
         void SetFloat(string key, float value);
+        bool TryGetString(string key, out string value);
+        void SetString(string key, string value);
+        /// <summary>Forget a setting, so that its default applies again.</summary>
+        void Remove(string key);
         /// <summary>Write what was set to where it survives the app being closed.</summary>
         void Save();
     }
@@ -43,6 +47,14 @@ namespace Erupt.Interaction
 
         public static void SetBool(string key, bool value) => store.SetFloat(key, value ? 1f : 0f);
 
+        public static string GetString(string key, string fallback) =>
+            store.TryGetString(key, out string value) ? value : fallback;
+
+        public static void SetString(string key, string value) => store.SetString(key, value);
+
+        /// <summary>Forget a setting, so that its default applies again.</summary>
+        public static void Remove(string key) => store.Remove(key);
+
         public static void Save() => store.Save();
     }
 
@@ -58,6 +70,17 @@ namespace Erupt.Interaction
 
         public void SetFloat(string key, float value) => PlayerPrefs.SetFloat(key, value);
 
+        public bool TryGetString(string key, out string value)
+        {
+            bool has = PlayerPrefs.HasKey(key);
+            value = has ? PlayerPrefs.GetString(key) : null;
+            return has;
+        }
+
+        public void SetString(string key, string value) => PlayerPrefs.SetString(key, value);
+
+        public void Remove(string key) => PlayerPrefs.DeleteKey(key);
+
         public void Save() => PlayerPrefs.Save();
     }
 
@@ -65,13 +88,21 @@ namespace Erupt.Interaction
     public sealed class MemoryUserSettingsStore : IUserSettingsStore
     {
         private readonly Dictionary<string, float> values = new();
+        private readonly Dictionary<string, string> texts = new();
 
         /// <summary>How often <see cref="Save"/> was called.</summary>
         public int Saves { get; private set; }
 
         public bool TryGetFloat(string key, out float value) => values.TryGetValue(key, out value);
         public void SetFloat(string key, float value) => values[key] = value;
+        public bool TryGetString(string key, out string value) => texts.TryGetValue(key, out value);
+        public void SetString(string key, string value) => texts[key] = value;
+        public void Remove(string key)
+        {
+            values.Remove(key);
+            texts.Remove(key);
+        }
         public void Save() => Saves++;
-        public bool Has(string key) => values.ContainsKey(key);
+        public bool Has(string key) => values.ContainsKey(key) || texts.ContainsKey(key);
     }
 }

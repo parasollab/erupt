@@ -99,6 +99,45 @@ namespace Erupt.Ui.Tests
                 "Its header is gone from the strip.");
         }
 
+        // A section that needs the room (the ROS address keypad) has the tab to itself for a while.
+        [UnityTest]
+        public IEnumerator OneSection_CanHaveTheTabToItself_AndGiveItBack()
+        {
+            int builtOne = 0, builtTwo = 0;
+            rig.Settings.AddSection("one", column => { builtOne++; UiBuilder.CreateButton("One", column, "One", new Vector2(300f, 56f)); });
+            rig.Settings.AddSection("two", column => { builtTwo++; UiBuilder.CreateButton("Two", column, "Two", new Vector2(300f, 56f)); });
+            yield return null;
+            string[] Shown() => rig.Settings.Tab.Content.GetComponentsInChildren<Button>(true).Select(b => b.name).ToArray();
+            Assert.IsNull(rig.Settings.Showing);
+
+            rig.Settings.ShowOnly("two");
+            yield return null;
+            Assert.AreEqual("two", rig.Settings.Showing);
+            CollectionAssert.AreEqual(new[] { "Two" }, Shown());
+            Assert.AreEqual(1, rig.Settings.InteractiveElementCount);
+            CollectionAssert.AreEqual(new[] { "one", "two" }, rig.Settings.Sections.ToArray(), "The other section is still a section.");
+
+            // Asking again builds nothing again.
+            int before = builtTwo;
+            rig.Settings.ShowOnly("two");
+            Assert.AreEqual(before, builtTwo);
+
+            rig.Settings.ShowOnly(null);
+            yield return null;
+            Assert.IsNull(rig.Settings.Showing);
+            CollectionAssert.AreEqual(new[] { "One", "Two" }, Shown(), "In the order they were added, as before.");
+            Assert.Greater(builtOne, 1);
+
+            // A section that is not there cannot have the tab; one that leaves gives it back.
+            rig.Settings.ShowOnly("nobody");
+            Assert.IsNull(rig.Settings.Showing);
+            rig.Settings.ShowOnly("one");
+            Assert.IsTrue(rig.Settings.RemoveSection("one"));
+            yield return null;
+            Assert.IsNull(rig.Settings.Showing);
+            CollectionAssert.AreEqual(new[] { "Two" }, Shown());
+        }
+
         [UnityTest]
         public IEnumerator RemovingATab_TakesItsHeaderAndContent_AndAnEmptyPanelCloses()
         {

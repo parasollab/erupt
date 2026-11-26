@@ -95,7 +95,9 @@ runs on the same computer.
 
 1. Find your computer's address on the local network.
 2. In Unity, open **Robotics > ROS Settings** and enter that address as the ROS IP address,
-   port 10000. The headset cannot use `127.0.0.1`.
+   port 10000. The headset cannot use `127.0.0.1`. This is the address the app starts with;
+   you can change it later in the headset, without building again, on the panel's
+   [**Settings** tab](using-the-app.md#ros-connection).
 3. Open **File > Build Profiles**, switch to Android, connect the headset, and choose
    **Build And Run**. The app starts in the first scene of the profile's scene list, which
    is `KitchenFR3`.

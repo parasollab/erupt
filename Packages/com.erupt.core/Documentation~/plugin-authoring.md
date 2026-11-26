@@ -217,7 +217,8 @@ it, so every pose you sent in that frame, or made for the old base, is stale:
    person using the app, rather than a part of the task, belongs on the Settings tab, the
    last of the strip: a component contributes a section with
    `TierUiRig.Settings.AddSection(id, column => ...)` and keeps the value through
-   `UserSettings`.
+   `UserSettings` (`GetFloat`, `GetBool`, `GetString` with the default to use until the user
+   sets something, and `Remove` to go back to it).
 3. **An in-world widget** — spatial controls (`ctx.Ui.RegisterWidget`).
 4. **Never** a new menu, a fifth tier 1 control, or a second open panel; the registry throws.
 

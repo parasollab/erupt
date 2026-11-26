@@ -426,7 +426,7 @@ namespace Erupt.App.Desktop.Tests
                 ui.TierThree.Tabs.Select(t => t.Label).ToArray(), "The strip, left to right.");
             yield return Click(OnScreen(PanelButton($"Tab_{SettingsTab.TabId}"), "Settings tab"));
             Assert.AreEqual(SettingsTab.TabId, ui.TierThree.ActiveTab.Id);
-            Assert.AreEqual(3, ui.Settings.InteractiveElementCount, "A switch and two sliders.");
+            Assert.AreEqual(4, ui.Settings.InteractiveElementCount, "Change address for ROS, then a switch and two sliders.");
 
             Slider distance = PanelSlider("CollisionHapticsDistance");
             Slider strength = PanelSlider("CollisionHapticsStrength");

@@ -61,7 +61,8 @@ floor and a table.
 2. Start the ROS side for that robot, as in the [quick start](quick-start.md):
    `ROBOT=ur5e docker compose -f docker/compose.yaml up`.
 3. Open **Robotics > ROS Settings** and set the address of the computer that runs ROS
-   (`127.0.0.1` when it is this one).
+   (`127.0.0.1` when it is this one). The app starts with this address, and the panel's
+   **Settings** tab can [change it](using-the-app.md#ros-connection) while the app runs.
 4. Press Play.
 
 ## What is left for you
