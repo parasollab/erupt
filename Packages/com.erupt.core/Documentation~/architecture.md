@@ -87,7 +87,16 @@ that is there whenever it can work. See the design guidelines, *No modes*.
   collision haptics add theirs (below), so a scene without that component has no such
   controls and no scene wires anything. A value the user sets is kept between sessions
   through `UserSettings` (Erupt.Interaction: `PlayerPrefs` behind `IUserSettingsStore`; tests
-  put a `MemoryUserSettingsStore` there).
+  put a `MemoryUserSettingsStore` there). It holds numbers, switches and text.
+- **The ROS connection section** (`RosConnectionSection`, Erupt.Plugins) is core's own
+  section of that tab. `PluginHost` adds it when the bus has an endpoint it can change
+  (`bus.Endpoint()`) and the scene has a tier UI. It shows where the app connects and
+  whether it is connected, and **Change address** opens a keypad (digits, a dot, **Del**)
+  for an IPv4 address. While the keypad is open it has the tab to itself
+  (`SettingsTab.ShowOnly`); the button that opened it, **Connect**, leaving the tab and
+  closing the panel all put it away. **Connect** checks the entry (`RosAddress.TryParseIPv4`;
+  an entry that is no address is a refusal on the router), saves it and calls
+  `IRosEndpoint.ConnectTo`.
 - **Controls** are built in code by `UiBuilder`: buttons, cycles, toggles, and
   `CreateSlider`, a uGUI `Slider` on one plate that shows "label: value", moves in steps
   when asked and counts as one interactive element. Being uGUI, it is worked by whatever the
@@ -448,6 +457,24 @@ No path moves a joint past its limits, and there is one reason for that:
   connection, and nothing does while the app quits. The bus does not listen to TF on its own
   account, and drops the connector's TF listener when the scene its frame objects lived in is
   unloaded (a tool that wants TF, such as the connector's visualization suite, gets a new one).
+- **The ROS address** is the one the build carries (`Robotics > ROS Settings`, the
+  `ROSConnectionPrefab` resource) unless the user set another in the app. `IRosEndpoint`
+  (Erupt.Ros: `Host`, `Port`, `DefaultHost`, `DefaultPort`, `ConnectTo(host, port)`) is how a
+  bus says where it connects and is sent elsewhere; it is separate from `IRosBus`, so a
+  plugin cannot move the connection, and `bus.Endpoint()` finds it through a robot's
+  namespaced view. `LiveRosBus.ConnectTo` moves the one `ROSConnection`: a connection that
+  is up or still trying is closed and opened at the new address (the connector's
+  `Connect` ends the running connection thread first), and because the object stays, every
+  subscription, publisher, service and action client on it is announced to the new endpoint.
+  Before there is a connection the address is only noted and given to the connection when
+  the bus creates it, ahead of its `Start`. `RosEndpointSetting` keeps the user's address in
+  `UserSettings` together with the built-in endpoint it replaced, and applies it only while
+  the build still carries that endpoint, so changed ROS settings or a new build are not
+  hidden by an address entered earlier. `PluginHost` applies it once, before the first
+  plugin registers. A switch to another address is not an outage in time (the new side may
+  answer within milliseconds), so `MoveItPlugin` also watches the endpoint and treats a
+  change like a first connection: the planning scenes are held back until the connection
+  has settled, then every scene is sent and each robot is resynchronised (`Reconnected`).
 - **Live tests**: `Assets/Erupt.App/Tests/Live` runs the reference scenes against a real ROS 2
   stack (opt-in through `ERUPT_LIVE_ROS`; `Tools/live-tests.sh`), with the scene's FR3 or with
   any shipped robot put in its place (`ERUPT_LIVE_ROBOT`, `ERUPT_LIVE_ARMS`). See its README.

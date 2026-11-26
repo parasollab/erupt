@@ -18,9 +18,12 @@ Unity is not connected to ROS. The Unity console then repeats `Connection to ...
 1. **Is the ROS side running?** In the terminal where you started it, the log should have
    settled. `docker ps` shows the container; `docker compose -f docker/compose.yaml logs erupt`
    shows its log.
-2. **Is the address right?** Open **Robotics > ROS Settings**. In the editor, with Docker on the
-   same computer, the address is `127.0.0.1` and the port 10000. In the headset, the address
-   must be your computer's address on the local network; `127.0.0.1` there means the headset
+2. **Is the address right?** The panel's **Settings** tab shows the address the app uses and
+   whether it is connected, and **Change address** there sets another one while the app runs
+   (see [ROS connection](using-the-app.md#ros-connection)). **Robotics > ROS Settings** in
+   Unity sets the address a build starts with. In the editor, with Docker on the same
+   computer, the address is `127.0.0.1` and the port 10000. In the headset, the address must
+   be your computer's address on the local network; `127.0.0.1` there means the headset
    itself.
 3. **Can the headset reach the computer?** Both must be on the same network, and the
    computer's firewall must let port 10000 through. Guest and university networks often stop

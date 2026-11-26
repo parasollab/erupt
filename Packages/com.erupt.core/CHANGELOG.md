@@ -6,6 +6,27 @@ All notable changes to `com.erupt.core` are documented here. The format follows
 
 ## [Unreleased]
 
+### Added (the ROS address, set while the app runs)
+
+- The Settings tab has a **ROS connection** section (`RosConnectionSection`, added by
+  `PluginHost`; `PluginHost.RosConnectionInSettings` turns it off): where the app connects,
+  whether it is connected, and **Change address**, a keypad for an IPv4 address. The address
+  is used at once and kept on the device (`RosEndpointSetting`); it replaces the address the
+  build carries until that one changes.
+- `IRosEndpoint` (`Host`, `Port`, `DefaultHost`, `DefaultPort`, `ConnectTo`) and
+  `IRosBus.Endpoint()`. `LiveRosBus` implements it by moving its one `ROSConnection`, which
+  keeps every subscription and registration; `FakeRosBus` records the calls.
+- `RosAddress.TryParseIPv4`.
+- `UserSettings.GetString` / `SetString` / `Remove`. **`IUserSettingsStore` gains
+  `TryGetString`, `SetString` and `Remove`**, which a store of your own has to implement.
+- `SettingsTab.ShowOnly(id)` and `Showing`: one section has the tab to itself for a while.
+
+### Changed
+
+- Requires the ROS-TCP-Connector fork at a commit whose `ROSConnection.Connect()` ends a
+  running connection first (`erupt.requires`). With an older one, changing the address
+  while the connection is still trying the old one loses the registrations of every topic.
+
 ### Added (previews on a copy of the robot)
 
 - `RobotGhosts.PlayPreview(trajectory)` / `StopPreview()` / `IsPreviewPlaying`: plays a

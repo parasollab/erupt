@@ -23,7 +23,7 @@ Controls live in three places, called tiers. Nothing else in the app is a menu.
     robot's joints
   - **MTC**: the pick-and-place recorder, the stage tree and the best solutions
   - **Demonstrations**: record, replay and publish
-  - **Settings**: the collision haptics (see below)
+  - **Settings**: the ROS address and the collision haptics (see below)
 
   A tab is there only when its module is: without the MTC package there is no MTC tab, and
   the same goes for the actions a module adds to the menus.
@@ -64,8 +64,8 @@ Tier 3, the panel, tab by tab:
       <figcaption><strong>Demonstrations.</strong> <strong>Replay</strong> and <strong>Publish</strong> are greyed out until something is recorded.</figcaption>
     </figure>
     <figure>
-      <img width="1055" height="750" src="../images/panel-settings.webp" alt="The Settings tab: Collision haptics on, a Strength slider at 100 %, a Distance slider at 30 cm." loading="lazy">
-      <figcaption><strong>Settings.</strong> The collision haptics, described <a href="#collision-haptics">below</a>.</figcaption>
+      <img width="1055" height="750" src="../images/panel-settings.webp" alt="The Settings tab: Connected to ROS at 192.168.1.20:10000, Change address, Collision haptics on, a Strength slider at 100 %, a Distance slider at 30 cm." loading="lazy">
+      <figcaption><strong>Settings.</strong> The <a href="#ros-connection">ROS connection</a> and the <a href="#collision-haptics">collision haptics</a>, both described below.</figcaption>
     </figure>
   </div>
 </fieldset>
@@ -160,6 +160,29 @@ the closer it gets. The panel's **Settings** tab changes this while you use the 
 | **Distance** | How close the end effector has to come before the pulses start, from 5 to 50 cm |
 
 The settings are remembered the next time you start the app.
+
+## ROS connection
+
+The **Settings** tab also says where the app connects and whether it is connected, for
+example `Connected to ROS at 192.168.1.48:10000`. A build starts with the address set in
+Unity under **Robotics > ROS Settings**. To use another one without building again:
+
+1. Press **Change address**. A keypad takes the place of the other settings, with the
+   address in use already entered.
+2. Correct it with the keys; **Del** removes the last character. The address is an IPv4
+   address, four numbers from 0 to 255 such as `192.168.1.20`. The port is not changed.
+3. Press **Connect**. The app closes its connection and connects to the new address at
+   once, and the obstacles and each robot's state are sent to the ROS side there. **Cancel**
+   puts the keypad away without changing anything, and so does leaving the tab.
+
+An entry that is not an address is refused with a short message at the keypad.
+
+![The Settings tab with the keypad open: the line Connected to ROS at 192.168.1.20:10000, Cancel, the entry 192.168.1.35, the keys 1 to 9, dot, 0 and Del, and Connect.](../images/panel-settings-address.webp)
+
+The address is remembered on that device the next time you start the app. It replaces the
+built-in address only for as long as the build still carries that address: after you change
+**ROS Settings** in Unity or install a build with another address, the app uses the new
+built-in address. Entering the built-in address on the keypad goes back to it as well.
 
 ## In the Unity editor, without a headset
 

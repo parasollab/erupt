@@ -5,6 +5,14 @@ All notable changes to `com.erupt.plugin.moveit` are documented here. The format
 
 ## [Unreleased]
 
+### Changed (the ROS address can change while the app runs)
+
+- When the user sends the connection to another ROS address (the Settings tab,
+  `IRosEndpoint.ConnectTo`), the plugin treats the new side as a first connection: the
+  planning scenes are held back until the connection has settled, then every robot's scene
+  is sent and each session resynchronises (`Reconnected` fires). Before, only an outage of
+  more than 1.5 s did that, and a ROS side that answered at once was told nothing.
+
 ### Changed (the preview plays on a copy of the robot)
 
 - **A plan's preview plays on a blue translucent copy of the robot**, in a loop, and the robot

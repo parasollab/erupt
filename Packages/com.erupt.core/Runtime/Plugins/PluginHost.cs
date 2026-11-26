@@ -38,9 +38,14 @@ namespace Erupt.Plugins
         [Tooltip("Register every EruptPluginBehaviour in the scene on Start (inactive objects included).")]
         [SerializeField] private bool discoverInScene = true;
 
+        [Tooltip("Show the ROS address on the Settings tab, with a keypad to change it while the app runs.")]
+        [SerializeField] private bool rosConnectionInSettings = true;
+
         private readonly List<IEruptPlugin> registered = new();
         private IEruptContext context;
         private bool started;
+        private bool savedEndpointApplied;
+        private RosConnectionSection rosConnection;
 
         public IEruptContext Context => context;
 
@@ -50,6 +55,20 @@ namespace Erupt.Plugins
             get => discoverInScene;
             set => discoverInScene = value;
         }
+
+        /// <summary>
+        /// Whether the Settings tab gets the "ROS connection" section (the address and the keypad
+        /// to change it). Set before Start.
+        /// </summary>
+        public bool RosConnectionInSettings
+        {
+            get => rosConnectionInSettings;
+            set => rosConnectionInSettings = value;
+        }
+
+        /// <summary>The "ROS connection" section of the Settings tab, when the host put one there.</summary>
+        public RosConnectionSection RosConnection => rosConnection;
+
         /// <summary>Plugins in registration (dependency) order.</summary>
         public IReadOnlyList<IEruptPlugin> Plugins => registered;
 
@@ -75,7 +94,8 @@ namespace Erupt.Plugins
         private void Start()
         {
             started = true;
-            context ??= BuildContext();
+            EnsureContext();
+            ShowRosConnection();
 
             // The gripper belongs to the core robot, not to a plugin. Bound once: it acts on
             // the robot the selected object belongs to, and a robot without a gripper answers
@@ -134,7 +154,7 @@ namespace Erupt.Plugins
         /// </summary>
         public void RegisterAll(IEnumerable<IEruptPlugin> plugins)
         {
-            context ??= BuildContext();
+            EnsureContext();
             var ordered = Order(plugins.ToList(), registered.Select(p => p.Id));
             foreach (var plugin in ordered) RegisterOne(plugin);
         }
@@ -232,6 +252,27 @@ namespace Erupt.Plugins
                 throw new PluginDependencyException($"Plugin dependency cycle among [{string.Join(", ", stuck)}].");
             }
             return ordered;
+        }
+
+        // The context, and with it the ROS address the user set on this device: applied once,
+        // before the first plugin registers, so the connection its first subscription creates
+        // starts at that address and not at the one the build carries.
+        private void EnsureContext()
+        {
+            context ??= BuildContext();
+            if (savedEndpointApplied) return;
+            savedEndpointApplied = true;
+            RosEndpointSetting.ApplySaved(context.Ros?.Endpoint());
+        }
+
+        // Core's own section of the Settings tab. Like a component's setting it is there only
+        // when it can do something: with a tier UI, and a bus whose endpoint can be changed.
+        private void ShowRosConnection()
+        {
+            if (!rosConnectionInSettings || rosConnection != null) return;
+            if (!(context.Ui is TierUiRig rig) || context.Ros?.Endpoint() == null) return;
+            rosConnection = gameObject.AddComponent<RosConnectionSection>();
+            rosConnection.Show(context.Ros, rig, context.Router);
         }
 
         private IEruptContext BuildContext()

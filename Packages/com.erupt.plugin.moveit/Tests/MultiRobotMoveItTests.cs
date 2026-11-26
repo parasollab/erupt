@@ -271,5 +271,47 @@ namespace Erupt.Plugins.MoveIt.Tests
                 FakeRobots.DestroyAll(busless);
             }
         }
+
+        // The user sends the connection to another computer (the Settings tab). It answers at
+        // once, so there is no outage to notice, and it has been told nothing: every robot's
+        // planning scene gets the environment again.
+        [UnityTest]
+        public IEnumerator AnotherRosAddress_GetsTheEnvironment_ForEveryRobot()
+        {
+            GameObject crate = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            try
+            {
+                var publisher = crate.AddComponent<CollisionObjectPublisher>();
+                publisher.objectId = "crate";
+                publisher.publishRateHz = 100f;
+                yield return new WaitForSeconds(0.1f);
+                foreach (string ns in FakeRobots.ThreeIds)
+                    Assert.AreEqual(1, bus.CountOn($"/{ns}/collision_object"), $"'{ns}' was told about the crate once.");
+
+                int reconnects = 0;
+                plugin.Reconnected += () => reconnects++;
+                yield return new WaitForSecondsRealtime(0.5f);
+                Assert.AreEqual(0, reconnects, "Nothing is sent again while the address stays.");
+                bus.Clear();
+
+                bus.ConnectTo("10.0.0.7", bus.Port);
+                yield return null;
+                Assert.AreEqual(0, bus.Publishes.Count, "Not in the first moment: the connection has yet to register its topics there.");
+                yield return new WaitForSecondsRealtime(0.5f);
+
+                Assert.AreEqual(1, reconnects, "The plugin brought the new ROS side up to date, once.");
+                foreach (string ns in FakeRobots.ThreeIds)
+                {
+                    var sent = bus.PublishedOn($"/{ns}/collision_object").Cast<CollisionObjectMsg>().ToList();
+                    Assert.GreaterOrEqual(sent.Count, 1, $"'{ns}' at the new address is told about the crate.");
+                    Assert.AreEqual(CollisionObjectMsg.ADD, sent[0].operation);
+                    Assert.AreEqual("crate", sent[0].id);
+                }
+            }
+            finally
+            {
+                Object.DestroyImmediate(crate);
+            }
+        }
     }
 }

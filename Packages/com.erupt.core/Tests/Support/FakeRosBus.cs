@@ -11,7 +11,7 @@ namespace Erupt.Ros.Tests
     /// In-memory ROS transport. Records everything published and lets a test inject
     /// inbound messages, so the five core flows can be exercised without a TCP endpoint.
     /// </summary>
-    public sealed class FakeRosBus : IRosBus
+    public sealed class FakeRosBus : IRosBus, IRosEndpoint
     {
         public sealed class Published
         {
@@ -40,6 +40,27 @@ namespace Erupt.Ros.Tests
         public bool HasConnectionThread { get; set; } = true;
 
         public bool HasConnectionError { get; set; } = false;
+
+        // --- IRosEndpoint: where the bus says it connects, and what it was asked to change to ---
+
+        public string Host { get; set; } = "127.0.0.1";
+
+        public int Port { get; set; } = 10000;
+
+        /// <summary>The address "the build carries"; a test sets it to stand for ROS Settings.</summary>
+        public string DefaultHost { get; set; } = "127.0.0.1";
+
+        public int DefaultPort { get; set; } = 10000;
+
+        /// <summary>Every <see cref="ConnectTo"/>, in order.</summary>
+        public readonly List<(string host, int port)> ConnectCalls = new();
+
+        public void ConnectTo(string host, int port)
+        {
+            ConnectCalls.Add((host, port));
+            Host = host;
+            Port = port;
+        }
 
         public void Subscribe<T>(string topic, Action<T> callback) where T : Message
         {

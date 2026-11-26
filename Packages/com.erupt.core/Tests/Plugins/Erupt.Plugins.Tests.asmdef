@@ -9,6 +9,7 @@
         "Erupt.Robot",
         "Erupt.Environment",
         "Erupt.TestSupport",
+        "Unity.Robotics.ROSTCPConnector",
         "Unity.Robotics.ROSTCPConnector.Messages",
         "Unity.Robotics.ROSTCPConnector.MessageGeneration",
         "UnityEngine.TestRunner",

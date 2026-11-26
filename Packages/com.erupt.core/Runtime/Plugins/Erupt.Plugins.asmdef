@@ -10,7 +10,8 @@
         "Unity.Robotics.ROSTCPConnector",
         "Unity.Robotics.ROSTCPConnector.MessageGeneration",
         "Unity.Robotics.ROSTCPConnector.Messages",
-        "UnityEngine.UI"
+        "UnityEngine.UI",
+        "Unity.TextMeshPro"
     ],
     "includePlatforms": [
         "Android",

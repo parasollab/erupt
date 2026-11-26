@@ -26,7 +26,7 @@
     "requires": [
       {
         "name": "com.unity.robotics.ros-tcp-connector",
-        "source": "https://github.com/parasollab/ROS-TCP-Connector.git?path=/com.unity.robotics.ros-tcp-connector#3705ada03b179a38b8faffe42a555702e3b06576",
+        "source": "https://github.com/parasollab/ROS-TCP-Connector.git?path=/com.unity.robotics.ros-tcp-connector#a1599a11c0064fd47dc632fcbf2dbfc304a29eb4",
         "reason": "the ROS 2 transport"
       },
       {

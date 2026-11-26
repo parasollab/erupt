@@ -135,6 +135,7 @@ namespace Erupt.Plugins.MoveIt
             // Before the first object reports itself: is there anyone to send it to yet?
             linkOpen = linkWasEverClosed = linkOpenedOnce = false;
             onlineSince = offlineSince = -1f;
+            linkHost = null;
             WatchConnection();
             sessions = new RobotSessions<MoveItRobotSession>(robots, CreateSession, DisposeSession);
 
@@ -199,6 +200,9 @@ namespace Erupt.Plugins.MoveIt
         private const float SettleSeconds = 0.3f;
         private bool linkOpen, linkWasEverClosed, linkOpenedOnce;
         private float onlineSince = -1f, offlineSince = -1f;
+        // Where the connection goes, to notice when the user sends it somewhere else.
+        private string linkHost;
+        private int linkPort;
 
         /// <summary>Fires after the plugin has resynchronised with ROS: at the first connection of a start without ROS, and after an outage.</summary>
         public event Action Reconnected;
@@ -208,11 +212,30 @@ namespace Erupt.Plugins.MoveIt
         // knew. While the endpoint is away nothing is sent to the planning scenes (the objects
         // wait); when it is there, and was away at the start or for longer than a hiccup, every
         // planning scene is brought up to date.
+        //
+        // The user can also send the connection to another address (the Settings tab). That is
+        // another ROS side, which has been told nothing, however quickly it answers: it gets
+        // everything, as at a first connection.
         private void WatchConnection()
         {
             IRosBus bus = Context?.Ros;
             if (bus == null || scene == null) return;
             float now = Time.realtimeSinceStartup;
+            IRosEndpoint endpoint = bus.Endpoint();
+            if (endpoint != null)
+            {
+                string host = endpoint.Host;
+                int port = endpoint.Port;
+                if (linkHost != null && (port != linkPort || host != linkHost))
+                {
+                    linkOpen = linkOpenedOnce = false;
+                    linkWasEverClosed = true;
+                    onlineSince = offlineSince = -1f;
+                    scene.Suspended = true;
+                }
+                linkHost = host;
+                linkPort = port;
+            }
             if (!bus.HasConnectionThread || bus.HasConnectionError)
             {
                 if (offlineSince < 0f) offlineSince = now;
